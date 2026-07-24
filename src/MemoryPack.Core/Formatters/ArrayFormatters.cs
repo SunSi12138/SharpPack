@@ -19,6 +19,9 @@ namespace MemoryPack.Formatters
     public sealed class UnmanagedArrayFormatter<T> : MemoryPackFormatter<T[]>
             where T : unmanaged
     {
+        internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+            => graph.HasFormatterOverride<T>();
+
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref T[]? value)
         {
@@ -35,6 +38,9 @@ namespace MemoryPack.Formatters
     [Preserve]
     public sealed class DangerousUnmanagedArrayFormatter<T> : MemoryPackFormatter<T[]>
     {
+        internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+            => graph.HasFormatterOverride<T>();
+
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref T[]? value)
         {
@@ -51,6 +57,9 @@ namespace MemoryPack.Formatters
     [Preserve]
     public sealed class ArrayFormatter<T> : MemoryPackFormatter<T?[]>
     {
+        internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+            => graph.HasFormatterOverride<T>();
+
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref T?[]? value)
         {
@@ -67,6 +76,9 @@ namespace MemoryPack.Formatters
     [Preserve]
     public sealed class ArraySegmentFormatter<T> : MemoryPackFormatter<ArraySegment<T?>>
     {
+        internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+            => graph.HasFormatterOverride<T>();
+
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref ArraySegment<T?> value)
         {
@@ -84,6 +96,9 @@ namespace MemoryPack.Formatters
     [Preserve]
     public sealed class MemoryFormatter<T> : MemoryPackFormatter<Memory<T?>>
     {
+        internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+            => graph.HasFormatterOverride<T>();
+
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref Memory<T?> value)
         {
@@ -100,6 +115,9 @@ namespace MemoryPack.Formatters
     [Preserve]
     public sealed class ReadOnlyMemoryFormatter<T> : MemoryPackFormatter<ReadOnlyMemory<T?>>
     {
+        internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+            => graph.HasFormatterOverride<T>();
+
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref ReadOnlyMemory<T?> value)
         {
@@ -116,6 +134,9 @@ namespace MemoryPack.Formatters
     [Preserve]
     public sealed class ReadOnlySequenceFormatter<T> : MemoryPackFormatter<ReadOnlySequence<T?>>
     {
+        internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+            => graph.HasFormatterOverride<T>();
+
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref ReadOnlySequence<T?> value)
         {

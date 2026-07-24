@@ -16,6 +16,9 @@ public interface IMemoryPackFormatter<T>
 [Preserve]
 public abstract class MemoryPackFormatter<T> : IMemoryPackFormatter<T>
 {
+    internal virtual bool HasFormatterOverrideDependency(FormatterGraph graph)
+        => false;
+
     [Preserve]
     public abstract void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref T? value)
         where TBufferWriter : IBufferWriter<byte>;

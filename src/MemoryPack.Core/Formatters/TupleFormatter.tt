@@ -14,6 +14,10 @@
         " || ",
         Enumerable.Range(1, i).Select(x =>
             $"{state}.HasFormatterOverride<{TOrRest(x)}>()"));
+    string HasGraphOverride(int i) => string.Join(
+        " || ",
+        Enumerable.Range(1, i).Select(x =>
+            $"graph.HasFormatterOverride<{TOrRest(x)}>()"));
 #>
 using MemoryPack.Internal;
 
@@ -69,6 +73,9 @@ public sealed class ValueTupleFormatter<<#= CreateT(i) #>> : MemoryPackFormatter
     where TRest : struct
 <# } #>
 {
+    internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+        => <#= HasGraphOverride(i) #>;
+
     [Preserve]
     public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref ValueTuple<<#= CreateTNull(i) #>> value)
     {

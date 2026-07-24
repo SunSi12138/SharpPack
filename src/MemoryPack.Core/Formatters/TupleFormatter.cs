@@ -327,6 +327,9 @@ public sealed class TupleFormatter<T1, T2, T3, T4, T5, T6, T7, TRest> : MemoryPa
 [Preserve]
 public sealed class ValueTupleFormatter<T1> : MemoryPackFormatter<ValueTuple<T1?>>
 {
+    internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+        => graph.HasFormatterOverride<T1>();
+
     [Preserve]
     public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref ValueTuple<T1?> value)
     {
@@ -359,6 +362,10 @@ public sealed class ValueTupleFormatter<T1> : MemoryPackFormatter<ValueTuple<T1?
 [Preserve]
 public sealed class ValueTupleFormatter<T1, T2> : MemoryPackFormatter<ValueTuple<T1?, T2?>>
 {
+    internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+        => graph.HasFormatterOverride<T1>() ||
+           graph.HasFormatterOverride<T2>();
+
     [Preserve]
     public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref ValueTuple<T1?, T2?> value)
     {
@@ -395,6 +402,11 @@ public sealed class ValueTupleFormatter<T1, T2> : MemoryPackFormatter<ValueTuple
 [Preserve]
 public sealed class ValueTupleFormatter<T1, T2, T3> : MemoryPackFormatter<ValueTuple<T1?, T2?, T3?>>
 {
+    internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+        => graph.HasFormatterOverride<T1>() ||
+           graph.HasFormatterOverride<T2>() ||
+           graph.HasFormatterOverride<T3>();
+
     [Preserve]
     public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref ValueTuple<T1?, T2?, T3?> value)
     {
@@ -435,6 +447,12 @@ public sealed class ValueTupleFormatter<T1, T2, T3> : MemoryPackFormatter<ValueT
 [Preserve]
 public sealed class ValueTupleFormatter<T1, T2, T3, T4> : MemoryPackFormatter<ValueTuple<T1?, T2?, T3?, T4?>>
 {
+    internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+        => graph.HasFormatterOverride<T1>() ||
+           graph.HasFormatterOverride<T2>() ||
+           graph.HasFormatterOverride<T3>() ||
+           graph.HasFormatterOverride<T4>();
+
     [Preserve]
     public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref ValueTuple<T1?, T2?, T3?, T4?> value)
     {
@@ -479,6 +497,13 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4> : MemoryPackFormatter<Va
 [Preserve]
 public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5> : MemoryPackFormatter<ValueTuple<T1?, T2?, T3?, T4?, T5?>>
 {
+    internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+        => graph.HasFormatterOverride<T1>() ||
+           graph.HasFormatterOverride<T2>() ||
+           graph.HasFormatterOverride<T3>() ||
+           graph.HasFormatterOverride<T4>() ||
+           graph.HasFormatterOverride<T5>();
+
     [Preserve]
     public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref ValueTuple<T1?, T2?, T3?, T4?, T5?> value)
     {
@@ -527,6 +552,14 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5> : MemoryPackFormatte
 [Preserve]
 public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5, T6> : MemoryPackFormatter<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?>>
 {
+    internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+        => graph.HasFormatterOverride<T1>() ||
+           graph.HasFormatterOverride<T2>() ||
+           graph.HasFormatterOverride<T3>() ||
+           graph.HasFormatterOverride<T4>() ||
+           graph.HasFormatterOverride<T5>() ||
+           graph.HasFormatterOverride<T6>();
+
     [Preserve]
     public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?> value)
     {
@@ -579,6 +612,15 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5, T6> : MemoryPackForm
 [Preserve]
 public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5, T6, T7> : MemoryPackFormatter<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?>>
 {
+    internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+        => graph.HasFormatterOverride<T1>() ||
+           graph.HasFormatterOverride<T2>() ||
+           graph.HasFormatterOverride<T3>() ||
+           graph.HasFormatterOverride<T4>() ||
+           graph.HasFormatterOverride<T5>() ||
+           graph.HasFormatterOverride<T6>() ||
+           graph.HasFormatterOverride<T7>();
+
     [Preserve]
     public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?> value)
     {
@@ -636,6 +678,16 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5, T6, T7> : MemoryPack
 public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5, T6, T7, TRest> : MemoryPackFormatter<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?, TRest>>
     where TRest : struct
 {
+    internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+        => graph.HasFormatterOverride<T1>() ||
+           graph.HasFormatterOverride<T2>() ||
+           graph.HasFormatterOverride<T3>() ||
+           graph.HasFormatterOverride<T4>() ||
+           graph.HasFormatterOverride<T5>() ||
+           graph.HasFormatterOverride<T6>() ||
+           graph.HasFormatterOverride<T7>() ||
+           graph.HasFormatterOverride<TRest>();
+
     [Preserve]
     public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?, TRest> value)
     {

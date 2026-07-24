@@ -106,7 +106,7 @@ public sealed class MemoryPackWriterOptionalState : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool HasFormatterOverride<T>()
         => FormatterGraph is { } graph &&
-           graph.HasExplicitRegistration<T>();
+           graph.HasFormatterOverride<T>();
 
     internal MemoryPackWriterOptionalState()
     {

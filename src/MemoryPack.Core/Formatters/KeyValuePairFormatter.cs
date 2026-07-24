@@ -51,6 +51,10 @@ public static class KeyValuePairFormatter
 [Preserve]
 public sealed class KeyValuePairFormatter<TKey, TValue> : MemoryPackFormatter<KeyValuePair<TKey?, TValue?>>
 {
+    internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+        => graph.HasFormatterOverride<TKey>() ||
+           graph.HasFormatterOverride<TValue>();
+
     [Preserve]
     public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref KeyValuePair<TKey?, TValue?> value)
     {

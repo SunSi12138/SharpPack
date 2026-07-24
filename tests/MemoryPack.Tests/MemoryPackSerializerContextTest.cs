@@ -295,6 +295,114 @@ public class MemoryPackSerializerContextTest
     }
 
     [Fact]
+    public void PrimitiveRegistration_PropagatesThroughNullableCompositeShapes()
+    {
+        var context = new MemoryPackSerializerContextBuilder()
+            .Register(new VarIntIntFormatter())
+            .Build();
+        int?[] array = [1, null, 30_000];
+        var pair = new KeyValuePair<int?, int?>(200, 30_000);
+        var tuple = ((int?)200, (int?)30_000);
+
+        var arrayPayload = MemoryPackSerializer.Serialize(array, context);
+        arrayPayload.Should().NotEqual(MemoryPackSerializer.Serialize(array));
+        MemoryPackSerializer.Deserialize<int?[]>(arrayPayload, context)
+            .Should().Equal(array);
+
+        var pairPayload = MemoryPackSerializer.Serialize(pair, context);
+        pairPayload.Should().NotEqual(MemoryPackSerializer.Serialize(pair));
+        MemoryPackSerializer.Deserialize<KeyValuePair<int?, int?>>(
+            pairPayload,
+            context).Should().Be(pair);
+
+        var tuplePayload = MemoryPackSerializer.Serialize(tuple, context);
+        tuplePayload.Should().NotEqual(MemoryPackSerializer.Serialize(tuple));
+        MemoryPackSerializer.Deserialize<(int?, int?)>(tuplePayload, context)
+            .Should().Be(tuple);
+    }
+
+    [Fact]
+    public void ExactArrayRegistration_PropagatesThroughGeneratedShapes()
+    {
+        var context = new MemoryPackSerializerContextBuilder()
+            .Register(new VarIntIntArrayFormatter())
+            .Build();
+        var values = new[] { 1, 200, 30_000 };
+        var objectValue = new ContextIntArrayContainer { Values = values };
+        var versionTolerantValue = new ContextVersionTolerantIntArray
+        {
+            Values = values,
+            Tail = "tail",
+        };
+
+        AssertContextPayloadRoundTrip(values, context);
+        AssertContextPayloadRoundTrip(objectValue, context);
+        AssertContextPayloadRoundTrip(versionTolerantValue, context);
+    }
+
+    [Fact]
+    public void PrimitiveRegistration_PropagatesThroughGeneratedCompositeMembers()
+    {
+        var context = new MemoryPackSerializerContextBuilder()
+            .Register(new VarIntIntFormatter())
+            .Build();
+        var objectValue = new ContextCompositeScalars
+        {
+            Pair = new KeyValuePair<int, int>(200, 30_000),
+            Tuple = (4_000_000, 1),
+        };
+        var versionTolerantValue = new ContextVersionTolerantCompositeScalars
+        {
+            Pair = new KeyValuePair<int, int>(1, 4_000_000),
+            Tuple = (200, 30_000),
+        };
+
+        AssertContextPayloadRoundTrip(objectValue, context);
+        AssertContextPayloadRoundTrip(versionTolerantValue, context);
+    }
+
+    [Fact]
+    public void StringRegistration_PropagatesThroughGeneratedShapes()
+    {
+        var context = new MemoryPackSerializerContextBuilder()
+            .Register(new PrefixStringFormatter())
+            .Build();
+        var objectValue = new ContextStringContainer { Value = "object" };
+        var versionTolerantValue = new ContextVersionTolerantStringContainer
+        {
+            Value = "version-tolerant",
+        };
+
+        AssertContextPayloadRoundTrip("root", context);
+        AssertContextPayloadRoundTrip(objectValue, context);
+        AssertContextPayloadRoundTrip(versionTolerantValue, context);
+    }
+
+    [Fact]
+    public void PrimitiveRegistration_PropagatesThroughValueTupleRest()
+    {
+        var context = new MemoryPackSerializerContextBuilder()
+            .Register(new VarIntIntFormatter())
+            .Build();
+        var value = (
+            1L,
+            2L,
+            3L,
+            4L,
+            5L,
+            6L,
+            7L,
+            30_000);
+
+        var payload = MemoryPackSerializer.Serialize(value, context);
+        payload.Should().NotEqual(MemoryPackSerializer.Serialize(value));
+        MemoryPackSerializer.Deserialize<
+            (long, long, long, long, long, long, long, int)>(
+                payload,
+                context).Should().Be(value);
+    }
+
+    [Fact]
     public void UnrelatedRegistration_PreservesBulkCollectionFastPathWireFormat()
     {
         var context = new MemoryPackSerializerContextBuilder()
@@ -512,6 +620,36 @@ public partial class ContextCircularScalars
     public int Second { get; set; }
 }
 
+[MemoryPackable]
+public partial class ContextCompositeScalars
+{
+    public KeyValuePair<int, int> Pair { get; set; }
+    public (int First, int Second) Tuple { get; set; }
+}
+
+[MemoryPackable(GenerateType.VersionTolerant)]
+public partial class ContextVersionTolerantCompositeScalars
+{
+    [MemoryPackOrder(0)]
+    public KeyValuePair<int, int> Pair { get; set; }
+
+    [MemoryPackOrder(1)]
+    public (int First, int Second) Tuple { get; set; }
+}
+
+[MemoryPackable]
+public partial class ContextStringContainer
+{
+    public string? Value { get; set; }
+}
+
+[MemoryPackable(GenerateType.VersionTolerant)]
+public partial class ContextVersionTolerantStringContainer
+{
+    [MemoryPackOrder(0)]
+    public string? Value { get; set; }
+}
+
 public sealed class ContextCustomValue
 {
     public int Value { get; set; }
@@ -571,6 +709,71 @@ public sealed class VarIntIntFormatter : MemoryPackFormatter<int>
 
     public override void Deserialize(ref MemoryPackReader reader, scoped ref int value)
         => value = reader.ReadVarIntInt32();
+}
+
+public sealed class VarIntIntArrayFormatter : MemoryPackFormatter<int[]>
+{
+    public override void Serialize<TBufferWriter>(
+        ref MemoryPackWriter<TBufferWriter> writer,
+        scoped ref int[]? value)
+    {
+        if (value is null)
+        {
+            writer.WriteNullCollectionHeader();
+            return;
+        }
+
+        writer.WriteCollectionHeader(value.Length);
+        foreach (var item in value)
+        {
+            writer.WriteVarInt(item);
+        }
+    }
+
+    public override void Deserialize(
+        ref MemoryPackReader reader,
+        scoped ref int[]? value)
+    {
+        if (!reader.TryReadCollectionHeader(out var length))
+        {
+            value = null;
+            return;
+        }
+
+        value = new int[length];
+        for (var index = 0; index < length; index++)
+        {
+            value[index] = reader.ReadVarIntInt32();
+        }
+    }
+}
+
+public sealed class PrefixStringFormatter : MemoryPackFormatter<string>
+{
+    const string Prefix = "context:";
+
+    public override void Serialize<TBufferWriter>(
+        ref MemoryPackWriter<TBufferWriter> writer,
+        scoped ref string? value)
+        => writer.WriteString(value is null ? null : Prefix + value);
+
+    public override void Deserialize(
+        ref MemoryPackReader reader,
+        scoped ref string? value)
+    {
+        var encoded = reader.ReadString();
+        if (encoded is null)
+        {
+            value = null;
+            return;
+        }
+        if (!encoded.StartsWith(Prefix, StringComparison.Ordinal))
+        {
+            throw new MemoryPackSerializationException(
+                "The context string prefix is missing.");
+        }
+        value = encoded[Prefix.Length..];
+    }
 }
 
 public sealed class StandardTypeOneOffsetFormatter(int offset)

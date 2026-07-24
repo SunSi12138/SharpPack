@@ -37,6 +37,10 @@ internal sealed class FormatterGraph
     internal bool HasExplicitRegistration<T>()
         => ContextFormatterSlot<T>.HasExplicitRegistration(this);
 
+    internal bool HasFormatterOverride<T>()
+        => HasExplicitRegistration<T>() ||
+           GetFormatter<T>().HasFormatterOverrideDependency(this);
+
     internal void FreezeRegistrations()
         => registrationsFrozen = true;
 }

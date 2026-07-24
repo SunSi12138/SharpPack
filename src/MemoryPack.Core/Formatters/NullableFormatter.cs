@@ -10,6 +10,9 @@ public sealed class NullableFormatter<T> : MemoryPackFormatter<T?>
     // Nullable<T> is sometimes serialized on UnmanagedFormatter.
     // to keep same result, check if type is unmanaged.
 
+    internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+        => graph.HasFormatterOverride<T>();
+
     [Preserve]
     public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref T? value)
     {

@@ -1049,20 +1049,11 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
         var types = new List<ITypeSymbol>();
         foreach (var member in Members)
         {
-            switch (member.Kind)
+            if (member.Kind is MemberKind.Blank or MemberKind.CustomFormatter)
             {
-                case MemberKind.Unmanaged:
-                case MemberKind.Enum:
-                    types.Add(member.MemberType);
-                    break;
-                case MemberKind.UnmanagedNullable:
-                    types.Add(member.MemberType);
-                    types.Add(((INamedTypeSymbol)member.MemberType).TypeArguments[0]);
-                    break;
-                case MemberKind.UnmanagedArray:
-                    types.Add(((IArrayTypeSymbol)member.MemberType).ElementType);
-                    break;
+                continue;
             }
+            AddTypeAndDependencies(member.MemberType);
         }
 
         var registrations = types
@@ -1076,6 +1067,28 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
         return registrationCondition.Length == 0
             ? ""
             : $"{readerOrWriter}.OptionalState.HasFormatterOverrides && ({registrationCondition})";
+
+        void AddTypeAndDependencies(ITypeSymbol type)
+        {
+            types.Add(type);
+            if (type is IArrayTypeSymbol array)
+            {
+                AddTypeAndDependencies(array.ElementType);
+                return;
+            }
+
+            if (type is not INamedTypeSymbol named ||
+                !named.IsGenericType ||
+                !reference.KnownTypes.Contains(named))
+            {
+                return;
+            }
+
+            foreach (var argument in named.TypeArguments)
+            {
+                AddTypeAndDependencies(argument);
+            }
+        }
     }
 
     string EmitReadRefDeserializeMembers(
@@ -1528,19 +1541,21 @@ public partial class MemberMeta
         string writer,
         bool honorFormatterOverrides = false)
     {
+        if (honorFormatterOverrides &&
+            Kind is not MemberKind.Blank and not MemberKind.CustomFormatter)
+        {
+            return $"{writer}.WriteValue(value.@{Name});";
+        }
+
         switch (Kind)
         {
             case MemberKind.MemoryPackable:
                 return $"{writer}.WritePackable(value.@{Name});";
             case MemberKind.Unmanaged:
             case MemberKind.Enum:
-                return honorFormatterOverrides
-                    ? $"{writer}.WriteValue(value.@{Name});"
-                    : $"{writer}.WriteUnmanaged(value.@{Name});";
+                return $"{writer}.WriteUnmanaged(value.@{Name});";
             case MemberKind.UnmanagedNullable:
-                return honorFormatterOverrides
-                    ? $"{writer}.WriteValue(value.@{Name});"
-                    : $"{writer}.DangerousWriteUnmanaged(value.@{Name});";
+                return $"{writer}.DangerousWriteUnmanaged(value.@{Name});";
             case MemberKind.String:
                 return $"{writer}.WriteString(value.@{Name});";
             case MemberKind.UnmanagedArray:
@@ -1592,19 +1607,21 @@ public partial class MemberMeta
             ? $"if (deltas[{i}] == 0) {equalDefault} else "
             : "";
 
+        if (honorFormatterOverrides &&
+            Kind is not MemberKind.Blank and not MemberKind.CustomFormatter)
+        {
+            return $"{pre}__{Name} = reader.ReadValue<{MemberType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>();";
+        }
+
         switch (Kind)
         {
             case MemberKind.MemoryPackable:
                 return $"{pre}__{Name} = reader.ReadPackable<{MemberType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>();";
             case MemberKind.Unmanaged:
             case MemberKind.Enum:
-                return honorFormatterOverrides
-                    ? $"{pre}__{Name} = reader.ReadValue<{MemberType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>();"
-                    : $"{pre}reader.ReadUnmanaged(out __{Name});";
+                return $"{pre}reader.ReadUnmanaged(out __{Name});";
             case MemberKind.UnmanagedNullable:
-                return honorFormatterOverrides
-                    ? $"{pre}__{Name} = reader.ReadValue<{MemberType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>();"
-                    : $"{pre}reader.DangerousReadUnmanaged(out __{Name});";
+                return $"{pre}reader.DangerousReadUnmanaged(out __{Name});";
             case MemberKind.String:
                 return $"{pre}__{Name} = reader.ReadString();";
             case MemberKind.UnmanagedArray:
@@ -1636,19 +1653,21 @@ public partial class MemberMeta
             ? $"if (deltas[{i}] != 0) "
             : "";
 
+        if (honorFormatterOverrides &&
+            Kind is not MemberKind.Blank and not MemberKind.CustomFormatter)
+        {
+            return $"{pre}reader.ReadValue(ref __{Name});";
+        }
+
         switch (Kind)
         {
             case MemberKind.MemoryPackable:
                 return $"{pre}reader.ReadPackable(ref __{Name});";
             case MemberKind.Unmanaged:
             case MemberKind.Enum:
-                return honorFormatterOverrides
-                    ? $"{pre}reader.ReadValue(ref __{Name});"
-                    : $"{pre}reader.ReadUnmanaged(out __{Name});";
+                return $"{pre}reader.ReadUnmanaged(out __{Name});";
             case MemberKind.UnmanagedNullable:
-                return honorFormatterOverrides
-                    ? $"{pre}reader.ReadValue(ref __{Name});"
-                    : $"{pre}reader.DangerousReadUnmanaged(out __{Name});";
+                return $"{pre}reader.DangerousReadUnmanaged(out __{Name});";
             case MemberKind.String:
                 return $"{pre}__{Name} = reader.ReadString();";
             case MemberKind.UnmanagedArray:
