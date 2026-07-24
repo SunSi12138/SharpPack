@@ -580,11 +580,54 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
         var sb = new StringBuilder();
         foreach (var item in Members.Where(x => x.Kind == MemberKind.CustomFormatter))
         {
-            var fieldOrProp = item.IsField ? "Field" : "Property";
+            var attribute = item.CustomFormatterAttribute!;
+            var arguments = string.Join(
+                ", ",
+                attribute.ConstructorArguments.Select(EmitTypedConstant));
+            var initializers = attribute.NamedArguments
+                .Select(static pair =>
+                    $"@{pair.Key} = {EmitTypedConstant(pair.Value)}")
+                .ToArray();
+            var initializer = initializers.Length == 0
+                ? ""
+                : $" {{ {string.Join(", ", initializers)} }}";
 
-            sb.AppendLine($"    static readonly {item.CustomFormatterName} __{item.Name}Formatter = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<{item.CustomFormatter!.FullyQualifiedToString()}>(typeof({this.Symbol.FullyQualifiedToString()}).Get{fieldOrProp}(\"{item.Name}\", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)).GetFormatter();");
+            sb.AppendLine(
+                $"    static readonly {item.CustomFormatterName} __{item.Name}Formatter = " +
+                $"new {item.CustomFormatter!.FullyQualifiedToString()}({arguments})" +
+                $"{initializer}.GetFormatter();");
         }
         return sb.ToString();
+    }
+
+    static string EmitTypedConstant(TypedConstant constant)
+    {
+        if (constant.IsNull)
+        {
+            return "null";
+        }
+
+        return constant.Kind switch
+        {
+            TypedConstantKind.Primitive =>
+                Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatPrimitive(
+                    constant.Value!,
+                    quoteStrings: true,
+                    useHexadecimalNumbers: false),
+            TypedConstantKind.Enum =>
+                $"({constant.Type!.FullyQualifiedToString()})" +
+                Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatPrimitive(
+                    constant.Value!,
+                    quoteStrings: false,
+                    useHexadecimalNumbers: false),
+            TypedConstantKind.Type =>
+                $"typeof({((ITypeSymbol)constant.Value!).FullyQualifiedToString()})",
+            TypedConstantKind.Array =>
+                $"new {((IArrayTypeSymbol)constant.Type!).ElementType.FullyQualifiedToString()}[]" +
+                $" {{ {string.Join(", ", constant.Values.Select(EmitTypedConstant))} }}",
+            _ => throw new InvalidOperationException(
+                $"Unsupported custom formatter attribute argument: {constant.Kind}."),
+        };
     }
 
     string EmitAotFormatterRoots(string indent)
@@ -1249,6 +1292,10 @@ partial {{classOrInterfaceOrRecord}} {{TypeName}} : {{contextFactoryInterface}}
             $"{formatterSymbol.Name}MemoryPackContextExtensions";
         var registrationMethodName =
             $"Register{formatterSymbol.Name}";
+        var targetFactoryImplementation =
+            EmitExternalUnionTargetFactory(
+                formatterSymbol,
+                symbolFullQualified);
 
         var code = $$"""
 [global::MemoryPack.Internal.Preserve]
@@ -1296,9 +1343,88 @@ public static class {{registrationClassName}}
             {{TypeName}}>();
     }
 }
+{{targetFactoryImplementation}}
 """;
 
         writer.AppendLine(code);
+    }
+
+    string EmitExternalUnionTargetFactory(
+        INamedTypeSymbol formatterSymbol,
+        string symbolFullQualified)
+    {
+        var target = Symbol.OriginalDefinition;
+        if (!SymbolEqualityComparer.Default.Equals(
+                target.ContainingAssembly,
+                formatterSymbol.ContainingAssembly) ||
+            (Symbol.IsGenericType &&
+             !Symbol.IsUnboundGenericType &&
+             Symbol.TypeArguments.Any(
+                 static argument => argument is not ITypeParameterSymbol)) ||
+            target.DeclaringSyntaxReferences.Length == 0 ||
+            target.DeclaringSyntaxReferences.Any(static reference =>
+                reference.GetSyntax() is not TypeDeclarationSyntax declaration ||
+                !declaration.Modifiers.Any(
+                    static modifier =>
+                        modifier.IsKind(SyntaxKind.PartialKeyword))))
+        {
+            return "";
+        }
+
+        var declarations = new List<INamedTypeSymbol>();
+        for (var current = target.ContainingType;
+             current is not null;
+             current = current.ContainingType)
+        {
+            declarations.Add(current.OriginalDefinition);
+        }
+        declarations.Reverse();
+
+        var sb = new StringBuilder();
+        foreach (var declaration in declarations)
+        {
+            sb.AppendLine(EmitPartialTypeDeclaration(declaration));
+            sb.AppendLine(EmitTypeParameterConstraints(declaration.TypeParameters));
+            sb.AppendLine("{");
+        }
+
+        sb.AppendLine(EmitPartialTypeDeclaration(target) + " :");
+        sb.AppendLine(
+            $"    global::MemoryPack.IMemoryPackFormatterFactory<{symbolFullQualified}>");
+        sb.AppendLine(EmitTypeParameterConstraints(target.TypeParameters));
+        sb.AppendLine("{");
+        sb.AppendLine(
+            $"    static global::MemoryPack.MemoryPackFormatter<{symbolFullQualified}>");
+        sb.AppendLine(
+            $"        global::MemoryPack.IMemoryPackFormatterFactory<{symbolFullQualified}>.CreateFormatter()");
+        sb.AppendLine("    {");
+        sb.AppendLine($"        return new {TypeName}();");
+        sb.AppendLine("    }");
+        sb.AppendLine("}");
+
+        for (var i = declarations.Count - 1; i >= 0; i--)
+        {
+            sb.AppendLine("}");
+        }
+
+        return Environment.NewLine + sb;
+    }
+
+    static string EmitPartialTypeDeclaration(INamedTypeSymbol symbol)
+    {
+        var kind = (symbol.TypeKind, symbol.IsRecord, symbol.IsValueType) switch
+        {
+            (TypeKind.Interface, _, _) => "interface",
+            (_, true, true) => "record struct",
+            (_, true, false) => "record",
+            (_, false, true) => "struct",
+            _ => "class",
+        };
+        var typeParameters = symbol.TypeParameters.Length == 0
+            ? ""
+            : $"<{string.Join(", ", symbol.TypeParameters.Select(
+                static parameter => parameter.Name))}>";
+        return $"partial {kind} {symbol.Name}{typeParameters}";
     }
 
     static string EmitTypeParameterConstraints(

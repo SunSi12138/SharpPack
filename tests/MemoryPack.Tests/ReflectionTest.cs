@@ -34,6 +34,12 @@ public class ReflectionTest
         assembly.GetType("MemoryPack.DefaultMemoryPackSerializerContext").Should().BeNull();
         assembly.GetType("MemoryPack.IMemoryPackFormatter").Should().BeNull();
         assembly.GetType("MemoryPack.IMemoryPackFormatterRegister").Should().BeNull();
+        assembly.GetType("MemoryPack.FormatterResolver`1")!
+            .MakeGenericType(typeof(ReflecCheck))
+            .GetMethod(
+                "TryCreateExternalGeneratedFormatter",
+                BindingFlags.NonPublic | BindingFlags.Static)
+            .Should().BeNull();
         typeof(MemoryPackSerializerContext)
             .GetProperty(
                 "Default",

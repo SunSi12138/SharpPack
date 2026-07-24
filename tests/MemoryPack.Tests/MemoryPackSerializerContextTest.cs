@@ -9,6 +9,34 @@ namespace MemoryPack.Tests;
 public class MemoryPackSerializerContextTest
 {
     [Fact]
+    public void EmptyContext_PreservesRootUnmanagedStructPayload()
+    {
+        var value = new ContextUnmanagedStruct
+        {
+            Id = 42,
+            Timestamp = 123_456_789,
+        };
+        var context = new MemoryPackSerializerContext();
+        var defaultPayload = MemoryPackSerializer.Serialize(value);
+        var contextPayload = MemoryPackSerializer.Serialize(value, context);
+
+        contextPayload.Should().Equal(defaultPayload);
+        MemoryPackSerializer.Deserialize<ContextUnmanagedStruct>(
+            defaultPayload,
+            context).Should().Be(value);
+    }
+
+    [Fact]
+    public void FreshContext_ResolvesRootTypePayload()
+    {
+        var payload = MemoryPackSerializer.Serialize<Type>(typeof(ContextGraph));
+        var context = new MemoryPackSerializerContext();
+
+        MemoryPackSerializer.Deserialize<Type>(payload, context)
+            .Should().Be(typeof(ContextGraph));
+    }
+
+    [Fact]
     public void ExplicitContext_PreservesDefaultWireFormat()
     {
         var value = CreateGraph();
@@ -538,6 +566,14 @@ public class MemoryPackSerializerContextTest
         MemoryPackSerializer.Deserialize<T>(payload, context)
             .Should().BeEquivalentTo(value);
     }
+}
+
+[MemoryPackable]
+public partial struct ContextUnmanagedStruct
+{
+    public int Id { get; set; }
+
+    public long Timestamp { get; set; }
 }
 
 public sealed class IntSequenceSegment : ReadOnlySequenceSegment<int>

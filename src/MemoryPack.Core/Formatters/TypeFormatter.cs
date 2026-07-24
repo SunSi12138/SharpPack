@@ -57,11 +57,13 @@ public sealed partial class TypeFormatter : MemoryPackFormatter<Type>
                 static (assembly, name, ignoreCase) =>
                     assembly?.GetType(name, throwOnError: false, ignoreCase),
                 throwOnError: false);
+            value ??= Type.GetType(typeName, throwOnError: false);
             if (value is null)
             {
                 MemoryPackSerializationException.ThrowMessage(
                     $"Type '{typeName}' is not registered in the active serializer context.");
             }
+            context.AddType(value);
             return;
         }
 

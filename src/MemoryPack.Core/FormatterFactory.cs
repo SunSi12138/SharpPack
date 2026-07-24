@@ -175,11 +175,6 @@ internal static class FormatterResolver<T>
                 return (MemoryPackFormatter<T>)generic;
             }
 
-            if (TryCreateExternalGeneratedFormatter(type) is { } external)
-            {
-                return external;
-            }
-
             return new ErrorMemoryPackFormatter<T>();
         }
         catch (Exception ex)
@@ -193,83 +188,6 @@ internal static class FormatterResolver<T>
 
             return new ErrorMemoryPackFormatter<T>(ex);
         }
-    }
-
-    [UnconditionalSuppressMessage(
-        "Trimming",
-        "IL2026",
-        Justification = "Cold compatibility fallback; generated external formatter registration extensions are the trimming-safe path.")]
-    [UnconditionalSuppressMessage(
-        "Trimming",
-        "IL2055",
-        Justification = "Cold compatibility fallback; generated external formatter registration extensions are the trimming-safe path.")]
-    [UnconditionalSuppressMessage(
-        "Trimming",
-        "IL2065",
-        Justification = "Cold compatibility fallback; generated external formatter registration extensions are the trimming-safe path.")]
-    [UnconditionalSuppressMessage(
-        "AOT",
-        "IL3050",
-        Justification = "Cold compatibility fallback; generated external formatter registration extensions are the NativeAOT path.")]
-    static MemoryPackFormatter<T>? TryCreateExternalGeneratedFormatter(
-        Type targetType)
-    {
-        Type?[] candidates;
-        try
-        {
-            candidates = targetType.Assembly.GetTypes();
-        }
-        catch (ReflectionTypeLoadException ex)
-        {
-            candidates = ex.Types;
-        }
-
-        var factoryInterface = typeof(IMemoryPackFormatterFactory<T>);
-        foreach (var candidateDefinition in candidates)
-        {
-            if (candidateDefinition is null)
-            {
-                continue;
-            }
-
-            var candidate = candidateDefinition;
-            if (candidate.ContainsGenericParameters)
-            {
-                if (!targetType.IsGenericType ||
-                    candidate.GetGenericArguments().Length !=
-                    targetType.GetGenericArguments().Length)
-                {
-                    continue;
-                }
-
-                try
-                {
-                    candidate = candidate.MakeGenericType(targetType.GetGenericArguments());
-                }
-                catch (ArgumentException)
-                {
-                    continue;
-                }
-            }
-
-            if (!factoryInterface.IsAssignableFrom(candidate))
-            {
-                continue;
-            }
-
-            var factory = candidate
-                .GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
-                .FirstOrDefault(static method =>
-                    method.GetParameters().Length == 0 &&
-                    (method.Name == "CreateFormatter" ||
-                     method.Name.EndsWith(".CreateFormatter", StringComparison.Ordinal)));
-            if (factory is not null)
-            {
-                return (MemoryPackFormatter<T>)factory.Invoke(null, null)!;
-            }
-        }
-
-        return null;
     }
 
     [UnconditionalSuppressMessage(
