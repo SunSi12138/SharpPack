@@ -13,6 +13,7 @@ public static partial class SharpPackSerializer
     [ThreadStatic]
     static SharpPackReaderOptionalState? threadStaticReaderOptionalState;
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static T? Deserialize<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
         T>(ReadOnlySpan<byte> buffer)
@@ -22,6 +23,7 @@ public static partial class SharpPackSerializer
         return value;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Deserialize<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
         T>(ReadOnlySpan<byte> buffer, ref T? value)
@@ -37,7 +39,6 @@ public static partial class SharpPackSerializer
         }
 
         var state = AcquireReaderOptionalState();
-        state.InitDefault();
 
         var reader = new SharpPackReader(buffer, state);
         try
@@ -48,8 +49,7 @@ public static partial class SharpPackSerializer
         finally
         {
             reader.Dispose();
-            state.Reset();
-            state.Exit();
+            state.ResetAndExit();
         }
     }
 
@@ -112,7 +112,6 @@ public static partial class SharpPackSerializer
         }
 
         var state = AcquireReaderOptionalState();
-        state.InitDefault();
 
         var reader = new SharpPackReader(buffer, state);
         try
@@ -123,8 +122,7 @@ public static partial class SharpPackSerializer
         finally
         {
             reader.Dispose();
-            state.Reset();
-            state.Exit();
+            state.ResetAndExit();
         }
     }
 

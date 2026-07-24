@@ -127,6 +127,43 @@ public class GeneratorTest
     }
 
     [Fact]
+    public void MethodInvoke_WithContextFormatterOverride()
+    {
+        var context = new SharpPackSerializerContextBuilder()
+            .Register(new VarIntIntFormatter())
+            .Build();
+        var value = new MethodCall { MyProperty = 30_000 };
+
+        MethodCall.Log.Clear();
+        var payload = SharpPackSerializer.Serialize(value, context);
+        MethodCall.Log.Should().Equal(
+            "OnSerializing1",
+            "OnSerializing2",
+            "OnSerializing_M1",
+            "OnSerializing_M2",
+            "Get",
+            "OnSerialized1",
+            "OnSerialized2",
+            "OnSerialized_M1",
+            "OnSerialized_M2");
+
+        MethodCall.Log.Clear();
+        var decoded = SharpPackSerializer.Deserialize<MethodCall>(
+            payload,
+            context);
+        decoded.Should().NotBeNull();
+        MethodCall.Log.Should().Equal(
+            "OnDeserializing1",
+            "OnDeserializing_M1",
+            "Constructor",
+            "Set",
+            "OnDeserialized1",
+            "OnDeserialized2",
+            "OnDeserialized_M1",
+            "OnDeserialized_M2");
+    }
+
+    [Fact]
     public void Records()
     {
         VerifyEquivalent(new UnmanagedStruct { X = 9, Y = 3, Z = 2222 });

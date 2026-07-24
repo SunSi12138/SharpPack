@@ -17,11 +17,8 @@ public static class SharpPackReaderOptionalStatePool
         }
         var leaseId = state.ActivateLease();
 
-        if (context is null)
-        {
-            state.InitDefault();
-        }
-        else
+        // New and returned states already have no context or formatter graph.
+        if (context is not null)
         {
             state.Init(context);
         }
@@ -91,6 +88,7 @@ public sealed class SharpPackReaderOptionalState : IDisposable
     List<object>? sequentialReferences;
     Dictionary<uint, object>? sparseReferences;
     bool isInUse;
+    bool requiresReset;
     long leaseGeneration;
     int poolLeaseState;
 
@@ -106,14 +104,9 @@ public sealed class SharpPackReaderOptionalState : IDisposable
         => FormatterGraph is { } graph &&
            graph.HasFormatterOverride<T>();
 
-    internal void InitDefault()
-    {
-        SerializerContext = null;
-        FormatterGraph = null;
-    }
-
     internal void Init(SharpPackSerializerContext context)
     {
+        requiresReset = true;
         SerializerContext = context;
         FormatterGraph = context.OverrideGraph;
     }
@@ -133,6 +126,17 @@ public sealed class SharpPackReaderOptionalState : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void Exit()
         => isInUse = false;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void ResetAndExit()
+    {
+        if (requiresReset)
+        {
+            Reset();
+        }
+
+        isInUse = false;
+    }
 
     internal long ActivateLease()
     {
@@ -174,6 +178,7 @@ public sealed class SharpPackReaderOptionalState : IDisposable
 
     public void AddObjectReference(uint id, object value)
     {
+        requiresReset = true;
         sequentialReferences ??= [];
         if (id == (uint)sequentialReferences.Count)
         {
@@ -217,6 +222,7 @@ public sealed class SharpPackReaderOptionalState : IDisposable
 
         SerializerContext = null;
         FormatterGraph = null;
+        requiresReset = false;
     }
 
     void IDisposable.Dispose()

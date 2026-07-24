@@ -39,6 +39,7 @@ public static partial class SharpPackSerializer
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Serialize<T, TBufferWriter>(
         ref TBufferWriter bufferWriter,
         scoped in T? value,
@@ -59,8 +60,7 @@ public static partial class SharpPackSerializer
         }
         finally
         {
-            optionalState.Reset();
-            optionalState.Exit();
+            optionalState.ResetAndExit();
         }
     }
 
@@ -94,6 +94,7 @@ public static partial class SharpPackSerializer
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static T? Deserialize<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
         T>(ReadOnlySpan<byte> buffer, SharpPackSerializerContext context)
@@ -103,6 +104,7 @@ public static partial class SharpPackSerializer
         return value;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Deserialize<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
         T>(
@@ -123,8 +125,7 @@ public static partial class SharpPackSerializer
         finally
         {
             reader.Dispose();
-            state.Reset();
-            state.Exit();
+            state.ResetAndExit();
         }
     }
 
@@ -159,8 +160,7 @@ public static partial class SharpPackSerializer
         finally
         {
             reader.Dispose();
-            state.Reset();
-            state.Exit();
+            state.ResetAndExit();
         }
     }
 

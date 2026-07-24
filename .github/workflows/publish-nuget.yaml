@@ -6,7 +6,7 @@ on:
       version:
         description: "Package version without a v prefix"
         required: true
-        default: "1.0.1"
+        default: "1.0.2"
       nuget_user:
         description: "NuGet.org profile name, not an email address"
         required: true

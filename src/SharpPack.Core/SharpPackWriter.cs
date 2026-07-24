@@ -115,6 +115,17 @@ public ref partial struct SharpPackWriter<TBufferWriter>
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    void AdvanceWithinSpan(int count)
+    {
+        // Internal write paths call this only after GetSpanReference has
+        // guaranteed a contiguous span of at least count bytes.
+        bufferLength -= count;
+        bufferReference = ref Unsafe.Add(ref bufferReference, count);
+        advancedCount += count;
+        writtenCount += count;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Flush()
     {
         if (advancedCount != 0)
@@ -193,21 +204,21 @@ public ref partial struct SharpPackWriter<TBufferWriter>
             SharpPackSerializationException.ThrowWriteInvalidMemberCount(memberCount);
         }
         GetSpanReference(1) = memberCount;
-        Advance(1);
+        AdvanceWithinSpan(1);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteNullObjectHeader()
     {
         GetSpanReference(1) = SharpPackCode.NullObject;
-        Advance(1);
+        AdvanceWithinSpan(1);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteObjectReferenceId(uint referenceId)
     {
         GetSpanReference(1) = SharpPackCode.ReferenceId;
-        Advance(1);
+        AdvanceWithinSpan(1);
         WriteVarInt(referenceId);
     }
 
@@ -217,14 +228,14 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         if (tag < SharpPackCode.WideTag)
         {
             GetSpanReference(1) = (byte)tag;
-            Advance(1);
+            AdvanceWithinSpan(1);
         }
         else
         {
             ref var spanRef = ref GetSpanReference(3);
             Unsafe.WriteUnaligned(ref spanRef, SharpPackCode.WideTag);
             Unsafe.WriteUnaligned(ref Unsafe.Add(ref spanRef, 1), tag);
-            Advance(3);
+            AdvanceWithinSpan(3);
         }
     }
 
@@ -239,14 +250,14 @@ public ref partial struct SharpPackWriter<TBufferWriter>
     {
         ValidateLength(length);
         Unsafe.WriteUnaligned(ref GetSpanReference(4), length);
-        Advance(4);
+        AdvanceWithinSpan(4);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteNullCollectionHeader()
     {
         Unsafe.WriteUnaligned(ref GetSpanReference(4), SharpPackCode.NullCollection);
-        Advance(4);
+        AdvanceWithinSpan(4);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -286,7 +297,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         ref var src = ref Unsafe.As<char, byte>(ref Unsafe.AsRef(in value.GetPinnableReference()));
         Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref dest, 4), ref src, (uint)copyByteCount);
 
-        Advance(totalLength);
+        AdvanceWithinSpan(totalLength);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -304,7 +315,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         ref var dest = ref GetSpanReference(totalLength);
         Unsafe.WriteUnaligned(ref dest, value.Length);
         MemoryMarshal.AsBytes(value).CopyTo(MemoryMarshal.CreateSpan(ref Unsafe.Add(ref dest, 4), copyByteCount));
-        Advance(totalLength);
+        AdvanceWithinSpan(totalLength);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -343,7 +354,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
 
         // write written utf8-length in header, that is ~length
         Unsafe.WriteUnaligned(ref destPointer, ~bytesWritten);
-        Advance(CheckedAdd(bytesWritten, 8)); // + header
+        AdvanceWithinSpan(CheckedAdd(bytesWritten, 8)); // + header
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -366,7 +377,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         var dest = MemoryMarshal.CreateSpan(ref Unsafe.Add(ref destPointer, 8), utf8Value.Length);
         utf8Value.CopyTo(dest);
 
-        Advance(requiredLength);
+        AdvanceWithinSpan(requiredLength);
     }
 
 
@@ -608,7 +619,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         Unsafe.WriteUnaligned(ref dest, value.Length);
         Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref dest, 4), ref src, (uint)srcLength);
 
-        Advance(allocSize);
+        AdvanceWithinSpan(allocSize);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -629,7 +640,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         Unsafe.WriteUnaligned(ref dest, value.Length);
         Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref dest, 4), ref src, (uint)srcLength);
 
-        Advance(allocSize);
+        AdvanceWithinSpan(allocSize);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -650,7 +661,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         Unsafe.WriteUnaligned(ref dest, value.Length);
         Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref dest, 4), ref src, (uint)srcLength);
 
-        Advance(allocSize);
+        AdvanceWithinSpan(allocSize);
     }
 
     #endregion
@@ -670,7 +681,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
 
             Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)srcLength);
 
-            Advance(srcLength);
+            AdvanceWithinSpan(srcLength);
             return;
         }
         else

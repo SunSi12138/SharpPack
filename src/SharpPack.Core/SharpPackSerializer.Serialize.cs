@@ -66,7 +66,6 @@ public static partial class SharpPackSerializer
         }
 
         var state = AcquireWriterState();
-        state.InitDefault();
 
         try
         {
@@ -81,6 +80,7 @@ public static partial class SharpPackSerializer
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Serialize<T, TBufferWriter>(
         ref TBufferWriter bufferWriter,
         scoped in T? value)
@@ -127,7 +127,6 @@ public static partial class SharpPackSerializer
         }
 
         var state = AcquireWriterOptionalState();
-        state.InitDefault();
 
         try
         {
@@ -136,8 +135,7 @@ public static partial class SharpPackSerializer
         }
         finally
         {
-            state.Reset();
-            state.Exit();
+            state.ResetAndExit();
         }
     }
 
@@ -216,15 +214,10 @@ public static partial class SharpPackSerializer
             OptionalState.Init(context);
         }
 
-        public void InitDefault()
-        {
-            OptionalState.InitDefault();
-        }
-
         public void Reset()
         {
             BufferWriter.Reset();
-            OptionalState.Reset();
+            OptionalState.ResetAndExit();
         }
     }
 

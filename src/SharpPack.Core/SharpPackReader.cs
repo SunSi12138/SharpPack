@@ -145,10 +145,6 @@ public ref partial struct SharpPackReader
             SharpPackSerializationException.ThrowInvalidLength(count);
         }
         if (count == 0) return;
-        if (Remaining < count)
-        {
-            SharpPackSerializationException.ThrowInvalidAdvance();
-        }
 
         var rest = bufferLength - count;
         if (rest < 0)
@@ -160,6 +156,17 @@ public ref partial struct SharpPackReader
         }
 
         bufferLength = rest;
+        bufferReference = ref Unsafe.Add(ref bufferReference, count);
+        advancedCount += count;
+        consumed += count;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    void AdvanceWithinSpan(int count)
+    {
+        // Internal read paths call this only after GetSpanReference has
+        // guaranteed a contiguous span of at least count bytes.
+        bufferLength -= count;
         bufferReference = ref Unsafe.Add(ref bufferReference, count);
         advancedCount += count;
         consumed += count;
@@ -277,7 +284,7 @@ public ref partial struct SharpPackReader
     public bool TryReadObjectHeader(out byte memberCount)
     {
         memberCount = GetSpanReference(1);
-        Advance(1);
+        AdvanceWithinSpan(1);
         return memberCount != SharpPackCode.NullObject;
     }
 
@@ -285,7 +292,7 @@ public ref partial struct SharpPackReader
     public bool TryReadUnionHeader(out ushort tag)
     {
         var firstTag = GetSpanReference(1);
-        Advance(1);
+        AdvanceWithinSpan(1);
         if (firstTag < SharpPackCode.WideTag)
         {
             tag = firstTag;
@@ -307,7 +314,7 @@ public ref partial struct SharpPackReader
     public bool TryReadCollectionHeader(out int length)
     {
         length = Unsafe.ReadUnaligned<int>(ref GetSpanReference(4));
-        Advance(4);
+        AdvanceWithinSpan(4);
 
         if (length == SharpPackCode.NullCollection)
         {
@@ -393,7 +400,7 @@ public ref partial struct SharpPackReader
     public bool DangerousTryReadCollectionHeader(out int length)
     {
         length = Unsafe.ReadUnaligned<int>(ref GetSpanReference(4));
-        Advance(4);
+        AdvanceWithinSpan(4);
 
         if (length == SharpPackCode.NullCollection)
         {
@@ -438,7 +445,7 @@ public ref partial struct SharpPackReader
 
         var str = new string(MemoryMarshal.CreateReadOnlySpan(ref Unsafe.As<byte, char>(ref src), length));
 
-        Advance(byteCount);
+        AdvanceWithinSpan(byteCount);
 
         return str;
     }
@@ -499,7 +506,7 @@ public ref partial struct SharpPackReader
             }
         }
 
-        Advance(payloadLength);
+        AdvanceWithinSpan(payloadLength);
 
         return str;
     }
@@ -512,7 +519,7 @@ public ref partial struct SharpPackReader
         var size = Unsafe.SizeOf<T1>();
         ref var spanRef = ref GetSpanReference(size);
         var value1 = Unsafe.ReadUnaligned<T1>(ref spanRef);
-        Advance(size);
+        AdvanceWithinSpan(size);
         return value1;
     }
 
@@ -831,7 +838,7 @@ public ref partial struct SharpPackReader
         ref var src = ref GetSpanReference(byteCount);
         var dest = AllocateUninitializedArray<T>(length);
         Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref GetArrayDataReference(dest)), ref src, (uint)byteCount);
-        Advance(byteCount);
+        AdvanceWithinSpan(byteCount);
 
         return dest;
     }
@@ -862,7 +869,7 @@ public ref partial struct SharpPackReader
         ref var dest = ref Unsafe.As<T, byte>(ref GetArrayDataReference(value));
         Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);
 
-        Advance(byteCount);
+        AdvanceWithinSpan(byteCount);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -891,7 +898,7 @@ public ref partial struct SharpPackReader
         ref var dest = ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(value));
         Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);
 
-        Advance(byteCount);
+        AdvanceWithinSpan(byteCount);
     }
 
     #endregion
@@ -919,7 +926,7 @@ public ref partial struct SharpPackReader
             ref var dest = ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(value)!);
             Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);
 
-            Advance(byteCount);
+            AdvanceWithinSpan(byteCount);
         }
         else
         {
@@ -965,7 +972,7 @@ public ref partial struct SharpPackReader
             ref var dest = ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(value)!);
             Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);
 
-            Advance(byteCount);
+            AdvanceWithinSpan(byteCount);
         }
         else
         {
@@ -1004,7 +1011,7 @@ public ref partial struct SharpPackReader
 
         var span = MemoryMarshal.CreateReadOnlySpan(ref src, byteCount);
 
-        Advance(byteCount);
+        AdvanceWithinSpan(byteCount);
         view = span; // safe until call next GetSpanReference
     }
 

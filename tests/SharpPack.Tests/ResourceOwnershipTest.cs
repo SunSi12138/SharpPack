@@ -84,6 +84,24 @@ public class ResourceOwnershipTest
     }
 
     [Fact]
+    public void ResetReleasesCurrentSegmentRequestedBeforeAdvance()
+    {
+        var writer = new ReusableLinkedArrayBufferWriter(
+            useFirstBuffer: true,
+            pinned: false);
+
+        var rentedSpan = writer.GetSpan(8_192);
+        rentedSpan.Length.Should().BeGreaterThan(
+            writer.DangerousGetFirstBuffer().Length);
+
+        writer.Reset();
+
+        writer.TotalWritten.Should().Be(0);
+        writer.GetSpan(1).Length.Should().Be(
+            writer.DangerousGetFirstBuffer().Length);
+    }
+
+    [Fact]
     public async Task AsyncWriterResetsAllSegmentsWhenStreamThrows()
     {
         var writer = new ReusableLinkedArrayBufferWriter(

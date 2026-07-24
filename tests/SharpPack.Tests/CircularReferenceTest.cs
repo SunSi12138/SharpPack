@@ -168,4 +168,44 @@ public class CircularReferenceTest
         decoded.Children[0].Should().BeSameAs(decoded.Children[1]);
     }
 
+    [Fact]
+    public void ContextOverrideColdPathPreservesCircularIdentity()
+    {
+        var manager = new Employee { Name = "manager" };
+        var report = new Employee { Name = "report", Manager = manager };
+        manager.Manager = manager;
+        manager.DirectReports = [report, report];
+        var context = new SharpPackSerializerContextBuilder()
+            .Register(new PrefixStringFormatter())
+            .Build();
+
+        var payload = SharpPackSerializer.Serialize(manager, context);
+        var decoded = SharpPackSerializer.Deserialize<Employee>(
+            payload,
+            context)!;
+
+        decoded.Name.Should().Be(manager.Name);
+        decoded.Manager.Should().BeSameAs(decoded);
+        decoded.DirectReports![0].Manager.Should().BeSameAs(decoded);
+        decoded.DirectReports[0].Should().BeSameAs(decoded.DirectReports[1]);
+    }
+
+    [Fact]
+    public void ThreadStateClearsReferenceTablesBetweenOperations()
+    {
+        var root = new Node();
+        root.Parent = root;
+
+        var firstPayload = SharpPackSerializer.Serialize(root);
+        var secondPayload = SharpPackSerializer.Serialize(root);
+
+        secondPayload.Should().Equal(firstPayload);
+
+        var first = SharpPackSerializer.Deserialize<Node>(firstPayload)!;
+        var second = SharpPackSerializer.Deserialize<Node>(secondPayload)!;
+        first.Parent.Should().BeSameAs(first);
+        second.Parent.Should().BeSameAs(second);
+        second.Should().NotBeSameAs(first);
+    }
+
 }

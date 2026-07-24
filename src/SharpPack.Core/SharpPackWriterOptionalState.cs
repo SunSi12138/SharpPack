@@ -18,11 +18,8 @@ public static class SharpPackWriterOptionalStatePool
         }
         var leaseId = state.ActivateLease();
 
-        if (context is null)
-        {
-            state.InitDefault();
-        }
-        else
+        // New and returned states are already in the default configuration.
+        if (context is not null)
         {
             state.Init(context);
         }
@@ -91,6 +88,7 @@ public sealed class SharpPackWriterOptionalState : IDisposable
 
     uint nextId;
     bool isInUse;
+    bool requiresReset;
     long leaseGeneration;
     int poolLeaseState;
     Dictionary<object, uint>? objectToRef;
@@ -120,15 +118,9 @@ public sealed class SharpPackWriterOptionalState : IDisposable
         FormatterGraph = null;
     }
 
-    internal void InitDefault()
-    {
-        Configuration = SharpPackSerializerConfiguration.Default;
-        SerializerContext = null;
-        FormatterGraph = null;
-    }
-
     internal void Init(SharpPackSerializerContext context)
     {
+        requiresReset = true;
         Configuration = context.Configuration;
         SerializerContext = context;
         FormatterGraph = context.OverrideGraph;
@@ -149,6 +141,17 @@ public sealed class SharpPackWriterOptionalState : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void Exit()
         => isInUse = false;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void ResetAndExit()
+    {
+        if (requiresReset)
+        {
+            Reset();
+        }
+
+        isInUse = false;
+    }
 
     internal long ActivateLease()
     {
@@ -184,10 +187,12 @@ public sealed class SharpPackWriterOptionalState : IDisposable
         SerializerContext = null;
         FormatterGraph = null;
         nextId = 0;
+        requiresReset = false;
     }
 
     public (bool existsReference, uint id) GetOrAddReference(object value)
     {
+        requiresReset = true;
         objectToRef ??= new Dictionary<object, uint>(
             ReferenceEqualityComparer.Instance);
         ref var id = ref CollectionsMarshal.GetValueRefOrAddDefault(
