@@ -20,6 +20,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: Cysharp/Actions/.github/actions/checkout@main
+        with:
+          fetch-depth: 0
       - uses: Cysharp/Actions/.github/actions/setup-dotnet@main
       - run: dotnet build -c Release -p:Version="$VERSION"
         env:
