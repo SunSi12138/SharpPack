@@ -148,6 +148,10 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
         MemoryPackSerializerContext context)
         => context.Graph.GetFormatter<T>();
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    bool HasFormatterOverride<T>()
+        => optionalState.HasFormatterOverride<T>();
+
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int GetStringWriteLength(string? value)
@@ -423,7 +427,8 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteArray<T>(T?[]? value)
     {
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !HasFormatterOverride<T>())
         {
             DangerousWriteUnmanagedArray(value);
             return;
@@ -446,7 +451,8 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteSpan<T>(scoped Span<T?> value)
     {
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !HasFormatterOverride<T>())
         {
             DangerousWriteUnmanagedSpan(value);
             return;
@@ -463,7 +469,8 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteSpan<T>(scoped ReadOnlySpan<T?> value)
     {
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !HasFormatterOverride<T>())
         {
             DangerousWriteUnmanagedSpan(value);
             return;
@@ -654,7 +661,8 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
     {
         if (value.Length == 0) return;
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !HasFormatterOverride<T>())
         {
             var srcLength = GetUnmanagedByteCount<T>(value.Length);
             ref var dest = ref GetSpanReference(srcLength);

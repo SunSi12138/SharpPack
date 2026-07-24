@@ -22,13 +22,13 @@ namespace MemoryPack.Formatters
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref T[]? value)
         {
-            writer.WriteUnmanagedArray(value);
+            writer.WriteArray(value);
         }
 
         [Preserve]
         public override void Deserialize(ref MemoryPackReader reader, scoped ref T[]? value)
         {
-            reader.ReadUnmanagedArray<T>(ref value);
+            reader.ReadArray(ref value);
         }
     }
 
@@ -38,13 +38,13 @@ namespace MemoryPack.Formatters
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref T[]? value)
         {
-            writer.DangerousWriteUnmanagedArray(value);
+            writer.WriteArray(value);
         }
 
         [Preserve]
         public override void Deserialize(ref MemoryPackReader reader, scoped ref T[]? value)
         {
-            reader.DangerousReadUnmanagedArray<T>(ref value);
+            reader.ReadArray(ref Unsafe.As<T[]?, T?[]?>(ref value));
         }
     }
 

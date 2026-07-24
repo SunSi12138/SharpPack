@@ -28,22 +28,33 @@ internal static class ContextFormatterSlot<T>
         return cache.GetValue(
             graph,
             static graph => new Holder(
-                FormatterResolver<T>.Create(graph.Owner))).Formatter;
+                FormatterResolver<T>.Create(graph.Owner),
+                isExplicitRegistration: false)).Formatter;
     }
 
     internal static void Register(FormatterGraph graph, MemoryPackFormatter<T> formatter)
     {
         ArgumentNullException.ThrowIfNull(formatter);
-        if (!cache.TryAdd(graph, new Holder(formatter)))
+        if (!cache.TryAdd(
+                graph,
+                new Holder(formatter, isExplicitRegistration: true)))
         {
             throw new InvalidOperationException(
                 $"A formatter for {typeof(T).FullName} is already registered or resolved.");
         }
     }
 
-    sealed class Holder(MemoryPackFormatter<T> formatter)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool HasExplicitRegistration(FormatterGraph graph)
+        => cache.TryGetValue(graph, out var holder) &&
+           holder.IsExplicitRegistration;
+
+    sealed class Holder(
+        MemoryPackFormatter<T> formatter,
+        bool isExplicitRegistration)
     {
         internal MemoryPackFormatter<T> Formatter { get; } = formatter;
+        internal bool IsExplicitRegistration { get; } = isExplicitRegistration;
     }
 }
 

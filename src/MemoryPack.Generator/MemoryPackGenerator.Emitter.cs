@@ -772,8 +772,32 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
 """;
         }
 
+        var formatterOverrideCondition = string.Join(
+            " || ",
+            Members
+                .Where(static member => member.Kind == MemberKind.UnmanagedArray)
+                .Select(static member =>
+                {
+                    var elementType =
+                        ((IArrayTypeSymbol)member.MemberType).ElementType
+                        .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                    return $"writer.OptionalState.HasFormatterOverride<{elementType}>()";
+                })
+                .Distinct(StringComparer.Ordinal));
+        var formatterOverrideFallback =
+            formatterOverrideCondition.Length == 0
+                ? ""
+                : $$"""
+        if ({{formatterOverrideCondition}})
+        {
+{{EmitVersionTorelantSerializeBody()}}
+            goto END;
+        }
+
+""";
+
         return $$"""
-{{(!IsValueType ? $$"""
+{{formatterOverrideFallback}}{{(!IsValueType ? $$"""
         if (value == null)
         {
             writer.WriteNullObjectHeader();
@@ -1362,7 +1386,7 @@ public partial class MemberMeta
             case MemberKind.String:
                 return $"{writer}.WriteString(value.@{Name});";
             case MemberKind.UnmanagedArray:
-                return $"{writer}.WriteUnmanagedArray(value.@{Name});";
+                return $"{writer}.WriteArray(value.@{Name});";
             case MemberKind.MemoryPackableArray:
                 return $"{writer}.WritePackableArray(value.@{Name});";
             case MemberKind.MemoryPackableList:
@@ -1419,7 +1443,7 @@ public partial class MemberMeta
             case MemberKind.String:
                 return $"{pre}__{Name} = reader.ReadString();";
             case MemberKind.UnmanagedArray:
-                return $"{pre}__{Name} = reader.ReadUnmanagedArray<{(MemberType as IArrayTypeSymbol)!.ElementType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>();";
+                return $"{pre}__{Name} = reader.ReadArray<{(MemberType as IArrayTypeSymbol)!.ElementType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>();";
             case MemberKind.MemoryPackableArray:
                 return $"{pre}__{Name} = reader.ReadPackableArray<{(MemberType as IArrayTypeSymbol)!.ElementType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>();";
             case MemberKind.MemoryPackableList:
@@ -1456,7 +1480,7 @@ public partial class MemberMeta
             case MemberKind.String:
                 return $"{pre}__{Name} = reader.ReadString();";
             case MemberKind.UnmanagedArray:
-                return $"{pre}reader.ReadUnmanagedArray(ref __{Name});";
+                return $"{pre}reader.ReadArray(ref __{Name});";
             case MemberKind.MemoryPackableArray:
                 return $"{pre}reader.ReadPackableArray(ref __{Name});";
             case MemberKind.MemoryPackableList:

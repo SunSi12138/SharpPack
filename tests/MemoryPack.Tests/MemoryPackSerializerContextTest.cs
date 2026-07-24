@@ -1,6 +1,8 @@
 using MemoryPack.Tests.Models;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace MemoryPack.Tests;
 
@@ -76,6 +78,96 @@ public class MemoryPackSerializerContextTest
     }
 
     [Fact]
+    public void PrimitiveRegistration_PropagatesThroughBulkCollectionFastPaths()
+    {
+        var context = new MemoryPackSerializerContextBuilder()
+            .Register(new IntOffsetFormatter(100))
+            .Build();
+        var values = new[] { 1, 2, 3 };
+
+        var arrayPayload = MemoryPackSerializer.Serialize(values, context);
+        arrayPayload.Should().NotEqual(MemoryPackSerializer.Serialize(values));
+        MemoryPackSerializer.Deserialize<int[]>(arrayPayload, context)
+            .Should().Equal(values);
+
+        var list = values.ToList();
+        var listPayload = MemoryPackSerializer.Serialize(list, context);
+        listPayload.Should().NotEqual(MemoryPackSerializer.Serialize(list));
+        MemoryPackSerializer.Deserialize<List<int>>(listPayload, context)
+            .Should().Equal(values);
+
+        var segment = new ArraySegment<int>(values, 1, 2);
+        var segmentPayload = MemoryPackSerializer.Serialize(segment, context);
+        segmentPayload.Should().NotEqual(MemoryPackSerializer.Serialize(segment));
+        MemoryPackSerializer.Deserialize<ArraySegment<int>>(segmentPayload, context)
+            .Should().Equal(segment);
+
+        var memory = values.AsMemory();
+        var memoryPayload = MemoryPackSerializer.Serialize(memory, context);
+        memoryPayload.Should().NotEqual(MemoryPackSerializer.Serialize(memory));
+        MemoryPackSerializer.Deserialize<Memory<int>>(memoryPayload, context)
+            .ToArray().Should().Equal(values);
+
+        var readOnlyMemory = new ReadOnlyMemory<int>(values);
+        var readOnlyMemoryPayload = MemoryPackSerializer.Serialize(readOnlyMemory, context);
+        readOnlyMemoryPayload.Should().NotEqual(
+            MemoryPackSerializer.Serialize(readOnlyMemory));
+        MemoryPackSerializer.Deserialize<ReadOnlyMemory<int>>(
+            readOnlyMemoryPayload,
+            context).ToArray().Should().Equal(values);
+
+        var sequence = CreateSegmentedIntSequence(values);
+        var sequencePayload = MemoryPackSerializer.Serialize(sequence, context);
+        sequencePayload.Should().NotEqual(MemoryPackSerializer.Serialize(sequence));
+        MemoryPackSerializer.Deserialize<ReadOnlySequence<int>>(
+            sequencePayload,
+            context).ToArray().Should().Equal(values);
+
+        var generated = new ContextIntArrayContainer { Values = values };
+        var generatedPayload = MemoryPackSerializer.Serialize(generated, context);
+        generatedPayload.Should().NotEqual(MemoryPackSerializer.Serialize(generated));
+        MemoryPackSerializer.Deserialize<ContextIntArrayContainer>(
+            generatedPayload,
+            context)!.Values.Should().Equal(values);
+    }
+
+    [Fact]
+    public void PrimitiveRegistration_PropagatesThroughVersionTolerantArray()
+    {
+        var context = new MemoryPackSerializerContextBuilder()
+            .Register(new VarIntIntFormatter())
+            .Build();
+        var value = new ContextVersionTolerantIntArray
+        {
+            Values = [1, 200, 30_000],
+            Tail = "tail",
+        };
+
+        var payload = MemoryPackSerializer.Serialize(value, context);
+        payload.Should().NotEqual(MemoryPackSerializer.Serialize(value));
+
+        var decoded =
+            MemoryPackSerializer.Deserialize<ContextVersionTolerantIntArray>(
+                payload,
+                context);
+        decoded.Should().BeEquivalentTo(value);
+    }
+
+    [Fact]
+    public void UnrelatedRegistration_PreservesBulkCollectionFastPathWireFormat()
+    {
+        var context = new MemoryPackSerializerContextBuilder()
+            .Register(new OffsetFormatter(100))
+            .Build();
+        var values = new[] { 1, 2, 3 };
+
+        MemoryPackSerializer.Serialize(values, context)
+            .Should().Equal(MemoryPackSerializer.Serialize(values));
+        MemoryPackSerializer.Serialize(values.ToList(), context)
+            .Should().Equal(MemoryPackSerializer.Serialize(values.ToList()));
+    }
+
+    [Fact]
     public void Builder_CanOnlyBuildOnce()
     {
         var builder = new MemoryPackSerializerContextBuilder();
@@ -145,6 +237,35 @@ public class MemoryPackSerializerContextTest
         Pair = (50, "tuple"),
         Optional = 60,
     };
+
+    static ReadOnlySequence<int> CreateSegmentedIntSequence(int[] values)
+    {
+        var first = new IntSequenceSegment(values.AsMemory(0, 2));
+        var last = first.Append(values.AsMemory(2, 1));
+        return new ReadOnlySequence<int>(
+            first,
+            0,
+            last,
+            last.Memory.Length);
+    }
+}
+
+public sealed class IntSequenceSegment : ReadOnlySequenceSegment<int>
+{
+    public IntSequenceSegment(ReadOnlyMemory<int> memory)
+    {
+        Memory = memory;
+    }
+
+    public IntSequenceSegment Append(ReadOnlyMemory<int> memory)
+    {
+        var segment = new IntSequenceSegment(memory)
+        {
+            RunningIndex = RunningIndex + Memory.Length,
+        };
+        Next = segment;
+        return segment;
+    }
 }
 
 public sealed class ContextList<T> : List<T>;
@@ -164,6 +285,22 @@ public partial class ContextGraph
     public Dictionary<string, StandardTypeOne>? Map { get; set; }
     public (int, string)? Pair { get; set; }
     public int? Optional { get; set; }
+}
+
+[MemoryPackable]
+public partial class ContextIntArrayContainer
+{
+    public int[]? Values { get; set; }
+}
+
+[MemoryPackable(GenerateType.VersionTolerant)]
+public partial class ContextVersionTolerantIntArray
+{
+    [MemoryPackOrder(0)]
+    public int[]? Values { get; set; }
+
+    [MemoryPackOrder(1)]
+    public string? Tail { get; set; }
 }
 
 public sealed class ContextCustomValue
@@ -214,6 +351,17 @@ public sealed class IntOffsetFormatter(int offset) : MemoryPackFormatter<int>
         reader.ReadUnmanaged(out int encoded);
         value = encoded - offset;
     }
+}
+
+public sealed class VarIntIntFormatter : MemoryPackFormatter<int>
+{
+    public override void Serialize<TBufferWriter>(
+        ref MemoryPackWriter<TBufferWriter> writer,
+        scoped ref int value)
+        => writer.WriteVarInt(value);
+
+    public override void Deserialize(ref MemoryPackReader reader, scoped ref int value)
+        => value = reader.ReadVarIntInt32();
 }
 
 public sealed class StandardTypeOneOffsetFormatter(int offset)

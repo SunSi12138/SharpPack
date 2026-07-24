@@ -34,6 +34,9 @@ internal sealed class FormatterGraph
     internal MemoryPackFormatter<T> GetFormatter<T>()
         => ContextFormatterSlot<T>.Get(this);
 
+    internal bool HasExplicitRegistration<T>()
+        => ContextFormatterSlot<T>.HasExplicitRegistration(this);
+
     internal void FreezeRegistrations()
         => registrationsFrozen = true;
 }

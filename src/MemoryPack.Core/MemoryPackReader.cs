@@ -266,6 +266,11 @@ public ref partial struct MemoryPackReader
         MemoryPackSerializerContext context)
         => context.Graph.GetFormatter<T>();
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    bool HasFormatterOverride<T>()
+        => optionalState.FormatterGraph is { } graph &&
+           graph.HasExplicitRegistration<T>();
+
 
     // read methods
 
@@ -633,7 +638,8 @@ public ref partial struct MemoryPackReader
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ReadArray<T>(scoped ref T?[]? value)
     {
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !HasFormatterOverride<T>())
         {
             DangerousReadUnmanagedArray(ref value);
             return;
@@ -667,7 +673,8 @@ public ref partial struct MemoryPackReader
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ReadSpan<T>(scoped ref Span<T?> value)
     {
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !HasFormatterOverride<T>())
         {
             DangerousReadUnmanagedSpan(ref value);
             return;
@@ -900,7 +907,8 @@ public ref partial struct MemoryPackReader
             return;
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !HasFormatterOverride<T>())
         {
             if (value.Length != length)
             {
