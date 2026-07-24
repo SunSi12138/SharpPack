@@ -1,5 +1,5 @@
 ﻿#nullable disable
-using MemoryPack;
+using SharpPack;
 using MessagePack;
 using Orleans;
 using ProtoBuf;
@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 namespace Benchmark.Models
 {
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public partial class MobileFeed : IGenericEquality<MobileFeed>
     {
         [ProtoMember(1)]
@@ -117,7 +117,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public sealed partial class MobileQuestion : IMobileFeedBase<MobileQuestion>
     {
         [ProtoMember(1)]
@@ -190,7 +190,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public sealed partial class MobileRepChange : IMobileFeedBase<MobileRepChange>
     {
         [ProtoMember(1)]
@@ -238,7 +238,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public sealed partial class MobileInboxItem : IMobileFeedBase<MobileInboxItem>
     {
         [ProtoMember(1)]
@@ -310,7 +310,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public sealed partial class MobileBadgeAward : IMobileFeedBase<MobileBadgeAward>
     {
         public enum BadgeRank : byte
@@ -392,7 +392,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public sealed partial class MobilePrivilege : IMobileFeedBase<MobilePrivilege>
     {
         [ProtoMember(1)]
@@ -450,7 +450,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public sealed partial class MobileCommunityBulletin : IMobileFeedBase<MobileCommunityBulletin>
     {
         public enum CommunityBulletinType : byte
@@ -549,7 +549,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public sealed partial class MobileAssociationBonus : IMobileFeedBase<MobileAssociationBonus>
     {
         [ProtoMember(1)]
@@ -586,7 +586,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public sealed partial class MobileCareersJobAd : IMobileFeedBase<MobileCareersJobAd>
     {
         [ProtoMember(1)]
@@ -638,7 +638,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public sealed partial class MobileBannerAd : IMobileFeedBase<MobileBannerAd>
     {
         [ProtoMember(1)]
@@ -676,7 +676,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public sealed partial class MobileBannerAdImage : IGenericEquality<MobileBannerAdImage>
     {
         [ProtoMember(1)]
@@ -707,7 +707,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public sealed partial class MobileUpdateNotice : IGenericEquality<MobileUpdateNotice>
     {
         [ProtoMember(1)]

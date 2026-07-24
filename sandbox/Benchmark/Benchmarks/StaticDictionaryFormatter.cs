@@ -1,8 +1,8 @@
 ﻿using Benchmark.BenchmarkNetUtilities;
 using BenchmarkDotNet.Configs;
-using MemoryPack;
-using MemoryPack.Formatters;
-using MemoryPack.Internal;
+using SharpPack;
+using SharpPack.Formatters;
+using SharpPack.Internal;
 using Microsoft.Diagnostics.Tracing;
 using Orleans.Serialization.Buffers;
 using System;
@@ -22,13 +22,13 @@ namespace Benchmark.Benchmarks;
 public class StaticDictionaryFormatterCheck
 {
     Dictionary<string, int> target;
-    IMemoryPackFormatter<Dictionary<string, int>> current;
-    IMemoryPackFormatter<Dictionary<string, int>> improvement;
+    ISharpPackFormatter<Dictionary<string, int>> current;
+    ISharpPackFormatter<Dictionary<string, int>> improvement;
 
     Dictionary<string, int> dict;
     ArrayBufferWriter<byte> buffer;
-    MemoryPackWriterOptionalStateLease state;
-    MemoryPackReaderOptionalStateLease state2;
+    SharpPackWriterOptionalStateLease state;
+    SharpPackReaderOptionalStateLease state2;
     byte[] bytes;
 
     public StaticDictionaryFormatterCheck()
@@ -41,18 +41,18 @@ public class StaticDictionaryFormatterCheck
 
         dict = new Dictionary<string, int>(100);
 
-        bytes = MemoryPackSerializer.Serialize(target);
+        bytes = SharpPackSerializer.Serialize(target);
 
         buffer = new ArrayBufferWriter<byte>(bytes.Length);
 
-        state = MemoryPackWriterOptionalStatePool.Rent(null);
-        state2 = MemoryPackReaderOptionalStatePool.Rent(null);
+        state = SharpPackWriterOptionalStatePool.Rent(null);
+        state2 = SharpPackReaderOptionalStatePool.Rent(null);
     }
 
     //[Benchmark, BenchmarkCategory(Categories.Serialize)]
     //public void SerializeCurrent()
     //{
-    //    var writer = new MemoryPackWriter<ArrayBufferWriter<byte>>(ref buffer, state);
+    //    var writer = new SharpPackWriter<ArrayBufferWriter<byte>>(ref buffer, state);
     //    current.Serialize(ref writer, ref target!);
     //    writer.Flush();
     //    buffer.Clear();
@@ -61,7 +61,7 @@ public class StaticDictionaryFormatterCheck
     //[Benchmark, BenchmarkCategory(Categories.Serialize)]
     //public void SerializeImprovement()
     //{
-    //    var writer = new MemoryPackWriter<ArrayBufferWriter<byte>>(ref buffer, state);
+    //    var writer = new SharpPackWriter<ArrayBufferWriter<byte>>(ref buffer, state);
     //    improvement.Serialize(ref writer, ref target!);
     //    writer.Flush();
     //    buffer.Clear();
@@ -70,7 +70,7 @@ public class StaticDictionaryFormatterCheck
     [Benchmark, BenchmarkCategory(Categories.Deserialize)]
     public void DeserializeCurrent()
     {
-        var reader = new MemoryPackReader(bytes, state2);
+        var reader = new SharpPackReader(bytes, state2);
         current.Deserialize(ref reader, ref dict!);
         reader.Dispose();
     }
@@ -78,7 +78,7 @@ public class StaticDictionaryFormatterCheck
     [Benchmark, BenchmarkCategory(Categories.Deserialize)]
     public void DeserializeImprovement()
     {
-        var reader = new MemoryPackReader(bytes, state2);
+        var reader = new SharpPackReader(bytes, state2);
 
         improvement.Deserialize(ref reader, ref dict!);
         reader.Dispose();
@@ -87,7 +87,7 @@ public class StaticDictionaryFormatterCheck
 
 
 [Preserve]
-sealed class DictionaryFormatter<TKey, TValue> : MemoryPackFormatter<Dictionary<TKey, TValue?>>
+sealed class DictionaryFormatter<TKey, TValue> : SharpPackFormatter<Dictionary<TKey, TValue?>>
     where TKey : notnull
 {
     readonly IEqualityComparer<TKey>? equalityComparer;
@@ -104,7 +104,7 @@ sealed class DictionaryFormatter<TKey, TValue> : MemoryPackFormatter<Dictionary<
     }
 
     [Preserve]
-    public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref Dictionary<TKey, TValue?>? value)
+    public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Dictionary<TKey, TValue?>? value)
     {
         if (value == null)
         {
@@ -123,7 +123,7 @@ sealed class DictionaryFormatter<TKey, TValue> : MemoryPackFormatter<Dictionary<
     }
 
     [Preserve]
-    public override void Deserialize(ref MemoryPackReader reader, scoped ref Dictionary<TKey, TValue?>? value)
+    public override void Deserialize(ref SharpPackReader reader, scoped ref Dictionary<TKey, TValue?>? value)
     {
         if (!reader.TryReadCollectionHeader(out var length))
         {
@@ -151,7 +151,7 @@ sealed class DictionaryFormatter<TKey, TValue> : MemoryPackFormatter<Dictionary<
 }
 
 [Preserve]
-sealed class DictionaryFormatter2<TKey, TValue> : MemoryPackFormatter<Dictionary<TKey, TValue?>>
+sealed class DictionaryFormatter2<TKey, TValue> : SharpPackFormatter<Dictionary<TKey, TValue?>>
     where TKey : notnull
 {
     readonly IEqualityComparer<TKey>? equalityComparer;
@@ -168,7 +168,7 @@ sealed class DictionaryFormatter2<TKey, TValue> : MemoryPackFormatter<Dictionary
     }
 
     [Preserve]
-    public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref Dictionary<TKey, TValue?>? value)
+    public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Dictionary<TKey, TValue?>? value)
     {
         if (value == null)
         {
@@ -187,7 +187,7 @@ sealed class DictionaryFormatter2<TKey, TValue> : MemoryPackFormatter<Dictionary
     }
 
     [Preserve]
-    public override void Deserialize(ref MemoryPackReader reader, scoped ref Dictionary<TKey, TValue?>? value)
+    public override void Deserialize(ref SharpPackReader reader, scoped ref Dictionary<TKey, TValue?>? value)
     {
         if (!reader.TryReadCollectionHeader(out var length))
         {

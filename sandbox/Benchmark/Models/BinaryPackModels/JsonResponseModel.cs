@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using BinaryPack.Models.Helpers;
 using BinaryPack.Models.Interfaces;
-using MemoryPack;
+using SharpPack;
 using MessagePack;
 using Orleans;
 using ProtoBuf;
@@ -16,13 +16,13 @@ namespace BinaryPack.Models
     /// A model that represents a container for a fake REST API response in JSON format
     /// </summary>
     [Serializable]
-    [MemoryPackable]
+    [SharpPackable]
     [MessagePackObject]
     [ProtoContract]
     [Orleans.GenerateSerializer]
     public sealed partial class JsonResponseModel : IInitializable, IEquatable<JsonResponseModel>
     {
-        [MemoryPackConstructor]
+        [SharpPackConstructor]
         public JsonResponseModel() { }
 
         public JsonResponseModel(bool initialize)
@@ -100,7 +100,7 @@ namespace BinaryPack.Models
     /// A model that represents a container for a fake API response
     /// </summary>
     [Serializable]
-    [MemoryPackable]
+    [SharpPackable]
     [MessagePackObject]
     [ProtoContract]
     [Orleans.GenerateSerializer]
@@ -140,7 +140,7 @@ namespace BinaryPack.Models
     /// A model that represents a REST API response for a single item
     /// </summary>
     [Serializable]
-    [MemoryPackable]
+    [SharpPackable]
     [MessagePackObject]
     [ProtoContract]
     [Orleans.GenerateSerializer]
@@ -314,7 +314,7 @@ namespace BinaryPack.Models
     /// A model that represents a collection of fake images
     /// </summary>
     [Serializable]
-    [MemoryPackable]
+    [SharpPackable]
     [MessagePackObject]
     [ProtoContract]
     [Orleans.GenerateSerializer]
@@ -366,7 +366,7 @@ namespace BinaryPack.Models
     /// A simple model that contains a fake URL to an image and some metadata
     /// </summary>
     [Serializable]
-    [MemoryPackable]
+    [SharpPackable]
     [MessagePackObject]
     [ProtoContract]
     [Orleans.GenerateSerializer]

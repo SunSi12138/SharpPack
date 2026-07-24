@@ -1,6 +1,6 @@
 using System.Buffers;
-using MemoryPack;
-using MemoryPack.Compression;
+using SharpPack;
+using SharpPack.Compression;
 
 namespace Benchmark.Benchmarks;
 
@@ -10,7 +10,7 @@ public class BitPackDecodeBenchmark
     byte[] payload = null!;
     bool[] currentDestination = null!;
     bool[] scalarDestination = null!;
-    MemoryPackReaderOptionalStateLease readerState;
+    SharpPackReaderOptionalStateLease readerState;
 
     [Params(32, 256, 4096, 65536)]
     public int Length { get; set; }
@@ -22,8 +22,8 @@ public class BitPackDecodeBenchmark
             .Select(static index => (index * 31 & 7) < 3)
             .ToArray();
         var bufferWriter = new ArrayBufferWriter<byte>();
-        using var writerState = MemoryPackWriterOptionalStatePool.Rent();
-        var writer = new MemoryPackWriter<ArrayBufferWriter<byte>>(
+        using var writerState = SharpPackWriterOptionalStatePool.Rent();
+        var writer = new SharpPackWriter<ArrayBufferWriter<byte>>(
             ref bufferWriter,
             writerState);
         BitPackFormatter.Default.Serialize(ref writer, ref source);
@@ -31,7 +31,7 @@ public class BitPackDecodeBenchmark
         payload = bufferWriter.WrittenSpan.ToArray();
         currentDestination = new bool[Length];
         scalarDestination = new bool[Length];
-        readerState = MemoryPackReaderOptionalStatePool.Rent();
+        readerState = SharpPackReaderOptionalStatePool.Rent();
     }
 
     [GlobalCleanup]
@@ -43,7 +43,7 @@ public class BitPackDecodeBenchmark
     [Benchmark]
     public bool[] Current()
     {
-        var reader = new MemoryPackReader(payload, readerState);
+        var reader = new SharpPackReader(payload, readerState);
         bool[]? destination = currentDestination;
         try
         {
@@ -61,7 +61,7 @@ public class BitPackDecodeBenchmark
     [Benchmark(Baseline = true)]
     public bool[] Scalar()
     {
-        var reader = new MemoryPackReader(payload, readerState);
+        var reader = new SharpPackReader(payload, readerState);
         bool[]? destination = scalarDestination;
         try
         {
@@ -75,7 +75,7 @@ public class BitPackDecodeBenchmark
     }
 
     static void ScalarDeserialize(
-        ref MemoryPackReader reader,
+        ref SharpPackReader reader,
         ref bool[]? value)
     {
         if (!reader.DangerousTryReadCollectionHeader(out var length))
@@ -94,7 +94,7 @@ public class BitPackDecodeBenchmark
         var requireSize = readCount * 4;
         if (reader.Remaining < requireSize)
         {
-            MemoryPackSerializationException.ThrowInsufficientBufferUnless(
+            SharpPackSerializationException.ThrowInsufficientBufferUnless(
                 length);
         }
 

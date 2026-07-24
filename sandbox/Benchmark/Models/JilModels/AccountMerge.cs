@@ -1,5 +1,5 @@
 ﻿#nullable disable
-using MemoryPack;
+using SharpPack;
 using MessagePack;
 using Orleans;
 using ProtoBuf;
@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 namespace Benchmark.Models
 {
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public partial class AccountMerge : IGenericEquality<AccountMerge>
     {
         [ProtoMember(1)]

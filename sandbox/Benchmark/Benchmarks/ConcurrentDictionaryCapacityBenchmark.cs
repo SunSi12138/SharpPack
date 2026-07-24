@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using MemoryPack;
+using SharpPack;
 
 namespace Benchmark.Benchmarks;
 
@@ -20,11 +20,11 @@ public class ConcurrentDictionaryCapacityBenchmark
             value[index] = index;
         }
 
-        payload = MemoryPackSerializer.Serialize(value);
+        payload = SharpPackSerializer.Serialize(value);
     }
 
     [Benchmark]
     public ConcurrentDictionary<int, int>? Deserialize()
-        => MemoryPackSerializer.Deserialize<ConcurrentDictionary<int, int>>(
+        => SharpPackSerializer.Deserialize<ConcurrentDictionary<int, int>>(
             payload);
 }

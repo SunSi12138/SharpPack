@@ -2,7 +2,7 @@
 using System.Linq;
 using BinaryPack.Models.Helpers;
 using BinaryPack.Models.Interfaces;
-using MemoryPack;
+using SharpPack;
 using MessagePack;
 using Orleans;
 using ProtoBuf;
@@ -15,7 +15,7 @@ namespace BinaryPack.Models
     /// A model that represents an example of a neural network model
     /// </summary>
     [Serializable]
-    [MemoryPackable]
+    [SharpPackable]
     [MessagePackObject]
     [ProtoContract]
     [Orleans.GenerateSerializer]

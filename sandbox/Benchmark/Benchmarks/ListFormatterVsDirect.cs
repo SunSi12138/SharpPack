@@ -1,7 +1,7 @@
 ﻿using Benchmark.BenchmarkNetUtilities;
 using Benchmark.Models;
-using MemoryPack;
-using MemoryPack.Formatters;
+using SharpPack;
+using SharpPack.Formatters;
 using Orleans.Serialization.Buffers;
 using System;
 using System.Buffers;
@@ -16,28 +16,28 @@ public class ListFormatterVsDirect
 {
     List<MyClass> value;
     byte[] bytes;
-    IMemoryPackFormatter<List<MyClass?>> formatter;
+    ISharpPackFormatter<List<MyClass?>> formatter;
     ArrayBufferWriter<byte> buffer;
-    MemoryPackWriterOptionalStateLease state;
-    MemoryPackReaderOptionalStateLease state2;
+    SharpPackWriterOptionalStateLease state;
+    SharpPackReaderOptionalStateLease state2;
 
     public ListFormatterVsDirect()
     {
         value = Enumerable.Range(0, 100)
             .Select(_ => new MyClass { X = 100, Y = 99999999, Z = 4444, FirstName = "Hoge Huga Tako", LastName = "あいうえおかきくけこ" })
             .ToList();
-        bytes = MemoryPackSerializer.Serialize(value);
+        bytes = SharpPackSerializer.Serialize(value);
         formatter = new ListFormatter<MyClass>();
         buffer = new ArrayBufferWriter<byte>(bytes.Length);
 
-        state = MemoryPackWriterOptionalStatePool.Rent(null);
-        state2 = MemoryPackReaderOptionalStatePool.Rent(null);
+        state = SharpPackWriterOptionalStatePool.Rent(null);
+        state2 = SharpPackReaderOptionalStatePool.Rent(null);
     }
 
     [Benchmark, BenchmarkCategory(Categories.Serialize)]
     public void SerializeFormatter()
     {
-        var writer = new MemoryPackWriter<ArrayBufferWriter<byte>>(ref buffer, state);
+        var writer = new SharpPackWriter<ArrayBufferWriter<byte>>(ref buffer, state);
         formatter.Serialize(ref writer, ref value!);
         writer.Flush();
         buffer.Clear();
@@ -46,8 +46,8 @@ public class ListFormatterVsDirect
     [Benchmark, BenchmarkCategory(Categories.Serialize)]
     public void SerializePackable()
     {
-        var writer = new MemoryPackWriter<ArrayBufferWriter<byte>>(ref buffer, state);
-        MemoryPack.Formatters.ListFormatter.SerializePackable(ref writer, value!);
+        var writer = new SharpPackWriter<ArrayBufferWriter<byte>>(ref buffer, state);
+        SharpPack.Formatters.ListFormatter.SerializePackable(ref writer, value!);
         writer.Flush();
         buffer.Clear();
     }
@@ -57,9 +57,9 @@ public class ListFormatterVsDirect
     public void DeserializeFormatter()
     {
         List<MyClass?>? list = null;
-        var reader = new MemoryPackReader(bytes, state2);
+        var reader = new SharpPackReader(bytes, state2);
         //reader.ReadPackableArray
-        // var a = MemoryPack.Formatters.ListFormatter.DeserializePackable<(ref reader);
+        // var a = SharpPack.Formatters.ListFormatter.DeserializePackable<(ref reader);
         formatter.Deserialize(ref reader, ref list);
         reader.Dispose();
     }
@@ -68,7 +68,7 @@ public class ListFormatterVsDirect
     public void DeserializePackable()
     {
         List<MyClass?>? list = null;
-        var reader = new MemoryPackReader(bytes, state2);
+        var reader = new SharpPackReader(bytes, state2);
         ListFormatter.DeserializePackable(ref reader, ref list!);
         reader.Dispose();
     }

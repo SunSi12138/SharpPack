@@ -1,6 +1,6 @@
 ﻿using Benchmark.BenchmarkNetUtilities;
 using BinaryPack.Models.Helpers;
-using MemoryPack;
+using SharpPack;
 using System.Net.Http;
 
 namespace Benchmark.Benchmarks;
@@ -23,85 +23,85 @@ public class Utf16VsUtf8
     {
         this.japanese = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん";
         this.ascii = "abcedfghijklmnopqrstuvwxyz0123456789";
-        this.utf16Jpn = MemoryPackSerializer.Serialize(japanese, BenchmarkContexts.Utf16);
-        this.utf8Jpn = MemoryPackSerializer.Serialize(japanese, BenchmarkContexts.Utf8);
-        this.utf16Ascii = MemoryPackSerializer.Serialize(ascii, BenchmarkContexts.Utf16);
-        this.utf8Ascii = MemoryPackSerializer.Serialize(ascii, BenchmarkContexts.Utf8);
+        this.utf16Jpn = SharpPackSerializer.Serialize(japanese, BenchmarkContexts.Utf16);
+        this.utf8Jpn = SharpPackSerializer.Serialize(japanese, BenchmarkContexts.Utf8);
+        this.utf16Ascii = SharpPackSerializer.Serialize(ascii, BenchmarkContexts.Utf16);
+        this.utf8Ascii = SharpPackSerializer.Serialize(ascii, BenchmarkContexts.Utf8);
 
         this.largeAscii = RandomProvider.NextString(600);
-        this.utf16LargeAscii = MemoryPackSerializer.Serialize(largeAscii, BenchmarkContexts.Utf16);
-        this.utf8LargeAscii = MemoryPackSerializer.Serialize(largeAscii, BenchmarkContexts.Utf8);
+        this.utf16LargeAscii = SharpPackSerializer.Serialize(largeAscii, BenchmarkContexts.Utf16);
+        this.utf8LargeAscii = SharpPackSerializer.Serialize(largeAscii, BenchmarkContexts.Utf8);
     }
 
     [Benchmark]
     public byte[] SerializeUtf16Ascii()
     {
-        return MemoryPackSerializer.Serialize(ascii, BenchmarkContexts.Utf16);
+        return SharpPackSerializer.Serialize(ascii, BenchmarkContexts.Utf16);
     }
 
     [Benchmark]
     public byte[] SerializeUtf16Japanese()
     {
-        return MemoryPackSerializer.Serialize(japanese, BenchmarkContexts.Utf16);
+        return SharpPackSerializer.Serialize(japanese, BenchmarkContexts.Utf16);
     }
 
     [Benchmark]
     public byte[] SerializeUtf8Ascii()
     {
-        return MemoryPackSerializer.Serialize(ascii, BenchmarkContexts.Utf8);
+        return SharpPackSerializer.Serialize(ascii, BenchmarkContexts.Utf8);
     }
 
     [Benchmark]
     public byte[] SerializeUtf8Japanese()
     {
-        return MemoryPackSerializer.Serialize(japanese, BenchmarkContexts.Utf8);
+        return SharpPackSerializer.Serialize(japanese, BenchmarkContexts.Utf8);
     }
 
     [Benchmark]
     public byte[] SerializeUtf16LargeAscii()
     {
-        return MemoryPackSerializer.Serialize(largeAscii, BenchmarkContexts.Utf16);
+        return SharpPackSerializer.Serialize(largeAscii, BenchmarkContexts.Utf16);
     }
 
     [Benchmark]
     public byte[] SerializeUtf8LargeAscii()
     {
-        return MemoryPackSerializer.Serialize(largeAscii, BenchmarkContexts.Utf8);
+        return SharpPackSerializer.Serialize(largeAscii, BenchmarkContexts.Utf8);
     }
 
     [Benchmark]
     public void DeserializeUtf16Ascii()
     {
-        MemoryPackSerializer.Deserialize<string>(utf16Ascii);
+        SharpPackSerializer.Deserialize<string>(utf16Ascii);
     }
 
     [Benchmark]
     public void DeserializeUtf16Japanese()
     {
-        MemoryPackSerializer.Deserialize<string>(utf16Jpn);
+        SharpPackSerializer.Deserialize<string>(utf16Jpn);
     }
 
     [Benchmark]
     public void DeserializeUtf8Ascii()
     {
-        MemoryPackSerializer.Deserialize<string>(utf8Ascii);
+        SharpPackSerializer.Deserialize<string>(utf8Ascii);
     }
 
     [Benchmark]
     public void DeserializeUtf8Japanese()
     {
-        MemoryPackSerializer.Deserialize<string>(utf8Jpn);
+        SharpPackSerializer.Deserialize<string>(utf8Jpn);
     }
 
     [Benchmark]
     public void DeserializeUtf16LargeAscii()
     {
-        MemoryPackSerializer.Deserialize<string>(utf16LargeAscii);
+        SharpPackSerializer.Deserialize<string>(utf16LargeAscii);
     }
 
     [Benchmark]
     public void DeserializeUtf8LargeAscii()
     {
-        MemoryPackSerializer.Deserialize<string>(utf8LargeAscii);
+        SharpPackSerializer.Deserialize<string>(utf8LargeAscii);
     }
 }

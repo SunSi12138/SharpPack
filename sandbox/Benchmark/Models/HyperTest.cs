@@ -1,4 +1,4 @@
-﻿using MemoryPack;
+﻿using SharpPack;
 
 namespace Benchmark.Models;
 
@@ -7,7 +7,7 @@ public enum TestEnum
     one, two, three
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial class HyperTest
 {
     public Guid? Gn { get; set; }

@@ -3,10 +3,10 @@
 #pragma warning disable CS8602
 #pragma warning disable CS8618
 
-using MemoryPack;
-using MemoryPack.Compression;
-using MemoryPack.Formatters;
-using MemoryPack.Streaming;
+using SharpPack;
+using SharpPack.Compression;
+using SharpPack.Formatters;
+using SharpPack.Streaming;
 using Microsoft.Extensions.DependencyInjection;
 using Samples;
 using SandboxConsoleApp;
@@ -35,19 +35,19 @@ sourceCollection.Collection.Add("1234");
 sourceCollection.Collection.Add("5678");
 
 Pipe bufferPipe = new Pipe();
-MemoryPackSerializer.Serialize(bufferPipe.Writer, sourceCollection);
+SharpPackSerializer.Serialize(bufferPipe.Writer, sourceCollection);
 _ = await bufferPipe.Writer.FlushAsync().ConfigureAwait(false);
 ReadResult resultBuffer = await bufferPipe.Reader.ReadAsync().ConfigureAwait(false);
 
 
 //var newSource = new CollectionTest();
-var newSource = MemoryPackSerializer.Deserialize<CollectionTest>(resultBuffer.Buffer);
+var newSource = SharpPackSerializer.Deserialize<CollectionTest>(resultBuffer.Buffer);
 Console.WriteLine(newSource.Collection.Count);
 
 
 
 
-[MemoryPackable]
+[SharpPackable]
 public partial class Region
 {
     public int positionX;
@@ -55,7 +55,7 @@ public partial class Region
     public int positionZ;
     public Dictionary<Vector3, Chunk> chunks;
 }
-[MemoryPackable]
+[SharpPackable]
 public partial class Chunk
 {
     public bool hasGeneratedBorders;
@@ -65,7 +65,7 @@ public partial class Chunk
     public List<Brush> brushes;
     public Dictionary<ByteVector3, int> brushBBPositions;
 }
-[MemoryPackable]
+[SharpPackable]
 public partial class ByteVector3
 {
     public byte x, y, z;
@@ -89,7 +89,7 @@ public partial class ByteVector3
         return System.HashCode.Combine(x, y, z);
     }
 }
-[MemoryPackable]
+[SharpPackable]
 public partial class Brush
 {
     public byte[] vertices;
@@ -99,19 +99,19 @@ public partial class Brush
 }
 
 
-[MemoryPackable]
+[SharpPackable]
 public partial class CollectionTest
 {
     public Collection<string> Collection { get; } = new Collection<string>();
 
-    [MemoryPackOnSerializing]
+    [SharpPackOnSerializing]
     void OnSerializing2()
     {
         Console.WriteLine(nameof(OnSerializing2));
     }
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial record MemPackTestObj
 {
     public string[] Strings { get; set; }
@@ -120,7 +120,7 @@ public partial record MemPackTestObj
 }
 
 
-[MemoryPackable]
+[SharpPackable]
 public partial class CctorSample
 {
     //static partial void StaticConstructor()
@@ -128,7 +128,7 @@ public partial class CctorSample
     //}
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial class ListBytesSample
 {
     public int Id { get; set; }
@@ -141,7 +141,7 @@ public partial class ListBytesSample
     //}
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial class IntClass2
 {
     public int Value { get; set; }
@@ -149,7 +149,7 @@ public partial class IntClass2
 
 
 
-[MemoryPackable]
+[SharpPackable]
 public partial struct BrotliValue<T>
 {
     public long Value { get; set; }
@@ -204,7 +204,7 @@ public partial struct BrotliValue<T>
 
 
 
-//MemoryPackSerializer.Serialize(brotli, "hogehogehugahuga", MemoryPackSerializeOptions.Default);
+//SharpPackSerializer.Serialize(brotli, "hogehogehugahuga", SharpPackSerializeOptions.Default);
 
 
 //var foobarbaz = brotli.ToArray();
@@ -227,7 +227,7 @@ public partial struct BrotliValue<T>
 //var hogehoge = dest2.AsMemory(0, written2);
 
 
-//var tako2 = MemoryPackSerializer.Deserialize<string>(hogehoge.Span);
+//var tako2 = SharpPackSerializer.Deserialize<string>(hogehoge.Span);
 
 //Console.WriteLine(foobarbaz.SequenceEqual(tako));
 
@@ -294,7 +294,7 @@ public partial struct BrotliValue<T>
 //encoder.Dispose();
 
 
-[MemoryPackable]
+[SharpPackable]
 [GenerateTypeScript]
 public partial class FooBarBaz
 {
@@ -338,22 +338,22 @@ public enum Huga : int
     HOKEPON
 }
 
-[MemoryPackable]
-[MemoryPackUnion(0, typeof(SampleUnion1))]
-[MemoryPackUnion(1, typeof(SampleUnion2))]
+[SharpPackable]
+[SharpPackUnion(0, typeof(SampleUnion1))]
+[SharpPackUnion(1, typeof(SampleUnion2))]
 [GenerateTypeScript]
 public partial interface IMogeUnion
 {
 }
 
-[MemoryPackable]
+[SharpPackable]
 [GenerateTypeScript]
 public partial class SampleUnion1 : IMogeUnion
 {
     public int? MyProperty { get; set; }
 }
 
-[MemoryPackable]
+[SharpPackable]
 [GenerateTypeScript]
 public partial class SampleUnion2 : IMogeUnion
 {
@@ -362,7 +362,7 @@ public partial class SampleUnion2 : IMogeUnion
 }
 
 
-[MemoryPackable(GenerateType.Object)]
+[SharpPackable(GenerateType.Object)]
 [GenerateTypeScript]
 public partial class Sonota1
 {
@@ -375,20 +375,20 @@ public class NoSerializableObject
 
 }
 
-[MemoryPackable(SerializeLayout.Explicit)]
+[SharpPackable(SerializeLayout.Explicit)]
 [GenerateTypeScript]
 public partial class Sonota2
 {
-    [MemoryPackOrder(1)]
+    [SharpPackOrder(1)]
     public int MyProperty1 { get; set; }
-    [MemoryPackOrder(0)]
+    [SharpPackOrder(0)]
     public int MyProperty2 { get; set; }
 }
 
-[MemoryPackable(GenerateType.Object, SerializeLayout.Explicit)]
+[SharpPackable(GenerateType.Object, SerializeLayout.Explicit)]
 public partial class Sonota3
 {
-    [MemoryPackOrder(0)]
+    [SharpPackOrder(0)]
     public int MyProperty { get; set; }
 }
 
@@ -396,10 +396,10 @@ public partial class Sonota3
 
 
 //var person = new Person();
-//var bin = MemoryPackSerializer.Serialize(person);
+//var bin = SharpPackSerializer.Serialize(person);
 
 //// overwrite data to existing instance.
-//MemoryPackSerializer.Deserialize(bin, ref person);
+//SharpPackSerializer.Deserialize(bin, ref person);
 
 //internal void WriteCore(ReadOnlySpan<byte> buffer, bool isFinalBlock = false)
 //{
@@ -446,12 +446,12 @@ public partial class Sonota3
 //}
 
 
-[MemoryPackable(GenerateType.Collection)]
+[SharpPackable(GenerateType.Collection)]
 public partial class ListGenerics<T> : List<T>
 {
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial class Person
 {
     public int Age { get; set; }
@@ -460,29 +460,29 @@ public partial class Person
 }
 
 
-[MemoryPackable]
+[SharpPackable]
 public partial record struct FooStruct(int x, int y);
 
-[MemoryPackable]
+[SharpPackable]
 public partial class Nu
 {
     public UnionType? XXX;
 }
 
-[MemoryPackable]
-[MemoryPackUnion(0, typeof(A))]
+[SharpPackable]
+[SharpPackUnion(0, typeof(A))]
 public partial interface UnionType
 {
 
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial class A : UnionType
 {
 
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial class Foo
 {
 
@@ -498,7 +498,7 @@ public partial class Foo
 }
 
 
-[MemoryPackable]
+[SharpPackable]
 public partial class MonoMono
 {
     public FooBarFruit Yey { get; set; } = default!;
@@ -513,7 +513,7 @@ public enum FooBarFruit
 
 
 #pragma warning disable CS8618
-[MemoryPackable]
+[SharpPackable]
 public partial class HogeHoge
 {
     public BigInteger P1;
@@ -592,50 +592,50 @@ public partial class HogeHoge
 }
 
 
-[MemoryPackable]
+[SharpPackable]
 public partial struct MyStruct
 {
     public string? V;
 }
 
 
-[MemoryPackable(GenerateType.Collection)]
+[SharpPackable(GenerateType.Collection)]
 public partial class ListInt : List<int>
 {
 
 }
 
-[MemoryPackable(GenerateType.Collection)]
+[SharpPackable(GenerateType.Collection)]
 public partial class SetInt : HashSet<int>
 {
 }
 
-[MemoryPackable(GenerateType.Collection)]
+[SharpPackable(GenerateType.Collection)]
 public partial class DictionaryIntInt : Dictionary<int, int>
 {
 }
 
 
 
-[MemoryPackable(GenerateType.Collection)]
+[SharpPackable(GenerateType.Collection)]
 public partial class SetGenerics<T> : HashSet<T>
 {
 }
 
-[MemoryPackable(GenerateType.Collection)]
+[SharpPackable(GenerateType.Collection)]
 public partial class DictionaryGenerics<TK, TV> : Dictionary<TK, TV>
     where TK : notnull
 {
 }
 
 
-//[MemoryPackable]
+//[SharpPackable]
 //public partial class Packable<T>
 //{
 //    public int TakoyakiX { get; set; }
-//    [MemoryPackIgnore]
+//    [SharpPackIgnore]
 //    public object? ObjectObject { get; set; }
-//    [MemoryPackIgnore]
+//    [SharpPackIgnore]
 //    public Array? StandardArray { get; set; }
 //    public int[]? Array { get; set; }
 //    public int[,]? MoreArray { get; set; }
@@ -644,10 +644,10 @@ public partial class DictionaryGenerics<TK, TV> : Dictionary<TK, TV>
 
 //    public T? TTTTT { get; set; }
 
-//    [MemoryPackFormatter]
+//    [SharpPackFormatter]
 //    public Nazo? MyProperty { get; set; }
 
-//    [MemoryPackFormatter]
+//    [SharpPackFormatter]
 //    public Nazo2? MyProperty2 { get; set; }
 //}
 
@@ -674,7 +674,7 @@ public partial class DictionaryGenerics<TK, TV> : Dictionary<TK, TV>
 
 
 
-[MemoryPackable]
+[SharpPackable]
 public partial class Sample
 {
     // these types are serialized by default
@@ -691,14 +691,14 @@ public partial class Sample
     int privateField;
     readonly int privateReadOnlyField;
 
-    // use [MemoryPackIgnore] to remove target of public member
-    [MemoryPackIgnore]
+    // use [SharpPackIgnore] to remove target of public member
+    [SharpPackIgnore]
     public int PublicProperty2 => PublicProperty + PublicField;
 
-    // use [MemoryPackInclude] to promote private member to serialization target
-    [MemoryPackInclude]
+    // use [SharpPackInclude] to promote private member to serialization target
+    [SharpPackInclude]
     int privateField2;
-    [MemoryPackInclude]
+    [SharpPackInclude]
     int privateProperty2 { get; set; }
 }
 
@@ -711,7 +711,7 @@ public struct DateTimeParamDefault
 }
 
 [StructLayout(LayoutKind.Sequential)]
-[MemoryPackable]
+[SharpPackable]
 public partial struct TesTest
 {
     public ValueTuple<int, int> VTI;
@@ -720,7 +720,7 @@ public partial struct TesTest
 }
 
 [StructLayout(LayoutKind.Sequential)]
-[MemoryPackable]
+[SharpPackable]
 public partial struct DateTimeParamSequential
 {
     public DateTimeOffset DateTime; // short offset(2+padding) + dateTime/ulong(8) = 16
@@ -729,7 +729,7 @@ public partial struct DateTimeParamSequential
 }
 
 [StructLayout(LayoutKind.Auto)]
-[MemoryPackable]
+[SharpPackable]
 public partial struct DateTimeParamAuto
 {
     public DateTimeOffset DateTime; // short offset(2+padding) + dateTime/ulong(8) = 16
@@ -738,7 +738,7 @@ public partial struct DateTimeParamAuto
 }
 
 [StructLayout(LayoutKind.Explicit, Size = 25)]
-[MemoryPackable]
+[SharpPackable]
 public partial struct DateTimeParamExplicit
 {
     [FieldOffset(9)]
@@ -754,13 +754,13 @@ public struct MyMessageHeader
 {
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial struct HogeEEE
 {
     public int X;
     public int Y;
 
-    // [MemoryPackConstructor]
+    // [SharpPackConstructor]
     public HogeEEE(int x, int y)
     {
         this.X = x;

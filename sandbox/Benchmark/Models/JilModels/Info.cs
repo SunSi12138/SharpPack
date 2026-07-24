@@ -1,5 +1,5 @@
 ﻿#nullable disable
-using MemoryPack;
+using SharpPack;
 using MessagePack;
 using Orleans;
 using ProtoBuf;
@@ -20,7 +20,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public partial class Styling : IGenericEquality<Styling>
     {
         [ProtoMember(1)]
@@ -52,7 +52,7 @@ namespace Benchmark.Models
 
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public partial class Site : IGenericEquality<Site>
     {
         [ProtoMember(1)]
@@ -158,7 +158,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public partial class Info : IGenericEquality<Info>
     {
 
@@ -253,7 +253,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public partial class RelatedSite : IGenericEquality<RelatedSite>
     {
         [ProtoMember(1)]

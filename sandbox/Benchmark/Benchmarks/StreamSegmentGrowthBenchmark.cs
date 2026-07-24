@@ -1,4 +1,4 @@
-using MemoryPack;
+using SharpPack;
 
 namespace Benchmark.Benchmarks;
 
@@ -14,7 +14,7 @@ public class StreamSegmentGrowthBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        payload = MemoryPackSerializer.Serialize(new byte[PayloadSize]);
+        payload = SharpPackSerializer.Serialize(new byte[PayloadSize]);
         stream = new NonMemoryReadStream(payload);
     }
 
@@ -22,7 +22,7 @@ public class StreamSegmentGrowthBenchmark
     public async ValueTask<byte[]?> Deserialize()
     {
         stream.Reset();
-        return await MemoryPackSerializer.DeserializeAsync<byte[]>(stream);
+        return await SharpPackSerializer.DeserializeAsync<byte[]>(stream);
     }
 
     sealed class NonMemoryReadStream(byte[] source) : Stream

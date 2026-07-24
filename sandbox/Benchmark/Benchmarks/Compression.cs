@@ -2,8 +2,8 @@
 using BenchmarkDotNet.Configs;
 using K4os.Compression.LZ4.Encoders;
 using K4os.Compression.LZ4.Streams;
-using MemoryPack;
-using MemoryPack.Compression;
+using SharpPack;
+using SharpPack.Compression;
 using System.IO.Compression;
 
 namespace Benchmark.Benchmarks;
@@ -29,21 +29,21 @@ public class Compression<T> : SerializerTestBase<T>
         L10Opt = new LZ4EncoderSettings { CompressionLevel = K4os.Compression.LZ4.LZ4Level.L10_OPT };
         L04HC = new LZ4EncoderSettings { CompressionLevel = K4os.Compression.LZ4.LZ4Level.L04_HC };
 
-        normal = SerializeMemoryPack();
+        normal = SerializeSharpPack();
         brotliFast = BrotliCompressQ1();
         lz4Fast = LZ4CompressStreamFast();
     }
 
     [Benchmark(Baseline = true), BenchmarkCategory(Categories.Serialize)]
-    public byte[] SerializeMemoryPack()
+    public byte[] SerializeSharpPack()
     {
-        return MemoryPackSerializer.Serialize(value, BenchmarkContexts.Utf8);
+        return SharpPackSerializer.Serialize(value, BenchmarkContexts.Utf8);
     }
 
     [Benchmark]
-    public byte[] SerializeMemoryPackUtf16()
+    public byte[] SerializeSharpPackUtf16()
     {
-        return MemoryPackSerializer.Serialize(value, BenchmarkContexts.Utf16);
+        return SharpPackSerializer.Serialize(value, BenchmarkContexts.Utf16);
     }
 
     [Benchmark, BenchmarkCategory(Categories.Serialize)]
@@ -52,7 +52,7 @@ public class Compression<T> : SerializerTestBase<T>
         var compressor = new BrotliCompressor(quality: 1);
         try
         {
-            MemoryPackSerializer.Serialize(ref compressor, value, BenchmarkContexts.Utf8);
+            SharpPackSerializer.Serialize(ref compressor, value, BenchmarkContexts.Utf8);
             return compressor.ToArray();
         }
         finally
@@ -67,7 +67,7 @@ public class Compression<T> : SerializerTestBase<T>
         var compressor = new BrotliCompressor(quality: 2);
         try
         {
-            MemoryPackSerializer.Serialize(ref compressor, value, BenchmarkContexts.Utf8);
+            SharpPackSerializer.Serialize(ref compressor, value, BenchmarkContexts.Utf8);
             return compressor.ToArray();
         }
         finally
@@ -82,7 +82,7 @@ public class Compression<T> : SerializerTestBase<T>
         var compressor = new BrotliCompressor(quality: 3);
         try
         {
-            MemoryPackSerializer.Serialize(ref compressor, value, BenchmarkContexts.Utf8);
+            SharpPackSerializer.Serialize(ref compressor, value, BenchmarkContexts.Utf8);
             return compressor.ToArray();
         }
         finally
@@ -97,7 +97,7 @@ public class Compression<T> : SerializerTestBase<T>
         var compressor = new BrotliCompressor(quality: 4);
         try
         {
-            MemoryPackSerializer.Serialize(ref compressor, value, BenchmarkContexts.Utf8);
+            SharpPackSerializer.Serialize(ref compressor, value, BenchmarkContexts.Utf8);
             return compressor.ToArray();
         }
         finally
@@ -112,7 +112,7 @@ public class Compression<T> : SerializerTestBase<T>
         ms.Position = 0;
         using (var brotli = new BrotliStream(ms, CompressionLevel.Fastest, leaveOpen: true))
         {
-            MemoryPackSerializer.SerializeAsync(brotli, value, BenchmarkContexts.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
+            SharpPackSerializer.SerializeAsync(brotli, value, BenchmarkContexts.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
         }
         ms.Flush();
         return ms.ToArray();
@@ -124,7 +124,7 @@ public class Compression<T> : SerializerTestBase<T>
         ms.Position = 0;
         using (var brotli = new BrotliStream(ms, CompressionLevel.Optimal, leaveOpen: true))
         {
-            MemoryPackSerializer.SerializeAsync(brotli, value, BenchmarkContexts.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
+            SharpPackSerializer.SerializeAsync(brotli, value, BenchmarkContexts.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
         }
         ms.Flush();
         return ms.ToArray();
@@ -136,7 +136,7 @@ public class Compression<T> : SerializerTestBase<T>
         ms.Position = 0;
         using (var brotli = new BrotliStream(ms, CompressionLevel.SmallestSize, leaveOpen: true))
         {
-            MemoryPackSerializer.SerializeAsync(brotli, value, BenchmarkContexts.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
+            SharpPackSerializer.SerializeAsync(brotli, value, BenchmarkContexts.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
         }
         ms.Flush();
         return ms.ToArray();
@@ -148,7 +148,7 @@ public class Compression<T> : SerializerTestBase<T>
         ms.Position = 0;
         using (var brotli = new BrotliStream(ms, CompressionLevel.NoCompression, leaveOpen: true))
         {
-            MemoryPackSerializer.SerializeAsync(brotli, value, BenchmarkContexts.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
+            SharpPackSerializer.SerializeAsync(brotli, value, BenchmarkContexts.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
         }
         ms.Flush();
         return ms.ToArray();
@@ -162,7 +162,7 @@ public class Compression<T> : SerializerTestBase<T>
         ms.Position = 0;
         using (var lz4 = LZ4Stream.Encode(ms, Fast, leaveOpen: true))
         {
-            MemoryPackSerializer.SerializeAsync(lz4, value, BenchmarkContexts.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
+            SharpPackSerializer.SerializeAsync(lz4, value, BenchmarkContexts.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
         }
         ms.Flush();
         return ms.ToArray();
@@ -176,7 +176,7 @@ public class Compression<T> : SerializerTestBase<T>
         ms.Position = 0;
         using (var lz4 = LZ4Stream.Encode(ms, L04HC, leaveOpen: true))
         {
-            MemoryPackSerializer.SerializeAsync(lz4, value, BenchmarkContexts.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
+            SharpPackSerializer.SerializeAsync(lz4, value, BenchmarkContexts.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
         }
         ms.Flush();
         return ms.ToArray();
@@ -188,7 +188,7 @@ public class Compression<T> : SerializerTestBase<T>
         ms.Position = 0;
         using (var lz4 = LZ4Stream.Encode(ms, L10Opt, leaveOpen: true))
         {
-            MemoryPackSerializer.SerializeAsync(lz4, value, BenchmarkContexts.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
+            SharpPackSerializer.SerializeAsync(lz4, value, BenchmarkContexts.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
         }
         ms.Flush();
         return ms.ToArray();
@@ -197,16 +197,16 @@ public class Compression<T> : SerializerTestBase<T>
     //Decompress
 
     [Benchmark(Baseline = true), BenchmarkCategory(Categories.Deserialize)]
-    public T? DeserializeMemoryPack()
+    public T? DeserializeSharpPack()
     {
-        return MemoryPackSerializer.Deserialize<T>(normal);
+        return SharpPackSerializer.Deserialize<T>(normal);
     }
 
     [Benchmark(), BenchmarkCategory(Categories.Deserialize)]
     public T? DecompressBrotli()
     {
         using var decompressor = new BrotliDecompressor();
-        return MemoryPackSerializer.Deserialize<T>(decompressor.Decompress(brotliFast));
+        return SharpPackSerializer.Deserialize<T>(decompressor.Decompress(brotliFast));
     }
 
     [Benchmark(), BenchmarkCategory(Categories.Deserialize)]
@@ -215,7 +215,7 @@ public class Compression<T> : SerializerTestBase<T>
         using (var ms2 = new MemoryStream(brotliFast))
         using (var brotli = new BrotliStream(ms2, CompressionMode.Decompress))
         {
-            return MemoryPackSerializer.DeserializeAsync<T>(brotli).GetAwaiter().GetResult();
+            return SharpPackSerializer.DeserializeAsync<T>(brotli).GetAwaiter().GetResult();
         }
     }
 
@@ -225,7 +225,7 @@ public class Compression<T> : SerializerTestBase<T>
         using (var ms2 = new MemoryStream(lz4Fast))
         using (var lz4 = LZ4Stream.Decode(ms2, leaveOpen: true))
         {
-            return MemoryPackSerializer.DeserializeAsync<T>(lz4).GetAwaiter().GetResult();
+            return SharpPackSerializer.DeserializeAsync<T>(lz4).GetAwaiter().GetResult();
         }
     }
 
@@ -239,7 +239,7 @@ public class Compression<T> : SerializerTestBase<T>
     //    ms.Position = 0;
     //    using (var GZip = new GZipStream(ms, CompressionLevel.Fastest, leaveOpen: true))
     //    {
-    //        MemoryPackSerializer.SerializeAsync(GZip, value, MemoryPackSerializeOptions.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
+    //        SharpPackSerializer.SerializeAsync(GZip, value, SharpPackSerializeOptions.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
     //    }
     //    ms.Flush();
     //    return ms.ToArray();
@@ -251,7 +251,7 @@ public class Compression<T> : SerializerTestBase<T>
     //    ms.Position = 0;
     //    using (var GZip = new GZipStream(ms, CompressionLevel.Optimal, leaveOpen: true))
     //    {
-    //        MemoryPackSerializer.SerializeAsync(GZip, value, MemoryPackSerializeOptions.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
+    //        SharpPackSerializer.SerializeAsync(GZip, value, SharpPackSerializeOptions.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
     //    }
     //    ms.Flush();
     //    return ms.ToArray();
@@ -263,7 +263,7 @@ public class Compression<T> : SerializerTestBase<T>
     //    ms.Position = 0;
     //    using (var GZip = new GZipStream(ms, CompressionLevel.SmallestSize, leaveOpen: true))
     //    {
-    //        MemoryPackSerializer.SerializeAsync(GZip, value, MemoryPackSerializeOptions.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
+    //        SharpPackSerializer.SerializeAsync(GZip, value, SharpPackSerializeOptions.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
     //    }
     //    ms.Flush();
     //    return ms.ToArray();
@@ -275,7 +275,7 @@ public class Compression<T> : SerializerTestBase<T>
     //    ms.Position = 0;
     //    using (var GZip = new GZipStream(ms, CompressionLevel.NoCompression, leaveOpen: true))
     //    {
-    //        MemoryPackSerializer.SerializeAsync(GZip, value, MemoryPackSerializeOptions.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
+    //        SharpPackSerializer.SerializeAsync(GZip, value, SharpPackSerializeOptions.Utf8).ConfigureAwait(false).GetAwaiter().GetResult();
     //    }
     //    ms.Flush();
     //    return ms.ToArray();

@@ -6,24 +6,27 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)opensource.snk</AssemblyOriginatorKeyFile>
+    <VersionPrefix>1.0.0</VersionPrefix>
 
     <!-- NuGet Packaging -->
     <IsPackable>false</IsPackable>
     <PackageVersion>$(Version)</PackageVersion>
-    <Company>Cysharp</Company>
-    <Authors>Cysharp</Authors>
-    <Copyright>© Cysharp, Inc.</Copyright>
-    <PackageProjectUrl>https://github.com/Cysharp/MemoryPack</PackageProjectUrl>
+    <Company>SunSi12138</Company>
+    <Authors>SunSi12138</Authors>
+    <Copyright>© 2026 SunSi12138; portions © 2022 Cysharp, Inc.</Copyright>
+    <PackageProjectUrl>https://github.com/SunSi12138/SharpPack</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageIcon>Icon.png</PackageIcon>
+    <PackageTags>serializer;binary;zero-copy;memorypack-compatible</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)Icon.png" Pack="true" PackagePath="\" />
     <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" />
+    <None Include="$(MSBuildThisFileDirectory)NOTICE" Pack="true" PackagePath="\" />
     <EmbeddedResource Include="$(MSBuildThisFileDirectory)LICENSE" />
   </ItemGroup>
 </Project>

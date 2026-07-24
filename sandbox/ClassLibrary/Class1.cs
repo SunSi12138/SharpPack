@@ -1,7 +1,7 @@
 ﻿
-using MemoryPack;
+using SharpPack;
 
-[MemoryPackable]
+[SharpPackable]
 public partial class Stat
 {
     

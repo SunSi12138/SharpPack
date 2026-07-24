@@ -4,8 +4,8 @@ set -euo pipefail
 readonly source_commit="85ab9ad76c380aca48c09ff3a0ad955ee5a2902b"
 readonly script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly repository_root="$(cd "${script_dir}/../.." && pwd)"
-readonly tracked_corpus="${repository_root}/tests/MemoryPack.Tests/Compatibility/original-head-golden.json"
-readonly baseline_root="$(mktemp -d /tmp/memorypack-golden-XXXXXXXX)"
+readonly tracked_corpus="${repository_root}/tests/SharpPack.Tests/Compatibility/original-head-golden.json"
+readonly baseline_root="$(mktemp -d /tmp/sharppack-golden-XXXXXXXX)"
 update_corpus=false
 
 if [[ $# -gt 1 ]] || [[ $# -eq 1 && "$1" != "--update" ]]

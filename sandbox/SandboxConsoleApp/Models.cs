@@ -1,6 +1,6 @@
-﻿using MemoryPack;
-using MemoryPack.Formatters;
-using MemoryPack.Internal;
+﻿using SharpPack;
+using SharpPack.Formatters;
+using SharpPack.Internal;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 using System;
@@ -24,14 +24,14 @@ public class NewBase
     public long Description { get; set; }
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial struct FooUnman
 {
     public float MyProperty { get; set; }
     public float MyProperty2 { get; set; }
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial class NewProp : NewBase, IMore
 {
     Version IMore.Description { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
@@ -44,14 +44,14 @@ public partial class NewProp : NewBase, IMore
 }
 
 
-[MemoryPackable]
+[SharpPackable]
 public partial class NotNotOmu
 {
     public Guid? GUIDNULLABLE { get; set; }
 }
 
 
-[MemoryPackable]
+[SharpPackable]
 public partial class Mop
 {
     public NoGen? MyProperty { get; set; }
@@ -60,7 +60,7 @@ public partial class Mop
 }
 
 
-[MemoryPackable]
+[SharpPackable]
 public partial class NotSample
 {
     [Utf8StringFormatter]
@@ -68,30 +68,30 @@ public partial class NotSample
 
 }
 
-[MemoryPackable(GenerateType.CircularReference)]
+[SharpPackable(GenerateType.CircularReference)]
 public partial class Node
 {
-    [MemoryPackOrder(0)]
+    [SharpPackOrder(0)]
     public Node? Parent { get; set; }
-    [MemoryPackOrder(1)]
+    [SharpPackOrder(1)]
     public Node[]? Children { get; set; }
 }
 
-[MemoryPackable(GenerateType.VersionTolerant)]
+[SharpPackable(GenerateType.VersionTolerant)]
 public partial class TakoyakiY
 {
-    [MemoryPackOrder(1)]
+    [SharpPackOrder(1)]
     public string? Bar { get; set; }
-    [MemoryPackOrder(10)]
+    [SharpPackOrder(10)]
     public int Foo { get; set; }
 }
 
-[MemoryPackable(GenerateType.CircularReference)]
+[SharpPackable(GenerateType.CircularReference)]
 public partial class Suage
 {
-    [MemoryPackOrder(0)]
+    [SharpPackOrder(0)]
     public int Prop1 { get; set; }
-    [MemoryPackOrder(2)]
+    [SharpPackOrder(2)]
     public int Prop2 { get; set; }
 
     //public Suage(int prop1, int prop2)
@@ -103,12 +103,12 @@ public partial class Suage
 
 
 
-[MemoryPackable(GenerateType.NoGenerate)]
+[SharpPackable(GenerateType.NoGenerate)]
 public partial class NoGen
 {
 }
 
-[MemoryPackable(GenerateType.Collection)]
+[SharpPackable(GenerateType.Collection)]
 public partial class LisList : List<int>
 {
 

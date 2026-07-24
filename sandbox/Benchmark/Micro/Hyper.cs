@@ -1,6 +1,6 @@
 ﻿using Benchmark.Models;
 using BenchmarkDotNet.Order;
-using MemoryPack;
+using SharpPack;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,19 +32,19 @@ public class Hyper
             //  I = i.ToString()
         };
 
-        bin = MemoryPackSerializer.Serialize(test);
+        bin = SharpPackSerializer.Serialize(test);
     }
 
     [Benchmark]
     public byte[] Serialize()
     {
-        return MemoryPackSerializer.Serialize(test);
+        return SharpPackSerializer.Serialize(test);
     }
 
     [Benchmark]
     public HyperTest? Deserialize()
     {
-        return MemoryPackSerializer.Deserialize<HyperTest>(bin);
+        return SharpPackSerializer.Deserialize<HyperTest>(bin);
     }
 }
 

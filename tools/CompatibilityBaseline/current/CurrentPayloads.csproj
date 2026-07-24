@@ -6,6 +6,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../../src/MemoryPack.Core/MemoryPack.Core.csproj" />
+    <ProjectReference Include="../../../src/SharpPack.Core/SharpPack.Core.csproj" />
   </ItemGroup>
 </Project>

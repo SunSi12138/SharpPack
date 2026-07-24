@@ -1,4 +1,4 @@
-using MemoryPack;
+using SharpPack;
 
 namespace Benchmark.Benchmarks;
 
@@ -8,13 +8,13 @@ public class FormatterArchitectureBenchmark
     readonly FormatterBenchmarkDto simple = new()
     {
         Id = 42,
-        Name = "MemoryPack",
+        Name = "SharpPack",
     };
 
     readonly FormatterBenchmarkGraph graph = new()
     {
         Id = 42,
-        Name = "MemoryPack",
+        Name = "SharpPack",
         Child = new FormatterBenchmarkChild { Value = 10 },
         Children = Enumerable.Range(0, 32).Select(static x => new FormatterBenchmarkChild { Value = x }).ToArray(),
         ChildList = Enumerable.Range(0, 32).Select(static x => new FormatterBenchmarkChild { Value = x }).ToList(),
@@ -39,82 +39,82 @@ public class FormatterArchitectureBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        stringBytes = MemoryPackSerializer.Serialize("MemoryPack formatter architecture benchmark");
-        simpleBytes = MemoryPackSerializer.Serialize(simple);
-        graphBytes = MemoryPackSerializer.Serialize(graph);
-        primitiveArrayBytes = MemoryPackSerializer.Serialize(primitiveArray);
-        listBytes = MemoryPackSerializer.Serialize(list);
-        dictionaryBytes = MemoryPackSerializer.Serialize(dictionary);
-        unionBytes = MemoryPackSerializer.Serialize<FormatterBenchmarkUnion>(union);
-        circularBytes = MemoryPackSerializer.Serialize(circular);
+        stringBytes = SharpPackSerializer.Serialize("SharpPack formatter architecture benchmark");
+        simpleBytes = SharpPackSerializer.Serialize(simple);
+        graphBytes = SharpPackSerializer.Serialize(graph);
+        primitiveArrayBytes = SharpPackSerializer.Serialize(primitiveArray);
+        listBytes = SharpPackSerializer.Serialize(list);
+        dictionaryBytes = SharpPackSerializer.Serialize(dictionary);
+        unionBytes = SharpPackSerializer.Serialize<FormatterBenchmarkUnion>(union);
+        circularBytes = SharpPackSerializer.Serialize(circular);
 
-        _ = MemoryPackSerializer.Deserialize<string>(stringBytes);
-        _ = MemoryPackSerializer.Deserialize<FormatterBenchmarkDto>(simpleBytes);
-        _ = MemoryPackSerializer.Deserialize<FormatterBenchmarkGraph>(graphBytes);
-        _ = MemoryPackSerializer.Deserialize<int[]>(primitiveArrayBytes);
-        _ = MemoryPackSerializer.Deserialize<List<FormatterBenchmarkChild>>(listBytes);
-        _ = MemoryPackSerializer.Deserialize<Dictionary<int, FormatterBenchmarkChild>>(dictionaryBytes);
-        _ = MemoryPackSerializer.Deserialize<FormatterBenchmarkUnion>(unionBytes);
-        _ = MemoryPackSerializer.Deserialize<FormatterBenchmarkCircular>(circularBytes);
+        _ = SharpPackSerializer.Deserialize<string>(stringBytes);
+        _ = SharpPackSerializer.Deserialize<FormatterBenchmarkDto>(simpleBytes);
+        _ = SharpPackSerializer.Deserialize<FormatterBenchmarkGraph>(graphBytes);
+        _ = SharpPackSerializer.Deserialize<int[]>(primitiveArrayBytes);
+        _ = SharpPackSerializer.Deserialize<List<FormatterBenchmarkChild>>(listBytes);
+        _ = SharpPackSerializer.Deserialize<Dictionary<int, FormatterBenchmarkChild>>(dictionaryBytes);
+        _ = SharpPackSerializer.Deserialize<FormatterBenchmarkUnion>(unionBytes);
+        _ = SharpPackSerializer.Deserialize<FormatterBenchmarkCircular>(circularBytes);
     }
 
     [Benchmark]
-    public byte[] SerializePrimitive() => MemoryPackSerializer.Serialize(42);
+    public byte[] SerializePrimitive() => SharpPackSerializer.Serialize(42);
 
     [Benchmark]
-    public int DeserializePrimitive() => MemoryPackSerializer.Deserialize<int>(new byte[] { 42, 0, 0, 0 });
+    public int DeserializePrimitive() => SharpPackSerializer.Deserialize<int>(new byte[] { 42, 0, 0, 0 });
 
     [Benchmark]
-    public byte[] SerializeString() => MemoryPackSerializer.Serialize("MemoryPack formatter architecture benchmark");
+    public byte[] SerializeString() => SharpPackSerializer.Serialize("SharpPack formatter architecture benchmark");
 
     [Benchmark]
-    public string? DeserializeString() => MemoryPackSerializer.Deserialize<string>(stringBytes);
+    public string? DeserializeString() => SharpPackSerializer.Deserialize<string>(stringBytes);
 
     [Benchmark]
-    public byte[] SerializeSimple() => MemoryPackSerializer.Serialize(simple);
+    public byte[] SerializeSimple() => SharpPackSerializer.Serialize(simple);
 
     [Benchmark]
-    public FormatterBenchmarkDto? DeserializeSimple() => MemoryPackSerializer.Deserialize<FormatterBenchmarkDto>(simpleBytes);
+    public FormatterBenchmarkDto? DeserializeSimple() => SharpPackSerializer.Deserialize<FormatterBenchmarkDto>(simpleBytes);
 
     [Benchmark]
-    public byte[] SerializeGraph() => MemoryPackSerializer.Serialize(graph);
+    public byte[] SerializeGraph() => SharpPackSerializer.Serialize(graph);
 
     [Benchmark]
-    public FormatterBenchmarkGraph? DeserializeGraph() => MemoryPackSerializer.Deserialize<FormatterBenchmarkGraph>(graphBytes);
+    public FormatterBenchmarkGraph? DeserializeGraph() => SharpPackSerializer.Deserialize<FormatterBenchmarkGraph>(graphBytes);
 
     [Benchmark]
-    public byte[] SerializeArray() => MemoryPackSerializer.Serialize(primitiveArray);
+    public byte[] SerializeArray() => SharpPackSerializer.Serialize(primitiveArray);
 
     [Benchmark]
-    public int[]? DeserializeArray() => MemoryPackSerializer.Deserialize<int[]>(primitiveArrayBytes);
+    public int[]? DeserializeArray() => SharpPackSerializer.Deserialize<int[]>(primitiveArrayBytes);
 
     [Benchmark]
-    public byte[] SerializeList() => MemoryPackSerializer.Serialize(list);
+    public byte[] SerializeList() => SharpPackSerializer.Serialize(list);
 
     [Benchmark]
-    public List<FormatterBenchmarkChild>? DeserializeList() => MemoryPackSerializer.Deserialize<List<FormatterBenchmarkChild>>(listBytes);
+    public List<FormatterBenchmarkChild>? DeserializeList() => SharpPackSerializer.Deserialize<List<FormatterBenchmarkChild>>(listBytes);
 
     [Benchmark]
-    public byte[] SerializeDictionary() => MemoryPackSerializer.Serialize(dictionary);
+    public byte[] SerializeDictionary() => SharpPackSerializer.Serialize(dictionary);
 
     [Benchmark]
     public Dictionary<int, FormatterBenchmarkChild>? DeserializeDictionary()
-        => MemoryPackSerializer.Deserialize<Dictionary<int, FormatterBenchmarkChild>>(dictionaryBytes);
+        => SharpPackSerializer.Deserialize<Dictionary<int, FormatterBenchmarkChild>>(dictionaryBytes);
 
     [Benchmark]
-    public byte[] SerializeUnion() => MemoryPackSerializer.Serialize<FormatterBenchmarkUnion>(union);
+    public byte[] SerializeUnion() => SharpPackSerializer.Serialize<FormatterBenchmarkUnion>(union);
 
     [Benchmark]
     public FormatterBenchmarkUnion? DeserializeUnion()
-        => MemoryPackSerializer.Deserialize<FormatterBenchmarkUnion>(unionBytes);
+        => SharpPackSerializer.Deserialize<FormatterBenchmarkUnion>(unionBytes);
 
     [Benchmark]
     public byte[] SerializeCircularReference()
-        => MemoryPackSerializer.Serialize(circular);
+        => SharpPackSerializer.Serialize(circular);
 
     [Benchmark]
     public FormatterBenchmarkCircular? DeserializeCircularReference()
-        => MemoryPackSerializer.Deserialize<FormatterBenchmarkCircular>(
+        => SharpPackSerializer.Deserialize<FormatterBenchmarkCircular>(
             circularBytes);
 
     static FormatterBenchmarkCircular CreateCircular()
@@ -128,12 +128,12 @@ public class FormatterArchitectureBenchmark
 [MemoryDiagnoser]
 public class FormatterContextBenchmark
 {
-    readonly MemoryPackSerializerContext context = new();
-    readonly FormatterBenchmarkDto simple = new() { Id = 42, Name = "MemoryPack" };
+    readonly SharpPackSerializerContext context = new();
+    readonly FormatterBenchmarkDto simple = new() { Id = 42, Name = "SharpPack" };
     readonly FormatterBenchmarkGraph graph = new()
     {
         Id = 42,
-        Name = "MemoryPack",
+        Name = "SharpPack",
         Child = new FormatterBenchmarkChild { Value = 10 },
         Children = Enumerable.Range(0, 32).Select(static x => new FormatterBenchmarkChild { Value = x }).ToArray(),
         ChildList = Enumerable.Range(0, 32).Select(static x => new FormatterBenchmarkChild { Value = x }).ToList(),
@@ -157,80 +157,80 @@ public class FormatterContextBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        stringBytes = MemoryPackSerializer.Serialize("MemoryPack formatter architecture benchmark", context);
-        simpleBytes = MemoryPackSerializer.Serialize(simple, context);
-        graphBytes = MemoryPackSerializer.Serialize(graph, context);
-        listBytes = MemoryPackSerializer.Serialize(list, context);
-        dictionaryBytes = MemoryPackSerializer.Serialize(dictionary, context);
-        unionBytes = MemoryPackSerializer.Serialize<FormatterBenchmarkUnion>(union, context);
-        circularBytes = MemoryPackSerializer.Serialize(circular, context);
+        stringBytes = SharpPackSerializer.Serialize("SharpPack formatter architecture benchmark", context);
+        simpleBytes = SharpPackSerializer.Serialize(simple, context);
+        graphBytes = SharpPackSerializer.Serialize(graph, context);
+        listBytes = SharpPackSerializer.Serialize(list, context);
+        dictionaryBytes = SharpPackSerializer.Serialize(dictionary, context);
+        unionBytes = SharpPackSerializer.Serialize<FormatterBenchmarkUnion>(union, context);
+        circularBytes = SharpPackSerializer.Serialize(circular, context);
     }
 
     [Benchmark]
-    public byte[] SerializePrimitive() => MemoryPackSerializer.Serialize(42, context);
+    public byte[] SerializePrimitive() => SharpPackSerializer.Serialize(42, context);
 
     [Benchmark]
-    public int DeserializePrimitive() => MemoryPackSerializer.Deserialize<int>(new byte[] { 42, 0, 0, 0 }, context);
+    public int DeserializePrimitive() => SharpPackSerializer.Deserialize<int>(new byte[] { 42, 0, 0, 0 }, context);
 
     [Benchmark]
     public byte[] SerializeString()
-        => MemoryPackSerializer.Serialize("MemoryPack formatter architecture benchmark", context);
+        => SharpPackSerializer.Serialize("SharpPack formatter architecture benchmark", context);
 
     [Benchmark]
-    public string? DeserializeString() => MemoryPackSerializer.Deserialize<string>(stringBytes, context);
+    public string? DeserializeString() => SharpPackSerializer.Deserialize<string>(stringBytes, context);
 
     [Benchmark]
-    public byte[] SerializeSimple() => MemoryPackSerializer.Serialize(simple, context);
+    public byte[] SerializeSimple() => SharpPackSerializer.Serialize(simple, context);
 
     [Benchmark]
     public FormatterBenchmarkDto? DeserializeSimple()
-        => MemoryPackSerializer.Deserialize<FormatterBenchmarkDto>(simpleBytes, context);
+        => SharpPackSerializer.Deserialize<FormatterBenchmarkDto>(simpleBytes, context);
 
     [Benchmark]
-    public byte[] SerializeGraph() => MemoryPackSerializer.Serialize(graph, context);
+    public byte[] SerializeGraph() => SharpPackSerializer.Serialize(graph, context);
 
     [Benchmark]
     public FormatterBenchmarkGraph? DeserializeGraph()
-        => MemoryPackSerializer.Deserialize<FormatterBenchmarkGraph>(graphBytes, context);
+        => SharpPackSerializer.Deserialize<FormatterBenchmarkGraph>(graphBytes, context);
 
     [Benchmark]
-    public byte[] SerializeList() => MemoryPackSerializer.Serialize(list, context);
+    public byte[] SerializeList() => SharpPackSerializer.Serialize(list, context);
 
     [Benchmark]
     public List<FormatterBenchmarkChild>? DeserializeList()
-        => MemoryPackSerializer.Deserialize<List<FormatterBenchmarkChild>>(listBytes, context);
+        => SharpPackSerializer.Deserialize<List<FormatterBenchmarkChild>>(listBytes, context);
 
     [Benchmark]
-    public byte[] SerializeDictionary() => MemoryPackSerializer.Serialize(dictionary, context);
+    public byte[] SerializeDictionary() => SharpPackSerializer.Serialize(dictionary, context);
 
     [Benchmark]
     public Dictionary<int, FormatterBenchmarkChild>? DeserializeDictionary()
-        => MemoryPackSerializer.Deserialize<Dictionary<int, FormatterBenchmarkChild>>(dictionaryBytes, context);
+        => SharpPackSerializer.Deserialize<Dictionary<int, FormatterBenchmarkChild>>(dictionaryBytes, context);
 
     [Benchmark]
-    public byte[] SerializeUnion() => MemoryPackSerializer.Serialize<FormatterBenchmarkUnion>(union, context);
+    public byte[] SerializeUnion() => SharpPackSerializer.Serialize<FormatterBenchmarkUnion>(union, context);
 
     [Benchmark]
     public FormatterBenchmarkUnion? DeserializeUnion()
-        => MemoryPackSerializer.Deserialize<FormatterBenchmarkUnion>(unionBytes, context);
+        => SharpPackSerializer.Deserialize<FormatterBenchmarkUnion>(unionBytes, context);
 
     [Benchmark]
     public byte[] SerializeCircularReference()
-        => MemoryPackSerializer.Serialize(circular, context);
+        => SharpPackSerializer.Serialize(circular, context);
 
     [Benchmark]
     public FormatterBenchmarkCircular? DeserializeCircularReference()
-        => MemoryPackSerializer.Deserialize<FormatterBenchmarkCircular>(
+        => SharpPackSerializer.Deserialize<FormatterBenchmarkCircular>(
             circularBytes,
             context);
 
     [Benchmark]
-    public MemoryPackFormatter<FormatterBenchmarkGraph> ColdCreateAndResolveGraph()
-        => new MemoryPackSerializerContext().GetFormatter<FormatterBenchmarkGraph>();
+    public SharpPackFormatter<FormatterBenchmarkGraph> ColdCreateAndResolveGraph()
+        => new SharpPackSerializerContext().GetFormatter<FormatterBenchmarkGraph>();
 
     [Benchmark]
     public byte[] ColdCreateAndSerializeSimple()
-        => MemoryPackSerializer.Serialize(simple, new MemoryPackSerializerContext());
+        => SharpPackSerializer.Serialize(simple, new SharpPackSerializerContext());
 
     static FormatterBenchmarkCircular CreateCircular()
     {
@@ -240,14 +240,14 @@ public class FormatterContextBenchmark
     }
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial class FormatterBenchmarkDto
 {
     public int Id { get; set; }
     public string? Name { get; set; }
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial class FormatterBenchmarkGraph
 {
     public int Id { get; set; }
@@ -258,30 +258,30 @@ public partial class FormatterBenchmarkGraph
     public Dictionary<int, FormatterBenchmarkChild>? ChildMap { get; set; }
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial class FormatterBenchmarkChild
 {
     public int Value { get; set; }
 }
 
-[MemoryPackable]
-[MemoryPackUnion(0, typeof(FormatterBenchmarkUnionValue))]
+[SharpPackable]
+[SharpPackUnion(0, typeof(FormatterBenchmarkUnionValue))]
 public partial interface FormatterBenchmarkUnion
 {
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial class FormatterBenchmarkUnionValue : FormatterBenchmarkUnion
 {
     public int Value { get; set; }
 }
 
-[MemoryPackable(GenerateType.CircularReference)]
+[SharpPackable(GenerateType.CircularReference)]
 public partial class FormatterBenchmarkCircular
 {
-    [MemoryPackOrder(0)]
+    [SharpPackOrder(0)]
     public int Value { get; set; }
 
-    [MemoryPackOrder(1)]
+    [SharpPackOrder(1)]
     public FormatterBenchmarkCircular? Self { get; set; }
 }

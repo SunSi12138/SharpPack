@@ -1,0 +1,921 @@
+using SharpPack.Formatters;
+using SharpPack.Internal;
+using System.Buffers;
+using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+
+// Immutable Collections formatters
+
+namespace SharpPack.Formatters
+{
+    [Preserve]
+    public sealed class ImmutableArrayFormatter<T> : SharpPackFormatter<ImmutableArray<T?>>
+    {
+        [Preserve]
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ImmutableArray<T?> value)
+        {
+            if (value.IsDefault)
+            {
+                writer.WriteNullCollectionHeader();
+            }
+            else
+            {
+                writer.WriteSpan(value.AsSpan());
+            }
+        }
+
+        [Preserve]
+        public override void Deserialize(ref SharpPackReader reader, scoped ref ImmutableArray<T?> value)
+        {
+            var array = reader.ReadArray<T?>();
+            if (array == null)
+            {
+                value = default;
+                return;
+            }
+
+            if (array.Length == 0)
+            {
+                value = ImmutableArray<T?>.Empty;
+                return;
+            }
+
+            value = ImmutableCollectionsMarshal.AsImmutableArray(array);
+        }
+    }
+
+    [Preserve]
+    internal struct ImmutableArrayView<T>
+    {
+        public T[]? array;
+    }
+
+    [Preserve]
+    public sealed class ImmutableListFormatter<T> : SharpPackFormatter<ImmutableList<T?>>
+    {
+        [Preserve]
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ImmutableList<T?>? value)
+        {
+            if (value == null)
+            {
+                writer.WriteNullCollectionHeader();
+                return;
+            }
+
+            var formatter = writer.GetFormatter<T?>();
+            writer.WriteCollectionHeader(value.Count);
+            foreach (var item in value)
+            {
+                var v = item;
+                formatter.Serialize(ref writer, ref v);
+            }
+        }
+
+        [Preserve]
+        public override void Deserialize(ref SharpPackReader reader, scoped ref ImmutableList<T?>? value)
+        {
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
+
+            if (length == 0)
+            {
+                value = ImmutableList<T?>.Empty;
+                return;
+            }
+
+            if (length == 1)
+            {
+                var item = reader.ReadValue<T>();
+                value = ImmutableList.Create(item);
+                return;
+            }
+
+            var formatter = reader.GetFormatter<T?>();
+
+            var builder = ImmutableList.CreateBuilder<T?>();
+            for (int i = 0; i < length; i++)
+            {
+                T? item = default;
+                formatter.Deserialize(ref reader, ref item);
+                builder.Add(item);
+            }
+
+            value = builder.ToImmutable();
+        }
+    }
+
+    [Preserve]
+    public sealed class ImmutableQueueFormatter<T> : SharpPackFormatter<ImmutableQueue<T?>>
+    {
+        [Preserve]
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ImmutableQueue<T?>? value)
+        {
+            if (value == null)
+            {
+                writer.WriteNullCollectionHeader();
+                return;
+            }
+
+            // ImmutableQueue<T> has no Count, so use similar serialization of IEnumerable<T>
+
+            var tempBuffer = ReusableLinkedArrayBufferWriterPool.Rent(
+                out var tempBufferLeaseId);
+            try
+            {
+                var tempWriter = new SharpPackWriter<ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
+
+                var count = 0;
+                var formatter = writer.GetFormatter<T?>();
+                foreach (var item in value)
+                {
+                    count++;
+                    var v = item;
+                    formatter.Serialize(ref tempWriter, ref v);
+                }
+
+                tempWriter.Flush();
+
+                // write to parameter writer.
+                writer.WriteCollectionHeader(count);
+                tempBuffer.WriteToAndReset(ref writer);
+            }
+            finally
+            {
+                ReusableLinkedArrayBufferWriterPool.Return(
+                    tempBuffer,
+                    tempBufferLeaseId);
+            }
+        }
+
+        [Preserve]
+        public override void Deserialize(ref SharpPackReader reader, scoped ref ImmutableQueue<T?>? value)
+        {
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
+
+            if (length == 0)
+            {
+                value = ImmutableQueue<T?>.Empty;
+                return;
+            }
+
+            if (length == 1)
+            {
+                var item = reader.ReadValue<T>();
+                value = ImmutableQueue.Create(item);
+                return;
+            }
+
+            var items = new List<T?>(
+                FormatterValidation.InitialCapacity(length));
+            var formatter = reader.GetFormatter<T?>();
+            for (int i = 0; i < length; i++)
+            {
+                T? item = default;
+                formatter.Deserialize(ref reader, ref item);
+                items.Add(item);
+            }
+            value = ImmutableQueue.CreateRange(items);
+        }
+    }
+
+    [Preserve]
+    public sealed class ImmutableStackFormatter<T> : SharpPackFormatter<ImmutableStack<T?>>
+    {
+        [Preserve]
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ImmutableStack<T?>? value)
+        {
+            if (value == null)
+            {
+                writer.WriteNullCollectionHeader();
+                return;
+            }
+
+            // ImmutableStack<T> has no Count, so use similar serialization of IEnumerable<T>
+
+            var tempBuffer = ReusableLinkedArrayBufferWriterPool.Rent(
+                out var tempBufferLeaseId);
+            try
+            {
+                var tempWriter = new SharpPackWriter<ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
+
+                var count = 0;
+                var formatter = writer.GetFormatter<T?>();
+
+                foreach (var item in value.AsEnumerable().Reverse()) // serialize reverse order
+                {
+                    count++;
+                    var v = item;
+                    formatter.Serialize(ref tempWriter, ref v);
+                }
+
+                tempWriter.Flush();
+
+                // write to parameter writer.
+                writer.WriteCollectionHeader(count);
+                tempBuffer.WriteToAndReset(ref writer);
+            }
+            finally
+            {
+                ReusableLinkedArrayBufferWriterPool.Return(
+                    tempBuffer,
+                    tempBufferLeaseId);
+            }
+        }
+
+        [Preserve]
+        public override void Deserialize(ref SharpPackReader reader, scoped ref ImmutableStack<T?>? value)
+        {
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
+
+            if (length == 0)
+            {
+                value = ImmutableStack<T?>.Empty;
+                return;
+            }
+
+            if (length == 1)
+            {
+                var item = reader.ReadValue<T>();
+                value = ImmutableStack.Create(item);
+                return;
+            }
+
+            var items = new List<T?>(
+                FormatterValidation.InitialCapacity(length));
+            var formatter = reader.GetFormatter<T?>();
+            for (int i = 0; i < length; i++)
+            {
+                T? item = default;
+                formatter.Deserialize(ref reader, ref item);
+                items.Add(item);
+            }
+            value = ImmutableStack.CreateRange(items);
+        }
+    }
+
+    [Preserve]
+    public sealed class ImmutableDictionaryFormatter<TKey, TValue> : SharpPackFormatter<ImmutableDictionary<TKey, TValue?>?>
+        where TKey : notnull
+    {
+        readonly IEqualityComparer<TKey>? keyEqualityComparer;
+        readonly IEqualityComparer<TValue?>? valueEqualityComparer;
+
+        public ImmutableDictionaryFormatter()
+            : this(null, null)
+        {
+
+        }
+
+        public ImmutableDictionaryFormatter(IEqualityComparer<TKey>? keyEqualityComparer, IEqualityComparer<TValue?>? valueEqualityComparer)
+        {
+            this.keyEqualityComparer = keyEqualityComparer;
+            this.valueEqualityComparer = valueEqualityComparer;
+        }
+
+        [Preserve]
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ImmutableDictionary<TKey, TValue?>? value)
+        {
+            if (value == null)
+            {
+                writer.WriteNullCollectionHeader();
+                return;
+            }
+
+            var keyFormatter = writer.GetFormatter<TKey>();
+            var valueFormatter = writer.GetFormatter<TValue>();
+
+            writer.WriteCollectionHeader(value.Count);
+            foreach (var item in value)
+            {
+                KeyValuePairFormatter.Serialize(keyFormatter, valueFormatter, ref writer, item!);
+            }
+        }
+
+        [Preserve]
+        public override void Deserialize(ref SharpPackReader reader, scoped ref ImmutableDictionary<TKey, TValue?>? value)
+        {
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
+
+            if (length == 0)
+            {
+                value = ImmutableDictionary<TKey, TValue?>.Empty;
+                if (keyEqualityComparer != null || valueEqualityComparer != null)
+                {
+                    value = value.WithComparers(keyEqualityComparer, valueEqualityComparer);
+                }
+                return;
+            }
+
+            var keyFormatter = reader.GetFormatter<TKey>();
+            var valueFormatter = reader.GetFormatter<TValue>();
+
+            var builder = ImmutableDictionary.CreateBuilder<TKey, TValue?>(keyEqualityComparer, valueEqualityComparer);
+            for (int i = 0; i < length; i++)
+            {
+                KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
+                builder.Add(k!, v);
+            }
+
+            value = builder.ToImmutable();
+        }
+    }
+
+    [Preserve]
+    public sealed class ImmutableHashSetFormatter<T> : SharpPackFormatter<ImmutableHashSet<T?>>
+    {
+        readonly IEqualityComparer<T?>? equalityComparer;
+
+        public ImmutableHashSetFormatter()
+            : this(null)
+        {
+
+        }
+
+        public ImmutableHashSetFormatter(IEqualityComparer<T?>? equalityComparer)
+        {
+            this.equalityComparer = equalityComparer;
+        }
+
+        [Preserve]
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ImmutableHashSet<T?>? value)
+        {
+            if (value == null)
+            {
+                writer.WriteNullCollectionHeader();
+                return;
+            }
+
+            var formatter = writer.GetFormatter<T?>();
+            writer.WriteCollectionHeader(value.Count);
+            foreach (var item in value)
+            {
+                var v = item;
+                formatter.Serialize(ref writer, ref v);
+            }
+        }
+
+        [Preserve]
+        public override void Deserialize(ref SharpPackReader reader, scoped ref ImmutableHashSet<T?>? value)
+        {
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
+
+            if (length == 0)
+            {
+                value = ImmutableHashSet<T?>.Empty;
+                if (equalityComparer != null)
+                {
+                    value = value.WithComparer(equalityComparer);
+                }
+                return;
+            }
+
+            if (length == 1)
+            {
+                var item = reader.ReadValue<T>();
+                value = ImmutableHashSet.Create(equalityComparer, item);
+                return;
+            }
+
+            var formatter = reader.GetFormatter<T?>();
+
+            var builder = ImmutableHashSet.CreateBuilder<T?>(equalityComparer);
+            for (int i = 0; i < length; i++)
+            {
+                T? item = default;
+                formatter.Deserialize(ref reader, ref item);
+                builder.Add(item);
+            }
+
+            value = builder.ToImmutable();
+        }
+    }
+
+    [Preserve]
+    public sealed class ImmutableSortedDictionaryFormatter<TKey, TValue> : SharpPackFormatter<ImmutableSortedDictionary<TKey, TValue?>?>
+        where TKey : notnull
+    {
+        readonly IComparer<TKey>? keyComparer;
+        readonly IEqualityComparer<TValue?>? valueEqualityComparer;
+
+        public ImmutableSortedDictionaryFormatter()
+            : this(null, null)
+        {
+
+        }
+
+        public ImmutableSortedDictionaryFormatter(IComparer<TKey>? keyComparer, IEqualityComparer<TValue?>? valueEqualityComparer)
+        {
+            this.keyComparer = keyComparer;
+            this.valueEqualityComparer = valueEqualityComparer;
+        }
+
+        [Preserve]
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ImmutableSortedDictionary<TKey, TValue?>? value)
+        {
+            if (value == null)
+            {
+                writer.WriteNullCollectionHeader();
+                return;
+            }
+
+            var keyFormatter = writer.GetFormatter<TKey>();
+            var valueFormatter = writer.GetFormatter<TValue>();
+
+            writer.WriteCollectionHeader(value.Count);
+            foreach (var item in value)
+            {
+                KeyValuePairFormatter.Serialize(keyFormatter, valueFormatter, ref writer, item!);
+            }
+        }
+
+        [Preserve]
+        public override void Deserialize(ref SharpPackReader reader, scoped ref ImmutableSortedDictionary<TKey, TValue?>? value)
+        {
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
+
+            if (length == 0)
+            {
+                value = ImmutableSortedDictionary<TKey, TValue?>.Empty;
+                if (keyComparer != null || valueEqualityComparer != null)
+                {
+                    value = value.WithComparers(keyComparer, valueEqualityComparer);
+                }
+                return;
+            }
+
+            var keyFormatter = reader.GetFormatter<TKey>();
+            var valueFormatter = reader.GetFormatter<TValue>();
+
+            var builder = ImmutableSortedDictionary.CreateBuilder<TKey, TValue?>(keyComparer, valueEqualityComparer);
+            for (int i = 0; i < length; i++)
+            {
+                KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
+                builder.Add(k!, v);
+            }
+
+            value = builder.ToImmutable();
+        }
+    }
+
+    [Preserve]
+    public sealed class ImmutableSortedSetFormatter<T> : SharpPackFormatter<ImmutableSortedSet<T?>>
+    {
+        readonly IComparer<T?>? keyComparer;
+
+        public ImmutableSortedSetFormatter()
+            : this(null)
+        {
+
+        }
+
+        public ImmutableSortedSetFormatter(IComparer<T?>? keyComparer)
+        {
+            this.keyComparer = keyComparer;
+        }
+
+        [Preserve]
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ImmutableSortedSet<T?>? value)
+        {
+            if (value == null)
+            {
+                writer.WriteNullCollectionHeader();
+                return;
+            }
+
+            var formatter = writer.GetFormatter<T?>();
+            writer.WriteCollectionHeader(value.Count);
+            foreach (var item in value)
+            {
+                var v = item;
+                formatter.Serialize(ref writer, ref v);
+            }
+        }
+
+        [Preserve]
+        public override void Deserialize(ref SharpPackReader reader, scoped ref ImmutableSortedSet<T?>? value)
+        {
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
+
+            if (length == 0)
+            {
+                value = ImmutableSortedSet<T?>.Empty;
+                if (keyComparer != null)
+                {
+                    value = value.WithComparer(keyComparer);
+                }
+                return;
+            }
+
+            if (length == 1)
+            {
+                var item = reader.ReadValue<T>();
+                value = ImmutableSortedSet.Create(keyComparer, item);
+                return;
+            }
+
+            var formatter = reader.GetFormatter<T?>();
+
+            var builder = ImmutableSortedSet.CreateBuilder<T?>(keyComparer);
+            for (int i = 0; i < length; i++)
+            {
+                T? item = default;
+                formatter.Deserialize(ref reader, ref item);
+                builder.Add(item);
+            }
+
+            value = builder.ToImmutable();
+        }
+    }
+
+    [Preserve]
+    public sealed class InterfaceImmutableListFormatter<T> : SharpPackFormatter<IImmutableList<T?>>
+    {
+        [Preserve]
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref IImmutableList<T?>? value)
+        {
+            if (value == null)
+            {
+                writer.WriteNullCollectionHeader();
+                return;
+            }
+
+            var formatter = writer.GetFormatter<T?>();
+            writer.WriteCollectionHeader(value.Count);
+            foreach (var item in value)
+            {
+                var v = item;
+                formatter.Serialize(ref writer, ref v);
+            }
+        }
+
+        [Preserve]
+        public override void Deserialize(ref SharpPackReader reader, scoped ref IImmutableList<T?>? value)
+        {
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
+
+            if (length == 0)
+            {
+                value = ImmutableList<T?>.Empty;
+                return;
+            }
+
+            if (length == 1)
+            {
+                var item = reader.ReadValue<T>();
+                value = ImmutableList.Create(item);
+                return;
+            }
+
+            var formatter = reader.GetFormatter<T?>();
+
+            var builder = ImmutableList.CreateBuilder<T?>();
+            for (int i = 0; i < length; i++)
+            {
+                T? item = default;
+                formatter.Deserialize(ref reader, ref item);
+                builder.Add(item);
+            }
+
+            value = builder.ToImmutable();
+        }
+    }
+
+    [Preserve]
+    public sealed class InterfaceImmutableQueueFormatter<T> : SharpPackFormatter<IImmutableQueue<T?>>
+    {
+        [Preserve]
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref IImmutableQueue<T?>? value)
+        {
+            if (value == null)
+            {
+                writer.WriteNullCollectionHeader();
+                return;
+            }
+
+            // ImmutableQueue<T> has no Count, so use similar serialization of IEnumerable<T>
+
+            var tempBuffer = ReusableLinkedArrayBufferWriterPool.Rent(
+                out var tempBufferLeaseId);
+            try
+            {
+                var tempWriter = new SharpPackWriter<ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
+
+                var count = 0;
+                var formatter = writer.GetFormatter<T?>();
+                foreach (var item in value)
+                {
+                    count++;
+                    var v = item;
+                    formatter.Serialize(ref tempWriter, ref v);
+                }
+
+                tempWriter.Flush();
+
+                // write to parameter writer.
+                writer.WriteCollectionHeader(count);
+                tempBuffer.WriteToAndReset(ref writer);
+            }
+            finally
+            {
+                ReusableLinkedArrayBufferWriterPool.Return(
+                    tempBuffer,
+                    tempBufferLeaseId);
+            }
+        }
+
+        [Preserve]
+        public override void Deserialize(ref SharpPackReader reader, scoped ref IImmutableQueue<T?>? value)
+        {
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
+
+            if (length == 0)
+            {
+                value = ImmutableQueue<T?>.Empty;
+                return;
+            }
+
+            if (length == 1)
+            {
+                var item = reader.ReadValue<T>();
+                value = ImmutableQueue.Create(item);
+                return;
+            }
+
+            var items = new List<T?>(
+                FormatterValidation.InitialCapacity(length));
+            var formatter = reader.GetFormatter<T?>();
+            for (int i = 0; i < length; i++)
+            {
+                T? item = default;
+                formatter.Deserialize(ref reader, ref item);
+                items.Add(item);
+            }
+            value = ImmutableQueue.CreateRange(items);
+        }
+    }
+
+    [Preserve]
+    public sealed class InterfaceImmutableStackFormatter<T> : SharpPackFormatter<IImmutableStack<T?>>
+    {
+        [Preserve]
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref IImmutableStack<T?>? value)
+        {
+            if (value == null)
+            {
+                writer.WriteNullCollectionHeader();
+                return;
+            }
+
+            // ImmutableStack<T> has no Count, so use similar serialization of IEnumerable<T>
+
+            var tempBuffer = ReusableLinkedArrayBufferWriterPool.Rent(
+                out var tempBufferLeaseId);
+            try
+            {
+                var tempWriter = new SharpPackWriter<ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
+
+                var count = 0;
+                var formatter = writer.GetFormatter<T?>();
+                foreach (var item in value.AsEnumerable().Reverse()) // serialize reverse order
+                {
+                    count++;
+                    var v = item;
+                    formatter.Serialize(ref tempWriter, ref v);
+                }
+
+                tempWriter.Flush();
+
+                // write to parameter writer.
+                writer.WriteCollectionHeader(count);
+                tempBuffer.WriteToAndReset(ref writer);
+            }
+            finally
+            {
+                ReusableLinkedArrayBufferWriterPool.Return(
+                    tempBuffer,
+                    tempBufferLeaseId);
+            }
+        }
+
+        [Preserve]
+        public override void Deserialize(ref SharpPackReader reader, scoped ref IImmutableStack<T?>? value)
+        {
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
+
+            if (length == 0)
+            {
+                value = ImmutableStack<T?>.Empty;
+                return;
+            }
+
+            if (length == 1)
+            {
+                var item = reader.ReadValue<T>();
+                value = ImmutableStack.Create(item);
+                return;
+            }
+
+            var items = new List<T?>(
+                FormatterValidation.InitialCapacity(length));
+            var formatter = reader.GetFormatter<T?>();
+            for (int i = 0; i < length; i++)
+            {
+                T? item = default;
+                formatter.Deserialize(ref reader, ref item);
+                items.Add(item);
+            }
+            value = ImmutableStack.CreateRange(items);
+        }
+    }
+
+    [Preserve]
+    public sealed class InterfaceImmutableDictionaryFormatter<TKey, TValue> : SharpPackFormatter<IImmutableDictionary<TKey, TValue?>?>
+        where TKey : notnull
+    {
+        readonly IEqualityComparer<TKey>? keyEqualityComparer;
+        readonly IEqualityComparer<TValue?>? valueEqualityComparer;
+
+        public InterfaceImmutableDictionaryFormatter()
+            : this(null, null)
+        {
+
+        }
+
+        public InterfaceImmutableDictionaryFormatter(IEqualityComparer<TKey>? keyEqualityComparer, IEqualityComparer<TValue?>? valueEqualityComparer)
+        {
+            this.keyEqualityComparer = keyEqualityComparer;
+            this.valueEqualityComparer = valueEqualityComparer;
+        }
+
+        [Preserve]
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref IImmutableDictionary<TKey, TValue?>? value)
+        {
+            if (value == null)
+            {
+                writer.WriteNullCollectionHeader();
+                return;
+            }
+
+            var keyFormatter = writer.GetFormatter<TKey>();
+            var valueFormatter = writer.GetFormatter<TValue>();
+
+            writer.WriteCollectionHeader(value.Count);
+            foreach (var item in value)
+            {
+                KeyValuePairFormatter.Serialize(keyFormatter, valueFormatter, ref writer, item!);
+            }
+        }
+
+        [Preserve]
+        public override void Deserialize(ref SharpPackReader reader, scoped ref IImmutableDictionary<TKey, TValue?>? value)
+        {
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
+
+            if (length == 0)
+            {
+                if (keyEqualityComparer != null || valueEqualityComparer != null)
+                {
+                    value = ImmutableDictionary<TKey, TValue?>.Empty.WithComparers(keyEqualityComparer, valueEqualityComparer);
+                }
+                else
+                {
+                    value = ImmutableDictionary<TKey, TValue?>.Empty;
+                }
+                return;
+            }
+
+            var keyFormatter = reader.GetFormatter<TKey>();
+            var valueFormatter = reader.GetFormatter<TValue>();
+
+            var builder = ImmutableDictionary.CreateBuilder<TKey, TValue?>(keyEqualityComparer, valueEqualityComparer);
+            for (int i = 0; i < length; i++)
+            {
+                KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
+                builder.Add(k!, v);
+            }
+
+            value = builder.ToImmutable();
+        }
+    }
+
+    [Preserve]
+    public sealed class InterfaceImmutableSetFormatter<T> : SharpPackFormatter<IImmutableSet<T?>>
+    {
+        readonly IEqualityComparer<T?>? equalityComparer;
+
+        public InterfaceImmutableSetFormatter()
+            : this(null)
+        {
+
+        }
+
+        public InterfaceImmutableSetFormatter(IEqualityComparer<T?>? equalityComparer)
+        {
+            this.equalityComparer = equalityComparer;
+        }
+
+        [Preserve]
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref IImmutableSet<T?>? value)
+        {
+            if (value == null)
+            {
+                writer.WriteNullCollectionHeader();
+                return;
+            }
+
+            var formatter = writer.GetFormatter<T?>();
+            writer.WriteCollectionHeader(value.Count);
+            foreach (var item in value)
+            {
+                var v = item;
+                formatter.Serialize(ref writer, ref v);
+            }
+        }
+
+        [Preserve]
+        public override void Deserialize(ref SharpPackReader reader, scoped ref IImmutableSet<T?>? value)
+        {
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
+
+            if (length == 0)
+            {
+                if (equalityComparer != null)
+                {
+                    value = ImmutableHashSet<T?>.Empty.WithComparer(equalityComparer);
+                }
+                else
+                {
+                    value = ImmutableHashSet<T?>.Empty;
+                }
+                return;
+            }
+
+            if (length == 1)
+            {
+                var item = reader.ReadValue<T>();
+                value = ImmutableHashSet.Create(equalityComparer, item);
+                return;
+            }
+
+            var formatter = reader.GetFormatter<T?>();
+
+            var builder = ImmutableHashSet.CreateBuilder<T?>(equalityComparer);
+            for (int i = 0; i < length; i++)
+            {
+                T? item = default;
+                formatter.Deserialize(ref reader, ref item);
+                builder.Add(item);
+            }
+
+            value = builder.ToImmutable();
+        }
+    }
+}

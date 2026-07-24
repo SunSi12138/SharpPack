@@ -1,7 +1,7 @@
 ﻿using Benchmark.BenchmarkNetUtilities;
 using Benchmark.Models;
 using BinaryPack.Models;
-using MemoryPack;
+using SharpPack;
 using MessagePack;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
@@ -29,7 +29,7 @@ public class DeserializeTest<T> : SerializerTestBase<T>
 
     SerializerSession session;
     byte[] payloadMessagePack;
-    byte[] payloadMemoryPack;
+    byte[] payloadSharpPack;
     byte[] payloadProtobuf;
     byte[] payloadJson;
     byte[] payloadOrleans;
@@ -46,7 +46,7 @@ public class DeserializeTest<T> : SerializerTestBase<T>
 
         payloadOrleans = orleansSerializer.SerializeToArray(value);
         payloadMessagePack = MessagePackSerializer.Serialize(value);
-        payloadMemoryPack = MemoryPackSerializer.Serialize(value);
+        payloadSharpPack = SharpPackSerializer.Serialize(value);
         using var stream = new MemoryStream();
         ProtoBuf.Serializer.Serialize(stream, value);
         payloadProtobuf = stream.ToArray();
@@ -60,9 +60,9 @@ public class DeserializeTest<T> : SerializerTestBase<T>
     }
 
     [Benchmark(Baseline = true)]
-    public T? MemoryPackDeserialize()
+    public T? SharpPackDeserialize()
     {
-        return MemoryPackSerializer.Deserialize<T>(payloadMemoryPack);
+        return SharpPackSerializer.Deserialize<T>(payloadSharpPack);
     }
 
     [Benchmark]

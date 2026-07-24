@@ -1,12 +1,12 @@
-using MemoryPack;
+using SharpPack;
 
 namespace Benchmark;
 
 internal static class BenchmarkContexts
 {
-    internal static MemoryPackSerializerContext Utf8 { get; } =
-        new(MemoryPackSerializerConfiguration.Utf8);
+    internal static SharpPackSerializerContext Utf8 { get; } =
+        new(SharpPackSerializerConfiguration.Utf8);
 
-    internal static MemoryPackSerializerContext Utf16 { get; } =
-        new(MemoryPackSerializerConfiguration.Utf16);
+    internal static SharpPackSerializerContext Utf16 { get; } =
+        new(SharpPackSerializerConfiguration.Utf16);
 }

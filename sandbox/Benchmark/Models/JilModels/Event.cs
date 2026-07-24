@@ -1,5 +1,5 @@
 ﻿#nullable disable
-using MemoryPack;
+using SharpPack;
 using MessagePack;
 using Orleans;
 using ProtoBuf;
@@ -21,7 +21,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public partial class Event : IGenericEquality<Event>
     {
         [ProtoMember(1)]

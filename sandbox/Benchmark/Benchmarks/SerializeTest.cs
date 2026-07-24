@@ -9,8 +9,8 @@ using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Order;
 using BenchmarkDotNet.Running;
 using BinaryPack.Models;
-using MemoryPack;
-using MemoryPack.Formatters;
+using SharpPack;
+using SharpPack.Formatters;
 using MessagePack;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
@@ -63,7 +63,7 @@ public class SerializeTest<T> : SerializerTestBase<T>
         var serialize3 = stream.ToArray();
         stream.Position = 0;
         var serialize4 = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value));
-        var serialize5 = MemoryPackSerializer.Serialize(value);
+        var serialize5 = SharpPackSerializer.Serialize(value);
 
         writer = new ArrayBufferWriter<byte>(new[] { /* serialize1, */ serialize2, serialize3, serialize4, serialize5 }.Max(x => x.Length));
         jsonWriter = new Utf8JsonWriter(writer);
@@ -76,15 +76,15 @@ public class SerializeTest<T> : SerializerTestBase<T>
     }
 
     [Benchmark(Baseline = true), BenchmarkCategory(Categories.Bytes)]
-    public byte[] MemoryPackSerialize()
+    public byte[] SharpPackSerialize()
     {
-        return MemoryPackSerializer.Serialize(value, BenchmarkContexts.Utf8);
+        return SharpPackSerializer.Serialize(value, BenchmarkContexts.Utf8);
     }
 
     [Benchmark, BenchmarkCategory(Categories.Bytes)]
-    public byte[] MemoryPackSerializeUtf16()
+    public byte[] SharpPackSerializeUtf16()
     {
-        return MemoryPackSerializer.Serialize(value, BenchmarkContexts.Utf16);
+        return SharpPackSerializer.Serialize(value, BenchmarkContexts.Utf16);
     }
 
     // requires T:new(), can't test it.
@@ -126,16 +126,16 @@ public class SerializeTest<T> : SerializerTestBase<T>
     }
 
     [Benchmark(Baseline = true), BenchmarkCategory(Categories.BufferWriter)]
-    public void MemoryPackBufferWriter()
+    public void SharpPackBufferWriter()
     {
-        MemoryPackSerializer.Serialize(ref writer, value, BenchmarkContexts.Utf8);
+        SharpPackSerializer.Serialize(ref writer, value, BenchmarkContexts.Utf8);
         writer.Clear();
     }
 
     [Benchmark, BenchmarkCategory(Categories.BufferWriter)]
-    public void MemoryPackBufferWriterUtf16()
+    public void SharpPackBufferWriterUtf16()
     {
-        MemoryPackSerializer.Serialize(ref writer, value, BenchmarkContexts.Utf16);
+        SharpPackSerializer.Serialize(ref writer, value, BenchmarkContexts.Utf16);
         writer.Clear();
     }
 
