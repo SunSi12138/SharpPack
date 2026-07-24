@@ -170,7 +170,8 @@ public static class MemoryPackStreamingSerializer
 
         using var state = MemoryPackWriterOptionalStatePool.Rent(context);
 
-        var tempWriter = ReusableLinkedArrayBufferWriterPool.Rent();
+        var tempWriter = ReusableLinkedArrayBufferWriterPool.Rent(
+            out var tempWriterLeaseId);
         try
         {
             WriteCollectionHeader(tempWriter, count, state);
@@ -185,7 +186,9 @@ public static class MemoryPackStreamingSerializer
         }
         finally
         {
-            ReusableLinkedArrayBufferWriterPool.Return(tempWriter);
+            ReusableLinkedArrayBufferWriterPool.Return(
+                tempWriter,
+                tempWriterLeaseId);
         }
     }
 
@@ -196,15 +199,19 @@ public static class MemoryPackStreamingSerializer
         MemoryPackSerializerContext? context = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        static bool ReadCollectionHeader(in ReadOnlySequence<byte> buffer, MemoryPackReaderOptionalState state, out int length)
+        static void ReadCollectionHeader(
+            in ReadOnlySequence<byte> buffer,
+            MemoryPackReaderOptionalState state,
+            out int length)
         {
             using var reader = new MemoryPackReader(buffer, state);
-
-            // allow to use `Dangerous` read header.
-            return reader.DangerousTryReadCollectionHeader(out length);
+            if (!reader.DangerousTryReadCollectionHeader(out length))
+            {
+                length = 0;
+            }
         }
 
-        static (int Consumed, int Remain) Deserialize(
+        static (int Consumed, int Remain) DeserializeAvailable(
             in ReadOnlySequence<byte> buffer,
             int bufferAtLeast,
             List<T?> itemBuffer,
@@ -213,14 +220,9 @@ public static class MemoryPackStreamingSerializer
             MemoryPackReaderOptionalState state)
         {
             using var reader = new MemoryPackReader(buffer, state);
-
-            while (bufferIsFull || bufferAtLeast < reader.Remaining)
+            while (remain != 0 &&
+                   (bufferIsFull || bufferAtLeast < reader.Remaining))
             {
-                if (remain == 0)
-                {
-                    return (reader.Consumed, remain);
-                }
-
                 itemBuffer.Add(reader.ReadValue<T?>());
                 remain--;
             }
@@ -228,101 +230,133 @@ public static class MemoryPackStreamingSerializer
             return (reader.Consumed, remain);
         }
 
-        if (readMinimumSize < bufferAtLeast)
-        {
-            throw new ArgumentException($"readMinimumSize must larger than bufferAtLeast. readMinimumSize: {readMinimumSize} bufferAtLeast:{bufferAtLeast}");
-        }
+        ArgumentNullException.ThrowIfNull(pipeReader);
+        ArgumentOutOfRangeException.ThrowIfNegative(bufferAtLeast);
+        ArgumentOutOfRangeException.ThrowIfLessThan(readMinimumSize, bufferAtLeast);
 
         using var state = MemoryPackReaderOptionalStatePool.Rent(context);
-
         var itemBuffer = new List<T?>();
-        var readResult = await pipeReader.ReadAtLeastAsync(readMinimumSize, cancellationToken).ConfigureAwait(false);
+        var remain = -1;
+        var readResult = await pipeReader
+            .ReadAtLeastAsync(4, cancellationToken)
+            .ConfigureAwait(false);
 
-        if (!readResult.IsCanceled)
+        while (true)
         {
             var buffer = readResult.Buffer;
-            if (ReadCollectionHeader(buffer, state, out var length))
+            if (readResult.IsCanceled)
             {
-                pipeReader.AdvanceTo(buffer.GetPosition(4));
-                if (readResult.IsCompleted)
+                pipeReader.AdvanceTo(buffer.Start, buffer.Start);
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            var parseStart = buffer.Start;
+            if (remain < 0)
+            {
+                if (buffer.Length < 4)
                 {
-                    buffer = buffer.Slice(4);
+                    pipeReader.AdvanceTo(buffer.Start, buffer.End);
+                    if (readResult.IsCompleted)
+                    {
+                        throw new EndOfStreamException(
+                            "The pipe completed before the collection header was available.");
+                    }
+
+                    readResult = await pipeReader
+                        .ReadAtLeastAsync(4, cancellationToken)
+                        .ConfigureAwait(false);
+                    continue;
                 }
 
-                var remain = length;
+                ReadCollectionHeader(buffer, state, out remain);
+                parseStart = buffer.GetPosition(4);
                 if (remain > 0)
                 {
                     itemBuffer.EnsureCapacity(Math.Min(remain, 256));
                 }
-
-                while (remain != 0)
-                {
-                    if (!readResult.IsCompleted)
-                    {
-                        readResult = await pipeReader.ReadAtLeastAsync(readMinimumSize, cancellationToken).ConfigureAwait(false);
-                        buffer = readResult.Buffer;
-                    }
-
-                    if (readResult.IsCanceled)
-                    {
-                        yield break;
-                    }
-
-                    var result = Deserialize(
-                        buffer,
-                        bufferAtLeast,
-                        itemBuffer,
-                        remain,
-                        readResult.IsCompleted,
-                        state);
-                    var consumedByteCount = result.Consumed;
-                    remain = result.Remain;
-
-                    if (itemBuffer.Count > 0)
-                    {
-                        foreach (var item in itemBuffer)
-                        {
-                            yield return item;
-                        }
-                        itemBuffer.Clear();
-                    }
-
-                    if (readResult.IsCompleted)
-                    {
-                        buffer = buffer.Slice(consumedByteCount);
-
-                        if (consumedByteCount == 0 || buffer.Length == 0)
-                        {
-                            await pipeReader.CompleteAsync().ConfigureAwait(false);
-                            yield break;
-                        }
-                    }
-                    else
-                    {
-                        pipeReader.AdvanceTo(buffer.GetPosition(consumedByteCount));
-                    }
-                }
             }
-        }
 
-        foreach (var item in itemBuffer)
-        {
-            yield return item;
+            if (remain == 0)
+            {
+                pipeReader.AdvanceTo(parseStart, parseStart);
+                yield break;
+            }
+
+            int consumedByteCount;
+            try
+            {
+                var result = DeserializeAvailable(
+                    buffer.Slice(parseStart),
+                    bufferAtLeast,
+                    itemBuffer,
+                    remain,
+                    readResult.IsCompleted,
+                    state);
+                consumedByteCount = result.Consumed;
+                remain = result.Remain;
+            }
+            catch
+            {
+                pipeReader.AdvanceTo(parseStart, buffer.End);
+                throw;
+            }
+
+            var consumedPosition = buffer.GetPosition(
+                consumedByteCount,
+                parseStart);
+            pipeReader.AdvanceTo(
+                consumedPosition,
+                remain == 0 ? consumedPosition : buffer.End);
+
+            foreach (var item in itemBuffer)
+            {
+                yield return item;
+            }
+            itemBuffer.Clear();
+
+            if (remain == 0)
+            {
+                yield break;
+            }
+            if (readResult.IsCompleted)
+            {
+                throw new EndOfStreamException(
+                    $"The pipe completed with {remain} collection items remaining.");
+            }
+
+            readResult = await pipeReader
+                .ReadAtLeastAsync(readMinimumSize, cancellationToken)
+                .ConfigureAwait(false);
         }
     }
 
-    public static IAsyncEnumerable<T?> DeserializeAsync<T>(
+    public static async IAsyncEnumerable<T?> DeserializeAsync<T>(
         Stream stream,
         int bufferAtLeast = 4096,
         int readMinimumSize = 8192,
         MemoryPackSerializerContext? context = null,
-        CancellationToken cancellationToken = default)
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        return DeserializeAsync<T>(
-            PipeReader.Create(stream),
-            bufferAtLeast,
-            readMinimumSize,
-            context,
-            cancellationToken);
+        ArgumentNullException.ThrowIfNull(stream);
+        var pipeReader = PipeReader.Create(
+            stream,
+            new StreamPipeReaderOptions(leaveOpen: true));
+        try
+        {
+            await foreach (var item in DeserializeAsync<T>(
+                               pipeReader,
+                               bufferAtLeast,
+                               readMinimumSize,
+                               context,
+                               cancellationToken)
+                               .ConfigureAwait(false))
+            {
+                yield return item;
+            }
+        }
+        finally
+        {
+            await pipeReader.CompleteAsync().ConfigureAwait(false);
+        }
     }
 }

@@ -10,6 +10,43 @@ namespace MemoryPack.Tests;
 public class StreamOptimizeTest
 {
     [Fact]
+    public async Task LengthDelimitedDeserializeDoesNotConsumeFollowingMessage()
+    {
+        var first = MemoryPackSerializer.Serialize(new[] { 1, 2, 3 });
+        var second = MemoryPackSerializer.Serialize(new[] { 4, 5, 6 });
+        var bytes = first.Concat(second).ToArray();
+        var context = new MemoryPackSerializerContext();
+
+        foreach (var useContext in new[] { false, true })
+        {
+            using var backing = new MemoryStream(bytes);
+            using Stream stream = useContext
+                ? new BufferedStream(backing, 8)
+                : backing;
+
+            var firstValue = useContext
+                ? await MemoryPackSerializer.DeserializeAsync<int[]>(
+                    stream,
+                    first.Length,
+                    context)
+                : await MemoryPackSerializer.DeserializeAsync<int[]>(
+                    stream,
+                    first.Length);
+            var secondValue = useContext
+                ? await MemoryPackSerializer.DeserializeAsync<int[]>(
+                    stream,
+                    second.Length,
+                    context)
+                : await MemoryPackSerializer.DeserializeAsync<int[]>(
+                    stream,
+                    second.Length);
+
+            firstValue.Should().Equal(1, 2, 3);
+            secondValue.Should().Equal(4, 5, 6);
+        }
+    }
+
+    [Fact]
     public async Task MemoryStream()
     {
         var ms = new MemoryStream();

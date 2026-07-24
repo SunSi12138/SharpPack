@@ -132,15 +132,9 @@ internal static class FormatterResolver<T>
                 return (MemoryPackFormatter<T>)(object)new TypeFormatter();
             }
 
-            var factoryInterface = typeof(IMemoryPackFormatterFactory<>).MakeGenericType(type);
-            if (factoryInterface.IsAssignableFrom(type))
+            if (typeof(IMemoryPackFormatterFactory<T>).IsAssignableFrom(type))
             {
-                var factory = type
-                    .GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
-                    .First(static method =>
-                        method.GetParameters().Length == 0 &&
-                        (method.Name == "CreateFormatter" ||
-                         method.Name.EndsWith(".CreateFormatter", StringComparison.Ordinal)));
+                var factory = FindFactoryMethod(type)!;
                 return (MemoryPackFormatter<T>)factory.Invoke(null, null)!;
             }
 
@@ -167,7 +161,7 @@ internal static class FormatterResolver<T>
                 return (MemoryPackFormatter<T>)generic;
             }
 
-            if (TryCreateExternalGeneratedFormatter(type, factoryInterface) is { } external)
+            if (TryCreateExternalGeneratedFormatter(type) is { } external)
             {
                 return external;
             }
@@ -204,11 +198,26 @@ internal static class FormatterResolver<T>
         "IL3050",
         Justification = "Cold compatibility fallback; generated external formatter registration extensions are the NativeAOT path.")]
     static MemoryPackFormatter<T>? TryCreateExternalGeneratedFormatter(
-        Type targetType,
-        Type factoryInterface)
+        Type targetType)
     {
-        foreach (var candidateDefinition in targetType.Assembly.GetTypes())
+        Type?[] candidates;
+        try
         {
+            candidates = targetType.Assembly.GetTypes();
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            candidates = ex.Types;
+        }
+
+        var factoryInterface = typeof(IMemoryPackFormatterFactory<T>);
+        foreach (var candidateDefinition in candidates)
+        {
+            if (candidateDefinition is null)
+            {
+                continue;
+            }
+
             var candidate = candidateDefinition;
             if (candidate.ContainsGenericParameters)
             {
@@ -248,4 +257,19 @@ internal static class FormatterResolver<T>
 
         return null;
     }
+
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2070",
+        Justification = "Generated formatter factory methods are statically preserved by their implemented factory interface.")]
+    static MethodInfo? FindFactoryMethod(Type type)
+        => type
+            .GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+            .FirstOrDefault(static method =>
+                method.GetParameters().Length == 0 &&
+                (method.Name == "CreateFormatter" ||
+                 method.Name.EndsWith(".CreateFormatter", StringComparison.Ordinal)) &&
+                method.ReturnType.IsGenericType &&
+                method.ReturnType.GetGenericTypeDefinition() ==
+                    typeof(MemoryPackFormatter<>));
 }

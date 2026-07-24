@@ -7,32 +7,60 @@ namespace MemoryPack.Internal;
 internal static class ReusableReadOnlySequenceBuilderPool
 {
     static readonly ConcurrentQueue<ReusableReadOnlySequenceBuilder> queue = new();
+    static readonly int maximumRetainedBuilders =
+        Math.Max(4, Environment.ProcessorCount * 2);
+    static int retainedBuilderCount;
 
-    public static ReusableReadOnlySequenceBuilder Rent()
+    public static ReusableReadOnlySequenceBuilder Rent(out long leaseId)
     {
         if (queue.TryDequeue(out var builder))
         {
+            Interlocked.Decrement(ref retainedBuilderCount);
+            leaseId = builder.ActivateLease();
             return builder;
         }
-        return new ReusableReadOnlySequenceBuilder();
+        builder = new ReusableReadOnlySequenceBuilder();
+        leaseId = builder.ActivateLease();
+        return builder;
     }
 
-    public static void Return(ReusableReadOnlySequenceBuilder builder)
+    public static void Return(
+        ReusableReadOnlySequenceBuilder builder,
+        long leaseId)
     {
+        if (!builder.TryDeactivateLease(leaseId))
+        {
+            throw new InvalidOperationException(
+                "The sequence builder lease was already returned or belongs to another rental.");
+        }
         builder.Reset();
-        queue.Enqueue(builder);
+        if (Interlocked.Increment(ref retainedBuilderCount) <=
+            maximumRetainedBuilders)
+        {
+            queue.Enqueue(builder);
+        }
+        else
+        {
+            Interlocked.Decrement(ref retainedBuilderCount);
+        }
     }
 }
 
 internal sealed class ReusableReadOnlySequenceBuilder
 {
-    readonly Stack<Segment> segmentPool;
-    readonly List<Segment> list;
+    const int MaximumRetainedSegments = 4096;
+
+    Stack<Segment> segmentPool;
+    List<Segment> list;
+    long leaseGeneration;
+    int leaseState;
 
     public ReusableReadOnlySequenceBuilder()
     {
         list = new();
         segmentPool = new Stack<Segment>();
+        leaseGeneration = 0;
+        leaseState = 0;
     }
 
     public void Add(ReadOnlyMemory<byte> buffer, bool returnToPool)
@@ -88,10 +116,39 @@ internal sealed class ReusableReadOnlySequenceBuilder
         foreach (var item in span)
         {
             item.Reset();
-            segmentPool.Push(item);
+            if (segmentPool.Count < MaximumRetainedSegments)
+            {
+                segmentPool.Push(item);
+            }
         }
-        list.Clear();
+        if (list.Capacity > MaximumRetainedSegments)
+        {
+            list = new List<Segment>();
+        }
+        else
+        {
+            list.Clear();
+        }
+        if (segmentPool.Count > MaximumRetainedSegments)
+        {
+            segmentPool = new Stack<Segment>(MaximumRetainedSegments);
+        }
     }
+
+    internal long ActivateLease()
+    {
+        var leaseId = Interlocked.Increment(ref leaseGeneration);
+        if (Interlocked.Exchange(ref leaseState, 1) != 0)
+        {
+            throw new InvalidOperationException(
+                "The sequence builder is already leased.");
+        }
+        return leaseId;
+    }
+
+    internal bool TryDeactivateLease(long leaseId)
+        => Volatile.Read(ref leaseGeneration) == leaseId &&
+           Interlocked.CompareExchange(ref leaseState, 0, 1) == 1;
 
     class Segment : ReadOnlySequenceSegment<byte>
     {

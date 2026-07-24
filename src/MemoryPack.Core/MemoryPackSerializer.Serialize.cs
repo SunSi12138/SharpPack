@@ -47,8 +47,8 @@ public static partial class MemoryPackSerializer
                 return new byte[4] { 0, 0, 0, 0 };
             }
 
-            var dataSize = elementSize * length;
-            var destArray = AllocateUninitializedArray<byte>(dataSize + 4);
+            var dataSize = checked(elementSize * length);
+            var destArray = AllocateUninitializedArray<byte>(checked(dataSize + 4));
             ref var head = ref MemoryMarshal.GetArrayDataReference(destArray);
 
             Unsafe.WriteUnaligned(ref head, length);
@@ -114,15 +114,16 @@ public static partial class MemoryPackSerializer
                 return 4;
             }
 
-            var dataSize = elementSize * length;
-            var destSpan = bufferWriter.GetSpan(dataSize + 4);
+            var dataSize = checked(elementSize * length);
+            var totalSize = checked(dataSize + 4);
+            var destSpan = bufferWriter.GetSpan(totalSize);
             ref var head = ref MemoryMarshal.GetReference(destSpan);
 
             Unsafe.WriteUnaligned(ref head, length);
             Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref head, 4), ref MemoryMarshal.GetArrayDataReference(srcArray), (uint)dataSize);
 
-            bufferWriter.Advance(dataSize + 4);
-            return dataSize + 4;
+            bufferWriter.Advance(totalSize);
+            return totalSize;
         }
 
         var state = AcquireWriterOptionalState();
@@ -163,7 +164,8 @@ public static partial class MemoryPackSerializer
         T? value,
         CancellationToken cancellationToken = default)
     {
-        var tempWriter = ReusableLinkedArrayBufferWriterPool.Rent();
+        var tempWriter = ReusableLinkedArrayBufferWriterPool.Rent(
+            out var tempWriterLeaseId);
         try
         {
             _ = Serialize(ref tempWriter, value);
@@ -172,7 +174,9 @@ public static partial class MemoryPackSerializer
         }
         finally
         {
-            ReusableLinkedArrayBufferWriterPool.Return(tempWriter);
+            ReusableLinkedArrayBufferWriterPool.Return(
+                tempWriter,
+                tempWriterLeaseId);
         }
     }
 

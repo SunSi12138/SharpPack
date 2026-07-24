@@ -12,14 +12,18 @@ using static MemoryMarshal;
 [StructLayout(LayoutKind.Auto)]
 public ref partial struct MemoryPackReader
 {
+    const int DepthLimit = 1000;
+    static readonly UTF8Encoding StrictUtf8Encoding = new(false, true);
+
     ReadOnlySequence<byte> bufferSource;
     readonly long totalLength;
     ref byte bufferReference;
     int bufferLength;
-    byte[]? rentBuffer;
+    RentedBufferLease? rentBuffer;
     SmallReadBuffer smallBuffer;
     int advancedCount;
     int consumed;   // total length of consumed
+    int depth;
     readonly MemoryPackReaderOptionalState optionalState;
 
     public int Consumed => consumed;
@@ -34,6 +38,7 @@ public ref partial struct MemoryPackReader
         this.bufferLength = span.Length;
         this.advancedCount = 0;
         this.consumed = 0;
+        this.depth = 0;
         this.rentBuffer = null;
         this.smallBuffer = default;
         this.totalLength = sequence.Length;
@@ -47,6 +52,7 @@ public ref partial struct MemoryPackReader
         this.bufferLength = buffer.Length;
         this.advancedCount = 0;
         this.consumed = 0;
+        this.depth = 0;
         this.rentBuffer = null;
         this.smallBuffer = default;
         this.totalLength = buffer.Length;
@@ -58,6 +64,11 @@ public ref partial struct MemoryPackReader
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ref byte GetSpanReference(int sizeHint)
     {
+        if (sizeHint < 0)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(sizeHint);
+        }
+
         if (sizeHint <= bufferLength)
         {
             return ref bufferReference;
@@ -71,7 +82,7 @@ public ref partial struct MemoryPackReader
     {
         if (rentBuffer != null)
         {
-            ArrayPool<byte>.Shared.Return(rentBuffer);
+            rentBuffer.Return();
             rentBuffer = null;
         }
 
@@ -113,8 +124,9 @@ public ref partial struct MemoryPackReader
                 return ref bufferReference;
             }
 
-            rentBuffer = ArrayPool<byte>.Shared.Rent(sizeHint);
-            var span = rentBuffer.AsSpan(0, sizeHint);
+            rentBuffer = new RentedBufferLease(
+                ArrayPool<byte>.Shared.Rent(sizeHint));
+            var span = rentBuffer.Buffer.AsSpan(0, sizeHint);
             bufferSource.Slice(0, sizeHint).CopyTo(span);
             bufferReference = ref MemoryMarshal.GetReference(span);
             bufferLength = span.Length;
@@ -128,7 +140,15 @@ public ref partial struct MemoryPackReader
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Advance(int count)
     {
+        if (count < 0)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(count);
+        }
         if (count == 0) return;
+        if (Remaining < count)
+        {
+            MemoryPackSerializationException.ThrowInvalidAdvance();
+        }
 
         var rest = bufferLength - count;
         if (rest < 0)
@@ -148,13 +168,13 @@ public ref partial struct MemoryPackReader
     [MethodImpl(MethodImplOptions.NoInlining)]
     bool TryAdvanceSequence(int count)
     {
-        var rest = bufferSource.Length - count;
+        var rest = Remaining - count;
         if (rest < 0)
         {
             MemoryPackSerializationException.ThrowInvalidAdvance();
         }
 
-        bufferSource = bufferSource.Slice(advancedCount + count);
+        bufferSource = bufferSource.Slice((long)advancedCount + count);
         bufferReference = ref MemoryMarshal.GetReference(bufferSource.FirstSpan);
         bufferLength = bufferSource.FirstSpan.Length;
         advancedCount = 0;
@@ -196,7 +216,8 @@ public ref partial struct MemoryPackReader
     {
         if (rentBuffer != null)
         {
-            ArrayPool<byte>.Shared.Return(rentBuffer);
+            rentBuffer.Return();
+            rentBuffer = null;
         }
     }
 
@@ -205,6 +226,23 @@ public ref partial struct MemoryPackReader
     {
         internal const int Capacity = 32;
         byte element0;
+    }
+
+    sealed class RentedBufferLease(byte[] buffer)
+    {
+        int returned;
+
+        internal byte[] Buffer { get; } = buffer;
+
+        internal void Return()
+        {
+            if (Interlocked.Exchange(ref returned, 1) != 0)
+            {
+                throw new InvalidOperationException(
+                    "The reader buffer lease was already returned.");
+            }
+            ArrayPool<byte>.Shared.Return(Buffer);
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -267,13 +305,22 @@ public ref partial struct MemoryPackReader
         length = Unsafe.ReadUnaligned<int>(ref GetSpanReference(4));
         Advance(4);
 
+        if (length == MemoryPackCode.NullCollection)
+        {
+            return false;
+        }
+        if (length < 0)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(length);
+        }
+
         // If collection-length is larger than buffer-length, it is invalid data.
         if (Remaining < length)
         {
             MemoryPackSerializationException.ThrowInsufficientBufferUnless(length);
         }
 
-        return length != MemoryPackCode.NullCollection;
+        return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -317,13 +364,22 @@ public ref partial struct MemoryPackReader
     {
         length = Unsafe.ReadUnaligned<int>(ref GetSpanReference(4));
 
+        if (length == MemoryPackCode.NullCollection)
+        {
+            return false;
+        }
+        if (length < 0)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(length);
+        }
+
         // If collection-length is larger than buffer-length, it is invalid data.
         if (Remaining < length)
         {
             MemoryPackSerializationException.ThrowInsufficientBufferUnless(length);
         }
 
-        return length != MemoryPackCode.NullCollection;
+        return true;
     }
 
     /// <summary>
@@ -335,13 +391,23 @@ public ref partial struct MemoryPackReader
         length = Unsafe.ReadUnaligned<int>(ref GetSpanReference(4));
         Advance(4);
 
-        return length != MemoryPackCode.NullCollection;
+        if (length == MemoryPackCode.NullCollection)
+        {
+            return false;
+        }
+        if (length < 0)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(length);
+        }
+
+        return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public string? ReadString()
     {
-        if (!TryReadCollectionHeader(out var length))
+        var length = ReadUnmanaged<int>();
+        if (length == MemoryPackCode.NullCollection)
         {
             return null;
         }
@@ -363,7 +429,7 @@ public ref partial struct MemoryPackReader
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     string ReadUtf16(int length)
     {
-        var byteCount = checked(length * 2);
+        var byteCount = GetUnmanagedByteCount<char>(length);
         ref var src = ref GetSpanReference(byteCount);
 
         var str = new string(MemoryMarshal.CreateReadOnlySpan(ref Unsafe.As<byte, char>(ref src), length));
@@ -381,7 +447,8 @@ public ref partial struct MemoryPackReader
 
         utf8Length = ~utf8Length;
 
-        ref var spanRef = ref GetSpanReference(utf8Length + 4); // + read utf16 length
+        var payloadLength = CheckedAdd(utf8Length, 4);
+        ref var spanRef = ref GetSpanReference(payloadLength); // + read utf16 length
 
         string str;
         var utf16Length = Unsafe.ReadUnaligned<int>(ref spanRef);
@@ -389,16 +456,20 @@ public ref partial struct MemoryPackReader
         if (utf16Length <= 0)
         {
             var src = MemoryMarshal.CreateReadOnlySpan(ref Unsafe.Add(ref spanRef, 4), utf8Length);
-            str = Encoding.UTF8.GetString(src);
+            try
+            {
+                str = StrictUtf8Encoding.GetString(src);
+            }
+            catch (DecoderFallbackException ex)
+            {
+                throw new MemoryPackSerializationException("Failed to decode a strict UTF-8 payload.", ex);
+            }
         }
         else
         {
-            // check malformed utf16Length
-            var max = unchecked((Remaining + 1) * 3);
-            if (max < 0) max = int.MaxValue;
-            if (max < utf16Length)
+            if (utf16Length > utf8Length)
             {
-                MemoryPackSerializationException.ThrowInsufficientBufferUnless(utf8Length);
+                MemoryPackSerializationException.ThrowInvalidEncodingLength();
             }
 
 
@@ -415,12 +486,16 @@ public ref partial struct MemoryPackReader
                         {
                             MemoryPackSerializationException.ThrowFailedEncoding(status);
                         }
+                        if (bytesRead != state.Item2 || charsWritten != dest.Length)
+                        {
+                            MemoryPackSerializationException.ThrowInvalidEncodingLength();
+                        }
                     });
                 }
             }
         }
 
-        Advance(utf8Length + 4);
+        Advance(payloadLength);
 
         return str;
     }
@@ -448,7 +523,15 @@ public ref partial struct MemoryPackReader
             return;
         }
 
-        T.Deserialize(ref this, ref value);
+        EnterDepth<T>();
+        try
+        {
+            T.Deserialize(ref this, ref value);
+        }
+        finally
+        {
+            depth--;
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -460,9 +543,17 @@ public ref partial struct MemoryPackReader
             return ReadValue<T>();
         }
 
-        T? value = default;
-        T.Deserialize(ref this, ref value);
-        return value;
+        EnterDepth<T>();
+        try
+        {
+            T? value = default;
+            T.Deserialize(ref this, ref value);
+            return value;
+        }
+        finally
+        {
+            depth--;
+        }
     }
 
 
@@ -470,31 +561,63 @@ public ref partial struct MemoryPackReader
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ReadValue<T>(scoped ref T? value)
     {
-        GetFormatter<T>().Deserialize(ref this, ref value);
+        EnterDepth<T>();
+        try
+        {
+            GetFormatter<T>().Deserialize(ref this, ref value);
+        }
+        finally
+        {
+            depth--;
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public T? ReadValue<T>()
     {
-        T? value = default;
-        GetFormatter<T>().Deserialize(ref this, ref value);
-        return value;
+        EnterDepth<T>();
+        try
+        {
+            T? value = default;
+            GetFormatter<T>().Deserialize(ref this, ref value);
+            return value;
+        }
+        finally
+        {
+            depth--;
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ReadValueWithFormatter<TFormatter, T>(TFormatter formatter, scoped ref T? value)
         where TFormatter : IMemoryPackFormatter<T>
     {
-        formatter.Deserialize(ref this, ref value);
+        EnterDepth<T>();
+        try
+        {
+            formatter.Deserialize(ref this, ref value);
+        }
+        finally
+        {
+            depth--;
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public T? ReadValueWithFormatter<TFormatter, T>(TFormatter formatter)
         where TFormatter : IMemoryPackFormatter<T>
     {
-        T? value = default;
-        formatter.Deserialize(ref this, ref value);
-        return value;
+        EnterDepth<T>();
+        try
+        {
+            T? value = default;
+            formatter.Deserialize(ref this, ref value);
+            return value;
+        }
+        finally
+        {
+            depth--;
+        }
     }
 
     #region ReadArray/Span
@@ -698,7 +821,7 @@ public ref partial struct MemoryPackReader
 
         if (length == 0) return Array.Empty<T>();
 
-        var byteCount = length * Unsafe.SizeOf<T>();
+        var byteCount = GetUnmanagedByteCount<T>(length);
         ref var src = ref GetSpanReference(byteCount);
         var dest = AllocateUninitializedArray<T>(length);
         Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref GetArrayDataReference(dest)), ref src, (uint)byteCount);
@@ -722,7 +845,7 @@ public ref partial struct MemoryPackReader
             return;
         }
 
-        var byteCount = length * Unsafe.SizeOf<T>();
+        var byteCount = GetUnmanagedByteCount<T>(length);
         ref var src = ref GetSpanReference(byteCount);
 
         if (value is null || value.Length != length)
@@ -751,7 +874,7 @@ public ref partial struct MemoryPackReader
             return;
         }
 
-        var byteCount = length * Unsafe.SizeOf<T>();
+        var byteCount = GetUnmanagedByteCount<T>(length);
         ref var src = ref GetSpanReference(byteCount);
 
         if (value.Length != length)
@@ -770,6 +893,7 @@ public ref partial struct MemoryPackReader
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ReadSpanWithoutReadLengthHeader<T>(int length, scoped ref Span<T?> value)
     {
+        ValidateLength(length);
         if (length == 0)
         {
             value = Array.Empty<T?>();
@@ -783,7 +907,7 @@ public ref partial struct MemoryPackReader
                 value = AllocateUninitializedArray<T?>(length);
             }
 
-            var byteCount = length * Unsafe.SizeOf<T>();
+            var byteCount = GetUnmanagedByteCount<T>(length);
             ref var src = ref GetSpanReference(byteCount);
             ref var dest = ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(value)!);
             Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);
@@ -809,6 +933,7 @@ public ref partial struct MemoryPackReader
     public void ReadPackableSpanWithoutReadLengthHeader<T>(int length, scoped ref Span<T?> value)
         where T : IMemoryPackable<T>
     {
+        ValidateLength(length);
         if (optionalState.FormatterGraph is not null)
         {
             ReadSpanWithoutReadLengthHeader(length, ref value);
@@ -828,7 +953,7 @@ public ref partial struct MemoryPackReader
                 value = AllocateUninitializedArray<T?>(length);
             }
 
-            var byteCount = length * Unsafe.SizeOf<T>();
+            var byteCount = GetUnmanagedByteCount<T>(length);
             ref var src = ref GetSpanReference(byteCount);
             ref var dest = ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(value)!);
             Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);
@@ -867,12 +992,55 @@ public ref partial struct MemoryPackReader
             return;
         }
 
-        var byteCount = length * Unsafe.SizeOf<T>();
+        var byteCount = GetUnmanagedByteCount<T>(length);
         ref var src = ref GetSpanReference(byteCount);
 
         var span = MemoryMarshal.CreateReadOnlySpan(ref src, byteCount);
 
         Advance(byteCount);
         view = span; // safe until call next GetSpanReference
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static void ValidateLength(int length)
+    {
+        if (length < 0)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(length);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static int CheckedAdd(int left, int right)
+    {
+        var result = (long)left + right;
+        if ((ulong)result > int.MaxValue)
+        {
+            MemoryPackSerializationException.ThrowSizeOverflow();
+        }
+        return (int)result;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static int GetUnmanagedByteCount<T>(int length)
+    {
+        ValidateLength(length);
+        var byteCount = (long)length * Unsafe.SizeOf<T>();
+        if ((ulong)byteCount > int.MaxValue)
+        {
+            MemoryPackSerializationException.ThrowSizeOverflow();
+        }
+        return (int)byteCount;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    void EnterDepth<T>()
+    {
+        depth++;
+        if (depth >= DepthLimit)
+        {
+            depth--;
+            MemoryPackSerializationException.ThrowReachedDepthLimit(typeof(T));
+        }
     }
 }

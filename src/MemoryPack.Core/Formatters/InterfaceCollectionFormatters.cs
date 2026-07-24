@@ -104,7 +104,8 @@ namespace MemoryPack.Formatters
             else
             {
                 // write to tempbuffer(because we don't know length so can't write header)
-                var tempBuffer = ReusableLinkedArrayBufferWriterPool.Rent();
+                var tempBuffer = ReusableLinkedArrayBufferWriterPool.Rent(
+                    out var tempBufferLeaseId);
                 try
                 {
                     var tempWriter = new MemoryPackWriter<ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
@@ -126,7 +127,9 @@ namespace MemoryPack.Formatters
                 }
                 finally
                 {
-                    ReusableLinkedArrayBufferWriterPool.Return(tempBuffer);
+                    ReusableLinkedArrayBufferWriterPool.Return(
+                        tempBuffer,
+                        tempBufferLeaseId);
                 }
             }
         }
@@ -471,7 +474,9 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var set = new HashSet<T?>(length, equalityComparer);
+            var set = new HashSet<T?>(
+                FormatterValidation.InitialCapacity(length),
+                equalityComparer);
 
             var formatter = reader.GetFormatter<T>();
             for (int i = 0; i < length; i++)
@@ -528,7 +533,9 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var set = new HashSet<T?>(length, equalityComparer);
+            var set = new HashSet<T?>(
+                FormatterValidation.InitialCapacity(length),
+                equalityComparer);
 
             var formatter = reader.GetFormatter<T>();
             for (int i = 0; i < length; i++)

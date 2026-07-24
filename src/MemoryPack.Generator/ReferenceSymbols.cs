@@ -148,6 +148,10 @@ public class ReferenceSymbols
             { "System.Collections.Immutable.IImmutableDictionary<,>", "global::MemoryPack.Formatters.InterfaceImmutableDictionaryFormatter<TREPLACE>" },
             { "System.Collections.Immutable.IImmutableSet<>", "global::MemoryPack.Formatters.InterfaceImmutableSetFormatter<TREPLACE>" },
 
+            // FrozenCollectionFormatters
+            { "System.Collections.Frozen.FrozenDictionary<,>", "global::MemoryPack.Formatters.FrozenDictionaryFormatter<TREPLACE>" },
+            { "System.Collections.Frozen.FrozenSet<>", "global::MemoryPack.Formatters.FrozenSetFormatter<TREPLACE>" },
+
             // InterfaceCollectionFormatters
             { "System.Collections.Generic.IEnumerable<>", "global::MemoryPack.Formatters.InterfaceEnumerableFormatter<TREPLACE>" },
             { "System.Collections.Generic.ICollection<>", "global::MemoryPack.Formatters.InterfaceCollectionFormatter<TREPLACE>" },

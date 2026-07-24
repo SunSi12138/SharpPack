@@ -13,6 +13,18 @@ Run from any directory:
 tools/CompatibilityBaseline/generate-original-head-corpus.sh
 ```
 
+This is a verify-only command. It regenerates the original corpus in a
+temporary directory, compares all deterministic entries with the checked-in
+baseline, verifies current-reader/original-writer and
+original-reader/current-writer compatibility, and leaves the worktree
+unchanged.
+
+Updating the checked-in baseline is an explicit maintenance operation:
+
+```bash
+tools/CompatibilityBaseline/generate-original-head-corpus.sh --update
+```
+
 The generator refuses to accept a corpus unless it came from commit
 `85ab9ad76c380aca48c09ff3a0ad955ee5a2902b` and contains all 117 original
 well-known formatter registrations, all 68 original generic shapes, and the

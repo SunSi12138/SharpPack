@@ -27,13 +27,14 @@ public sealed class TwoDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,]>
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>())
         {
-            var byteCount = Unsafe.SizeOf<T>() * i * j;
+            var byteCount = FormatterValidation.ByteCount<T>(value.Length);
             ref var src = ref MemoryMarshal.GetArrayDataReference(value);
-            ref var dest = ref writer.GetSpanReference(byteCount + 4);
+            var totalLength = FormatterValidation.AddHeader(byteCount);
+            ref var dest = ref writer.GetSpanReference(totalLength);
 
             Unsafe.WriteUnaligned(ref dest, value.Length);
             Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref dest, 4), ref src, (uint)byteCount);
-            writer.Advance(byteCount + 4);
+            writer.Advance(totalLength);
         }
         else
         {
@@ -68,6 +69,10 @@ public sealed class TwoDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,]>
         {
             MemoryPackSerializationException.ThrowInvalidCollection();
         }
+        var elementCount = FormatterValidation.ValidateDimensions(
+            length,
+            iLength,
+            jLength);
 
         if (value != null && value.GetLength(0) == iLength && value.GetLength(1) == jLength && value.Length == length)
         {
@@ -80,7 +85,7 @@ public sealed class TwoDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,]>
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>())
         {
-            var byteCount = Unsafe.SizeOf<T>() * iLength * jLength;
+            var byteCount = FormatterValidation.ByteCount<T>(elementCount);
             ref var dest = ref MemoryMarshal.GetArrayDataReference(value);
             ref var src = ref reader.GetSpanReference(byteCount);
             Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);
@@ -135,13 +140,14 @@ public sealed class ThreeDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>())
         {
-            var byteCount = Unsafe.SizeOf<T>() * i * j * k;
+            var byteCount = FormatterValidation.ByteCount<T>(value.Length);
             ref var src = ref MemoryMarshal.GetArrayDataReference(value);
-            ref var dest = ref writer.GetSpanReference(byteCount + 4);
+            var totalLength = FormatterValidation.AddHeader(byteCount);
+            ref var dest = ref writer.GetSpanReference(totalLength);
 
             Unsafe.WriteUnaligned(ref dest, value.Length);
             Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref dest, 4), ref src, (uint)byteCount);
-            writer.Advance(byteCount + 4);
+            writer.Advance(totalLength);
         }
         else
         {
@@ -175,6 +181,11 @@ public sealed class ThreeDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,
         {
             MemoryPackSerializationException.ThrowInvalidCollection();
         }
+        var elementCount = FormatterValidation.ValidateDimensions(
+            length,
+            iLength,
+            jLength,
+            kLength);
 
         if (value != null && value.GetLength(0) == iLength && value.GetLength(1) == jLength && value.GetLength(2) == kLength && value.Length == length)
         {
@@ -187,7 +198,7 @@ public sealed class ThreeDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>())
         {
-            var byteCount = Unsafe.SizeOf<T>() * iLength * jLength * kLength;
+            var byteCount = FormatterValidation.ByteCount<T>(elementCount);
             ref var dest = ref MemoryMarshal.GetArrayDataReference(value);
             ref var src = ref reader.GetSpanReference(byteCount);
             Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);
@@ -250,13 +261,14 @@ public sealed class FourDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,,
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>())
         {
-            var byteCount = Unsafe.SizeOf<T>() * i * j * k * l;
+            var byteCount = FormatterValidation.ByteCount<T>(value.Length);
             ref var src = ref MemoryMarshal.GetArrayDataReference(value);
-            ref var dest = ref writer.GetSpanReference(byteCount + 4);
+            var totalLength = FormatterValidation.AddHeader(byteCount);
+            ref var dest = ref writer.GetSpanReference(totalLength);
 
             Unsafe.WriteUnaligned(ref dest, value.Length);
             Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref dest, 4), ref src, (uint)byteCount);
-            writer.Advance(byteCount + 4);
+            writer.Advance(totalLength);
         }
         else
         {
@@ -290,6 +302,12 @@ public sealed class FourDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,,
         {
             MemoryPackSerializationException.ThrowInvalidCollection();
         }
+        var elementCount = FormatterValidation.ValidateDimensions(
+            length,
+            iLength,
+            jLength,
+            kLength,
+            lLength);
 
         if (value != null && value.GetLength(0) == iLength && value.GetLength(1) == jLength && value.GetLength(2) == kLength && value.GetLength(3) == lLength && value.Length == length)
         {
@@ -302,7 +320,7 @@ public sealed class FourDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,,
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>())
         {
-            var byteCount = Unsafe.SizeOf<T>() * iLength * jLength * kLength * lLength;
+            var byteCount = FormatterValidation.ByteCount<T>(elementCount);
             ref var dest = ref MemoryMarshal.GetArrayDataReference(value);
             ref var src = ref reader.GetSpanReference(byteCount);
             Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);

@@ -27,8 +27,8 @@ public class StaticDictionaryFormatterCheck
 
     Dictionary<string, int> dict;
     ArrayBufferWriter<byte> buffer;
-    MemoryPackWriterOptionalState state;
-    MemoryPackReaderOptionalState state2;
+    MemoryPackWriterOptionalStateLease state;
+    MemoryPackReaderOptionalStateLease state2;
     byte[] bytes;
 
     public StaticDictionaryFormatterCheck()

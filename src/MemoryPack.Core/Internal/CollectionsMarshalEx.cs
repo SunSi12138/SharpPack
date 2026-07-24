@@ -3,6 +3,7 @@
 #pragma warning disable CS0649
 
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace MemoryPack.Internal;
 
@@ -13,11 +14,10 @@ internal static class CollectionsMarshalEx
     /// </summary>
     public static Span<T?> CreateSpan<T>(List<T?> list, int length)
     {
+        list.Clear();
         list.EnsureCapacity(length);
-
-        ref var view = ref Unsafe.As<List<T?>, ListView<T?>>(ref list);
-        view._size = length;
-        return view._items.AsSpan(0, length);
+        CollectionsMarshal.SetCount(list, length);
+        return CollectionsMarshal.AsSpan(list);
     }
 
     public static Span<T?> AsSpan<T>(Stack<T?> stack)
@@ -26,23 +26,7 @@ internal static class CollectionsMarshalEx
         return view._items.AsSpan(0, view._size);
     }
 
-    public static Span<T?> CreateSpan<T>(Stack<T?> stack, int length)
-    {
-        stack.EnsureCapacity(length);
-
-        ref var view = ref Unsafe.As<Stack<T?>, StackView<T?>>(ref stack);
-        view._size = length;
-        return view._items.AsSpan(0, view._size);
-    }
-
     // NOTE: These structure depndent on .NET 7, if changed, require to keep same structure.
-
-    internal sealed class ListView<T>
-    {
-        public T[] _items;
-        public int _size;
-        public int _version;
-    }
 
     internal sealed class StackView<T>
     {

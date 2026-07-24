@@ -1,4 +1,5 @@
 using MemoryPack.Compression;
+using MemoryPack.Formatters;
 using MemoryPack.Tests.Models;
 using System;
 using System.Buffers;
@@ -158,6 +159,115 @@ public class CompressionTest
         }
     }
 
+    [Fact]
+    public void BrotliByteArrayRoundTripsNullAndEmpty()
+    {
+        foreach (var expected in new byte[]?[] { null, Array.Empty<byte>() })
+        {
+            var value = new CompressionEdgeData { Data = expected };
+            var defaultPayload = MemoryPackSerializer.Serialize(value);
+            var context = new MemoryPackSerializerContext();
+            var contextPayload = MemoryPackSerializer.Serialize(value, context);
+
+            MemoryPackSerializer.Deserialize<CompressionEdgeData>(defaultPayload)!
+                .Data.Should().Equal(expected);
+            MemoryPackSerializer.Deserialize<CompressionEdgeData>(
+                    contextPayload,
+                    context)!
+                .Data.Should().Equal(expected);
+        }
+    }
+
+    [Fact]
+    public void BrotliDecompressorStopsAtFrameEndAndEnforcesLimit()
+    {
+        var source = new byte[16_384];
+        var compressor = new BrotliCompressor();
+        try
+        {
+            MemoryPackSerializer.Serialize(ref compressor, source);
+            var compressed = compressor.ToArray();
+            var sequence = ReadOnlySequenceBuilder.Create(
+                compressed,
+                new byte[] { 0xCA, 0xFE });
+
+            using var decompressor = new BrotliDecompressor();
+            var decompressed = decompressor.Decompress(
+                sequence,
+                out var consumed);
+
+            consumed.Should().Be(compressed.Length);
+            MemoryPackSerializer.Deserialize<byte[]>(decompressed)
+                .Should().Equal(source);
+
+            using var limited = new BrotliDecompressor(1024);
+            Action exceedLimit = () => limited.Decompress(compressed);
+            exceedLimit.Should().Throw<MemoryPackSerializationException>();
+        }
+        finally
+        {
+            compressor.Dispose();
+        }
+    }
+
+    [Fact]
+    public void SegmentedBrotliStringRejectsDecodedLengthMismatch()
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        using var writerState = MemoryPackWriterOptionalStatePool.Rent();
+        var writer = new MemoryPackWriter<ArrayBufferWriter<byte>>(
+            ref buffer,
+            writerState);
+        var formatter = new BrotliStringFormatter();
+        string? text = "segment-boundary";
+        formatter.Serialize(ref writer, ref text);
+        writer.Flush();
+
+        var payload = buffer.WrittenSpan.ToArray();
+        BitConverter.GetBytes(text!.Length + 1).CopyTo(payload, 0);
+        var sequence = ReadOnlySequenceBuilder.Create(
+            payload.Select(static value => new[] { value }).ToArray());
+
+        using var readerState = MemoryPackReaderOptionalStatePool.Rent();
+        var reader = new MemoryPackReader(sequence, readerState);
+        string? restored = null;
+        var error = false;
+        try
+        {
+            formatter.Deserialize(ref reader, ref restored);
+        }
+        catch (MemoryPackSerializationException)
+        {
+            error = true;
+        }
+
+        error.Should().BeTrue();
+    }
+
+    [Fact]
+    public void GenericBrotliRejectsTrailingDecompressedPayload()
+    {
+        var compressor = new BrotliCompressor();
+        try
+        {
+            MemoryPackSerializer.Serialize(ref compressor, 123);
+            MemoryPackSerializer.Serialize(ref compressor, 456);
+            var payload = compressor.ToArray();
+            var context = new MemoryPackSerializerContextBuilder()
+                .Register<int>(new BrotliFormatter<int>())
+                .Build();
+
+            Action deserialize = () =>
+                MemoryPackSerializer.Deserialize<int>(payload, context);
+
+            deserialize.Should().Throw<MemoryPackSerializationException>();
+        }
+        finally
+        {
+            compressor.Dispose();
+        }
+    }
+
 
     byte[] ReferenceDecompress(byte[] bytes)
     {
@@ -202,4 +312,11 @@ public partial class CompressionAttrData2
     public StandardTypeTwo Two { get; set; } = default!;
 
     public int Id2 { get; set; }
+}
+
+[MemoryPackable]
+public partial class CompressionEdgeData
+{
+    [BrotliFormatter]
+    public byte[]? Data { get; set; }
 }

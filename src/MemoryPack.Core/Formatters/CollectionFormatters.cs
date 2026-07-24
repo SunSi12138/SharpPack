@@ -58,11 +58,21 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new List<T?>(length);
+                value = new List<T?>(
+                    FormatterValidation.InitialCapacity(length));
             }
-            else if (value.Count == length)
+
+            if (length > FormatterValidation.MaximumInitialCollectionCapacity &&
+                value.Capacity < length)
             {
                 value.Clear();
+                value.EnsureCapacity(
+                    FormatterValidation.MaximumInitialCollectionCapacity);
+                for (int i = 0; i < length; i++)
+                {
+                    value.Add(reader.ReadValue<T>());
+                }
+                return;
             }
 
             var span = CollectionsMarshalEx.CreateSpan(value, length);
@@ -95,11 +105,24 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new List<T?>(length);
+                value = new List<T?>(
+                    FormatterValidation.InitialCapacity(length));
             }
-            else if (value.Count == length)
+
+            if (length > FormatterValidation.MaximumInitialCollectionCapacity &&
+                value.Capacity < length)
             {
                 value.Clear();
+                value.EnsureCapacity(
+                    FormatterValidation.MaximumInitialCollectionCapacity);
+                var formatter = reader.GetFormatter<T?>();
+                for (int i = 0; i < length; i++)
+                {
+                    T? item = default;
+                    formatter.Deserialize(ref reader, ref item);
+                    value.Add(item);
+                }
+                return;
             }
 
             var span = CollectionsMarshalEx.CreateSpan(value, length);
@@ -133,15 +156,21 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new Stack<T?>(length);
+                value = new Stack<T?>(
+                    FormatterValidation.InitialCapacity(length));
             }
-            else if (value.Count != length)
+            else
             {
                 value.Clear();
             }
 
-            var span = CollectionsMarshalEx.CreateSpan(value, length);
-            reader.ReadSpanWithoutReadLengthHeader(length, ref span);
+            var formatter = reader.GetFormatter<T?>();
+            for (int i = 0; i < length; i++)
+            {
+                T? item = default;
+                formatter.Deserialize(ref reader, ref item);
+                value.Push(item);
+            }
         }
     }
 
@@ -179,12 +208,14 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new Queue<T?>(length);
+                value = new Queue<T?>(
+                    FormatterValidation.InitialCapacity(length));
             }
             else
             {
                 value.Clear();
-                value.EnsureCapacity(length);
+                value.EnsureCapacity(
+                    FormatterValidation.InitialCapacity(length));
             }
 
             var formatter = reader.GetFormatter<T?>();
@@ -290,7 +321,9 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new HashSet<T?>(length, equalityComparer);
+                value = new HashSet<T?>(
+                    FormatterValidation.InitialCapacity(length),
+                    equalityComparer);
             }
             else
             {
@@ -402,7 +435,8 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new PriorityQueue<TElement?, TPriority?>(length);
+                value = new PriorityQueue<TElement?, TPriority?>(
+                    FormatterValidation.InitialCapacity(length));
             }
             else
             {
@@ -741,7 +775,9 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new Dictionary<TKey, TValue?>(length, equalityComparer);
+                value = new Dictionary<TKey, TValue?>(
+                    FormatterValidation.InitialCapacity(length),
+                    equalityComparer);
             }
             else
             {
@@ -869,7 +905,9 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new SortedList<TKey, TValue?>(length, comparer);
+                value = new SortedList<TKey, TValue?>(
+                    FormatterValidation.InitialCapacity(length),
+                    comparer);
             }
             else
             {

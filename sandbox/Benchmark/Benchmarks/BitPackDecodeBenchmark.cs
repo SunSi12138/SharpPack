@@ -10,7 +10,7 @@ public class BitPackDecodeBenchmark
     byte[] payload = null!;
     bool[] currentDestination = null!;
     bool[] scalarDestination = null!;
-    MemoryPackReaderOptionalState readerState = null!;
+    MemoryPackReaderOptionalStateLease readerState;
 
     [Params(32, 256, 4096, 65536)]
     public int Length { get; set; }

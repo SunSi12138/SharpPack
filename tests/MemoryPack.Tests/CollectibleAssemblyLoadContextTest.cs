@@ -383,6 +383,42 @@ public static class PluginEntry
         references.PluginType.IsAlive.Should().BeFalse();
     }
 
+    [Fact]
+    public void EmptyContextTracksRuntimeTypeInsideNonCollectibleHost()
+    {
+        var references = RoundTripHostRuntimeTypeAndUnload(CompilePlugin());
+
+        ForceUnload(references);
+
+        references.LoadContext.IsAlive.Should().BeFalse();
+        references.Assembly.IsAlive.Should().BeFalse();
+        references.PluginType.IsAlive.Should().BeFalse();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static UnloadReferences RoundTripHostRuntimeTypeAndUnload(byte[] image)
+    {
+        var loaded = LoadedPlugin.Load(image, "host-runtime-type");
+        var context = new MemoryPackSerializerContext();
+        var value = new HostRuntimeTypeEnvelope
+        {
+            RuntimeType = loaded.PluginType
+        };
+
+        var payload = MemoryPackSerializer.Serialize(value, context);
+        var restored = MemoryPackSerializer.Deserialize<HostRuntimeTypeEnvelope>(
+            payload,
+            context);
+        restored!.RuntimeType.Should().BeSameAs(loaded.PluginType);
+
+        var references = loaded.Unload();
+        restored = null;
+        value = null!;
+        context = null!;
+        loaded = null!;
+        return references;
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     static UnloadReferences LoadInvokeAndUnload(byte[] image, string name, string methodName)
     {
@@ -487,6 +523,7 @@ public static class PluginEntry
         Type? pluginType;
 
         public Assembly Assembly => assembly!;
+        public Type PluginType => pluginType!;
 
         LoadedPlugin(PluginLoadContext loadContext, Assembly assembly, Type entryType, Type pluginType)
         {
@@ -535,4 +572,10 @@ public static class PluginEntry
     }
 
     sealed record UnloadReferences(WeakReference LoadContext, WeakReference Assembly, WeakReference PluginType);
+}
+
+[MemoryPackable]
+public partial class HostRuntimeTypeEnvelope
+{
+    public Type? RuntimeType { get; set; }
 }

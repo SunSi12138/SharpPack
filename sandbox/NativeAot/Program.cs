@@ -1,68 +1,58 @@
-﻿using System.Buffers;
 using MemoryPack;
 
-// require this unused line for reproduce error?
-var bufferWriter = new ArrayBufferWriter<byte>();
-
-var mc = new MemPackObject();
-
-var formatter = new MemoryPackableFormatter2<MemPackObject>();
-formatter.Serialize<ArrayBufferWriter<byte>>(ref mc);
-
-var memoryPackValue = new AotMemoryPackModel
+var value = new AotMemoryPackModel
 {
     Id = 42,
-    Name = "NativeAOT",
+    Name = "NativeAOT 明示",
+    Values = [1, 2, 3, 5, 8],
+    RuntimeType = typeof(AotMemoryPackModel),
+    Item = new AotUnionItem { Value = 123 },
 };
-var context = new MemoryPackSerializerContextBuilder()
-    .RegisterFactory<AotMemoryPackModel, AotMemoryPackModel>()
-    .Build();
-var payload = MemoryPackSerializer.Serialize(memoryPackValue, context);
-var memoryPackRoundTrip =
-    MemoryPackSerializer.Deserialize<AotMemoryPackModel>(payload, context);
-if (memoryPackRoundTrip is null ||
-    memoryPackRoundTrip.Id != memoryPackValue.Id ||
-    memoryPackRoundTrip.Name != memoryPackValue.Name)
+
+var defaultPayload = MemoryPackSerializer.Serialize(value);
+AssertModel(
+    MemoryPackSerializer.Deserialize<AotMemoryPackModel>(defaultPayload),
+    value);
+
+var context = new MemoryPackSerializerContext();
+var contextPayload = MemoryPackSerializer.Serialize(value, context);
+if (!defaultPayload.AsSpan().SequenceEqual(contextPayload))
 {
-    throw new InvalidOperationException("MemoryPack NativeAOT round-trip failed.");
+    throw new InvalidOperationException(
+        "The empty Context changed the MemoryPack wire format.");
 }
+AssertModel(
+    MemoryPackSerializer.Deserialize<AotMemoryPackModel>(
+        contextPayload,
+        context),
+    value);
 
+var utf8Context = new MemoryPackSerializerContext(
+    MemoryPackSerializerConfiguration.Utf8);
+var utf8Payload = MemoryPackSerializer.Serialize(value, utf8Context);
+AssertModel(
+    MemoryPackSerializer.Deserialize<AotMemoryPackModel>(
+        utf8Payload,
+        utf8Context),
+    value);
 
-public interface IMemoryPackable2<T>
+Console.WriteLine("MemoryPack NativeAOT verification passed.");
+
+static void AssertModel(
+    AotMemoryPackModel? actual,
+    AotMemoryPackModel expected)
 {
-    static abstract void Serialize<TBufferWriter>(scoped ref T? value)
-        where TBufferWriter : IBufferWriter<byte>;
-}
-
-public interface IMemoryPackFormatter2<T>
-{
-    void Serialize<TBufferWriter>(scoped ref T? value)
-        where TBufferWriter : IBufferWriter<byte>;
-}
-
-public abstract class MemoryPackFormatter2<T> : IMemoryPackFormatter2<T>
-{
-    public abstract void Serialize<TBufferWriter>(scoped ref T? value)
-        where TBufferWriter : IBufferWriter<byte>;
-}
-
-public sealed class MemoryPackableFormatter2<T> : MemoryPackFormatter2<T>
-    where T : IMemoryPackable2<T>
-{
-    public override void Serialize<TBufferWriter>(scoped ref T? value)
+    if (actual is null ||
+        actual.Id != expected.Id ||
+        actual.Name != expected.Name ||
+        !actual.Values.SequenceEqual(expected.Values) ||
+        actual.RuntimeType != expected.RuntimeType ||
+        actual.OptionalNext is not null ||
+        actual.Item is not AotUnionItem union ||
+        union.Value != ((AotUnionItem)expected.Item!).Value)
     {
-        Console.WriteLine("Before");
-        T.Serialize<TBufferWriter>(ref value);
-        Console.WriteLine("After");
-    }
-}
-
-public class MemPackObject : IMemoryPackable2<MemPackObject>
-{
-    public static void Serialize<TBufferWriter>(scoped ref MemPackObject? value)
-          where TBufferWriter : IBufferWriter<byte>
-    {
-        Console.WriteLine("OK");
+        throw new InvalidOperationException(
+            "MemoryPack NativeAOT round-trip failed.");
     }
 }
 
@@ -70,5 +60,24 @@ public class MemPackObject : IMemoryPackable2<MemPackObject>
 public partial class AotMemoryPackModel
 {
     public int Id { get; set; }
+
     public string? Name { get; set; }
+
+    public List<int> Values { get; set; } = [];
+
+    public Type? RuntimeType { get; set; }
+
+    public AotMemoryPackModel? OptionalNext { get; set; }
+
+    public IAotUnion? Item { get; set; }
+}
+
+[MemoryPackable]
+[MemoryPackUnion(7, typeof(AotUnionItem))]
+public partial interface IAotUnion;
+
+[MemoryPackable]
+public partial class AotUnionItem : IAotUnion
+{
+    public int Value { get; set; }
 }

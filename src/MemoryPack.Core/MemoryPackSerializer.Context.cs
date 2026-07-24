@@ -12,22 +12,15 @@ public static partial class MemoryPackSerializer
     public static byte[] Serialize<T>(in T? value, MemoryPackSerializerContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (context.CanUseDefaultPath<T>())
-        {
-            return SerializeCore(value);
-        }
-
         return SerializeWithContext(value, context);
     }
 
-    [MethodImpl(MethodImplOptions.NoInlining)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static byte[] SerializeWithContext<T>(
         in T? value,
         MemoryPackSerializerContext context)
     {
-        context.EnsureRootType<T>();
         var state = AcquireWriterState();
-        state.BufferWriter.Reset();
         state.OptionalState.Init(context);
         try
         {
@@ -53,12 +46,6 @@ public static partial class MemoryPackSerializer
         where TBufferWriter : IBufferWriter<byte>
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (context.CanUseDefaultPath<T>())
-        {
-            return Serialize(ref bufferWriter, value);
-        }
-
-        context.EnsureRootType<T>();
 
         var optionalState = AcquireWriterOptionalState();
         optionalState.Init(context);
@@ -91,17 +78,8 @@ public static partial class MemoryPackSerializer
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (context.CanUseDefaultPath<T>())
-        {
-            await SerializeAsync(
-                stream,
-                value,
-                cancellationToken).ConfigureAwait(false);
-            return;
-        }
-
-        context.EnsureRootType<T>();
-        var tempWriter = ReusableLinkedArrayBufferWriterPool.Rent();
+        var tempWriter = ReusableLinkedArrayBufferWriterPool.Rent(
+            out var tempWriterLeaseId);
         try
         {
             _ = Serialize(ref tempWriter, value, context);
@@ -110,7 +88,9 @@ public static partial class MemoryPackSerializer
         }
         finally
         {
-            ReusableLinkedArrayBufferWriterPool.Return(tempWriter);
+            ReusableLinkedArrayBufferWriterPool.Return(
+                tempWriter,
+                tempWriterLeaseId);
         }
     }
 
@@ -131,11 +111,6 @@ public static partial class MemoryPackSerializer
         MemoryPackSerializerContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (context.CanUseDefaultPath<T>())
-        {
-            return Deserialize(buffer, ref value);
-        }
-
         context.EnsureRootType<T>();
         var state = AcquireReaderOptionalState();
         state.Init(context);
@@ -172,11 +147,6 @@ public static partial class MemoryPackSerializer
         MemoryPackSerializerContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (context.CanUseDefaultPath<T>())
-        {
-            return Deserialize(buffer, ref value);
-        }
-
         context.EnsureRootType<T>();
         var state = AcquireReaderOptionalState();
         state.Init(context);
@@ -194,6 +164,16 @@ public static partial class MemoryPackSerializer
         }
     }
 
+    /// <summary>
+    /// Deserializes from the stream's remaining contents using the supplied
+    /// serializer context.
+    /// </summary>
+    /// <remarks>
+    /// A buffer-backed <see cref="MemoryStream"/> advances by the bytes consumed
+    /// by one value. Other streams are read through end-of-stream because a
+    /// general <see cref="Stream"/> cannot return bytes read past that value.
+    /// Use the payload-length overload for framed or concatenated messages.
+    /// </remarks>
     public static async ValueTask<T?> DeserializeAsync<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
         T>(
@@ -202,13 +182,6 @@ public static partial class MemoryPackSerializer
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
-        if (context.CanUseDefaultPath<T>())
-        {
-            return await DeserializeAsync<T>(
-                stream,
-                cancellationToken).ConfigureAwait(false);
-        }
-
         context.EnsureRootType<T>();
         if (stream is MemoryStream memoryStream && memoryStream.TryGetBuffer(out var segment))
         {
@@ -222,7 +195,8 @@ public static partial class MemoryPackSerializer
             return value;
         }
 
-        var builder = ReusableReadOnlySequenceBuilderPool.Rent();
+        var builder = ReusableReadOnlySequenceBuilderPool.Rent(
+            out var builderLeaseId);
         try
         {
             var buffer = ArrayPool<byte>.Shared.Rent(65536);
@@ -270,7 +244,29 @@ public static partial class MemoryPackSerializer
         }
         finally
         {
-            ReusableReadOnlySequenceBuilderPool.Return(builder);
+            ReusableReadOnlySequenceBuilderPool.Return(
+                builder,
+                builderLeaseId);
         }
+    }
+
+    /// <summary>
+    /// Deserializes exactly one length-delimited payload using the supplied
+    /// serializer context.
+    /// </summary>
+    public static ValueTask<T?> DeserializeAsync<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+        T>(
+        Stream stream,
+        int payloadLength,
+        MemoryPackSerializerContext context,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return DeserializeLengthDelimitedAsync<T>(
+            stream,
+            payloadLength,
+            context,
+            cancellationToken);
     }
 }

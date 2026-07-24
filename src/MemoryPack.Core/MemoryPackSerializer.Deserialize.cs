@@ -128,6 +128,15 @@ public static partial class MemoryPackSerializer
         }
     }
 
+    /// <summary>
+    /// Deserializes from the stream's remaining contents.
+    /// </summary>
+    /// <remarks>
+    /// A buffer-backed <see cref="MemoryStream"/> advances by the bytes consumed
+    /// by one value. Other streams are read through end-of-stream because a
+    /// general <see cref="Stream"/> cannot return bytes read past that value.
+    /// Use the payload-length overload for framed or concatenated messages.
+    /// </remarks>
     public static async ValueTask<T?> DeserializeAsync<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
         T>(Stream stream, CancellationToken cancellationToken = default)
@@ -136,7 +145,9 @@ public static partial class MemoryPackSerializer
         {
             cancellationToken.ThrowIfCancellationRequested();
             T? value = default;
-            var bytesRead = Deserialize<T>(streamBuffer.AsSpan(checked((int)ms.Position)), ref value);
+            var bytesRead = Deserialize<T>(
+                streamBuffer.AsSpan(checked((int)ms.Position)),
+                ref value);
 
             // Emulate that we had actually "read" from the stream.
             ms.Seek(bytesRead, SeekOrigin.Current);
@@ -144,7 +155,8 @@ public static partial class MemoryPackSerializer
             return value;
         }
 
-        var builder = ReusableReadOnlySequenceBuilderPool.Rent();
+        var builder = ReusableReadOnlySequenceBuilderPool.Rent(
+            out var builderLeaseId);
         try
         {
             var buffer = ArrayPool<byte>.Shared.Rent(65536); // initial 64K
@@ -197,7 +209,124 @@ public static partial class MemoryPackSerializer
         }
         finally
         {
-            ReusableReadOnlySequenceBuilderPool.Return(builder);
+            ReusableReadOnlySequenceBuilderPool.Return(
+                builder,
+                builderLeaseId);
+        }
+    }
+
+    /// <summary>
+    /// Deserializes exactly one length-delimited payload without consuming
+    /// bytes from a following message.
+    /// </summary>
+    public static ValueTask<T?> DeserializeAsync<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+        T>(
+        Stream stream,
+        int payloadLength,
+        CancellationToken cancellationToken = default)
+        => DeserializeLengthDelimitedAsync<T>(
+            stream,
+            payloadLength,
+            context: null,
+            cancellationToken);
+
+    static async ValueTask<T?> DeserializeLengthDelimitedAsync<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+        T>(
+        Stream stream,
+        int payloadLength,
+        MemoryPackSerializerContext? context,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        ArgumentOutOfRangeException.ThrowIfNegative(payloadLength);
+
+        if (stream is MemoryStream memoryStream &&
+            memoryStream.TryGetBuffer(out var segment))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var position = checked((int)memoryStream.Position);
+            if (segment.Count - position < payloadLength)
+            {
+                throw new EndOfStreamException(
+                    $"The stream ended before the {payloadLength}-byte payload was available.");
+            }
+
+            T? value = default;
+            var payload = segment.AsSpan(position, payloadLength);
+            var consumed = context is null
+                ? Deserialize(payload, ref value)
+                : Deserialize(payload, ref value, context);
+            EnsureFrameConsumed(payloadLength, consumed);
+            memoryStream.Seek(payloadLength, SeekOrigin.Current);
+            return value;
+        }
+
+        var builder = ReusableReadOnlySequenceBuilderPool.Rent(
+            out var builderLeaseId);
+        try
+        {
+            var remaining = payloadLength;
+            while (remaining > 0)
+            {
+                var requested = Math.Min(remaining, 65536);
+                var buffer = ArrayPool<byte>.Shared.Rent(requested);
+                var offset = 0;
+                try
+                {
+                    while (offset < requested)
+                    {
+                        var read = await stream.ReadAsync(
+                            buffer.AsMemory(offset, requested - offset),
+                            cancellationToken).ConfigureAwait(false);
+                        if (read == 0)
+                        {
+                            throw new EndOfStreamException(
+                                $"The stream ended with {remaining - offset} payload bytes remaining.");
+                        }
+                        offset += read;
+                    }
+
+                    builder.Add(
+                        buffer.AsMemory(0, requested),
+                        returnToPool: true);
+                    buffer = null!;
+                }
+                finally
+                {
+                    if (buffer is not null)
+                    {
+                        ArrayPool<byte>.Shared.Return(buffer);
+                    }
+                }
+
+                remaining -= requested;
+            }
+
+            var sequence = builder.Build();
+            T? value = default;
+            var consumed = context is null
+                ? Deserialize(sequence, ref value)
+                : Deserialize(sequence, ref value, context);
+            EnsureFrameConsumed(payloadLength, consumed);
+            return value;
+        }
+        finally
+        {
+            ReusableReadOnlySequenceBuilderPool.Return(
+                builder,
+                builderLeaseId);
+        }
+    }
+
+    static void EnsureFrameConsumed(int payloadLength, int consumed)
+    {
+        if (payloadLength != consumed)
+        {
+            throw new MemoryPackSerializationException(
+                $"The formatter consumed {consumed} of the " +
+                $"{payloadLength}-byte payload.");
         }
     }
 

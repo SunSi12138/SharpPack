@@ -47,12 +47,14 @@ public sealed class StringBuilderFormatter : MemoryPackFormatter<StringBuilder>
 
         if (value == null)
         {
-            value = new StringBuilder(length);
+            value = new StringBuilder(
+                FormatterValidation.InitialCapacity(length));
         }
         else
         {
             value.Clear();
-            value.EnsureCapacity(length);
+            value.EnsureCapacity(
+                FormatterValidation.InitialCapacity(length));
         }
 
         // note: require to check is Utf8

@@ -381,6 +381,7 @@ public partial class TypeMeta
     [global::MemoryPack.Internal.Preserve]
     static global::MemoryPack.MemoryPackFormatter<{{TypeName}}> global::MemoryPack.IMemoryPackFormatterFactory<{{TypeName}}>.CreateFormatter()
     {
+{{EmitAotFormatterRoots("        ")}}
         return new global::MemoryPack.Formatters.MemoryPackableFormatter<{{TypeName}}>();
     }
 """;
@@ -441,9 +442,19 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
         {
             readBeginBody = """
         Span<int> deltas = stackalloc int[count];
+        long totalDelta = 0;
         for (int i = 0; i < count; i++)
         {
             deltas[i] = reader.ReadVarIntInt32();
+            if (deltas[i] < 0)
+            {
+                MemoryPackSerializationException.ThrowInvalidLength(deltas[i]);
+            }
+            totalDelta += deltas[i];
+        }
+        if (totalDelta > reader.Remaining)
+        {
+            MemoryPackSerializationException.ThrowInvalidAdvance();
         }
 """;
 
@@ -570,6 +581,80 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
         return sb.ToString();
     }
 
+    string EmitAotFormatterRoots(string indent)
+    {
+        var formatterTypes = new HashSet<string>(StringComparer.Ordinal);
+        var factoryTypes = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var member in Members)
+        {
+            AddFormatterTypes(member.MemberType);
+        }
+
+        if (formatterTypes.Count == 0 && factoryTypes.Count == 0)
+        {
+            return "";
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine(
+            $"{indent}if (!global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)");
+        sb.AppendLine($"{indent}{{");
+        foreach (var formatterType in formatterTypes.OrderBy(static x => x))
+        {
+            sb.AppendLine(
+                $"{indent}    global::System.GC.KeepAlive(new {formatterType}());");
+        }
+        foreach (var factoryType in factoryTypes.OrderBy(static x => x))
+        {
+            sb.AppendLine(
+                $"{indent}    global::System.GC.KeepAlive(PreserveFactory<{factoryType}, {factoryType}>());");
+            sb.AppendLine(
+                $"{indent}    global::System.GC.KeepAlive(typeof({factoryType}).GetMethods(global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.NonPublic));");
+        }
+        if (factoryTypes.Count != 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine(
+                $"{indent}    static global::System.Func<global::MemoryPack.MemoryPackFormatter<TValue>> PreserveFactory<TValue, TFactory>()");
+            sb.AppendLine(
+                $"{indent}        where TFactory : global::MemoryPack.IMemoryPackFormatterFactory<TValue>");
+            sb.AppendLine(
+                $"{indent}        => TFactory.CreateFormatter;");
+        }
+        sb.Append($"{indent}}}");
+        return sb.ToString();
+
+        void AddFormatterTypes(ITypeSymbol type)
+        {
+            if (reference.KnownTypes.GetNonDefaultFormatterName(type) is { } formatter)
+            {
+                formatterTypes.Add(formatter);
+            }
+
+            if (type.TryGetMemoryPackableType(
+                    reference,
+                    out var generateType,
+                    out _) &&
+                generateType != GenerateType.NoGenerate)
+            {
+                factoryTypes.Add(type.FullyQualifiedToString());
+            }
+
+            if (type is IArrayTypeSymbol array)
+            {
+                AddFormatterTypes(array.ElementType);
+            }
+            else if (type is INamedTypeSymbol named)
+            {
+                foreach (var argument in named.TypeArguments)
+                {
+                    AddFormatterTypes(argument);
+                }
+            }
+        }
+    }
+
     string EmitSerializeBody()
     {
         if (this.GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference)
@@ -624,7 +709,8 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
         }
 """ : "")}}
 {{checkCircularReference}}
-        var tempBuffer = global::MemoryPack.Internal.ReusableLinkedArrayBufferWriterPool.Rent();
+        var tempBuffer = global::MemoryPack.Internal.ReusableLinkedArrayBufferWriterPool.Rent(
+            out var tempBufferLeaseId);
         try
         {
             Span<int> offsets = stackalloc int[{{Members.Length}}];
@@ -653,7 +739,9 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
         }
         finally
         {
-            global::MemoryPack.Internal.ReusableLinkedArrayBufferWriterPool.Return(tempBuffer);
+            global::MemoryPack.Internal.ReusableLinkedArrayBufferWriterPool.Return(
+                tempBuffer,
+                tempBufferLeaseId);
         }
 """;
     }
@@ -978,6 +1066,7 @@ partial {{classOrInterfaceOrRecord}} {{TypeName}} : {{contextFactoryInterface}}
 partial class {{TypeName}} :
     MemoryPackFormatter<{{symbolFullQualified}}>,
     global::MemoryPack.IMemoryPackFormatterFactory<{{symbolFullQualified}}>
+{{registrationConstraints}}
 {
     static global::MemoryPack.MemoryPackFormatter<{{symbolFullQualified}}>
         global::MemoryPack.IMemoryPackFormatterFactory<{{symbolFullQualified}}>.CreateFormatter()
@@ -1040,7 +1129,11 @@ public static class {{registrationClassName}}
             }
             else if (parameter.HasReferenceTypeConstraint)
             {
-                constraints.Add("class");
+                constraints.Add(
+                    parameter.ReferenceTypeConstraintNullableAnnotation ==
+                    NullableAnnotation.Annotated
+                        ? "class?"
+                        : "class");
             }
             else if (parameter.HasNotNullConstraint)
             {

@@ -55,7 +55,9 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var dict = new Dictionary<TKey, TValue?>(length, equalityComparer);
+            var dict = new Dictionary<TKey, TValue?>(
+                FormatterValidation.InitialCapacity(length),
+                equalityComparer);
 
             var keyFormatter = reader.GetFormatter<TKey>();
             var valueFormatter = reader.GetFormatter<TValue>();
@@ -108,7 +110,9 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var set = new HashSet<T>(length, equalityComparer);
+            var set = new HashSet<T>(
+                FormatterValidation.InitialCapacity(length),
+                equalityComparer);
 
             var formatter = reader.GetFormatter<T?>();
             for (int i = 0; i < length; i++)

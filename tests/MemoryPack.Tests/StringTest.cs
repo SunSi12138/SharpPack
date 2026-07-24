@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -47,6 +48,48 @@ public class StringTest
 
         Assert.Throws<MemoryPackSerializationException>(
             () => MemoryPackSerializer.Deserialize<string>(bin, context));
+    }
+
+    [Fact]
+    public void Utf8HeaderOverflowAndDecodedLengthMismatchAreRejected()
+    {
+        var overflow = new byte[4];
+        BinaryPrimitives.WriteInt32LittleEndian(overflow, int.MinValue);
+
+        var mismatch = new byte[9];
+        BinaryPrimitives.WriteInt32LittleEndian(mismatch, ~1);
+        BinaryPrimitives.WriteInt32LittleEndian(mismatch.AsSpan(4), 2);
+        mismatch[8] = (byte)'A';
+
+        foreach (var context in new MemoryPackSerializerContext?[]
+                 {
+                     null,
+                     new MemoryPackSerializerContext()
+                 })
+        {
+            Action deserializeOverflow = context is null
+                ? () => MemoryPackSerializer.Deserialize<string>(overflow)
+                : () => MemoryPackSerializer.Deserialize<string>(overflow, context);
+            Action deserializeMismatch = context is null
+                ? () => MemoryPackSerializer.Deserialize<string>(mismatch)
+                : () => MemoryPackSerializer.Deserialize<string>(mismatch, context);
+
+            deserializeOverflow.Should().Throw<MemoryPackSerializationException>();
+            deserializeMismatch.Should().Throw<MemoryPackSerializationException>();
+        }
+    }
+
+    [Fact]
+    public void UnknownUtf16LengthStillRequiresStrictUtf8()
+    {
+        var payload = new byte[10];
+        BinaryPrimitives.WriteInt32LittleEndian(payload, ~2);
+        BinaryPrimitives.WriteInt32LittleEndian(payload.AsSpan(4), -1);
+        payload[8] = 0xC3;
+        payload[9] = 0x28;
+
+        Assert.Throws<MemoryPackSerializationException>(
+            () => MemoryPackSerializer.Deserialize<string>(payload));
     }
 
     [Fact]

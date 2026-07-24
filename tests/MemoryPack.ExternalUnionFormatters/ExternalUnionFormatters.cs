@@ -11,4 +11,5 @@ public partial class ExternalUnionFormatter;
 [MemoryPackUnionFormatter(typeof(IExternalGenericUnion<>))]
 [MemoryPackUnion(21, typeof(ExternalGenericUnionA<>))]
 [MemoryPackUnion(22, typeof(ExternalGenericUnionB<>))]
-public partial class ExternalGenericUnionFormatter<T>;
+public partial class ExternalGenericUnionFormatter<T>
+    where T : class?;

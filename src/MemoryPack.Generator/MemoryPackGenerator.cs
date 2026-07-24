@@ -98,7 +98,6 @@ public partial class MemoryPackGenerator : IIncrementalGenerator
         {
             var source = typeDeclarations
                 .Combine(context.CompilationProvider)
-                .WithComparer(Comparer.Instance)
                 .Combine(logProvider)
                 .Combine(parseOptions)
                 .WithTrackingName("MemoryPack.MemoryPackable.2_MemoryPackableCombined");
@@ -115,7 +114,6 @@ public partial class MemoryPackGenerator : IIncrementalGenerator
         {
             var source = typeDeclarations2
                 .Combine(context.CompilationProvider)
-                .WithComparer(Comparer.Instance)
                 .Combine(logProvider)
                 .Combine(parseOptions)
                 .WithTrackingName("MemoryPack.MemoryPackable.2_MemoryPackUnionCombined");
@@ -190,7 +188,6 @@ public partial class MemoryPackGenerator : IIncrementalGenerator
 
         var typeScriptGenerateSource = typeScriptDeclarations
             .Combine(context.CompilationProvider)
-            .WithComparer(Comparer.Instance)
             .Combine(typeScriptEnabled)
             .Where(x => x.Right != null) // filter
             .Collect();
@@ -275,21 +272,6 @@ public partial class MemoryPackGenerator : IIncrementalGenerator
                 }
             }
         });
-    }
-
-    class Comparer : IEqualityComparer<(TypeDeclarationSyntax, Compilation)>
-    {
-        public static readonly Comparer Instance = new Comparer();
-
-        public bool Equals((TypeDeclarationSyntax, Compilation) x, (TypeDeclarationSyntax, Compilation) y)
-        {
-            return x.Item1.Equals(y.Item1);
-        }
-
-        public int GetHashCode((TypeDeclarationSyntax, Compilation) obj)
-        {
-            return obj.Item1.GetHashCode();
-        }
     }
 
     class GeneratorContext : IGeneratorContext

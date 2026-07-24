@@ -10,9 +10,9 @@ namespace MemoryPack;
 public sealed class MemoryPackSerializerContext
 {
     readonly FormatterGraph graph;
-    readonly Dictionary<string, Assembly> assemblies = new(StringComparer.OrdinalIgnoreCase);
+    readonly Dictionary<string, List<Assembly>> assemblies =
+        new(StringComparer.OrdinalIgnoreCase);
     readonly Lock assemblyLock = new();
-    bool canUseDefaultPath;
 
     public MemoryPackSerializerConfiguration Configuration { get; }
 
@@ -31,8 +31,6 @@ public sealed class MemoryPackSerializerContext
         bool freezeRegistrations)
     {
         Configuration = configuration;
-        canUseDefaultPath =
-            configuration.StringEncoding == MemoryPackStringEncoding.Utf8;
         graph = new FormatterGraph(this);
 
         AddAssembly(typeof(object).Assembly);
@@ -57,14 +55,8 @@ public sealed class MemoryPackSerializerContext
     internal void EnsureRootType<T>()
         => ContextRootTypeRegistration<T>.Ensure(this);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal bool CanUseDefaultPath<T>()
-        => canUseDefaultPath &&
-           !FormatterTypeTraits<T>.ContainsCollectibleType;
-
     internal void Register<T>(MemoryPackFormatter<T> formatter)
     {
-        canUseDefaultPath = false;
         graph.Register(formatter);
         AddType(typeof(T));
     }
@@ -81,8 +73,32 @@ public sealed class MemoryPackSerializerContext
 
         lock (assemblyLock)
         {
-            assemblies.TryGetValue(name.Name, out var assembly);
-            return assembly;
+            if (!assemblies.TryGetValue(name.Name, out var candidates))
+            {
+                return null;
+            }
+
+            if (candidates.Count == 1)
+            {
+                return candidates[0];
+            }
+
+            Assembly? match = null;
+            foreach (var candidate in candidates)
+            {
+                if (!AssemblyName.ReferenceMatchesDefinition(
+                        candidate.GetName(),
+                        name))
+                {
+                    continue;
+                }
+                if (match is not null)
+                {
+                    return null;
+                }
+                match = candidate;
+            }
+            return match;
         }
     }
 
@@ -116,7 +132,14 @@ public sealed class MemoryPackSerializerContext
         var name = assembly.GetName().Name;
         if (name is not null)
         {
-            assemblies[name] = assembly;
+            if (!assemblies.TryGetValue(name, out var candidates))
+            {
+                assemblies.Add(name, [assembly]);
+            }
+            else if (!candidates.Contains(assembly))
+            {
+                candidates.Add(assembly);
+            }
         }
     }
 }

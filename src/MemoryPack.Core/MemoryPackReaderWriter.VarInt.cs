@@ -230,7 +230,7 @@ public ref partial struct MemoryPackReader
             case VarIntCodes.SByte:
                 return checked((byte)ReadUnmanaged<sbyte>());
             case VarIntCodes.UInt16:
-                return checked((byte)ReadUnmanaged<byte>());
+                return checked((byte)ReadUnmanaged<ushort>());
             case VarIntCodes.Int16:
                 return checked((byte)ReadUnmanaged<short>());
             case VarIntCodes.UInt32:

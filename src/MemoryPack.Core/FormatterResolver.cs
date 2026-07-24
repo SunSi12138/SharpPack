@@ -15,10 +15,6 @@ internal static partial class FormatterResolver
         "AOT",
         "IL3050",
         Justification = "Cold compatibility fallback for closed generic shapes; generated or explicit registrations are required for NativeAOT.")]
-    [UnconditionalSuppressMessage(
-        "Trimming",
-        "IL2072",
-        Justification = "Known formatter types all have public parameterless constructors.")]
     internal static object? CreateGenericFormatter(
         Type type,
         bool typeIsReferenceOrContainsReferences)
@@ -84,6 +80,8 @@ internal static partial class FormatterResolver
         "Trimming",
         "IL2055",
         Justification = "Known formatter definitions are retained by direct typeof references in this resolver.")]
+    [return: DynamicallyAccessedMembers(
+        DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)]
     static Type? TryCreateKnownGenericFormatterType(Type type)
     {
         if (!type.IsGenericType)
@@ -96,6 +94,8 @@ internal static partial class FormatterResolver
         return formatterType?.MakeGenericType(type.GetGenericArguments());
     }
 
+    [return: DynamicallyAccessedMembers(
+        DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)]
     static Type? GetKnownGenericFormatterDefinition(Type type)
     {
         if (type == typeof(KeyValuePair<,>)) return typeof(KeyValuePairFormatter<,>);

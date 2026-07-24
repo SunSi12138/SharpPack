@@ -28,16 +28,16 @@ public class ExternalUnionContextRegistrationTest
     public void ExternalGenericUnion_UsesClosedGeneratedRegistration()
     {
         var context = new MemoryPackSerializerContextBuilder()
-            .RegisterExternalGenericUnionFormatter<string>()
+            .RegisterExternalGenericUnionFormatter<string?>()
             .Build();
-        IExternalGenericUnion<string> value =
-            new ExternalGenericUnionB<string> { Value = "external" };
+        IExternalGenericUnion<string?> value =
+            new ExternalGenericUnionB<string?> { Value = "external" };
 
         var payload = MemoryPackSerializer.Serialize(value, context);
         var decoded = MemoryPackSerializer.Deserialize<
-            IExternalGenericUnion<string>>(payload, context);
+            IExternalGenericUnion<string?>>(payload, context);
 
-        decoded.Should().BeOfType<ExternalGenericUnionB<string>>()
+        decoded.Should().BeOfType<ExternalGenericUnionB<string?>>()
             .Which.Value.Should().Be("external");
     }
 }

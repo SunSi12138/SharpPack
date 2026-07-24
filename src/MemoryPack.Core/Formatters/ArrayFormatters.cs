@@ -164,10 +164,22 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var memory = ArrayPool<T?>.Shared.Rent(length).AsMemory(0, length);
-            var span = memory.Span;
-            reader.ReadSpanWithoutReadLengthHeader(length, ref span);
-            value = memory;
+            var array = ArrayPool<T?>.Shared.Rent(length);
+            try
+            {
+                var memory = array.AsMemory(0, length);
+                var span = memory.Span;
+                reader.ReadSpanWithoutReadLengthHeader(length, ref span);
+                value = memory;
+            }
+            catch
+            {
+                ArrayPool<T?>.Shared.Return(
+                    array,
+                    clearArray:
+                        RuntimeHelpers.IsReferenceOrContainsReferences<T?>());
+                throw;
+            }
         }
     }
 
@@ -195,10 +207,22 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var memory = ArrayPool<T?>.Shared.Rent(length).AsMemory(0, length);
-            var span = memory.Span;
-            reader.ReadSpanWithoutReadLengthHeader(length, ref span);
-            value = memory;
+            var array = ArrayPool<T?>.Shared.Rent(length);
+            try
+            {
+                var memory = array.AsMemory(0, length);
+                var span = memory.Span;
+                reader.ReadSpanWithoutReadLengthHeader(length, ref span);
+                value = memory;
+            }
+            catch
+            {
+                ArrayPool<T?>.Shared.Return(
+                    array,
+                    clearArray:
+                        RuntimeHelpers.IsReferenceOrContainsReferences<T?>());
+                throw;
+            }
         }
     }
 }

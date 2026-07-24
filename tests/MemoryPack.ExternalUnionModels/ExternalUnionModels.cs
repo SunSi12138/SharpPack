@@ -18,16 +18,19 @@ public partial class ExternalUnionB : IExternalUnion
 }
 
 [MemoryPackable(GenerateType.NoGenerate)]
-public partial interface IExternalGenericUnion<T>;
+public partial interface IExternalGenericUnion<T>
+    where T : class?;
 
 [MemoryPackable]
 public partial class ExternalGenericUnionA<T> : IExternalGenericUnion<T>
+    where T : class?
 {
     public T? Value { get; set; }
 }
 
 [MemoryPackable]
 public partial class ExternalGenericUnionB<T> : IExternalGenericUnion<T>
+    where T : class?
 {
     public T? Value { get; set; }
 }

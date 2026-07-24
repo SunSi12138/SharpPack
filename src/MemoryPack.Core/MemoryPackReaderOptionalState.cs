@@ -7,13 +7,14 @@ public static class MemoryPackReaderOptionalStatePool
 {
     static readonly ConcurrentQueue<MemoryPackReaderOptionalState> queue = new();
 
-    public static MemoryPackReaderOptionalState Rent(
+    public static MemoryPackReaderOptionalStateLease Rent(
         MemoryPackSerializerContext? context = null)
     {
         if (!queue.TryDequeue(out var state))
         {
             state = new MemoryPackReaderOptionalState();
         }
+        var leaseId = state.ActivateLease();
 
         if (context is null)
         {
@@ -23,13 +24,62 @@ public static class MemoryPackReaderOptionalStatePool
         {
             state.Init(context);
         }
-        return state;
+        return new MemoryPackReaderOptionalStateLease(state, leaseId);
     }
 
-    internal static void Return(MemoryPackReaderOptionalState state)
+    internal static void Return(
+        MemoryPackReaderOptionalState state,
+        long leaseId)
     {
+        if (!state.TryDeactivateLease(leaseId))
+        {
+            throw new InvalidOperationException(
+                "The reader state lease was already returned or belongs to another rental.");
+        }
         state.Reset();
         queue.Enqueue(state);
+    }
+}
+
+public readonly struct MemoryPackReaderOptionalStateLease : IDisposable
+{
+    readonly MemoryPackReaderOptionalState? state;
+    readonly long leaseId;
+
+    internal MemoryPackReaderOptionalStateLease(
+        MemoryPackReaderOptionalState state,
+        long leaseId)
+    {
+        this.state = state;
+        this.leaseId = leaseId;
+    }
+
+    public MemoryPackReaderOptionalState State
+        => state is not null && state.IsLeaseActive(leaseId)
+            ? state
+            : throw new ObjectDisposedException(
+                nameof(MemoryPackReaderOptionalStateLease));
+
+    public static implicit operator MemoryPackReaderOptionalState(
+        MemoryPackReaderOptionalStateLease lease)
+        => lease.State;
+
+    public object GetObjectReference(uint id)
+        => State.GetObjectReference(id);
+
+    public void AddObjectReference(uint id, object value)
+        => State.AddObjectReference(id, value);
+
+    public void Reset()
+        => State.Reset();
+
+    public void Dispose()
+    {
+        if (state is null)
+        {
+            return;
+        }
+        MemoryPackReaderOptionalStatePool.Return(state, leaseId);
     }
 }
 
@@ -40,6 +90,8 @@ public sealed class MemoryPackReaderOptionalState : IDisposable
     List<object>? sequentialReferences;
     Dictionary<uint, object>? sparseReferences;
     bool isInUse;
+    long leaseGeneration;
+    int poolLeaseState;
 
     internal MemoryPackSerializerContext? SerializerContext { get; private set; }
     internal FormatterGraph? FormatterGraph { get; private set; }
@@ -71,6 +123,25 @@ public sealed class MemoryPackReaderOptionalState : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void Exit()
         => isInUse = false;
+
+    internal long ActivateLease()
+    {
+        var leaseId = Interlocked.Increment(ref leaseGeneration);
+        if (Interlocked.Exchange(ref poolLeaseState, 1) != 0)
+        {
+            throw new InvalidOperationException(
+                "The reader state is already leased.");
+        }
+        return leaseId;
+    }
+
+    internal bool TryDeactivateLease(long leaseId)
+        => Volatile.Read(ref leaseGeneration) == leaseId &&
+           Interlocked.CompareExchange(ref poolLeaseState, 0, 1) == 1;
+
+    internal bool IsLeaseActive(long leaseId)
+        => Volatile.Read(ref leaseGeneration) == leaseId &&
+           Volatile.Read(ref poolLeaseState) == 1;
 
     public object GetObjectReference(uint id)
     {
@@ -139,5 +210,12 @@ public sealed class MemoryPackReaderOptionalState : IDisposable
     }
 
     void IDisposable.Dispose()
-        => MemoryPackReaderOptionalStatePool.Return(this);
+    {
+        if (Volatile.Read(ref poolLeaseState) != 0)
+        {
+            throw new InvalidOperationException(
+                "Dispose the reader state lease instead of its pooled state.");
+        }
+        Reset();
+    }
 }

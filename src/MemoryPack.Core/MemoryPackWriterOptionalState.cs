@@ -8,13 +8,14 @@ public static class MemoryPackWriterOptionalStatePool
 {
     static readonly ConcurrentQueue<MemoryPackWriterOptionalState> queue = new();
 
-    public static MemoryPackWriterOptionalState Rent(
+    public static MemoryPackWriterOptionalStateLease Rent(
         MemoryPackSerializerContext? context = null)
     {
         if (!queue.TryDequeue(out var state))
         {
             state = new MemoryPackWriterOptionalState();
         }
+        var leaseId = state.ActivateLease();
 
         if (context is null)
         {
@@ -24,13 +25,59 @@ public static class MemoryPackWriterOptionalStatePool
         {
             state.Init(context);
         }
-        return state;
+        return new MemoryPackWriterOptionalStateLease(state, leaseId);
     }
 
-    internal static void Return(MemoryPackWriterOptionalState state)
+    internal static void Return(
+        MemoryPackWriterOptionalState state,
+        long leaseId)
     {
+        if (!state.TryDeactivateLease(leaseId))
+        {
+            throw new InvalidOperationException(
+                "The writer state lease was already returned or belongs to another rental.");
+        }
         state.Reset();
         queue.Enqueue(state);
+    }
+}
+
+public readonly struct MemoryPackWriterOptionalStateLease : IDisposable
+{
+    readonly MemoryPackWriterOptionalState? state;
+    readonly long leaseId;
+
+    internal MemoryPackWriterOptionalStateLease(
+        MemoryPackWriterOptionalState state,
+        long leaseId)
+    {
+        this.state = state;
+        this.leaseId = leaseId;
+    }
+
+    public MemoryPackWriterOptionalState State
+        => state is not null && state.IsLeaseActive(leaseId)
+            ? state
+            : throw new ObjectDisposedException(
+                nameof(MemoryPackWriterOptionalStateLease));
+
+    public static implicit operator MemoryPackWriterOptionalState(
+        MemoryPackWriterOptionalStateLease lease)
+        => lease.State;
+
+    public (bool existsReference, uint id) GetOrAddReference(object value)
+        => State.GetOrAddReference(value);
+
+    public void Reset()
+        => State.Reset();
+
+    public void Dispose()
+    {
+        if (state is null)
+        {
+            return;
+        }
+        MemoryPackWriterOptionalStatePool.Return(state, leaseId);
     }
 }
 
@@ -43,6 +90,8 @@ public sealed class MemoryPackWriterOptionalState : IDisposable
 
     uint nextId;
     bool isInUse;
+    long leaseGeneration;
+    int poolLeaseState;
     Dictionary<object, uint>? objectToRef;
 
     public MemoryPackSerializerConfiguration Configuration { get; private set; }
@@ -91,6 +140,25 @@ public sealed class MemoryPackWriterOptionalState : IDisposable
     internal void Exit()
         => isInUse = false;
 
+    internal long ActivateLease()
+    {
+        var leaseId = Interlocked.Increment(ref leaseGeneration);
+        if (Interlocked.Exchange(ref poolLeaseState, 1) != 0)
+        {
+            throw new InvalidOperationException(
+                "The writer state is already leased.");
+        }
+        return leaseId;
+    }
+
+    internal bool TryDeactivateLease(long leaseId)
+        => Volatile.Read(ref leaseGeneration) == leaseId &&
+           Interlocked.CompareExchange(ref poolLeaseState, 0, 1) == 1;
+
+    internal bool IsLeaseActive(long leaseId)
+        => Volatile.Read(ref leaseGeneration) == leaseId &&
+           Volatile.Read(ref poolLeaseState) == 1;
+
     public void Reset()
     {
         if (objectToRef is { Count: > MaxRetainedReferenceCount })
@@ -126,7 +194,14 @@ public sealed class MemoryPackWriterOptionalState : IDisposable
     }
 
     void IDisposable.Dispose()
-        => MemoryPackWriterOptionalStatePool.Return(this);
+    {
+        if (Volatile.Read(ref poolLeaseState) != 0)
+        {
+            throw new InvalidOperationException(
+                "Dispose the writer state lease instead of its pooled state.");
+        }
+        Reset();
+    }
 
     sealed class ReferenceEqualityComparer : IEqualityComparer<object>
     {

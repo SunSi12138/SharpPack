@@ -153,6 +153,76 @@ public class StreamingSerializer
     }
 
     [Fact]
+    public async Task DeserializePreservesTrailingBytesAndCallerOwnership()
+    {
+        var payload = MemoryPackSerializer.Serialize(new[] { 1, 2, 3 });
+        var pipe = new Pipe();
+        pipe.Writer.Write(payload);
+        pipe.Writer.Write(new byte[] { 0xCA, 0xFE });
+        await pipe.Writer.CompleteAsync();
+
+        var actual = new List<int>();
+        await foreach (var item in MemoryPackStreamingSerializer.DeserializeAsync<int>(
+            pipe.Reader,
+            bufferAtLeast: 4,
+            readMinimumSize: 4))
+        {
+            actual.Add(item);
+        }
+
+        actual.Should().Equal(1, 2, 3);
+        var trailing = await pipe.Reader.ReadAsync();
+        trailing.Buffer.ToArray().Should().Equal(0xCA, 0xFE);
+        pipe.Reader.AdvanceTo(trailing.Buffer.End);
+        await pipe.Reader.CompleteAsync();
+    }
+
+    [Fact]
+    public async Task DeserializeBalancesReadWhenConsumerStopsEarly()
+    {
+        var payload = MemoryPackSerializer.Serialize(
+            Enumerable.Range(0, 100).ToArray());
+        var pipe = new Pipe();
+        pipe.Writer.Write(payload);
+        pipe.Writer.Write(new byte[] { 0xCA, 0xFE });
+        await pipe.Writer.CompleteAsync();
+
+        await foreach (var item in MemoryPackStreamingSerializer.DeserializeAsync<int>(
+            pipe.Reader,
+            bufferAtLeast: 4,
+            readMinimumSize: 4))
+        {
+            item.Should().Be(0);
+            break;
+        }
+
+        var trailing = await pipe.Reader.ReadAsync();
+        trailing.Buffer.ToArray().Should().Equal(0xCA, 0xFE);
+        pipe.Reader.AdvanceTo(trailing.Buffer.End);
+        await pipe.Reader.CompleteAsync();
+    }
+
+    [Fact]
+    public async Task DeserializeTurnsCanceledReadResultIntoCancellation()
+    {
+        var pipe = new Pipe();
+        await using var enumerator = MemoryPackStreamingSerializer
+            .DeserializeAsync<int>(
+                pipe.Reader,
+                bufferAtLeast: 4,
+                readMinimumSize: 4)
+            .GetAsyncEnumerator();
+
+        var moveNext = enumerator.MoveNextAsync().AsTask();
+        pipe.Reader.CancelPendingRead();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await moveNext);
+        await pipe.Reader.CompleteAsync();
+        await pipe.Writer.CompleteAsync();
+    }
+
+    [Fact]
     public async Task DeserializeRejectsTruncatedFinalItem()
     {
         var payload = MemoryPackSerializer.Serialize(new[] { 1, 2, 3 });
