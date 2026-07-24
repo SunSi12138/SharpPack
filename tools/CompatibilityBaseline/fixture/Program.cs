@@ -172,7 +172,9 @@ void Add(
         type == typeof(BitArray) ||
         type == typeof(BitArray[]) ||
         type == typeof(BigInteger) ||
-        type == typeof(BigInteger[]))
+        type == typeof(BigInteger[]) ||
+        type == typeof(TimeZoneInfo) ||
+        type == typeof(TimeZoneInfo[]))
     {
         deterministic = false;
     }
@@ -320,6 +322,12 @@ static string Describe(object? value)
         {
             return "collection:default";
         }
+    }
+    if (value is IFormattable formattable)
+    {
+        return formattable.ToString(null, CultureInfo.InvariantCulture)
+               ?? value.GetType().FullName
+               ?? value.GetType().Name;
     }
     return value.ToString() ?? value.GetType().FullName ?? value.GetType().Name;
 }

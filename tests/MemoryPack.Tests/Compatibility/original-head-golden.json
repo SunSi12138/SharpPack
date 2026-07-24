@@ -73,7 +73,7 @@
       "Configuration": "Utf8",
       "PayloadHex": "46460B00",
       "Deterministic": true,
-      "Decoded": "2024/1/2"
+      "Decoded": "01/02/2024"
     },
     {
       "Category": "well-known",
@@ -89,7 +89,7 @@
       "Configuration": "Utf8",
       "PayloadHex": "00009CE86A0DDC48",
       "Deterministic": true,
-      "Decoded": "2024/1/4 21:20:00"
+      "Decoded": "01/04/2024 21:20:00"
     },
     {
       "Category": "well-known",
@@ -97,7 +97,7 @@
       "Configuration": "Utf8",
       "PayloadHex": "000000000000000000009CE86A0DDC08",
       "Deterministic": true,
-      "Decoded": "2024/1/4 21:20:00 +00:00"
+      "Decoded": "01/04/2024 21:20:00 +00:00"
     },
     {
       "Category": "well-known",
@@ -305,7 +305,7 @@
       "Configuration": "Utf8",
       "PayloadHex": "0117716B46460B00",
       "Deterministic": false,
-      "Decoded": "2024/1/2"
+      "Decoded": "01/02/2024"
     },
     {
       "Category": "well-known",
@@ -313,7 +313,7 @@
       "Configuration": "Utf8",
       "PayloadHex": "010000000000000000009CE86A0DDC48",
       "Deterministic": false,
-      "Decoded": "2024/1/4 21:20:00"
+      "Decoded": "01/04/2024 21:20:00"
     },
     {
       "Category": "well-known",
@@ -321,7 +321,7 @@
       "Configuration": "Utf8",
       "PayloadHex": "0117716B01000000000000000000000000009CE86A0DDC08",
       "Deterministic": false,
-      "Decoded": "2024/1/4 21:20:00 +00:00"
+      "Decoded": "01/04/2024 21:20:00 +00:00"
     },
     {
       "Category": "well-known",
@@ -800,7 +800,7 @@
       "Type": "System.TimeZoneInfo, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
       "Configuration": "Utf8",
       "PayloadHex": "C2FFFFFF1F0000005554433B303B285554432920E58D8FE8B083E4B896E7958CE697B63BE58D8FE8B083E4B896E7958CE697B63BE58D8FE8B083E4B896E7958CE697B63B3B",
-      "Deterministic": true,
+      "Deterministic": false,
       "Decoded": "(UTC) 协调世界时"
     },
     {
@@ -808,7 +808,7 @@
       "Type": "System.TimeZoneInfo[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
       "Configuration": "Utf8",
       "PayloadHex": "01000000C2FFFFFF1F0000005554433B303B285554432920E58D8FE8B083E4B896E7958CE697B63BE58D8FE8B083E4B896E7958CE697B63BE58D8FE8B083E4B896E7958CE697B63B3B",
-      "Deterministic": true,
+      "Deterministic": false,
       "Decoded": "array:1:1"
     },
     {
