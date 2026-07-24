@@ -33,12 +33,30 @@ public class UnionTest
             var bin1 = MemoryPackSerializer.Serialize((IGenericsUnion<DateTime>)one);
             var bin2 = MemoryPackSerializer.Serialize((IGenericsUnion<string>)two);
 
+            bin1[0].Should().Be(0);
+            bin2[0].Should().Be(11);
+
             var one2 = MemoryPackSerializer.Deserialize<IGenericsUnion<DateTime>>(bin1);
             var two2 = MemoryPackSerializer.Deserialize<IGenericsUnion<string>>(bin2);
 
             one2.Should().BeAssignableTo<BForOne<DateTime>>().Subject.Should().BeEquivalentTo(one);
             two2.Should().BeAssignableTo<BForTwo<string>>().Subject.Should().BeEquivalentTo(two);
         }
+    }
+
+    [Fact]
+    public void ClosedGenericExternalUnionUsesGeneratedDefaultFactory()
+    {
+        IClosedGenericsUnion<string> value =
+            new ClosedGenericsUnionValue<string> { Value = "closed" };
+
+        var payload = MemoryPackSerializer.Serialize(value);
+        var decoded =
+            MemoryPackSerializer.Deserialize<IClosedGenericsUnion<string>>(
+                payload);
+
+        decoded.Should().BeOfType<ClosedGenericsUnionValue<string>>()
+            .Which.Value.Should().Be("closed");
     }
 
     [Fact]

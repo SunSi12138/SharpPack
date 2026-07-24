@@ -1292,10 +1292,6 @@ partial {{classOrInterfaceOrRecord}} {{TypeName}} : {{contextFactoryInterface}}
             $"{formatterSymbol.Name}MemoryPackContextExtensions";
         var registrationMethodName =
             $"Register{formatterSymbol.Name}";
-        var targetFactoryImplementation =
-            EmitExternalUnionTargetFactory(
-                formatterSymbol,
-                symbolFullQualified);
 
         var code = $$"""
 [global::MemoryPack.Internal.Preserve]
@@ -1343,74 +1339,12 @@ public static class {{registrationClassName}}
             {{TypeName}}>();
     }
 }
-{{targetFactoryImplementation}}
 """;
 
         writer.AppendLine(code);
     }
 
-    string EmitExternalUnionTargetFactory(
-        INamedTypeSymbol formatterSymbol,
-        string symbolFullQualified)
-    {
-        var target = Symbol.OriginalDefinition;
-        if (!SymbolEqualityComparer.Default.Equals(
-                target.ContainingAssembly,
-                formatterSymbol.ContainingAssembly) ||
-            (Symbol.IsGenericType &&
-             !Symbol.IsUnboundGenericType &&
-             Symbol.TypeArguments.Any(
-                 static argument => argument is not ITypeParameterSymbol)) ||
-            target.DeclaringSyntaxReferences.Length == 0 ||
-            target.DeclaringSyntaxReferences.Any(static reference =>
-                reference.GetSyntax() is not TypeDeclarationSyntax declaration ||
-                !declaration.Modifiers.Any(
-                    static modifier =>
-                        modifier.IsKind(SyntaxKind.PartialKeyword))))
-        {
-            return "";
-        }
-
-        var declarations = new List<INamedTypeSymbol>();
-        for (var current = target.ContainingType;
-             current is not null;
-             current = current.ContainingType)
-        {
-            declarations.Add(current.OriginalDefinition);
-        }
-        declarations.Reverse();
-
-        var sb = new StringBuilder();
-        foreach (var declaration in declarations)
-        {
-            sb.AppendLine(EmitPartialTypeDeclaration(declaration));
-            sb.AppendLine(EmitTypeParameterConstraints(declaration.TypeParameters));
-            sb.AppendLine("{");
-        }
-
-        sb.AppendLine(EmitPartialTypeDeclaration(target) + " :");
-        sb.AppendLine(
-            $"    global::MemoryPack.IMemoryPackFormatterFactory<{symbolFullQualified}>");
-        sb.AppendLine(EmitTypeParameterConstraints(target.TypeParameters));
-        sb.AppendLine("{");
-        sb.AppendLine(
-            $"    static global::MemoryPack.MemoryPackFormatter<{symbolFullQualified}>");
-        sb.AppendLine(
-            $"        global::MemoryPack.IMemoryPackFormatterFactory<{symbolFullQualified}>.CreateFormatter()");
-        sb.AppendLine("    {");
-        sb.AppendLine($"        return new {TypeName}();");
-        sb.AppendLine("    }");
-        sb.AppendLine("}");
-
-        for (var i = declarations.Count - 1; i >= 0; i--)
-        {
-            sb.AppendLine("}");
-        }
-
-        return Environment.NewLine + sb;
-    }
-
-    static string EmitPartialTypeDeclaration(INamedTypeSymbol symbol)
+    internal static string EmitPartialTypeDeclaration(INamedTypeSymbol symbol)
     {
         var kind = (symbol.TypeKind, symbol.IsRecord, symbol.IsValueType) switch
         {
@@ -1427,7 +1361,7 @@ public static class {{registrationClassName}}
         return $"partial {kind} {symbol.Name}{typeParameters}";
     }
 
-    static string EmitTypeParameterConstraints(
+    internal static string EmitTypeParameterConstraints(
         ImmutableArray<ITypeParameterSymbol> typeParameters)
     {
         var clauses = new List<string>();

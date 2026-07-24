@@ -286,7 +286,6 @@ public
     {
         if (bufferWriter == null) return;
 
-        bufferWriter.Reset();
         ReusableLinkedArrayBufferWriterPool.Return(
             bufferWriter,
             bufferWriterLeaseId);

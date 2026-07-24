@@ -127,6 +127,26 @@ public partial class MemoryPackGenerator : IIncrementalGenerator
                 Generate(typeDeclaration, compilation, logPath, new GeneratorContext(context, langVersion));
             });
         }
+        {
+            var source = typeDeclarations2
+                .Collect()
+                .Combine(context.CompilationProvider)
+                .Combine(parseOptions)
+                .WithTrackingName(
+                    "MemoryPack.MemoryPackable.2_ExternalUnionFactoriesCombined");
+
+            context.RegisterSourceOutput(source, static (context, source) =>
+            {
+                var declarations = source.Left.Left;
+                var compilation = source.Left.Right;
+                var langVersion = source.Right;
+
+                GenerateExternalUnionTargetFactories(
+                    declarations,
+                    compilation,
+                    new GeneratorContext(context, langVersion));
+            });
+        }
     }
 
     void RegisterTypeScript(IncrementalGeneratorInitializationContext context)

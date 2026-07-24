@@ -46,6 +46,17 @@ if (MemoryPackSerializer.Deserialize<IAotExternalUnion>(externalPayload)
         "The generated external-union factory failed under NativeAOT.");
 }
 
+IAotClosedExternalUnion<string> closedExternal =
+    new AotClosedExternalUnionItem<string> { Value = "closed-aot" };
+var closedExternalPayload = MemoryPackSerializer.Serialize(closedExternal);
+if (MemoryPackSerializer.Deserialize<IAotClosedExternalUnion<string>>(
+        closedExternalPayload) is not
+    AotClosedExternalUnionItem<string> { Value: "closed-aot" })
+{
+    throw new InvalidOperationException(
+        "The generated closed external-union factory failed under NativeAOT.");
+}
+
 Console.WriteLine("MemoryPack NativeAOT verification passed.");
 
 static void AssertModel(
@@ -130,3 +141,17 @@ public partial class AotExternalUnionItem : IAotExternalUnion
 [MemoryPackUnionFormatter(typeof(IAotExternalUnion))]
 [MemoryPackUnion(3, typeof(AotExternalUnionItem))]
 public partial class AotExternalUnionFormatter;
+
+[MemoryPackable(GenerateType.NoGenerate)]
+public partial interface IAotClosedExternalUnion<T>;
+
+[MemoryPackable]
+public partial class AotClosedExternalUnionItem<T>
+    : IAotClosedExternalUnion<T>
+{
+    public T? Value { get; set; }
+}
+
+[MemoryPackUnionFormatter(typeof(IAotClosedExternalUnion<string>))]
+[MemoryPackUnion(4, typeof(AotClosedExternalUnionItem<string>))]
+public partial class AotClosedExternalUnionFormatter;

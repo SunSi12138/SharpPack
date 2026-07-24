@@ -16,23 +16,31 @@ public class ResourceOwnershipTest
         var compressorCopy = compressor;
         compressor.Dispose();
 
+        var activeCompressor = new BrotliCompressor();
+        MemoryPackSerializer.Serialize(ref activeCompressor, 42);
+
         Action disposeCompressorCopy = () => compressorCopy.Dispose();
         disposeCompressorCopy.Should().Throw<InvalidOperationException>();
 
-        var source = new BrotliCompressor();
-        byte[] compressed;
         try
         {
-            MemoryPackSerializer.Serialize(ref source, 42);
-            compressed = source.ToArray();
+            var compressed = activeCompressor.ToArray();
+            using var activeDecompressor = new BrotliDecompressor();
+            var decompressed = activeDecompressor.Decompress(compressed);
+            MemoryPackSerializer.Deserialize<int>(decompressed).Should().Be(42);
         }
         finally
         {
-            source.Dispose();
+            activeCompressor.Dispose();
         }
 
+        var source = new BrotliCompressor();
+        MemoryPackSerializer.Serialize(ref source, 42);
+        var validCompressed = source.ToArray();
+        source.Dispose();
+
         var decompressor = new BrotliDecompressor();
-        _ = decompressor.Decompress(compressed);
+        _ = decompressor.Decompress(validCompressed);
         var decompressorCopy = decompressor;
         decompressor.Dispose();
 
