@@ -234,6 +234,7 @@ public static class MemoryPackStreamingSerializer
         ArgumentOutOfRangeException.ThrowIfNegative(bufferAtLeast);
         ArgumentOutOfRangeException.ThrowIfLessThan(readMinimumSize, bufferAtLeast);
 
+        context?.EnsureRootType<T>();
         using var state = MemoryPackReaderOptionalStatePool.Rent(context);
         var itemBuffer = new List<T?>();
         var remain = -1;

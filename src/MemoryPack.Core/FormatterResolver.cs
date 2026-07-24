@@ -17,7 +17,8 @@ internal static partial class FormatterResolver
         Justification = "Cold compatibility fallback for closed generic shapes; generated or explicit registrations are required for NativeAOT.")]
     internal static object? CreateGenericFormatter(
         Type type,
-        bool typeIsReferenceOrContainsReferences)
+        bool typeIsReferenceOrContainsReferences,
+        bool preferKnownGenericFormatter)
     {
         Type? formatterType = null;
 
@@ -54,6 +55,13 @@ internal static partial class FormatterResolver
                         return null; // not supported
                 }
             }
+        }
+
+        if (preferKnownGenericFormatter &&
+            TryCreateKnownGenericFormatterType(type) is { } knownFormatterType)
+        {
+            formatterType = knownFormatterType;
+            goto CREATE;
         }
 
         if (type.IsEnum || !typeIsReferenceOrContainsReferences)

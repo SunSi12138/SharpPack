@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 namespace MemoryPack;
@@ -95,6 +96,15 @@ public sealed class MemoryPackReaderOptionalState : IDisposable
 
     internal MemoryPackSerializerContext? SerializerContext { get; private set; }
     internal FormatterGraph? FormatterGraph { get; private set; }
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public bool HasFormatterOverrides => FormatterGraph is not null;
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool HasFormatterOverride<T>()
+        => FormatterGraph is { } graph &&
+           graph.HasExplicitRegistration<T>();
 
     internal void InitDefault()
     {

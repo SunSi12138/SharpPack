@@ -100,6 +100,9 @@ public sealed class MemoryPackWriterOptionalState : IDisposable
     internal FormatterGraph? FormatterGraph { get; private set; }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
+    public bool HasFormatterOverrides => FormatterGraph is not null;
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool HasFormatterOverride<T>()
         => FormatterGraph is { } graph &&

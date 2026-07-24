@@ -167,7 +167,10 @@ internal static class FormatterResolver<T>
             }
 
             var containsReferences = TypeHelpers.IsReferenceOrContainsReferences(type);
-            if (FormatterResolver.CreateGenericFormatter(type, containsReferences) is { } generic)
+            if (FormatterResolver.CreateGenericFormatter(
+                    type,
+                    containsReferences,
+                    preferKnownGenericFormatter: context is not null) is { } generic)
             {
                 return (MemoryPackFormatter<T>)generic;
             }

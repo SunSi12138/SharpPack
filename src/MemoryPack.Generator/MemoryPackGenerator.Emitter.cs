@@ -515,7 +515,10 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
             {
 {{Members.Where(x => x.Symbol != null).Select(x => $"                __{x.Name} = value.@{x.Name};").NewLine()}}
 
-{{Members.Select(x => "                " + x.EmitReadRefDeserialize(x.Order, GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference)).NewLine()}}
+{{EmitReadRefDeserializeMembers(
+    Members,
+    "                ",
+    includeCountJumps: false)}}
 
                 goto SET;
             }
@@ -539,7 +542,10 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
 {{(IsValueType ? "#endif" : "")}}
 
             if (count == 0) goto SKIP_READ;
-{{Members.Select((x, i) => "            " + x.EmitReadRefDeserialize(x.Order, GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference) + $" if (count == {i + 1}) goto SKIP_READ;").NewLine()}}
+{{EmitReadRefDeserializeMembers(
+    Members,
+    "            ",
+    includeCountJumps: true)}}
 
     SKIP_READ:
             {{(IsValueType ? "" : "if (value == null)")}}
@@ -657,18 +663,59 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
 
     string EmitSerializeBody()
     {
+        var formatterOverrideCondition =
+            EmitFormatterOverrideCondition("writer");
+
         if (this.GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference)
         {
-            if (Members.All(x => x.Kind is MemberKind.Unmanaged or MemberKind.String or MemberKind.Enum or MemberKind.UnmanagedArray or MemberKind.UnmanagedNullable or MemberKind.Blank))
+            var defaultBody = Members.All(x =>
+                x.Kind is MemberKind.Unmanaged
+                    or MemberKind.String
+                    or MemberKind.Enum
+                    or MemberKind.UnmanagedArray
+                    or MemberKind.UnmanagedNullable
+                    or MemberKind.Blank)
+                ? EmitVersionTorelantSerializeBodyOptimized()
+                : EmitVersionTorelantSerializeBody(
+                    honorFormatterOverrides: false);
+            if (formatterOverrideCondition.Length == 0)
             {
-                return EmitVersionTorelantSerializeBodyOptimized();
+                return defaultBody;
             }
-            else
-            {
-                return EmitVersionTorelantSerializeBody();
-            }
+
+            return $$"""
+        if ({{formatterOverrideCondition}})
+        {
+{{EmitVersionTorelantSerializeBody(honorFormatterOverrides: true)}}
+        }
+        else
+        {
+{{defaultBody}}
+        }
+""";
         }
 
+        var defaultObjectBody =
+            EmitObjectSerializeBody(honorFormatterOverrides: false);
+        if (formatterOverrideCondition.Length == 0)
+        {
+            return defaultObjectBody;
+        }
+
+        return $$"""
+        if ({{formatterOverrideCondition}})
+        {
+{{EmitObjectSerializeBody(honorFormatterOverrides: true)}}
+        }
+        else
+        {
+{{defaultObjectBody}}
+        }
+""";
+    }
+
+    string EmitObjectSerializeBody(bool honorFormatterOverrides)
+    {
         return $$"""
 {{(!IsValueType ? $$"""
         if (value == null)
@@ -678,11 +725,16 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
         }
 """ : "")}}
 
-{{EmitSerializeMembers(Members, "        ", toTempWriter: false, writeObjectHeader: true)}}
+{{EmitSerializeMembers(
+    Members,
+    "        ",
+    toTempWriter: false,
+    writeObjectHeader: true,
+    honorFormatterOverrides)}}
 """;
     }
 
-    string EmitVersionTorelantSerializeBody()
+    string EmitVersionTorelantSerializeBody(bool honorFormatterOverrides)
     {
         const string newTempWriter =
             "new MemoryPackWriter<global::MemoryPack.Internal.ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState)";
@@ -716,7 +768,12 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
             Span<int> offsets = stackalloc int[{{Members.Length}}];
             var tempWriter = {{newTempWriter}};
 
-{{EmitSerializeMembers(Members, "            ", toTempWriter: true, writeObjectHeader: false)}}
+{{EmitSerializeMembers(
+    Members,
+    "            ",
+    toTempWriter: true,
+    writeObjectHeader: false,
+    honorFormatterOverrides)}}
 
             tempWriter.Flush();
 
@@ -772,32 +829,8 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
 """;
         }
 
-        var formatterOverrideCondition = string.Join(
-            " || ",
-            Members
-                .Where(static member => member.Kind == MemberKind.UnmanagedArray)
-                .Select(static member =>
-                {
-                    var elementType =
-                        ((IArrayTypeSymbol)member.MemberType).ElementType
-                        .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-                    return $"writer.OptionalState.HasFormatterOverride<{elementType}>()";
-                })
-                .Distinct(StringComparer.Ordinal));
-        var formatterOverrideFallback =
-            formatterOverrideCondition.Length == 0
-                ? ""
-                : $$"""
-        if ({{formatterOverrideCondition}})
-        {
-{{EmitVersionTorelantSerializeBody()}}
-            goto END;
-        }
-
-""";
-
         return $$"""
-{{formatterOverrideFallback}}{{(!IsValueType ? $$"""
+{{(!IsValueType ? $$"""
         if (value == null)
         {
             writer.WriteNullObjectHeader();
@@ -813,7 +846,12 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
     }
 
     // toTempWriter is VersionTolerant
-    public string EmitSerializeMembers(MemberMeta[] members, string indent, bool toTempWriter, bool writeObjectHeader)
+    public string EmitSerializeMembers(
+        MemberMeta[] members,
+        string indent,
+        bool toTempWriter,
+        bool writeObjectHeader,
+        bool honorFormatterOverrides = false)
     {
         // members is guranteed writable.
         if (members.Length == 0 && writeObjectHeader)
@@ -826,7 +864,9 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
         var sb = new StringBuilder();
         for (int i = 0; i < members.Length; i++)
         {
-            if (!(members[i].Kind is MemberKind.Unmanaged or MemberKind.Enum or MemberKind.UnmanagedNullable) || toTempWriter)
+            if (honorFormatterOverrides ||
+                !(members[i].Kind is MemberKind.Unmanaged or MemberKind.Enum or MemberKind.UnmanagedNullable) ||
+                toTempWriter)
             {
                 sb.Append(indent);
                 if (i == 0 && writeObjectHeader)
@@ -835,7 +875,9 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
                     sb.Append(indent);
                 }
 
-                sb.Append(members[i].EmitSerialize(writer));
+                sb.Append(members[i].EmitSerialize(
+                    writer,
+                    honorFormatterOverrides));
                 if (toTempWriter)
                 {
                     sb.AppendLine($" offsets[{i}] = tempWriter.WrittenCount;");
@@ -911,14 +953,51 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
     // for optimize, can use same count, value == null.
     public string EmitDeserializeMembers(MemberMeta[] members, string indent)
     {
+        var formatterOverrideCondition =
+            EmitFormatterOverrideCondition("reader");
+        var defaultBody = EmitDeserializeMembersCore(
+            members,
+            formatterOverrideCondition.Length == 0 ? indent : indent + "    ",
+            honorFormatterOverrides: false);
+        if (formatterOverrideCondition.Length == 0)
+        {
+            return defaultBody;
+        }
+
+        var overrideBody = EmitDeserializeMembersCore(
+            members,
+            indent + "    ",
+            honorFormatterOverrides: true);
+        return $$"""
+{{indent}}if ({{formatterOverrideCondition}})
+{{indent}}{
+{{overrideBody}}
+{{indent}}}
+{{indent}}else
+{{indent}}{
+{{defaultBody}}
+{{indent}}}
+""";
+    }
+
+    string EmitDeserializeMembersCore(
+        MemberMeta[] members,
+        string indent,
+        bool honorFormatterOverrides)
+    {
         // {{Members.Select(x => "                " + x.EmitReadToDeserialize()).NewLine()}}
         var sb = new StringBuilder();
         for (int i = 0; i < members.Length; i++)
         {
-            if (!(members[i].Kind is MemberKind.Unmanaged or MemberKind.Enum or MemberKind.UnmanagedNullable) || (GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference))
+            if (honorFormatterOverrides ||
+                !(members[i].Kind is MemberKind.Unmanaged or MemberKind.Enum or MemberKind.UnmanagedNullable) ||
+                (GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference))
             {
                 sb.Append(indent);
-                sb.AppendLine(members[i].EmitReadToDeserialize(i, GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference));
+                sb.AppendLine(members[i].EmitReadToDeserialize(
+                    i,
+                    GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference,
+                    honorFormatterOverrides));
                 continue;
             }
 
@@ -963,6 +1042,79 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
         }
 
         return sb.ToString();
+    }
+
+    string EmitFormatterOverrideCondition(string readerOrWriter)
+    {
+        var types = new List<ITypeSymbol>();
+        foreach (var member in Members)
+        {
+            switch (member.Kind)
+            {
+                case MemberKind.Unmanaged:
+                case MemberKind.Enum:
+                    types.Add(member.MemberType);
+                    break;
+                case MemberKind.UnmanagedNullable:
+                    types.Add(member.MemberType);
+                    types.Add(((INamedTypeSymbol)member.MemberType).TypeArguments[0]);
+                    break;
+                case MemberKind.UnmanagedArray:
+                    types.Add(((IArrayTypeSymbol)member.MemberType).ElementType);
+                    break;
+            }
+        }
+
+        var registrations = types
+            .Select(static type =>
+                type.ToDisplayString(
+                    SymbolDisplayFormat.FullyQualifiedFormat))
+            .Distinct(StringComparer.Ordinal)
+            .Select(type =>
+                $"{readerOrWriter}.OptionalState.HasFormatterOverride<{type}>()");
+        var registrationCondition = string.Join(" || ", registrations);
+        return registrationCondition.Length == 0
+            ? ""
+            : $"{readerOrWriter}.OptionalState.HasFormatterOverrides && ({registrationCondition})";
+    }
+
+    string EmitReadRefDeserializeMembers(
+        MemberMeta[] members,
+        string indent,
+        bool includeCountJumps)
+    {
+        string Emit(bool honorFormatterOverrides, string lineIndent)
+        {
+            return members
+                .Select((member, index) =>
+                    lineIndent +
+                    member.EmitReadRefDeserialize(
+                        member.Order,
+                        GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference,
+                        honorFormatterOverrides) +
+                    (includeCountJumps
+                        ? $" if (count == {index + 1}) goto SKIP_READ;"
+                        : ""))
+                .NewLine();
+        }
+
+        var formatterOverrideCondition =
+            EmitFormatterOverrideCondition("reader");
+        if (formatterOverrideCondition.Length == 0)
+        {
+            return Emit(honorFormatterOverrides: false, indent);
+        }
+
+        return $$"""
+{{indent}}if ({{formatterOverrideCondition}})
+{{indent}}{
+{{Emit(honorFormatterOverrides: true, indent + "    ")}}
+{{indent}}}
+{{indent}}else
+{{indent}}{
+{{Emit(honorFormatterOverrides: false, indent + "    ")}}
+{{indent}}}
+""";
     }
 
     string EmitConstructor()
@@ -1372,7 +1524,9 @@ public partial class MethodMeta
 
 public partial class MemberMeta
 {
-    public string EmitSerialize(string writer)
+    public string EmitSerialize(
+        string writer,
+        bool honorFormatterOverrides = false)
     {
         switch (Kind)
         {
@@ -1380,9 +1534,13 @@ public partial class MemberMeta
                 return $"{writer}.WritePackable(value.@{Name});";
             case MemberKind.Unmanaged:
             case MemberKind.Enum:
-                return $"{writer}.WriteUnmanaged(value.@{Name});";
+                return honorFormatterOverrides
+                    ? $"{writer}.WriteValue(value.@{Name});"
+                    : $"{writer}.WriteUnmanaged(value.@{Name});";
             case MemberKind.UnmanagedNullable:
-                return $"{writer}.DangerousWriteUnmanaged(value.@{Name});";
+                return honorFormatterOverrides
+                    ? $"{writer}.WriteValue(value.@{Name});"
+                    : $"{writer}.DangerousWriteUnmanaged(value.@{Name});";
             case MemberKind.String:
                 return $"{writer}.WriteString(value.@{Name});";
             case MemberKind.UnmanagedArray:
@@ -1421,7 +1579,10 @@ public partial class MemberMeta
         }
     }
 
-    public string EmitReadToDeserialize(int i, bool requireDeltaCheck)
+    public string EmitReadToDeserialize(
+        int i,
+        bool requireDeltaCheck,
+        bool honorFormatterOverrides = false)
     {
         var equalDefault = Kind == MemberKind.Blank
             ? "{ }"
@@ -1437,9 +1598,13 @@ public partial class MemberMeta
                 return $"{pre}__{Name} = reader.ReadPackable<{MemberType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>();";
             case MemberKind.Unmanaged:
             case MemberKind.Enum:
-                return $"{pre}reader.ReadUnmanaged(out __{Name});";
+                return honorFormatterOverrides
+                    ? $"{pre}__{Name} = reader.ReadValue<{MemberType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>();"
+                    : $"{pre}reader.ReadUnmanaged(out __{Name});";
             case MemberKind.UnmanagedNullable:
-                return $"{pre}reader.DangerousReadUnmanaged(out __{Name});";
+                return honorFormatterOverrides
+                    ? $"{pre}__{Name} = reader.ReadValue<{MemberType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>();"
+                    : $"{pre}reader.DangerousReadUnmanaged(out __{Name});";
             case MemberKind.String:
                 return $"{pre}__{Name} = reader.ReadString();";
             case MemberKind.UnmanagedArray:
@@ -1462,7 +1627,10 @@ public partial class MemberMeta
         }
     }
 
-    public string EmitReadRefDeserialize(int i, bool requireDeltaCheck)
+    public string EmitReadRefDeserialize(
+        int i,
+        bool requireDeltaCheck,
+        bool honorFormatterOverrides = false)
     {
         var pre = requireDeltaCheck
             ? $"if (deltas[{i}] != 0) "
@@ -1474,9 +1642,13 @@ public partial class MemberMeta
                 return $"{pre}reader.ReadPackable(ref __{Name});";
             case MemberKind.Unmanaged:
             case MemberKind.Enum:
-                return $"{pre}reader.ReadUnmanaged(out __{Name});";
+                return honorFormatterOverrides
+                    ? $"{pre}reader.ReadValue(ref __{Name});"
+                    : $"{pre}reader.ReadUnmanaged(out __{Name});";
             case MemberKind.UnmanagedNullable:
-                return $"{pre}reader.DangerousReadUnmanaged(out __{Name});";
+                return honorFormatterOverrides
+                    ? $"{pre}reader.ReadValue(ref __{Name});"
+                    : $"{pre}reader.DangerousReadUnmanaged(out __{Name});";
             case MemberKind.String:
                 return $"{pre}__{Name} = reader.ReadString();";
             case MemberKind.UnmanagedArray:

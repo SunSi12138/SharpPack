@@ -244,6 +244,37 @@ public class StreamingSerializer
     }
 
     [Fact]
+    public async Task DeserializeRegistersFreshContextRootType()
+    {
+        var expected = new[]
+        {
+            new StreamingTypeValue
+            {
+                Value = typeof(StreamingSerializer),
+            },
+        };
+        var pipe = new Pipe();
+        pipe.Writer.Write(MemoryPackSerializer.Serialize(expected));
+        await pipe.Writer.CompleteAsync();
+
+        var context = new MemoryPackSerializerContext();
+        var actual = new List<StreamingTypeValue?>();
+        await foreach (var item in MemoryPackStreamingSerializer
+                           .DeserializeAsync<StreamingTypeValue>(
+                               pipe.Reader,
+                               bufferAtLeast: 4,
+                               readMinimumSize: 4,
+                               context))
+        {
+            actual.Add(item);
+        }
+
+        actual.Should().ContainSingle();
+        actual[0]!.Value.Should().Be(typeof(StreamingSerializer));
+        await pipe.Reader.CompleteAsync();
+    }
+
+    [Fact]
     public async Task SingleMessagePipeApi_IsZeroCopyAndFrameBounded()
     {
         var context = new MemoryPackSerializerContext();
@@ -345,4 +376,10 @@ public partial class SampleClassForMemoryPack
     {
         return $"{Id}-{Name}";
     }
+}
+
+[MemoryPackable]
+public partial class StreamingTypeValue
+{
+    public Type? Value { get; set; }
 }

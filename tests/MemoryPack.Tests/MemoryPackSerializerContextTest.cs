@@ -217,6 +217,84 @@ public class MemoryPackSerializerContextTest
     }
 
     [Fact]
+    public void PrimitiveRegistration_PropagatesThroughGeneratedScalarFastPaths()
+    {
+        var context = new MemoryPackSerializerContextBuilder()
+            .Register(new VarIntIntFormatter())
+            .Build();
+        var objectValue = new ContextObjectScalars
+        {
+            First = 1,
+            Second = 30_000,
+        };
+        var versionTolerantValue = new ContextVersionTolerantScalars
+        {
+            First = 200,
+            Second = 4_000_000,
+        };
+        var circularValue = new ContextCircularScalars
+        {
+            First = 30_000,
+            Second = 200,
+        };
+
+        AssertContextPayloadRoundTrip(objectValue, context);
+        AssertContextPayloadRoundTrip(versionTolerantValue, context);
+        AssertContextPayloadRoundTrip(circularValue, context);
+    }
+
+    [Fact]
+    public void PrimitiveRegistration_PropagatesThroughUnmanagedCompositeFormatters()
+    {
+        var context = new MemoryPackSerializerContextBuilder()
+            .Register(new VarIntIntFormatter())
+            .Build();
+
+        int? nullable = 30_000;
+        var nullablePayload = MemoryPackSerializer.Serialize(nullable, context);
+        nullablePayload.Should().NotEqual(MemoryPackSerializer.Serialize(nullable));
+        MemoryPackSerializer.Deserialize<int?>(nullablePayload, context)
+            .Should().Be(nullable);
+
+        var pair = new KeyValuePair<int, int>(200, 30_000);
+        var pairPayload = MemoryPackSerializer.Serialize(pair, context);
+        pairPayload.Should().NotEqual(MemoryPackSerializer.Serialize(pair));
+        MemoryPackSerializer.Deserialize<KeyValuePair<int, int>>(
+            pairPayload,
+            context).Should().Be(pair);
+
+        var tuple = (First: 200, Second: 30_000);
+        var tuplePayload = MemoryPackSerializer.Serialize(tuple, context);
+        tuplePayload.Should().NotEqual(MemoryPackSerializer.Serialize(tuple));
+        MemoryPackSerializer.Deserialize<(int First, int Second)>(
+            tuplePayload,
+            context).Should().Be(tuple);
+
+        var dictionary = new Dictionary<int, int>
+        {
+            [200] = 30_000,
+            [4_000_000] = 1,
+        };
+        var dictionaryPayload = MemoryPackSerializer.Serialize(dictionary, context);
+        dictionaryPayload.Should().NotEqual(
+            MemoryPackSerializer.Serialize(dictionary));
+        MemoryPackSerializer.Deserialize<Dictionary<int, int>>(
+            dictionaryPayload,
+            context).Should().Equal(dictionary);
+
+        var queue = new PriorityQueue<int, int>();
+        queue.Enqueue(30_000, 200);
+        queue.Enqueue(4_000_000, 1);
+        var queuePayload = MemoryPackSerializer.Serialize(queue, context);
+        queuePayload.Should().NotEqual(MemoryPackSerializer.Serialize(queue));
+        var decodedQueue = MemoryPackSerializer.Deserialize<PriorityQueue<int, int>>(
+            queuePayload,
+            context)!;
+        decodedQueue.Dequeue().Should().Be(4_000_000);
+        decodedQueue.Dequeue().Should().Be(30_000);
+    }
+
+    [Fact]
     public void UnrelatedRegistration_PreservesBulkCollectionFastPathWireFormat()
     {
         var context = new MemoryPackSerializerContextBuilder()
@@ -226,6 +304,10 @@ public class MemoryPackSerializerContextTest
         var two = new int[,] { { 1, 2 }, { 3, 4 } };
         var three = new int[,,] { { { 1, 2 }, { 3, 4 } } };
         var four = new int[,,,] { { { { 1, 2 }, { 3, 4 } } } };
+        int? nullable = 30_000;
+        var pair = new KeyValuePair<int, int>(200, 30_000);
+        var tuple = (First: 200, Second: 30_000);
+        var dictionary = new Dictionary<int, int> { [200] = 30_000 };
 
         MemoryPackSerializer.Serialize(values, context)
             .Should().Equal(MemoryPackSerializer.Serialize(values));
@@ -237,6 +319,14 @@ public class MemoryPackSerializerContextTest
             .Should().Equal(MemoryPackSerializer.Serialize(three));
         MemoryPackSerializer.Serialize(four, context)
             .Should().Equal(MemoryPackSerializer.Serialize(four));
+        MemoryPackSerializer.Serialize(nullable, context)
+            .Should().Equal(MemoryPackSerializer.Serialize(nullable));
+        MemoryPackSerializer.Serialize(pair, context)
+            .Should().Equal(MemoryPackSerializer.Serialize(pair));
+        MemoryPackSerializer.Serialize(tuple, context)
+            .Should().Equal(MemoryPackSerializer.Serialize(tuple));
+        MemoryPackSerializer.Serialize(dictionary, context)
+            .Should().Equal(MemoryPackSerializer.Serialize(dictionary));
     }
 
     [Fact]
@@ -330,6 +420,16 @@ public class MemoryPackSerializerContextTest
         }
         actual.Cast<object?>().Should().Equal(expected.Cast<object?>());
     }
+
+    static void AssertContextPayloadRoundTrip<T>(
+        T value,
+        MemoryPackSerializerContext context)
+    {
+        var payload = MemoryPackSerializer.Serialize(value, context);
+        payload.Should().NotEqual(MemoryPackSerializer.Serialize(value));
+        MemoryPackSerializer.Deserialize<T>(payload, context)
+            .Should().BeEquivalentTo(value);
+    }
 }
 
 public sealed class IntSequenceSegment : ReadOnlySequenceSegment<int>
@@ -383,6 +483,33 @@ public partial class ContextVersionTolerantIntArray
 
     [MemoryPackOrder(1)]
     public string? Tail { get; set; }
+}
+
+[MemoryPackable]
+public partial class ContextObjectScalars
+{
+    public int First { get; set; }
+    public int Second { get; set; }
+}
+
+[MemoryPackable(GenerateType.VersionTolerant)]
+public partial class ContextVersionTolerantScalars
+{
+    [MemoryPackOrder(0)]
+    public int First { get; set; }
+
+    [MemoryPackOrder(1)]
+    public int Second { get; set; }
+}
+
+[MemoryPackable(GenerateType.CircularReference)]
+public partial class ContextCircularScalars
+{
+    [MemoryPackOrder(0)]
+    public int First { get; set; }
+
+    [MemoryPackOrder(1)]
+    public int Second { get; set; }
 }
 
 public sealed class ContextCustomValue
