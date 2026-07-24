@@ -25,7 +25,8 @@ public sealed class TwoDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,]>
         var j = value.GetLength(1);
         writer.WriteUnmanaged(i, j);
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>() &&
+            !writer.HasFormatterOverride<T>())
         {
             var byteCount = FormatterValidation.ByteCount<T>(value.Length);
             ref var src = ref MemoryMarshal.GetArrayDataReference(value);
@@ -83,7 +84,8 @@ public sealed class TwoDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,]>
             value = new T[iLength, jLength];
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>() &&
+            !reader.HasFormatterOverride<T>())
         {
             var byteCount = FormatterValidation.ByteCount<T>(elementCount);
             ref var dest = ref MemoryMarshal.GetArrayDataReference(value);
@@ -138,7 +140,8 @@ public sealed class ThreeDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,
         var k = value.GetLength(2);
         writer.WriteUnmanaged(i, j, k);
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>() &&
+            !writer.HasFormatterOverride<T>())
         {
             var byteCount = FormatterValidation.ByteCount<T>(value.Length);
             ref var src = ref MemoryMarshal.GetArrayDataReference(value);
@@ -196,7 +199,8 @@ public sealed class ThreeDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,
             value = new T[iLength, jLength, kLength];
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>() &&
+            !reader.HasFormatterOverride<T>())
         {
             var byteCount = FormatterValidation.ByteCount<T>(elementCount);
             ref var dest = ref MemoryMarshal.GetArrayDataReference(value);
@@ -259,7 +263,8 @@ public sealed class FourDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,,
         var l = value.GetLength(3);
         writer.WriteUnmanaged(i, j, k, l);
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>() &&
+            !writer.HasFormatterOverride<T>())
         {
             var byteCount = FormatterValidation.ByteCount<T>(value.Length);
             ref var src = ref MemoryMarshal.GetArrayDataReference(value);
@@ -318,7 +323,8 @@ public sealed class FourDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,,
             value = new T[iLength, jLength, kLength, lLength];
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>() &&
+            !reader.HasFormatterOverride<T>())
         {
             var byteCount = FormatterValidation.ByteCount<T>(elementCount);
             ref var dest = ref MemoryMarshal.GetArrayDataReference(value);

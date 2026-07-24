@@ -267,7 +267,7 @@ public ref partial struct MemoryPackReader
         => context.Graph.GetFormatter<T>();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    bool HasFormatterOverride<T>()
+    internal bool HasFormatterOverride<T>()
         => optionalState.FormatterGraph is { } graph &&
            graph.HasExplicitRegistration<T>();
 

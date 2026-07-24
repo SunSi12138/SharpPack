@@ -154,17 +154,89 @@ public class MemoryPackSerializerContextTest
     }
 
     [Fact]
+    public void PrimitiveRegistration_PropagatesThroughMultiDimensionalArrays()
+    {
+        var context = new MemoryPackSerializerContextBuilder()
+            .Register(new IntOffsetFormatter(100))
+            .Build();
+        var two = new int[,] { { 1, 2 }, { 3, 4 } };
+        var three = new int[,,] { { { 5, 6 }, { 7, 8 } } };
+        var four = new int[,,,] { { { { 9, 10 }, { 11, 12 } } } };
+
+        var twoPayload = MemoryPackSerializer.Serialize(two, context);
+        var threePayload = MemoryPackSerializer.Serialize(three, context);
+        var fourPayload = MemoryPackSerializer.Serialize(four, context);
+
+        twoPayload.Should().NotEqual(MemoryPackSerializer.Serialize(two));
+        threePayload.Should().NotEqual(MemoryPackSerializer.Serialize(three));
+        fourPayload.Should().NotEqual(MemoryPackSerializer.Serialize(four));
+
+        AssertArrayEqual(
+            two,
+            MemoryPackSerializer.Deserialize<int[,]>(twoPayload, context)!);
+        AssertArrayEqual(
+            three,
+            MemoryPackSerializer.Deserialize<int[,,]>(threePayload, context)!);
+        AssertArrayEqual(
+            four,
+            MemoryPackSerializer.Deserialize<int[,,,]>(fourPayload, context)!);
+
+        var overwrite = new int[2, 2];
+        var original = overwrite;
+        MemoryPackSerializer.Deserialize(twoPayload, ref overwrite, context);
+        overwrite.Should().BeSameAs(original);
+        AssertArrayEqual(two, overwrite!);
+    }
+
+    [Fact]
+    public void VariableLengthPrimitiveRegistration_PropagatesThroughMultiDimensionalArrays()
+    {
+        var context = new MemoryPackSerializerContextBuilder()
+            .Register(new VarIntIntFormatter())
+            .Build();
+        var two = new int[,] { { 1, 200 }, { 30_000, 4_000_000 } };
+        var three = new int[,,] { { { 1, 200 }, { 30_000, 4_000_000 } } };
+        var four = new int[,,,] { { { { 1, 200 }, { 30_000, 4_000_000 } } } };
+
+        var twoPayload = MemoryPackSerializer.Serialize(two, context);
+        var threePayload = MemoryPackSerializer.Serialize(three, context);
+        var fourPayload = MemoryPackSerializer.Serialize(four, context);
+
+        twoPayload.Should().NotEqual(MemoryPackSerializer.Serialize(two));
+        threePayload.Should().NotEqual(MemoryPackSerializer.Serialize(three));
+        fourPayload.Should().NotEqual(MemoryPackSerializer.Serialize(four));
+        AssertArrayEqual(
+            two,
+            MemoryPackSerializer.Deserialize<int[,]>(twoPayload, context)!);
+        AssertArrayEqual(
+            three,
+            MemoryPackSerializer.Deserialize<int[,,]>(threePayload, context)!);
+        AssertArrayEqual(
+            four,
+            MemoryPackSerializer.Deserialize<int[,,,]>(fourPayload, context)!);
+    }
+
+    [Fact]
     public void UnrelatedRegistration_PreservesBulkCollectionFastPathWireFormat()
     {
         var context = new MemoryPackSerializerContextBuilder()
             .Register(new OffsetFormatter(100))
             .Build();
         var values = new[] { 1, 2, 3 };
+        var two = new int[,] { { 1, 2 }, { 3, 4 } };
+        var three = new int[,,] { { { 1, 2 }, { 3, 4 } } };
+        var four = new int[,,,] { { { { 1, 2 }, { 3, 4 } } } };
 
         MemoryPackSerializer.Serialize(values, context)
             .Should().Equal(MemoryPackSerializer.Serialize(values));
         MemoryPackSerializer.Serialize(values.ToList(), context)
             .Should().Equal(MemoryPackSerializer.Serialize(values.ToList()));
+        MemoryPackSerializer.Serialize(two, context)
+            .Should().Equal(MemoryPackSerializer.Serialize(two));
+        MemoryPackSerializer.Serialize(three, context)
+            .Should().Equal(MemoryPackSerializer.Serialize(three));
+        MemoryPackSerializer.Serialize(four, context)
+            .Should().Equal(MemoryPackSerializer.Serialize(four));
     }
 
     [Fact]
@@ -247,6 +319,16 @@ public class MemoryPackSerializerContextTest
             0,
             last,
             last.Memory.Length);
+    }
+
+    static void AssertArrayEqual(Array expected, Array actual)
+    {
+        actual.Rank.Should().Be(expected.Rank);
+        for (var dimension = 0; dimension < expected.Rank; dimension++)
+        {
+            actual.GetLength(dimension).Should().Be(expected.GetLength(dimension));
+        }
+        actual.Cast<object?>().Should().Equal(expected.Cast<object?>());
     }
 }
 

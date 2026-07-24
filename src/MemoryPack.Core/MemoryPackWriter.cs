@@ -149,7 +149,7 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
         => context.Graph.GetFormatter<T>();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    bool HasFormatterOverride<T>()
+    internal bool HasFormatterOverride<T>()
         => optionalState.HasFormatterOverride<T>();
 
 
