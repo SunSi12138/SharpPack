@@ -7,10 +7,11 @@
         <IncludeContentInPack>true</IncludeContentInPack>
         <NoWarn>$(NoWarn);NU5128</NoWarn>
 
-		    <!-- NuGet -->
+        <!-- NuGet -->
         <IsPackable>true</IsPackable>
-        <PackageTags>serializer</PackageTags>
-        <Description>Zero encoding extreme performance binary serializer for C#.</Description>
+        <PackageId>SharpPack</PackageId>
+        <PackageTags>serializer;binary;zero-copy;source-generator;memorypack-compatible</PackageTags>
+        <Description>High-performance, source-generated binary serialization for modern .NET.</Description>
     </PropertyGroup>
 
     <ItemGroup>

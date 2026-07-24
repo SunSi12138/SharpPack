@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1
+
+- Published SharpPack as a public project and prepared the first NuGet.org
+  packages.
+- Added a complete collectible `AssemblyLoadContext` host/plugin sample.
+- Added reproducible BenchmarkDotNet comparisons against MemoryPack 1.21.4.
+- Improved package metadata, descriptions, tags, and repository provenance.
+
 ## 1.0.0
 
 - Renamed the product, assemblies, packages, namespaces, public APIs, source

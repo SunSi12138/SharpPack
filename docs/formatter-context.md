@@ -125,3 +125,9 @@ strong references. The host must release:
 The regression suite compiles and loads collectible plugins, exercises nested
 graphs, unions, custom formatters, buffer writers, sequences and async streams,
 then verifies that the load context, assembly and types are collected.
+
+The executable
+[`sandbox/CollectibleAlcSample`](../sandbox/CollectibleAlcSample) demonstrates
+the complete host/plugin lifecycle: load a plugin into a collectible context,
+pass an explicit serializer context into plugin-owned generic code, release all
+strong references, call `Unload`, and verify collection.

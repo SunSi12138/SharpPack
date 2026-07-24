@@ -13,10 +13,11 @@
         <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
         <IsRoslynComponent>true</IsRoslynComponent>
 
-		    <!-- NuGet -->
+        <!-- NuGet -->
         <IsPackable>true</IsPackable>
-        <PackageTags>serializer</PackageTags>
-        <Description>Code generator for SharpPack.</Description>
+        <PackageId>SharpPack.Generator</PackageId>
+        <PackageTags>serializer;source-generator;roslyn;memorypack-compatible</PackageTags>
+        <Description>Roslyn source generator for SharpPack serializable types.</Description>
     </PropertyGroup>
 
     <ItemGroup>

@@ -1,7 +1,7 @@
 SharpPack
 =========
 
-SharpPack is an independently maintained internal fork derived from MemoryPack,
+SharpPack is an independently maintained fork derived from MemoryPack,
 originally developed by Cysharp, Inc.
 
 The original MemoryPack source and this derivative are licensed under the MIT

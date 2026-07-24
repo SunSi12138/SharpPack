@@ -1,16 +1,22 @@
-name: Build-Release
+name: Publish-NuGet
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version without a v prefix, for example 1.0.0"
+        description: "Package version without a v prefix"
+        required: true
+        default: "1.0.1"
+      nuget_user:
+        description: "NuGet.org profile name, not an email address"
         required: true
 
 jobs:
-  build-and-release:
+  publish:
+    environment: release
     permissions:
-      contents: write
+      contents: read
+      id-token: write
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -20,10 +26,18 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
-      - run: dotnet build -c Release -p:Version="$VERSION"
+      - name: Validate version
+        run: |
+          project_version=$(sed -n \
+            's:.*<VersionPrefix>\(.*\)</VersionPrefix>.*:\1:p' \
+            Directory.Build.props)
+          test "$project_version" = "$VERSION"
         env:
           VERSION: ${{ inputs.version }}
-      - run: dotnet test -c Release --no-build
+      - run: dotnet build SharpPack.sln -c Release -p:Version="$VERSION"
+        env:
+          VERSION: ${{ inputs.version }}
+      - run: dotnet test tests/SharpPack.Tests/SharpPack.Tests.csproj -c Release --no-build
       - run: dotnet run --project sandbox/CollectibleAlcSample -c Release
       - run: tools/CompatibilityBaseline/generate-original-head-corpus.sh
       - run: dotnet publish sandbox/NativeAot/NativeAot.csproj -c Release -o "$RUNNER_TEMP/sharppack-aot"
@@ -38,12 +52,26 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
       - run: git diff --exit-code
-      - name: Create GitHub release
-        run: >-
-          gh release create "v$VERSION" ./publish/*
-          --target "$GITHUB_SHA"
-          --title "SharpPack $VERSION"
-          --notes-file CHANGELOG.md
+      - name: NuGet login
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ inputs.nuget_user }}
+      - name: Push packages
+        run: |
+          for package in \
+            ./publish/SharpPack.Core.*.nupkg \
+            ./publish/SharpPack.Generator.*.nupkg \
+            ./publish/SharpPack.Streaming.*.nupkg \
+            ./publish/SharpPack.[0-9]*.nupkg
+          do
+            case "$package" in
+              *.symbols.nupkg) continue ;;
+            esac
+            dotnet nuget push "$package" \
+              --api-key "$NUGET_API_KEY" \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
         env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ inputs.version }}
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
