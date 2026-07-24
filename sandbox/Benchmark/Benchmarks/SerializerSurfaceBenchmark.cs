@@ -1,7 +1,7 @@
 using System.Buffers;
 using System.IO.Pipelines;
-using MemoryPack;
-using MemoryPack.Streaming;
+using SharpPack;
+using SharpPack.Streaming;
 
 namespace Benchmark.Benchmarks;
 
@@ -21,11 +21,11 @@ public enum SerializerContextScenario
 [MemoryDiagnoser]
 public class SerializerSurfaceBenchmark
 {
-    readonly MemoryPackSerializerContext emptyContext = new();
-    readonly MemoryPackSerializerContext configuredContext =
-        new(MemoryPackSerializerConfiguration.Utf16);
-    readonly MemoryPackSerializerContext customContext =
-        new MemoryPackSerializerContextBuilder()
+    readonly SharpPackSerializerContext emptyContext = new();
+    readonly SharpPackSerializerContext configuredContext =
+        new(SharpPackSerializerConfiguration.Utf16);
+    readonly SharpPackSerializerContext customContext =
+        new SharpPackSerializerContextBuilder()
             .Register(new PassthroughByteArrayFormatter())
             .Build();
 
@@ -67,30 +67,30 @@ public class SerializerSurfaceBenchmark
     {
         bufferWriter.Clear();
         return GetContext() is { } context
-            ? MemoryPackSerializer.Serialize(ref bufferWriter, value, context)
-            : MemoryPackSerializer.Serialize(ref bufferWriter, value);
+            ? SharpPackSerializer.Serialize(ref bufferWriter, value, context)
+            : SharpPackSerializer.Serialize(ref bufferWriter, value);
     }
 
     [Benchmark]
     public int DestinationSpan()
     {
         var success = GetContext() is { } context
-            ? MemoryPackSerializer.TrySerialize(destination, value, context, out var written)
-            : MemoryPackSerializer.TrySerialize(destination, value, out written);
+            ? SharpPackSerializer.TrySerialize(destination, value, context, out var written)
+            : SharpPackSerializer.TrySerialize(destination, value, out written);
         return success ? written : -1;
     }
 
     [Benchmark]
     public byte[]? ReadOnlySpan()
         => GetContext() is { } context
-            ? MemoryPackSerializer.Deserialize<byte[]>(serialized, context)
-            : MemoryPackSerializer.Deserialize<byte[]>(serialized);
+            ? SharpPackSerializer.Deserialize<byte[]>(serialized, context)
+            : SharpPackSerializer.Deserialize<byte[]>(serialized);
 
     [Benchmark]
     public byte[]? ReadOnlySequence()
         => GetContext() is { } context
-            ? MemoryPackSerializer.Deserialize<byte[]>(segmented, context)
-            : MemoryPackSerializer.Deserialize<byte[]>(segmented);
+            ? SharpPackSerializer.Deserialize<byte[]>(segmented, context)
+            : SharpPackSerializer.Deserialize<byte[]>(segmented);
 
     [Benchmark]
     public async ValueTask<int> Stream()
@@ -98,11 +98,11 @@ public class SerializerSurfaceBenchmark
         stream.SetLength(0);
         if (GetContext() is { } context)
         {
-            await MemoryPackSerializer.SerializeAsync(stream, value, context);
+            await SharpPackSerializer.SerializeAsync(stream, value, context);
         }
         else
         {
-            await MemoryPackSerializer.SerializeAsync(stream, value);
+            await SharpPackSerializer.SerializeAsync(stream, value);
         }
 
         return checked((int)stream.Length);
@@ -116,11 +116,11 @@ public class SerializerSurfaceBenchmark
                 pauseWriterThreshold: long.MaxValue,
                 resumeWriterThreshold: long.MaxValue));
         var context = GetContext();
-        var written = await MemoryPackStreamingSerializer.SerializeFrameAsync(
+        var written = await SharpPackStreamingSerializer.SerializeFrameAsync(
             pipe.Writer,
             value,
             context);
-        _ = await MemoryPackStreamingSerializer.DeserializeFrameAsync<byte[]>(
+        _ = await SharpPackStreamingSerializer.DeserializeFrameAsync<byte[]>(
             pipe.Reader,
             written,
             context);
@@ -131,10 +131,10 @@ public class SerializerSurfaceBenchmark
 
     byte[] Serialize(byte[] source)
         => GetContext() is { } context
-            ? MemoryPackSerializer.Serialize(source, context)
-            : MemoryPackSerializer.Serialize(source);
+            ? SharpPackSerializer.Serialize(source, context)
+            : SharpPackSerializer.Serialize(source);
 
-    MemoryPackSerializerContext? GetContext()
+    SharpPackSerializerContext? GetContext()
         => ContextScenario switch
         {
             SerializerContextScenario.Default => null,
@@ -188,15 +188,15 @@ public class SerializerSurfaceBenchmark
         }
     }
 
-    sealed class PassthroughByteArrayFormatter : MemoryPackFormatter<byte[]>
+    sealed class PassthroughByteArrayFormatter : SharpPackFormatter<byte[]>
     {
         public override void Serialize<TBufferWriter>(
-            ref MemoryPackWriter<TBufferWriter> writer,
+            ref SharpPackWriter<TBufferWriter> writer,
             scoped ref byte[]? value)
             => writer.WriteUnmanagedArray(value);
 
         public override void Deserialize(
-            ref MemoryPackReader reader,
+            ref SharpPackReader reader,
             scoped ref byte[]? value)
             => reader.ReadUnmanagedArray(ref value);
     }

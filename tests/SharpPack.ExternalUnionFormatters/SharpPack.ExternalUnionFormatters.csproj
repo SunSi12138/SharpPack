@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/SharpPack.Core/SharpPack.Core.csproj" />
+    <ProjectReference Include="../../src/SharpPack.Generator/SharpPack.Generator.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../SharpPack.ExternalUnionModels/SharpPack.ExternalUnionModels.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,6 +1,6 @@
 ﻿#nullable disable
 using MessagePack;
-using MemoryPack;
+using SharpPack;
 using Orleans;
 using ProtoBuf;
 using System;
@@ -24,7 +24,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public partial class UserTimeline : IGenericEquality<UserTimeline>
     {
         [ProtoMember(1)]

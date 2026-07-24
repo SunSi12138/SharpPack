@@ -1,6 +1,6 @@
 ﻿using Benchmark.Models;
 using BinaryPack.Models;
-using MemoryPack.Formatters;
+using SharpPack.Formatters;
 
 namespace Benchmark.Benchmarks;
 

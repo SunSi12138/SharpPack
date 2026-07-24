@@ -1,4 +1,4 @@
-﻿using MemoryPack;
+﻿using SharpPack;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -12,10 +12,10 @@ using static System.Runtime.InteropServices.JavaScript.JSType;
 namespace Samples;
 
 
-[MemoryPackable]
+[SharpPackable]
 public partial class Sample2
 {
-    [MemoryPackAllowSerialize]
+    [SharpPackAllowSerialize]
     public NotSerializableType? NotSerializableProperty { get; set; }
 
 
@@ -27,7 +27,7 @@ public class NotSerializableType
 }
 
 
-[MemoryPackable]
+[SharpPackable]
 public partial class Person
 {
     public readonly int Age;
@@ -42,7 +42,7 @@ public partial class Person
 }
 
 // also supports record primary constructor
-[MemoryPackable]
+[SharpPackable]
 public partial record Person2(int Age, string Name);
 
 public partial class Person3
@@ -56,8 +56,8 @@ public partial class Person3
         this.Name = "";
     }
 
-    // If exists multiple constructors, must use [MemoryPackConstructor]
-    [MemoryPackConstructor]
+    // If exists multiple constructors, must use [SharpPackConstructor]
+    [SharpPackConstructor]
     public Person3(int age, string name)
     {
         this.Age = age;
@@ -66,33 +66,33 @@ public partial class Person3
 }
 
 
-[MemoryPackable(GenerateType.Collection)]
+[SharpPackable(GenerateType.Collection)]
 public partial class MyList<T> : List<T>
 {
 }
 
-[MemoryPackable(GenerateType.Collection)]
+[SharpPackable(GenerateType.Collection)]
 public partial class MyStringDictionary<TValue> : Dictionary<string, TValue>
 {
 
 }
 
 // Annotate inheritance types
-[MemoryPackable]
-[MemoryPackUnion(0, typeof(FooClass))]
-[MemoryPackUnion(249, typeof(BarClass))]
-// [MemoryPackUnion(250, typeof(BarClass), useWideTag: true)]
+[SharpPackable]
+[SharpPackUnion(0, typeof(FooClass))]
+[SharpPackUnion(249, typeof(BarClass))]
+// [SharpPackUnion(250, typeof(BarClass), useWideTag: true)]
 public partial interface IUnionSample
 {
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial class FooClass : IUnionSample
 {
     public int XYZ { get; set; }
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial class BarClass : IUnionSample
 {
     public string? OPQ { get; set; }
@@ -101,9 +101,9 @@ public partial class BarClass : IUnionSample
 
 
 
-public class Skelton : MemoryPackFormatter<Skelton>
+public class Skelton : SharpPackFormatter<Skelton>
 {
-    public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref Skelton? value)
+    public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Skelton? value)
     {
         if (value == null)
         {
@@ -114,7 +114,7 @@ public class Skelton : MemoryPackFormatter<Skelton>
         // use writer method.
     }
 
-    public override void Deserialize(ref MemoryPackReader reader, scoped ref Skelton? value)
+    public override void Deserialize(ref SharpPackReader reader, scoped ref Skelton? value)
     {
         if (!reader.TryReadObjectHeader(out var count))
         {
@@ -128,7 +128,7 @@ public class Skelton : MemoryPackFormatter<Skelton>
 
 
 
-[MemoryPackable]
+[SharpPackable]
 public partial class Version1
 {
     public int Prop1 { get; set; }
@@ -136,7 +136,7 @@ public partial class Version1
 }
 
 // Add is OK.
-[MemoryPackable]
+[SharpPackable]
 public partial class Version2
 {
     public int Prop1 { get; set; }
@@ -145,16 +145,16 @@ public partial class Version2
 }
 
 
-[MemoryPackable(SerializeLayout.Explicit)]
+[SharpPackable(SerializeLayout.Explicit)]
 public partial class SampleExplicitOrder
 {
-    [MemoryPackOrder(1)]
+    [SharpPackOrder(1)]
     public int Prop1 { get; set; }
-    [MemoryPackOrder(0)]
+    [SharpPackOrder(0)]
     public int Prop0 { get; set; }
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial class MyDictContainer
 {
     public Dictionary<int, string>? MD { get; set; }
@@ -163,7 +163,7 @@ public partial class MyDictContainer
 }
 
 
-[MemoryPackable]
+[SharpPackable]
 public partial class PoolModelSample : IDisposable
 {
     public int Id { get; }
@@ -179,7 +179,7 @@ public partial class PoolModelSample : IDisposable
 
     bool usePool;
 
-    [MemoryPackOnDeserialized]
+    [SharpPackOnDeserialized]
     void OnDeserialized()
     {
         usePool = true;

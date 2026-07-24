@@ -1,5 +1,5 @@
 using System.Text.Json;
-using MemoryPack;
+using SharpPack;
 
 if (args is not [var originalCorpusPath])
 {
@@ -24,8 +24,8 @@ foreach (var entry in original.Entries)
 
     var invoker = PayloadInvoker.Create(type);
     var context = entry.Configuration == "Utf16"
-        ? new MemoryPackSerializerContext(
-            MemoryPackSerializerConfiguration.Utf16)
+        ? new SharpPackSerializerContext(
+            SharpPackSerializerConfiguration.Utf16)
         : null;
     var originalPayload = Convert.FromHexString(entry.PayloadHex);
     var value = invoker.Deserialize(originalPayload, context);
@@ -51,11 +51,11 @@ abstract class PayloadInvoker
 {
     internal abstract object? Deserialize(
         byte[] payload,
-        MemoryPackSerializerContext? context);
+        SharpPackSerializerContext? context);
 
     internal abstract byte[] Serialize(
         object? value,
-        MemoryPackSerializerContext? context);
+        SharpPackSerializerContext? context);
 
     internal static PayloadInvoker Create(Type type)
         => (PayloadInvoker)Activator.CreateInstance(
@@ -66,19 +66,19 @@ sealed class PayloadInvoker<T> : PayloadInvoker
 {
     internal override object? Deserialize(
         byte[] payload,
-        MemoryPackSerializerContext? context)
+        SharpPackSerializerContext? context)
         => context is null
-            ? MemoryPackSerializer.Deserialize<T>(payload)
-            : MemoryPackSerializer.Deserialize<T>(payload, context);
+            ? SharpPackSerializer.Deserialize<T>(payload)
+            : SharpPackSerializer.Deserialize<T>(payload, context);
 
     internal override byte[] Serialize(
         object? value,
-        MemoryPackSerializerContext? context)
+        SharpPackSerializerContext? context)
     {
         var typedValue = (T?)value;
         return context is null
-            ? MemoryPackSerializer.Serialize(typedValue)
-            : MemoryPackSerializer.Serialize(typedValue, context);
+            ? SharpPackSerializer.Serialize(typedValue)
+            : SharpPackSerializer.Serialize(typedValue, context);
     }
 }
 

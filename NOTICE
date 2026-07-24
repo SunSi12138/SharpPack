@@ -1,0 +1,11 @@
+SharpPack
+=========
+
+SharpPack is an independently maintained internal fork derived from MemoryPack,
+originally developed by Cysharp, Inc.
+
+The original MemoryPack source and this derivative are licensed under the MIT
+License. The original Cysharp copyright notice is retained in LICENSE.
+
+SharpPack preserves the MemoryPack binary wire format as a compatibility
+contract while exposing a renamed SharpPack API and package identity.

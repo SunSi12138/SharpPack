@@ -1,7 +1,7 @@
 ﻿using Benchmark.BenchmarkNetUtilities;
 using Benchmark.Models;
 using BenchmarkDotNet.Configs;
-using MemoryPack;
+using SharpPack;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -40,33 +40,33 @@ public class VersionTolerant
             LastName = "ふがふが"
         };
 
-        serializedNormal = MemoryPackSerializer.Serialize(value1);
-        serializedVT = MemoryPackSerializer.Serialize(value2);
+        serializedNormal = SharpPackSerializer.Serialize(value1);
+        serializedVT = SharpPackSerializer.Serialize(value2);
     }
 
     [Benchmark, BenchmarkCategory(Categories.Serialize)]
     public byte[] DefaultSerialzie()
     {
-        return MemoryPackSerializer.Serialize(value1);
+        return SharpPackSerializer.Serialize(value1);
     }
 
     [Benchmark, BenchmarkCategory(Categories.Serialize)]
     public byte[] VersionTolerantSerialize()
     {
-        return MemoryPackSerializer.Serialize(value2);
+        return SharpPackSerializer.Serialize(value2);
     }
 
 
     [Benchmark, BenchmarkCategory(Categories.Serialize)]
     public MyClass? DefaultDeserialize()
     {
-        return MemoryPackSerializer.Deserialize<MyClass>(serializedNormal);
+        return SharpPackSerializer.Deserialize<MyClass>(serializedNormal);
     }
 
     [Benchmark, BenchmarkCategory(Categories.Serialize)]
     public VersionTolerantMyClass? VersionTolerantDeserialzie()
     {
-        return MemoryPackSerializer.Deserialize<VersionTolerantMyClass>(serializedVT);
+        return SharpPackSerializer.Deserialize<VersionTolerantMyClass>(serializedVT);
     }
 }
 

@@ -1,5 +1,5 @@
 using System.Buffers;
-using MemoryPack;
+using SharpPack;
 
 namespace Benchmark.Benchmarks;
 
@@ -9,13 +9,13 @@ public class FormatterHotPathBenchmark
     readonly FormatterBenchmarkDto value = new()
     {
         Id = 42,
-        Name = "MemoryPack",
+        Name = "SharpPack",
     };
-    readonly MemoryPackSerializerContext emptyContext = new();
-    readonly MemoryPackSerializerContext configuredContext =
-        new(MemoryPackSerializerConfiguration.Utf8);
-    readonly MemoryPackSerializerContext customContext =
-        new MemoryPackSerializerContextBuilder()
+    readonly SharpPackSerializerContext emptyContext = new();
+    readonly SharpPackSerializerContext configuredContext =
+        new(SharpPackSerializerConfiguration.Utf8);
+    readonly SharpPackSerializerContext customContext =
+        new SharpPackSerializerContextBuilder()
             .Register(new PassthroughIntFormatter())
             .Build();
     ArrayBufferWriter<byte> bufferWriter = new(1024);
@@ -24,54 +24,54 @@ public class FormatterHotPathBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        _ = MemoryPackSerializer.Serialize(value);
-        _ = MemoryPackSerializer.Serialize(value, emptyContext);
-        _ = MemoryPackSerializer.Serialize(value, configuredContext);
-        _ = MemoryPackSerializer.Serialize(value, customContext);
+        _ = SharpPackSerializer.Serialize(value);
+        _ = SharpPackSerializer.Serialize(value, emptyContext);
+        _ = SharpPackSerializer.Serialize(value, configuredContext);
+        _ = SharpPackSerializer.Serialize(value, customContext);
     }
 
     [Benchmark(Baseline = true)]
     public byte[] Default()
-        => MemoryPackSerializer.Serialize(value);
+        => SharpPackSerializer.Serialize(value);
 
     [Benchmark]
     public byte[] EmptyContext()
-        => MemoryPackSerializer.Serialize(value, emptyContext);
+        => SharpPackSerializer.Serialize(value, emptyContext);
 
     [Benchmark]
     public byte[] ConfiguredContext()
-        => MemoryPackSerializer.Serialize(value, configuredContext);
+        => SharpPackSerializer.Serialize(value, configuredContext);
 
     [Benchmark]
     public byte[] CustomContext()
-        => MemoryPackSerializer.Serialize(value, customContext);
+        => SharpPackSerializer.Serialize(value, customContext);
 
     [Benchmark]
     public int BufferWriter()
     {
         bufferWriter.Clear();
-        return MemoryPackSerializer.Serialize(ref bufferWriter, value);
+        return SharpPackSerializer.Serialize(ref bufferWriter, value);
     }
 
     [Benchmark]
     public int SpanDestination()
     {
-        MemoryPackSerializer.TrySerialize(
+        SharpPackSerializer.TrySerialize(
             spanBuffer,
             value,
             out var written);
         return written;
     }
 
-    sealed class PassthroughIntFormatter : MemoryPackFormatter<int>
+    sealed class PassthroughIntFormatter : SharpPackFormatter<int>
     {
         public override void Serialize<TBufferWriter>(
-            ref MemoryPackWriter<TBufferWriter> writer,
+            ref SharpPackWriter<TBufferWriter> writer,
             scoped ref int value)
             => writer.WriteUnmanaged(value);
 
         public override void Deserialize(
-            ref MemoryPackReader reader,
+            ref SharpPackReader reader,
             scoped ref int value)
             => reader.ReadUnmanaged(out value);
     }

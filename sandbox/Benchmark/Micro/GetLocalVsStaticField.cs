@@ -1,4 +1,4 @@
-﻿using MemoryPack;
+﻿using SharpPack;
 using MessagePack.Formatters;
 using Microsoft.Diagnostics.Tracing.Parsers.ClrPrivate;
 using Orleans.Serialization.Buffers;
@@ -24,8 +24,8 @@ public class GetLocalVsStaticField
     [Benchmark(Baseline = true)]
     public void GetFromWriter()
     {
-        using var state = MemoryPackWriterOptionalStatePool.Rent();
-        var writer = new MemoryPackWriter<ArrayBufferWriter<byte>>(ref bufferWriter, state);
+        using var state = SharpPackWriterOptionalStatePool.Rent();
+        var writer = new SharpPackWriter<ArrayBufferWriter<byte>>(ref bufferWriter, state);
         for (int i = 0; i < 100; i++)
         {
             writer.GetFormatter<int>().Serialize(ref writer, ref i);
@@ -36,8 +36,8 @@ public class GetLocalVsStaticField
     [Benchmark]
     public void GetFromLocal()
     {
-        using var state = MemoryPackWriterOptionalStatePool.Rent();
-        var writer = new MemoryPackWriter<ArrayBufferWriter<byte>>(ref bufferWriter, state);
+        using var state = SharpPackWriterOptionalStatePool.Rent();
+        var writer = new SharpPackWriter<ArrayBufferWriter<byte>>(ref bufferWriter, state);
         var formatter = writer.GetFormatter<int>();
         for (int i = 0; i < 100; i++)
         {

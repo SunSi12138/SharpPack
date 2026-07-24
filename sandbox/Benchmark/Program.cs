@@ -11,9 +11,9 @@ using BinaryPack.Models;
 using BinaryPack.Models.Helpers;
 using BinaryPack.Models.Interfaces;
 using Iced.Intel;
-using MemoryPack;
-using MemoryPack.Compression;
-using MemoryPack.Formatters;
+using SharpPack;
+using SharpPack.Compression;
+using SharpPack.Formatters;
 using System.Reflection;
 
 #if !DEBUG
@@ -89,13 +89,13 @@ BenchmarkSwitcher.FromAssembly(Assembly.GetEntryAssembly()!).Run(args, config);
 #if DEBUG
 
 //MessagePack.MessagePackSerializerOptions
-//MemoryPack.MemoryPackSerializerConfiguration
+//SharpPack.SharpPackSerializerConfiguration
 //System.Text.Json.JsonSerializerOptions
 
 //new JilBenchmark<Question>().OrleansDeserializeStream();
 var jil = new JilBenchmark<Question>();
-var bin = jil.MemoryPackSerializeUtf16();
-var q2 = MemoryPackSerializer.Deserialize<Question>(bin);
+var bin = jil.SharpPackSerializeUtf16();
+var q2 = SharpPackSerializer.Deserialize<Question>(bin);
 
 
 new Hyper().Serialize();
@@ -112,7 +112,7 @@ var model = new JsonResponseModel(true);
 var model2 = Enumerable.Repeat(new Vector3 { X = 10.3f, Y = 40.5f, Z = 13411.3f }, 1000).ToArray();
 
 var compressor = new BrotliCompressor();
-MemoryPackSerializer.Serialize(ref compressor, model2);
+SharpPackSerializer.Serialize(ref compressor, model2);
 var foo = compressor.ToArray();
 compressor.Dispose();
 
@@ -128,13 +128,13 @@ void Check<T>()
 {
     var model = new T();
     model.Initialize();
-    var bin = MemoryPackSerializer.Serialize(model);
-    var model2 = MemoryPackSerializer.Deserialize<T>(bin);
+    var bin = SharpPackSerializer.Serialize(model);
+    var model2 = SharpPackSerializer.Deserialize<T>(bin);
     var ok = model.Equals(model2);
     Console.WriteLine(typeof(T) + " is " + (ok ? "ok" : "ng"));
 }
 
-[MemoryPackable]
+[SharpPackable]
 public partial class Test
 {
     public float[] F = default!;

@@ -1,4 +1,4 @@
-﻿using MemoryPack;
+﻿using SharpPack;
 using MessagePack;
 using Orleans;
 using ProtoBuf;
@@ -17,7 +17,7 @@ namespace Benchmark.Models;
 /// </summary>
 [MessagePackObject]
 [ProtoContract]
-[MemoryPackable]
+[SharpPackable]
 public partial class MyClass
 {
     [Key(0)]
@@ -43,17 +43,17 @@ public partial class MyClass
 }
 
 
-[MemoryPackable(GenerateType.VersionTolerant)]
+[SharpPackable(GenerateType.VersionTolerant)]
 public partial class VersionTolerantMyClass
 {
-    [MemoryPackOrder(0)]
+    [SharpPackOrder(0)]
     public int X { get; set; }
-    [MemoryPackOrder(1)]
+    [SharpPackOrder(1)]
     public int Y { get; set; }
-    [MemoryPackOrder(2)]
+    [SharpPackOrder(2)]
     public int Z { get; set; }
-    [MemoryPackOrder(3)]
+    [SharpPackOrder(3)]
     public string? FirstName { get; set; }
-    [MemoryPackOrder(4)]
+    [SharpPackOrder(4)]
     public string? LastName { get; set; }
 }

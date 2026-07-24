@@ -1,4 +1,4 @@
-using MemoryPack;
+using SharpPack;
 
 namespace Benchmark.Benchmarks;
 
@@ -31,28 +31,28 @@ public class CircularReferenceOptimizationBenchmark
             };
         }
 
-        payload = MemoryPackSerializer.Serialize(value);
+        payload = SharpPackSerializer.Serialize(value);
     }
 
     [Benchmark]
     public byte[] Serialize()
-        => MemoryPackSerializer.Serialize(value);
+        => SharpPackSerializer.Serialize(value);
 
     [Benchmark]
     public CircularReferenceBenchmarkNode[]? Deserialize()
-        => MemoryPackSerializer.Deserialize<
+        => SharpPackSerializer.Deserialize<
             CircularReferenceBenchmarkNode[]>(payload);
 }
 
-[MemoryPackable(GenerateType.CircularReference)]
+[SharpPackable(GenerateType.CircularReference)]
 public partial class CircularReferenceBenchmarkNode
 {
-    [MemoryPackOrder(0)]
+    [SharpPackOrder(0)]
     public int Id { get; set; }
 
-    [MemoryPackOrder(1)]
+    [SharpPackOrder(1)]
     public string? Name { get; set; }
 
-    [MemoryPackOrder(2)]
+    [SharpPackOrder(2)]
     public CircularReferenceBenchmarkNode? Shared { get; set; }
 }

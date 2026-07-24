@@ -1,45 +1,45 @@
-using MemoryPack;
+using SharpPack;
 
-var value = new AotMemoryPackModel
+var value = new AotSharpPackModel
 {
     Id = 42,
     Name = "NativeAOT 明示",
     Encoded = 99,
     Values = [1, 2, 3, 5, 8],
-    RuntimeType = typeof(AotMemoryPackModel),
+    RuntimeType = typeof(AotSharpPackModel),
     Item = new AotUnionItem { Value = 123 },
 };
 
-var defaultPayload = MemoryPackSerializer.Serialize(value);
+var defaultPayload = SharpPackSerializer.Serialize(value);
 AssertModel(
-    MemoryPackSerializer.Deserialize<AotMemoryPackModel>(defaultPayload),
+    SharpPackSerializer.Deserialize<AotSharpPackModel>(defaultPayload),
     value);
 
-var context = new MemoryPackSerializerContext();
-var contextPayload = MemoryPackSerializer.Serialize(value, context);
+var context = new SharpPackSerializerContext();
+var contextPayload = SharpPackSerializer.Serialize(value, context);
 if (!defaultPayload.AsSpan().SequenceEqual(contextPayload))
 {
     throw new InvalidOperationException(
-        "The empty Context changed the MemoryPack wire format.");
+        "The empty Context changed the SharpPack wire format.");
 }
 AssertModel(
-    MemoryPackSerializer.Deserialize<AotMemoryPackModel>(
+    SharpPackSerializer.Deserialize<AotSharpPackModel>(
         contextPayload,
         context),
     value);
 
-var utf8Context = new MemoryPackSerializerContext(
-    MemoryPackSerializerConfiguration.Utf8);
-var utf8Payload = MemoryPackSerializer.Serialize(value, utf8Context);
+var utf8Context = new SharpPackSerializerContext(
+    SharpPackSerializerConfiguration.Utf8);
+var utf8Payload = SharpPackSerializer.Serialize(value, utf8Context);
 AssertModel(
-    MemoryPackSerializer.Deserialize<AotMemoryPackModel>(
+    SharpPackSerializer.Deserialize<AotSharpPackModel>(
         utf8Payload,
         utf8Context),
     value);
 
 IAotExternalUnion external = new AotExternalUnionItem { Value = 456 };
-var externalPayload = MemoryPackSerializer.Serialize(external);
-if (MemoryPackSerializer.Deserialize<IAotExternalUnion>(externalPayload)
+var externalPayload = SharpPackSerializer.Serialize(external);
+if (SharpPackSerializer.Deserialize<IAotExternalUnion>(externalPayload)
         is not AotExternalUnionItem { Value: 456 })
 {
     throw new InvalidOperationException(
@@ -48,8 +48,8 @@ if (MemoryPackSerializer.Deserialize<IAotExternalUnion>(externalPayload)
 
 IAotClosedExternalUnion<string> closedExternal =
     new AotClosedExternalUnionItem<string> { Value = "closed-aot" };
-var closedExternalPayload = MemoryPackSerializer.Serialize(closedExternal);
-if (MemoryPackSerializer.Deserialize<IAotClosedExternalUnion<string>>(
+var closedExternalPayload = SharpPackSerializer.Serialize(closedExternal);
+if (SharpPackSerializer.Deserialize<IAotClosedExternalUnion<string>>(
         closedExternalPayload) is not
     AotClosedExternalUnionItem<string> { Value: "closed-aot" })
 {
@@ -57,11 +57,11 @@ if (MemoryPackSerializer.Deserialize<IAotClosedExternalUnion<string>>(
         "The generated closed external-union factory failed under NativeAOT.");
 }
 
-Console.WriteLine("MemoryPack NativeAOT verification passed.");
+Console.WriteLine("SharpPack NativeAOT verification passed.");
 
 static void AssertModel(
-    AotMemoryPackModel? actual,
-    AotMemoryPackModel expected)
+    AotSharpPackModel? actual,
+    AotSharpPackModel expected)
 {
     if (actual is null ||
         actual.Id != expected.Id ||
@@ -74,12 +74,12 @@ static void AssertModel(
         union.Value != ((AotUnionItem)expected.Item!).Value)
     {
         throw new InvalidOperationException(
-            "MemoryPack NativeAOT round-trip failed.");
+            "SharpPack NativeAOT round-trip failed.");
     }
 }
 
-[MemoryPackable]
-public partial class AotMemoryPackModel
+[SharpPackable]
+public partial class AotSharpPackModel
 {
     public int Id { get; set; }
 
@@ -92,30 +92,30 @@ public partial class AotMemoryPackModel
 
     public Type? RuntimeType { get; set; }
 
-    public AotMemoryPackModel? OptionalNext { get; set; }
+    public AotSharpPackModel? OptionalNext { get; set; }
 
     public IAotUnion? Item { get; set; }
 }
 
-[MemoryPackable]
-[MemoryPackUnion(7, typeof(AotUnionItem))]
+[SharpPackable]
+[SharpPackUnion(7, typeof(AotUnionItem))]
 public partial interface IAotUnion;
 
-[MemoryPackable]
+[SharpPackable]
 public partial class AotUnionItem : IAotUnion
 {
     public int Value { get; set; }
 }
 
-public sealed class AotPlusOneFormatter : MemoryPackFormatter<int>
+public sealed class AotPlusOneFormatter : SharpPackFormatter<int>
 {
     public override void Serialize<TBufferWriter>(
-        ref MemoryPackWriter<TBufferWriter> writer,
+        ref SharpPackWriter<TBufferWriter> writer,
         scoped ref int value)
         => writer.WriteUnmanaged(value + 1);
 
     public override void Deserialize(
-        ref MemoryPackReader reader,
+        ref SharpPackReader reader,
         scoped ref int value)
     {
         reader.ReadUnmanaged(out int encoded);
@@ -124,34 +124,34 @@ public sealed class AotPlusOneFormatter : MemoryPackFormatter<int>
 }
 
 public sealed class AotPlusOneFormatterAttribute
-    : MemoryPackCustomFormatterAttribute<AotPlusOneFormatter, int>
+    : SharpPackCustomFormatterAttribute<AotPlusOneFormatter, int>
 {
     public override AotPlusOneFormatter GetFormatter() => new();
 }
 
-[MemoryPackable(GenerateType.NoGenerate)]
+[SharpPackable(GenerateType.NoGenerate)]
 public partial interface IAotExternalUnion;
 
-[MemoryPackable]
+[SharpPackable]
 public partial class AotExternalUnionItem : IAotExternalUnion
 {
     public int Value { get; set; }
 }
 
-[MemoryPackUnionFormatter(typeof(IAotExternalUnion))]
-[MemoryPackUnion(3, typeof(AotExternalUnionItem))]
+[SharpPackUnionFormatter(typeof(IAotExternalUnion))]
+[SharpPackUnion(3, typeof(AotExternalUnionItem))]
 public partial class AotExternalUnionFormatter;
 
-[MemoryPackable(GenerateType.NoGenerate)]
+[SharpPackable(GenerateType.NoGenerate)]
 public partial interface IAotClosedExternalUnion<T>;
 
-[MemoryPackable]
+[SharpPackable]
 public partial class AotClosedExternalUnionItem<T>
     : IAotClosedExternalUnion<T>
 {
     public T? Value { get; set; }
 }
 
-[MemoryPackUnionFormatter(typeof(IAotClosedExternalUnion<string>))]
-[MemoryPackUnion(4, typeof(AotClosedExternalUnionItem<string>))]
+[SharpPackUnionFormatter(typeof(IAotClosedExternalUnion<string>))]
+[SharpPackUnion(4, typeof(AotClosedExternalUnionItem<string>))]
 public partial class AotClosedExternalUnionFormatter;

@@ -1,5 +1,5 @@
 ﻿using Benchmark.Models;
-using MemoryPack;
+using SharpPack;
 using MessagePack;
 using System.Buffers;
 using System.Runtime.CompilerServices;
@@ -63,7 +63,7 @@ public class RawSerialize
     }
 
     [Benchmark]
-    public byte[] HandMemoryPackWriterEmpty()
+    public byte[] HandSharpPackWriterEmpty()
     {
         var bufWriter = staticWriter;
         if (bufWriter == null)
@@ -71,8 +71,8 @@ public class RawSerialize
             bufWriter = staticWriter = new ReusableLinkedArrayBufferWriter(true, true);
         }
 
-        var state = MemoryPackWriterOptionalStatePool.Rent(null);
-        var writer = new MemoryPackWriter<ReusableLinkedArrayBufferWriter>(ref bufWriter, bufWriter.DangerousGetFirstBuffer(), state);
+        var state = SharpPackWriterOptionalStatePool.Rent(null);
+        var writer = new SharpPackWriter<ReusableLinkedArrayBufferWriter>(ref bufWriter, bufWriter.DangerousGetFirstBuffer(), state);
         try
         {
             if (value == null)
@@ -100,7 +100,7 @@ public class RawSerialize
     }
 
     [Benchmark]
-    public byte[] HandMemoryPackWriterHeaderOnly()
+    public byte[] HandSharpPackWriterHeaderOnly()
     {
         var bufWriter = staticWriter;
         if (bufWriter == null)
@@ -108,8 +108,8 @@ public class RawSerialize
             bufWriter = staticWriter = new ReusableLinkedArrayBufferWriter(true, true);
         }
 
-        var state = MemoryPackWriterOptionalStatePool.Rent(null);
-        var writer = new MemoryPackWriter<ReusableLinkedArrayBufferWriter>(ref bufWriter, bufWriter.DangerousGetFirstBuffer(), state);
+        var state = SharpPackWriterOptionalStatePool.Rent(null);
+        var writer = new SharpPackWriter<ReusableLinkedArrayBufferWriter>(ref bufWriter, bufWriter.DangerousGetFirstBuffer(), state);
         try
         {
             if (value == null)
@@ -136,7 +136,7 @@ public class RawSerialize
     }
 
     [Benchmark]
-    public byte[] HandMemoryPackWriterHeaderInt3()
+    public byte[] HandSharpPackWriterHeaderInt3()
     {
         var bufWriter = staticWriter;
         if (bufWriter == null)
@@ -144,8 +144,8 @@ public class RawSerialize
             bufWriter = staticWriter = new ReusableLinkedArrayBufferWriter(true, true);
         }
 
-        var state = MemoryPackWriterOptionalStatePool.Rent(null);
-        var writer = new MemoryPackWriter<ReusableLinkedArrayBufferWriter>(ref bufWriter, bufWriter.DangerousGetFirstBuffer(), state);
+        var state = SharpPackWriterOptionalStatePool.Rent(null);
+        var writer = new SharpPackWriter<ReusableLinkedArrayBufferWriter>(ref bufWriter, bufWriter.DangerousGetFirstBuffer(), state);
         try
         {
             if (value == null)
@@ -172,7 +172,7 @@ public class RawSerialize
     }
 
     [Benchmark]
-    public byte[] HandMemoryPackWriterHeaderInt3String1()
+    public byte[] HandSharpPackWriterHeaderInt3String1()
     {
         var bufWriter = staticWriter;
         if (bufWriter == null)
@@ -180,8 +180,8 @@ public class RawSerialize
             bufWriter = staticWriter = new ReusableLinkedArrayBufferWriter(true, true);
         }
 
-        var state = MemoryPackWriterOptionalStatePool.Rent(null);
-        var writer = new MemoryPackWriter<ReusableLinkedArrayBufferWriter>(ref bufWriter, bufWriter.DangerousGetFirstBuffer(), state);
+        var state = SharpPackWriterOptionalStatePool.Rent(null);
+        var writer = new SharpPackWriter<ReusableLinkedArrayBufferWriter>(ref bufWriter, bufWriter.DangerousGetFirstBuffer(), state);
         try
         {
             if (value == null)
@@ -208,7 +208,7 @@ public class RawSerialize
     }
 
     [Benchmark]
-    public byte[] HandMemoryPackFull()
+    public byte[] HandSharpPackFull()
     {
         var bufWriter = staticWriter;
         if (bufWriter == null)
@@ -216,8 +216,8 @@ public class RawSerialize
             bufWriter = staticWriter = new ReusableLinkedArrayBufferWriter(true, true);
         }
 
-        var state = MemoryPackWriterOptionalStatePool.Rent(null);
-        var writer = new MemoryPackWriter<ReusableLinkedArrayBufferWriter>(ref bufWriter, bufWriter.DangerousGetFirstBuffer(), state);
+        var state = SharpPackWriterOptionalStatePool.Rent(null);
+        var writer = new SharpPackWriter<ReusableLinkedArrayBufferWriter>(ref bufWriter, bufWriter.DangerousGetFirstBuffer(), state);
         try
         {
             if (value == null)
@@ -244,9 +244,9 @@ public class RawSerialize
     }
 
     [Benchmark]
-    public byte[] MemoryPackSerialize()
+    public byte[] SharpPackSerialize()
     {
-        return MemoryPackSerializer.Serialize(value);
+        return SharpPackSerializer.Serialize(value);
     }
 }
 
@@ -285,7 +285,7 @@ internal sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
 
     public Memory<byte> GetMemory(int sizeHint = 0)
     {
-        // MemoryPack don't use GetMemory.
+        // SharpPack don't use GetMemory.
         throw new NotSupportedException();
     }
 
@@ -374,7 +374,7 @@ internal sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
         return result;
     }
 
-    public void WriteToAndReset<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer)
+    public void WriteToAndReset<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer)
         where TBufferWriter : IBufferWriter<byte>
     {
         if (totalWritten == 0) return;

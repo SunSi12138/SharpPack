@@ -40,9 +40,9 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\MemoryPack.Core\MemoryPack.Core.csproj" />
-        <ProjectReference Include="..\..\src\MemoryPack.Streaming\MemoryPack.Streaming.csproj" />
-        <ProjectReference Include="..\..\src\MemoryPack.Generator\MemoryPack.Generator.csproj">
+        <ProjectReference Include="..\..\src\SharpPack.Core\SharpPack.Core.csproj" />
+        <ProjectReference Include="..\..\src\SharpPack.Streaming\SharpPack.Streaming.csproj" />
+        <ProjectReference Include="..\..\src\SharpPack.Generator\SharpPack.Generator.csproj">
             <OutputItemType>Analyzer</OutputItemType>
             <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         </ProjectReference>

@@ -14,10 +14,10 @@ namespace SandboxConsoleApp;
 // For a struct, or a class with multiple constructors, specify the one to use by applying the[JsonConstructor] attribute.
 // When the attribute is not used, a public parameterless constructor is always used if present.
 
-// MemoryPack choose class/struct as same rule.
+// SharpPack choose class/struct as same rule.
 // If has no explicit constrtucotr, use parameterless one.
 // If has a one parameterless/parameterized constructor, choose it.
-// If has multiple construcotrs, should apply [MemoryPackConstructor] attribute(no automatically choose one), otherwise generator error it.
+// If has multiple construcotrs, should apply [SharpPackConstructor] attribute(no automatically choose one), otherwise generator error it.
 
 // The parameter names of a parameterized constructor must match the property names.
 // Matching is case-insensitive, and the constructor parameter must match the actual property name.

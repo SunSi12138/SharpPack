@@ -4,7 +4,7 @@ using Benchmark.BenchmarkNetUtilities;
 using Benchmark.Models;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Order;
-using MemoryPack;
+using SharpPack;
 using MessagePack;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
@@ -99,14 +99,14 @@ public class JilBenchmark<T>
     SerializerSession session;
     Serializer<T> orleansSerializer;
     byte[] payloadMessagePack;
-    byte[] payloadMemoryPack;
-    byte[] payloadMemoryPackUtf16;
+    byte[] payloadSharpPack;
+    byte[] payloadSharpPackUtf16;
     byte[] payloadProtobuf;
     byte[] payloadJson;
     byte[] payloadOrleans;
     Stream payloadStreamMessagePack;
-    Stream payloadStreamMemoryPack;
-    Stream payloadStreamMemoryPackUtf16;
+    Stream payloadStreamSharpPack;
+    Stream payloadStreamSharpPackUtf16;
     Stream payloadStreamProtobuf;
     Stream payloadStreamJson;
     Stream payloadStreamOrleans;
@@ -146,15 +146,15 @@ public class JilBenchmark<T>
         payloadProtobuf = stream.ToArray();
         stream.Position = 0;
         payloadJson = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(value));
-        payloadMemoryPack = MemoryPackSerializer.Serialize(value);
-        payloadMemoryPackUtf16 = MemoryPackSerializer.Serialize(value, BenchmarkContexts.Utf16);
+        payloadSharpPack = SharpPackSerializer.Serialize(value);
+        payloadSharpPackUtf16 = SharpPackSerializer.Serialize(value, BenchmarkContexts.Utf16);
 
         writer = new ArrayBufferWriter<byte>(payloadJson.Length);
         jsonWriter = new Utf8JsonWriter(writer);
 
         payloadStreamMessagePack = new MemoryStream(payloadMessagePack, 0, payloadMessagePack.Length, writable: false, publiclyVisible: false);
-        payloadStreamMemoryPack = new MemoryStream(payloadMemoryPack, 0, payloadMemoryPack.Length, writable: false, publiclyVisible: false);
-        payloadStreamMemoryPackUtf16 = new MemoryStream(payloadMemoryPackUtf16, 0, payloadMemoryPackUtf16.Length, writable: false, publiclyVisible: false);
+        payloadStreamSharpPack = new MemoryStream(payloadSharpPack, 0, payloadSharpPack.Length, writable: false, publiclyVisible: false);
+        payloadStreamSharpPackUtf16 = new MemoryStream(payloadSharpPackUtf16, 0, payloadSharpPackUtf16.Length, writable: false, publiclyVisible: false);
         payloadStreamProtobuf = new MemoryStream(payloadProtobuf, 0, payloadProtobuf.Length, writable: false, publiclyVisible: false);
         payloadStreamJson = new MemoryStream(payloadJson, 0, payloadJson.Length, writable: false, publiclyVisible: false);
         payloadStreamOrleans = new MemoryStream(payloadOrleans, 0, payloadOrleans.Length, writable: false, publiclyVisible: false);
@@ -167,15 +167,15 @@ public class JilBenchmark<T>
     }
 
     [Benchmark, BenchmarkCategory(Categories.Serialize, Categories.Bytes)]
-    public byte[] MemoryPackSerialize()
+    public byte[] SharpPackSerialize()
     {
-        return MemoryPackSerializer.Serialize(value, BenchmarkContexts.Utf8);
+        return SharpPackSerializer.Serialize(value, BenchmarkContexts.Utf8);
     }
 
     [Benchmark, BenchmarkCategory(Categories.Serialize, Categories.Bytes)]
-    public byte[] MemoryPackSerializeUtf16()
+    public byte[] SharpPackSerializeUtf16()
     {
-        return MemoryPackSerializer.Serialize(value, BenchmarkContexts.Utf16);
+        return SharpPackSerializer.Serialize(value, BenchmarkContexts.Utf16);
     }
 
     [Benchmark, BenchmarkCategory(Categories.Serialize, Categories.Bytes)]
@@ -210,16 +210,16 @@ public class JilBenchmark<T>
     }
 
     [Benchmark, BenchmarkCategory(Categories.Serialize, Categories.BufferWriter)]
-    public void MemoryPackBufferWriter()
+    public void SharpPackBufferWriter()
     {
-        MemoryPackSerializer.Serialize(ref writer, value);
+        SharpPackSerializer.Serialize(ref writer, value);
         writer.Clear();
     }
 
     [Benchmark, BenchmarkCategory(Categories.Serialize, Categories.BufferWriter)]
-    public void MemoryPackBufferWriterUtf16()
+    public void SharpPackBufferWriterUtf16()
     {
-        MemoryPackSerializer.Serialize(ref writer, value, BenchmarkContexts.Utf16);
+        SharpPackSerializer.Serialize(ref writer, value, BenchmarkContexts.Utf16);
         writer.Clear();
     }
 
@@ -279,16 +279,16 @@ public class JilBenchmark<T>
     }
 
     [Benchmark, BenchmarkCategory(Categories.Serialize, Categories.Stream)]
-    public void MemoryPackStream()
+    public void SharpPackStream()
     {
-        MemoryPackSerializer.SerializeAsync(stream, value, BenchmarkContexts.Utf8).GetAwaiter().GetResult();
+        SharpPackSerializer.SerializeAsync(stream, value, BenchmarkContexts.Utf8).GetAwaiter().GetResult();
         stream.Position = 0;
     }
 
     [Benchmark, BenchmarkCategory(Categories.Serialize, Categories.Stream)]
-    public void MemoryPackStreamUtf16()
+    public void SharpPackStreamUtf16()
     {
-        MemoryPackSerializer.SerializeAsync(stream, value, BenchmarkContexts.Utf16).GetAwaiter().GetResult();
+        SharpPackSerializer.SerializeAsync(stream, value, BenchmarkContexts.Utf16).GetAwaiter().GetResult();
         stream.Position = 0;
     }
 
@@ -331,15 +331,15 @@ public class JilBenchmark<T>
     }
 
     [Benchmark, BenchmarkCategory(Categories.Deserialize, Categories.Bytes)]
-    public T MemoryPackDeserialize()
+    public T SharpPackDeserialize()
     {
-        return MemoryPackSerializer.Deserialize<T>(payloadMemoryPack);
+        return SharpPackSerializer.Deserialize<T>(payloadSharpPack);
     }
 
     [Benchmark, BenchmarkCategory(Categories.Deserialize, Categories.Bytes)]
-    public T MemoryPackDeserializeUtf16()
+    public T SharpPackDeserializeUtf16()
     {
-        return MemoryPackSerializer.Deserialize<T>(payloadMemoryPackUtf16);
+        return SharpPackSerializer.Deserialize<T>(payloadSharpPackUtf16);
     }
 
     [Benchmark, BenchmarkCategory(Categories.Deserialize, Categories.Bytes)]
@@ -376,17 +376,17 @@ public class JilBenchmark<T>
     }
 
     [Benchmark, BenchmarkCategory(Categories.Deserialize, Categories.Stream)]
-    public T MemoryPackDeserializeStream()
+    public T SharpPackDeserializeStream()
     {
-        payloadStreamMemoryPack.Position = 0;
-        return MemoryPackSerializer.DeserializeAsync<T>(payloadStreamMemoryPack).GetAwaiter().GetResult();
+        payloadStreamSharpPack.Position = 0;
+        return SharpPackSerializer.DeserializeAsync<T>(payloadStreamSharpPack).GetAwaiter().GetResult();
     }
 
     [Benchmark, BenchmarkCategory(Categories.Deserialize, Categories.Stream)]
-    public T MemoryPackDeserializeStreamUtf16()
+    public T SharpPackDeserializeStreamUtf16()
     {
-        payloadStreamMemoryPackUtf16.Position = 0;
-        return MemoryPackSerializer.DeserializeAsync<T>(payloadStreamMemoryPackUtf16).GetAwaiter().GetResult();
+        payloadStreamSharpPackUtf16.Position = 0;
+        return SharpPackSerializer.DeserializeAsync<T>(payloadStreamSharpPackUtf16).GetAwaiter().GetResult();
     }
 
     [Benchmark, BenchmarkCategory(Categories.Deserialize, Categories.Stream)]

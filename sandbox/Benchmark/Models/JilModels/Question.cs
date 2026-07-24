@@ -7,12 +7,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using MemoryPack;
+using SharpPack;
 
 namespace Benchmark.Models
 {
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public partial class OriginalQuestion : IGenericEquality<OriginalQuestion>
     {
         [ProtoMember(1)]
@@ -48,7 +48,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public partial class ClosedDetails : IGenericEquality<ClosedDetails>
     {
         
@@ -96,7 +96,7 @@ namespace Benchmark.Models
 
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public partial class Notice : IGenericEquality<Notice>
     {
         [ProtoMember(1)]
@@ -127,7 +127,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public partial class MigrationInfo : IGenericEquality<MigrationInfo>
     {
         [ProtoMember(1)]
@@ -158,7 +158,7 @@ namespace Benchmark.Models
     }
 
     [ProtoContract]
-    [MemoryPackable, MessagePackObject, GenerateSerializer]
+    [SharpPackable, MessagePackObject, GenerateSerializer]
     public partial class Question : IGenericEquality<Question>
     {
 
