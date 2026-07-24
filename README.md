@@ -7,7 +7,7 @@ modern .NET.
 
 ![SharpPack icon](Icon.png)
 
-SharpPack is an independently maintained internal fork of
+SharpPack is an independently maintained fork of
 [Cysharp/MemoryPack](https://github.com/Cysharp/MemoryPack). It retains the
 original MemoryPack binary wire format while using a fully renamed API,
 context-owned formatter graphs, modern .NET 10 runtime targets, and aggressive
@@ -34,9 +34,14 @@ Installation
 ---
 SharpPack 1.x targets .NET 10 and uses C# 14.
 
-Versioned `.nupkg` files are attached to the private repository's GitHub
-Releases. Add the downloaded package directory as an internal NuGet source and
-install `SharpPack`.
+Install the aggregate runtime and source-generator package from NuGet:
+
+```shell
+dotnet add package SharpPack --version 1.0.1
+```
+
+Versioned packages and symbols are also attached to
+[GitHub Releases](https://github.com/SunSi12138/SharpPack/releases).
 
 The runtime packages target `net10.0`. `SharpPack.Generator` targets
 `netstandard2.0` only because Roslyn analyzers are loaded by the compiler host;
@@ -110,7 +115,13 @@ There is no mutable global formatter provider. Release the context together
 with plugin values, assemblies, reflection objects and delegates before
 unloading the plugin `AssemblyLoadContext`.
 
-See [Formatter contexts and collectible AssemblyLoadContext](docs/formatter-context.md) for lifecycle rules, migration details, architecture, and benchmark results.
+See [Formatter contexts and collectible AssemblyLoadContext](docs/formatter-context.md)
+for lifecycle rules, migration details and architecture. A complete executable
+example is available in
+[`sandbox/CollectibleAlcSample`](sandbox/CollectibleAlcSample).
+
+See [SharpPack versus MemoryPack benchmarks](docs/benchmarks.md) for the
+reproducible comparison and current measured results.
 
 Built-in supported types
 ---

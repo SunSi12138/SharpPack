@@ -7,10 +7,11 @@
         <NoWarn>$(NoWarn);CS1591;CA2255</NoWarn>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
-		    <!-- NuGet -->
+        <!-- NuGet -->
         <IsPackable>true</IsPackable>
-        <PackageTags>serializer</PackageTags>
-        <Description>Additional streaming support for SharpPack.</Description>
+        <PackageId>SharpPack.Streaming</PackageId>
+        <PackageTags>serializer;streaming;pipelines;zero-copy;memorypack-compatible</PackageTags>
+        <Description>PipeReader, PipeWriter, and framed streaming support for SharpPack.</Description>
     </PropertyGroup>
 
     <ItemGroup>

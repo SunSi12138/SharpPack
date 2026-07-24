@@ -8,10 +8,11 @@
         <RootNamespace>SharpPack</RootNamespace>
         <NoWarn>$(NoWarn);CS1591;CA2255</NoWarn>
 
-		    <!-- NuGet -->
+        <!-- NuGet -->
         <IsPackable>true</IsPackable>
-        <PackageTags>serializer</PackageTags>
-        <Description>Core libraries(attribute, logics) of SharpPack.</Description>
+        <PackageId>SharpPack.Core</PackageId>
+        <PackageTags>serializer;binary;zero-copy;memorypack-compatible</PackageTags>
+        <Description>SharpPack runtime, serializer APIs, formatter contexts, and built-in formatters.</Description>
     </PropertyGroup>
 
     <ItemGroup>
