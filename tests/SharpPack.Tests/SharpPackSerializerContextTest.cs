@@ -66,6 +66,35 @@ public class SharpPackSerializerContextTest
     }
 
     [Fact]
+    public void ThreadStateClearsContextAfterSuccessAndFormatterFailure()
+    {
+        const string value = "state isolation";
+        var defaultPayload = SharpPackSerializer.Serialize(value);
+        var prefixContext = new SharpPackSerializerContextBuilder()
+            .Register(new PrefixStringFormatter())
+            .Build();
+        var throwingContext = new SharpPackSerializerContextBuilder()
+            .Register(new ThrowingStringFormatter())
+            .Build();
+
+        var contextPayload = SharpPackSerializer.Serialize(value, prefixContext);
+        SharpPackSerializer.Deserialize<string>(contextPayload, prefixContext)
+            .Should().Be(value);
+        SharpPackSerializer.Serialize(value).Should().Equal(defaultPayload);
+        SharpPackSerializer.Deserialize<string>(defaultPayload).Should().Be(value);
+
+        Assert.Throws<InvalidOperationException>(
+            () => SharpPackSerializer.Serialize(value, throwingContext));
+        SharpPackSerializer.Serialize(value).Should().Equal(defaultPayload);
+
+        Assert.Throws<InvalidOperationException>(
+            () => SharpPackSerializer.Deserialize<string>(
+                defaultPayload,
+                throwingContext));
+        SharpPackSerializer.Deserialize<string>(defaultPayload).Should().Be(value);
+    }
+
+    [Fact]
     public void Registrations_AreFrozenAndIsolatedPerContext()
     {
         var first = new SharpPackSerializerContextBuilder()
@@ -810,6 +839,19 @@ public sealed class PrefixStringFormatter : SharpPackFormatter<string>
         }
         value = encoded[Prefix.Length..];
     }
+}
+
+public sealed class ThrowingStringFormatter : SharpPackFormatter<string>
+{
+    public override void Serialize<TBufferWriter>(
+        ref SharpPackWriter<TBufferWriter> writer,
+        scoped ref string? value)
+        => throw new InvalidOperationException("Injected formatter failure.");
+
+    public override void Deserialize(
+        ref SharpPackReader reader,
+        scoped ref string? value)
+        => throw new InvalidOperationException("Injected formatter failure.");
 }
 
 public sealed class StandardTypeOneOffsetFormatter(int offset)

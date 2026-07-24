@@ -61,7 +61,7 @@ public class SharpPackVsMemoryPackBufferWriterBenchmark
 
 public abstract class SharpPackVsMemoryPackBenchmarkBase
 {
-    [Params(16, 1024)]
+    [Params(0, 16, 1024)]
     public int ItemCount { get; set; }
 
     protected MemoryPackComparisonPayload MemoryPackValue { get; private set; }

@@ -276,6 +276,11 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Reset()
     {
+        if (totalWritten == 0 && current.IsNull)
+        {
+            return;
+        }
+
         foreach (ref var item in CollectionsMarshal.AsSpan(buffers))
         {
             item.Clear();

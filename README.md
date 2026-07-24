@@ -37,7 +37,7 @@ SharpPack 1.x targets .NET 10 and uses C# 14.
 Install the aggregate runtime and source-generator package from NuGet:
 
 ```shell
-dotnet add package SharpPack --version 1.0.1
+dotnet add package SharpPack --version 1.0.2
 ```
 
 Versioned packages and symbols are also attached to

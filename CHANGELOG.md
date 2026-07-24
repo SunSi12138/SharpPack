@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.2
+
+- Reduced default-path overhead for small objects while improving large
+  serialization throughput.
+- Moved generated formatter-override handling into isolated cold paths without
+  changing MemoryPack-compatible payloads.
+- Reduced optional-state reset work and optimized contiguous reader/writer
+  advancement.
+- Added regression coverage for context isolation, circular references, pooled
+  buffer ownership, generated callbacks, and helper-name collisions.
+
 ## 1.0.1
 
 - Published SharpPack as a public project and prepared the first NuGet.org

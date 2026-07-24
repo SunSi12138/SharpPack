@@ -7,6 +7,100 @@ namespace SharpPack.Tests.SourceGeneratorTests;
 public class FormatterGenerationTest
 {
     [Fact]
+    public void FormatterOverrideHelpers_AvoidUserMemberNameCollisions()
+    {
+        var source = """
+namespace Generated;
+
+[SharpPackable]
+public partial class Model
+{
+    public int Value { get; set; }
+
+    static void __SharpPackSerializeWithFormatterOverrides()
+    {
+    }
+
+    static int __SharpPackDeserializeWithFormatterOverrides => 0;
+}
+""";
+
+        var (compilation, diagnostics) =
+            CSharpGeneratorRunner.RunGenerator(source);
+
+        diagnostics.Should().BeEmpty();
+        compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error)
+            .Should().BeEmpty();
+
+        var generated = string.Join(
+            Environment.NewLine,
+            compilation.SyntaxTrees
+                .Where(static tree =>
+                    tree.FilePath.EndsWith(
+                        ".g.cs",
+                        StringComparison.Ordinal))
+                .Select(static tree => tree.ToString()));
+
+        generated.Should().Contain(
+            "__SharpPackSerializeWithFormatterOverrides_<TBufferWriter>");
+        generated.Should().Contain(
+            "bool __SharpPackDeserializeWithFormatterOverrides_(");
+    }
+
+    [Fact]
+    public void FormatterOverridePaths_AreEmittedAsColdHelpers()
+    {
+        var source = """
+namespace Generated;
+
+[SharpPackable]
+public partial class Model
+{
+    public int Value { get; set; }
+    public string? Name { get; set; }
+    public int[]? Values { get; set; }
+}
+""";
+
+        var (compilation, diagnostics) =
+            CSharpGeneratorRunner.RunGenerator(source);
+
+        diagnostics.Should().BeEmpty();
+        compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error)
+            .Should().BeEmpty();
+
+        var generated = string.Join(
+            Environment.NewLine,
+            compilation.SyntaxTrees
+                .Where(static tree =>
+                    tree.FilePath.EndsWith(
+                        ".g.cs",
+                        StringComparison.Ordinal))
+                .Select(static tree => tree.ToString()));
+
+        generated.Should().Contain(
+            "MethodImplOptions.NoInlining");
+        generated.Should().Contain(
+            "__SharpPackSerializeWithFormatterOverrides");
+        generated.Should().Contain(
+            "__SharpPackDeserializeWithFormatterOverrides");
+        generated.Should().Contain(
+            "writer.OptionalState.HasFormatterOverrides &&");
+        generated.Should().Contain(
+            "reader.OptionalState.HasFormatterOverrides &&");
+        generated.Should().Contain(
+            "writer.WriteUnmanagedArray(value.@Values);");
+        generated.Should().Contain(
+            "__Values = reader.ReadUnmanagedArray<int>();");
+        generated.Should().Contain(
+            "writer.WriteValue(value.@Values);");
+    }
+
+    [Fact]
     public void CustomFormatterAttributes_AreConstructedWithoutMemberReflection()
     {
         var source = """
