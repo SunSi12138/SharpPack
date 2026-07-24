@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
@@ -6,12 +6,8 @@ using System.Runtime.InteropServices;
 
 namespace MemoryPack.Internal;
 
-#if NET7_0_OR_GREATER
 using static GC;
 using static MemoryMarshal;
-#else
-using static MemoryPack.Internal.MemoryMarshalEx;
-#endif
 
 // internal but used by generator code
 
@@ -19,26 +15,37 @@ public static class ReusableLinkedArrayBufferWriterPool
 {
     static readonly ConcurrentQueue<ReusableLinkedArrayBufferWriter> queue = new ConcurrentQueue<ReusableLinkedArrayBufferWriter>();
 
-    public static ReusableLinkedArrayBufferWriter Rent()
+    public static ReusableLinkedArrayBufferWriter Rent(out long leaseId)
     {
         if (queue.TryDequeue(out var writer))
         {
+            leaseId = writer.ActivateLease();
             return writer;
         }
-        return new ReusableLinkedArrayBufferWriter(useFirstBuffer: false, pinned: false); // does not cache firstBuffer
+        writer = new ReusableLinkedArrayBufferWriter(
+            useFirstBuffer: false,
+            pinned: false);
+        leaseId = writer.ActivateLease();
+        return writer;
     }
 
-    public static void Return(ReusableLinkedArrayBufferWriter writer)
+    public static void Return(
+        ReusableLinkedArrayBufferWriter writer,
+        long leaseId)
     {
+        if (!writer.TryDeactivateLease(leaseId))
+        {
+            throw new InvalidOperationException(
+                "The buffer writer lease was already returned or belongs to another rental.");
+        }
         writer.Reset();
         queue.Enqueue(writer);
     }
 }
 
-// This class has large buffer so should cache [ThreadStatic] or Pool.
 public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
 {
-    const int InitialBufferSize = 262144; // 256K(32768, 65536, 131072, 262144)
+    const int InitialBufferSize = 4096;
     static readonly byte[] noUseFirstBufferSentinel = new byte[0];
 
     List<BufferSegment> buffers; // add freezed buffer.
@@ -50,6 +57,8 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
     int nextBufferSize;
 
     int totalWritten;
+    long leaseGeneration;
+    int leaseState;
 
     public int TotalWritten => totalWritten;
     bool UseFirstBuffer => firstBuffer != noUseFirstBufferSentinel;
@@ -64,6 +73,8 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
         this.current = default;
         this.nextBufferSize = InitialBufferSize;
         this.totalWritten = 0;
+        this.leaseGeneration = 0;
+        this.leaseState = 0;
     }
 
     public byte[] DangerousGetFirstBuffer() => firstBuffer;
@@ -88,7 +99,7 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
         else
         {
             var buffer = current.FreeBuffer;
-            if (buffer.Length > sizeHint)
+            if (buffer.Length >= sizeHint)
             {
                 return buffer;
             }
@@ -108,6 +119,10 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
         if (current.WrittenCount != 0)
         {
             buffers.Add(current);
+        }
+        else if (!current.IsNull)
+        {
+            current.Clear();
         }
         current = next;
         return next.FreeBuffer;
@@ -129,7 +144,11 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
 
     public byte[] ToArrayAndReset()
     {
-        if (totalWritten == 0) return Array.Empty<byte>();
+        if (totalWritten == 0)
+        {
+            Reset();
+            return Array.Empty<byte>();
+        }
 
         var result = AllocateUninitializedArray<byte>(totalWritten);
         var dest = result.AsSpan();
@@ -142,11 +161,7 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
 
         if (buffers.Count > 0)
         {
-#if NET7_0_OR_GREATER
             foreach (ref var item in CollectionsMarshal.AsSpan(buffers))
-#else
-            foreach (var item in buffers)
-#endif
             {
                 item.WrittenBuffer.CopyTo(dest);
                 dest = dest.Slice(item.WrittenCount);
@@ -165,13 +180,13 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
     }
 
     public void WriteToAndReset<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer)
-#if NET7_0_OR_GREATER
         where TBufferWriter : IBufferWriter<byte>
-#else
-        where TBufferWriter : class, IBufferWriter<byte>
-#endif
     {
-        if (totalWritten == 0) return;
+        if (totalWritten == 0)
+        {
+            Reset();
+            return;
+        }
 
         if (UseFirstBuffer)
         {
@@ -182,11 +197,7 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
 
         if (buffers.Count > 0)
         {
-#if NET7_0_OR_GREATER
             foreach (ref var item in CollectionsMarshal.AsSpan(buffers))
-#else
-            foreach (var item in buffers)
-#endif
             {
                 ref var spanRef = ref writer.GetSpanReference(item.WrittenCount);
                 item.WrittenBuffer.CopyTo(MemoryMarshal.CreateSpan(ref spanRef, item.WrittenCount));
@@ -208,29 +219,35 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
 
     public async ValueTask WriteToAndResetAsync(Stream stream, CancellationToken cancellationToken)
     {
-        if (totalWritten == 0) return;
-
-        if (UseFirstBuffer)
+        try
         {
-            await stream.WriteAsync(firstBuffer.AsMemory(0, firstBufferWritten), cancellationToken).ConfigureAwait(false);
-        }
-
-        if (buffers.Count > 0)
-        {
-            foreach (var item in buffers)
+            if (totalWritten == 0)
             {
-                await stream.WriteAsync(item.WrittenMemory, cancellationToken).ConfigureAwait(false);
-                item.Clear(); // reset
+                return;
+            }
+
+            if (UseFirstBuffer)
+            {
+                await stream.WriteAsync(firstBuffer.AsMemory(0, firstBufferWritten), cancellationToken).ConfigureAwait(false);
+            }
+
+            if (buffers.Count > 0)
+            {
+                foreach (var item in buffers)
+                {
+                    await stream.WriteAsync(item.WrittenMemory, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            if (!current.IsNull)
+            {
+                await stream.WriteAsync(current.WrittenMemory, cancellationToken).ConfigureAwait(false);
             }
         }
-
-        if (!current.IsNull)
+        finally
         {
-            await stream.WriteAsync(current.WrittenMemory, cancellationToken).ConfigureAwait(false);
-            current.Clear();
+            Reset();
         }
-
-        ResetCore();
     }
 
     public Enumerator GetEnumerator()
@@ -243,7 +260,14 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
     void ResetCore()
     {
         firstBufferWritten = 0;
-        buffers.Clear();
+        if (buffers.Capacity > 4096)
+        {
+            buffers = new List<BufferSegment>();
+        }
+        else
+        {
+            buffers.Clear();
+        }
         totalWritten = 0;
         current = default;
         nextBufferSize = InitialBufferSize;
@@ -252,18 +276,28 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Reset()
     {
-        if (totalWritten == 0) return;
-#if NET7_0_OR_GREATER
         foreach (ref var item in CollectionsMarshal.AsSpan(buffers))
-#else
-        foreach (var item in buffers)
-#endif
         {
             item.Clear();
         }
         current.Clear();
         ResetCore();
     }
+
+    internal long ActivateLease()
+    {
+        var leaseId = Interlocked.Increment(ref leaseGeneration);
+        if (Interlocked.Exchange(ref leaseState, 1) != 0)
+        {
+            throw new InvalidOperationException(
+                "The buffer writer is already leased.");
+        }
+        return leaseId;
+    }
+
+    internal bool TryDeactivateLease(long leaseId)
+        => Volatile.Read(ref leaseGeneration) == leaseId &&
+           Interlocked.CompareExchange(ref leaseState, 0, 1) == 1;
 
     public struct Enumerator : IEnumerator<Memory<byte>>
     {

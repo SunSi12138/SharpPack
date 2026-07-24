@@ -1,4 +1,4 @@
-﻿using MemoryPack.Internal;
+using MemoryPack.Internal;
 using System.Buffers;
 using System.Runtime.CompilerServices;
 
@@ -12,13 +12,11 @@ public static class KeyValuePairFormatter
     [Preserve]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Serialize<TKey, TValue, TBufferWriter>(IMemoryPackFormatter<TKey> keyFormatter, IMemoryPackFormatter<TValue> valueFormatter, ref MemoryPackWriter<TBufferWriter> writer, KeyValuePair<TKey?, TValue?> value)
-#if NET7_0_OR_GREATER
         where TBufferWriter : IBufferWriter<byte>
-#else
-        where TBufferWriter : class, IBufferWriter<byte>
-#endif
     {
-        if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<KeyValuePair<TKey?, TValue?>>())
+        if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<KeyValuePair<TKey?, TValue?>>() &&
+            !writer.HasFormatterOverride<TKey>() &&
+            !writer.HasFormatterOverride<TValue>())
         {
             writer.DangerousWriteUnmanaged(value);
             return;
@@ -33,7 +31,9 @@ public static class KeyValuePairFormatter
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Deserialize<TKey, TValue>(IMemoryPackFormatter<TKey> keyFormatter, IMemoryPackFormatter<TValue> valueFormatter, ref MemoryPackReader reader, out TKey? key, out TValue? value)
     {
-        if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<KeyValuePair<TKey?, TValue?>>())
+        if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<KeyValuePair<TKey?, TValue?>>() &&
+            !reader.HasFormatterOverride<TKey>() &&
+            !reader.HasFormatterOverride<TValue>())
         {
             reader.DangerousReadUnmanaged(out KeyValuePair<TKey?, TValue?> kvp);
             key = kvp.Key;
@@ -51,10 +51,16 @@ public static class KeyValuePairFormatter
 [Preserve]
 public sealed class KeyValuePairFormatter<TKey, TValue> : MemoryPackFormatter<KeyValuePair<TKey?, TValue?>>
 {
+    internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+        => graph.HasFormatterOverride<TKey>() ||
+           graph.HasFormatterOverride<TValue>();
+
     [Preserve]
     public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref KeyValuePair<TKey?, TValue?> value)
     {
-        if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<KeyValuePair<TKey?, TValue?>>())
+        if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<KeyValuePair<TKey?, TValue?>>() &&
+            !writer.HasFormatterOverride<TKey>() &&
+            !writer.HasFormatterOverride<TValue>())
         {
             writer.DangerousWriteUnmanaged(value);
             return;
@@ -67,7 +73,9 @@ public sealed class KeyValuePairFormatter<TKey, TValue> : MemoryPackFormatter<Ke
     [Preserve]
     public override void Deserialize(ref MemoryPackReader reader, scoped ref KeyValuePair<TKey?, TValue?> value)
     {
-        if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<KeyValuePair<TKey?, TValue?>>())
+        if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<KeyValuePair<TKey?, TValue?>>() &&
+            !reader.HasFormatterOverride<TKey>() &&
+            !reader.HasFormatterOverride<TValue>())
         {
             reader.DangerousReadUnmanaged(out value);
             return;

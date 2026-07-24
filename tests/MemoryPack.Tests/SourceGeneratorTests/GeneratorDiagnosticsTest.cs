@@ -1,5 +1,3 @@
-﻿#if NET7_0_OR_GREATER
-
 using MemoryPack.Generator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -527,15 +525,8 @@ public partial struct Hoge
 }
 """;
 
-        {
-            var (_, diagnostics) = CSharpGeneratorRunner.RunGenerator(code, preprocessorSymbols: new[] { "NET7_0_OR_GREATER" });
-            diagnostics.Length.Should().Be(0);
-        }
-        {
-            var (_, diagnostics) = CSharpGeneratorRunner.RunGenerator(code, preprocessorSymbols: new string[] { });
-            diagnostics.Length.Should().Be(1);
-            diagnostics[0].Id.Should().Be("MEMPACK034");
-        }
+        var (_, diagnostics) = CSharpGeneratorRunner.RunGenerator(code);
+        diagnostics.Length.Should().Be(0);
     }
 
     [Fact]
@@ -705,5 +696,3 @@ public partial struct Tester
                     """);
     }
 }
-
-#endif

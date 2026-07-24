@@ -1,4 +1,4 @@
-﻿using MemoryPack.Tests.Models;
+using MemoryPack.Tests.Models;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -198,5 +198,38 @@ public class VersionTolerantTest
 
         var r = MemoryPackSerializer.Deserialize<MoreVersion1>(bin2);
         r.Id.Should().Be(new Version(5, 1, 2, 6));
+    }
+
+    [Fact]
+    public void ExplicitContext_ReadsOlderAndNewerVersionsBothDirections()
+    {
+        var older = new VersionTolerant3
+        {
+            MyProperty1 = 10,
+            MyProperty2 = 20,
+            MyProperty3 = 30,
+        };
+        var newer = new VersionTolerant4
+        {
+            MyProperty1 = 40,
+            MyProperty3 = 50,
+        };
+        var context = new MemoryPackSerializerContext();
+
+        var olderPayload = MemoryPackSerializer.Serialize(older, context);
+        var newerPayload = MemoryPackSerializer.Serialize(newer, context);
+
+        var readNewer = MemoryPackSerializer.Deserialize<VersionTolerant4>(
+            olderPayload,
+            context)!;
+        readNewer.MyProperty1.Should().Be(10);
+        readNewer.MyProperty3.Should().Be(30);
+
+        var readOlder = MemoryPackSerializer.Deserialize<VersionTolerant3>(
+            newerPayload,
+            context)!;
+        readOlder.MyProperty1.Should().Be(40);
+        readOlder.MyProperty2.Should().Be(0);
+        readOlder.MyProperty3.Should().Be(50);
     }
 }

@@ -14,8 +14,8 @@ public class ReferenceSymbols
     public INamedTypeSymbol MemoryPackConstructorAttribute { get; }
     public INamedTypeSymbol MemoryPackAllowSerializeAttribute { get; }
     public INamedTypeSymbol MemoryPackOrderAttribute { get; }
-    public INamedTypeSymbol? MemoryPackCustomFormatterAttribute { get; } // Unity is null.
-    public INamedTypeSymbol? MemoryPackCustomFormatter2Attribute { get; } // Unity is null.
+    public INamedTypeSymbol? MemoryPackCustomFormatterAttribute { get; }
+    public INamedTypeSymbol? MemoryPackCustomFormatter2Attribute { get; }
     public INamedTypeSymbol MemoryPackIgnoreAttribute { get; }
     public INamedTypeSymbol MemoryPackIncludeAttribute { get; }
     public INamedTypeSymbol MemoryPackOnSerializingAttribute { get; }
@@ -147,6 +147,10 @@ public class ReferenceSymbols
             { "System.Collections.Immutable.IImmutableStack<>", "global::MemoryPack.Formatters.InterfaceImmutableStackFormatter<TREPLACE>" },
             { "System.Collections.Immutable.IImmutableDictionary<,>", "global::MemoryPack.Formatters.InterfaceImmutableDictionaryFormatter<TREPLACE>" },
             { "System.Collections.Immutable.IImmutableSet<>", "global::MemoryPack.Formatters.InterfaceImmutableSetFormatter<TREPLACE>" },
+
+            // FrozenCollectionFormatters
+            { "System.Collections.Frozen.FrozenDictionary<,>", "global::MemoryPack.Formatters.FrozenDictionaryFormatter<TREPLACE>" },
+            { "System.Collections.Frozen.FrozenSet<>", "global::MemoryPack.Formatters.FrozenSetFormatter<TREPLACE>" },
 
             // InterfaceCollectionFormatters
             { "System.Collections.Generic.IEnumerable<>", "global::MemoryPack.Formatters.InterfaceEnumerableFormatter<TREPLACE>" },
@@ -337,4 +341,3 @@ public class ReferenceSymbols
         INamedTypeSymbol GetTypeByMetadataName(string metadataName) => parent.GetTypeByMetadataName(metadataName);
     }
 }
-

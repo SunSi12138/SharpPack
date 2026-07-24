@@ -78,13 +78,13 @@ public class SerializeTest<T> : SerializerTestBase<T>
     [Benchmark(Baseline = true), BenchmarkCategory(Categories.Bytes)]
     public byte[] MemoryPackSerialize()
     {
-        return MemoryPackSerializer.Serialize(value, MemoryPackSerializerOptions.Default);
+        return MemoryPackSerializer.Serialize(value, BenchmarkContexts.Utf8);
     }
 
     [Benchmark, BenchmarkCategory(Categories.Bytes)]
     public byte[] MemoryPackSerializeUtf16()
     {
-        return MemoryPackSerializer.Serialize(value, MemoryPackSerializerOptions.Utf16);
+        return MemoryPackSerializer.Serialize(value, BenchmarkContexts.Utf16);
     }
 
     // requires T:new(), can't test it.
@@ -128,14 +128,14 @@ public class SerializeTest<T> : SerializerTestBase<T>
     [Benchmark(Baseline = true), BenchmarkCategory(Categories.BufferWriter)]
     public void MemoryPackBufferWriter()
     {
-        MemoryPackSerializer.Serialize(writer, value, MemoryPackSerializerOptions.Default);
+        MemoryPackSerializer.Serialize(ref writer, value, BenchmarkContexts.Utf8);
         writer.Clear();
     }
 
     [Benchmark, BenchmarkCategory(Categories.BufferWriter)]
     public void MemoryPackBufferWriterUtf16()
     {
-        MemoryPackSerializer.Serialize(writer, value, MemoryPackSerializerOptions.Utf16);
+        MemoryPackSerializer.Serialize(ref writer, value, BenchmarkContexts.Utf16);
         writer.Clear();
     }
 

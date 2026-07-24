@@ -27,8 +27,8 @@ public class StaticDictionaryFormatterCheck
 
     Dictionary<string, int> dict;
     ArrayBufferWriter<byte> buffer;
-    MemoryPackWriterOptionalState state;
-    MemoryPackReaderOptionalState state2;
+    MemoryPackWriterOptionalStateLease state;
+    MemoryPackReaderOptionalStateLease state2;
     byte[] bytes;
 
     public StaticDictionaryFormatterCheck()
@@ -90,14 +90,6 @@ public class StaticDictionaryFormatterCheck
 sealed class DictionaryFormatter<TKey, TValue> : MemoryPackFormatter<Dictionary<TKey, TValue?>>
     where TKey : notnull
 {
-    static DictionaryFormatter()
-    {
-        if (!MemoryPackFormatterProvider.IsRegistered<KeyValuePair<TKey, TValue?>>())
-        {
-            MemoryPackFormatterProvider.Register(new KeyValuePairFormatter<TKey, TValue?>());
-        }
-    }
-
     readonly IEqualityComparer<TKey>? equalityComparer;
 
     public DictionaryFormatter()

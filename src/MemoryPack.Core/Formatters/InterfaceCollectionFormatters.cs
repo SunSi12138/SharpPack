@@ -1,4 +1,4 @@
-﻿using MemoryPack.Formatters;
+using MemoryPack.Formatters;
 using MemoryPack.Internal;
 using System.Buffers;
 using System.Collections;
@@ -10,29 +10,6 @@ using System.Runtime.InteropServices;
 // IEnumerable, ICollection, IReadOnlyCollection, IList, IReadOnlyList
 // IDictionary, IReadOnlyDictionary, ILookup, IGrouping, ISet, IReadOnlySet
 
-namespace MemoryPack
-{
-    public static partial class MemoryPackFormatterProvider
-    {
-        static readonly Dictionary<Type, Type> InterfaceCollectionFormatters = new(11)
-        {
-            { typeof(IEnumerable<>), typeof(InterfaceEnumerableFormatter<>) },
-            { typeof(ICollection<>), typeof(InterfaceCollectionFormatter<>) },
-            { typeof(IReadOnlyCollection<>), typeof(InterfaceReadOnlyCollectionFormatter<>) },
-            { typeof(IList<>), typeof(InterfaceListFormatter<>) },
-            { typeof(IReadOnlyList<>), typeof(InterfaceReadOnlyListFormatter<>) },
-            { typeof(IDictionary<,>), typeof(InterfaceDictionaryFormatter<,>) },
-            { typeof(IReadOnlyDictionary<,>), typeof(InterfaceReadOnlyDictionaryFormatter<,>) },
-            { typeof(ILookup<,>), typeof(InterfaceLookupFormatter<,>) },
-            { typeof(IGrouping<,>), typeof(InterfaceGroupingFormatter<,>) },
-            { typeof(ISet<>), typeof(InterfaceSetFormatter<>) },
-#if NET7_0_OR_GREATER
-            { typeof(IReadOnlySet<>), typeof(InterfaceReadOnlySetFormatter<>) },
-#endif
-        };
-    }
-}
-
 namespace MemoryPack.Formatters
 {
     using static InterfaceCollectionFormatterUtils;
@@ -42,11 +19,7 @@ namespace MemoryPack.Formatters
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool TrySerializeOptimized<TBufferWriter, TCollection, TElement>(ref MemoryPackWriter<TBufferWriter> writer, [NotNullWhen(false)] scoped ref TCollection? value)
             where TCollection : IEnumerable<TElement>
-#if NET7_0_OR_GREATER
             where TBufferWriter : IBufferWriter<byte>
-#else
-            where TBufferWriter : class, IBufferWriter<byte>
-#endif
         {
             if (value == null)
             {
@@ -62,24 +35,18 @@ namespace MemoryPack.Formatters
                 return true;
             }
 
-#if NET7_0_OR_GREATER
             if (value is List<TElement?> list)
             {
                 writer.WriteSpan(CollectionsMarshal.AsSpan(list));
                 return true;
             }
-#endif
 
             return false;
         }
 
         public static void SerializeCollection<TBufferWriter, TCollection, TElement>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref TCollection? value)
             where TCollection : ICollection<TElement>
-#if NET7_0_OR_GREATER
             where TBufferWriter : IBufferWriter<byte>
-#else
-            where TBufferWriter : class, IBufferWriter<byte>
-#endif
         {
             if (TrySerializeOptimized<TBufferWriter, TCollection, TElement>(ref writer, ref value)) return;
 
@@ -94,11 +61,7 @@ namespace MemoryPack.Formatters
 
         public static void SerializeReadOnlyCollection<TBufferWriter, TCollection, TElement>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref TCollection? value)
             where TCollection : IReadOnlyCollection<TElement>
-#if NET7_0_OR_GREATER
             where TBufferWriter : IBufferWriter<byte>
-#else
-            where TBufferWriter : class, IBufferWriter<byte>
-#endif
         {
             if (TrySerializeOptimized<TBufferWriter, TCollection, TElement>(ref writer, ref value)) return;
 
@@ -141,7 +104,8 @@ namespace MemoryPack.Formatters
             else
             {
                 // write to tempbuffer(because we don't know length so can't write header)
-                var tempBuffer = ReusableLinkedArrayBufferWriterPool.Rent();
+                var tempBuffer = ReusableLinkedArrayBufferWriterPool.Rent(
+                    out var tempBufferLeaseId);
                 try
                 {
                     var tempWriter = new MemoryPackWriter<ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
@@ -163,7 +127,9 @@ namespace MemoryPack.Formatters
                 }
                 finally
                 {
-                    ReusableLinkedArrayBufferWriterPool.Return(tempBuffer);
+                    ReusableLinkedArrayBufferWriterPool.Return(
+                        tempBuffer,
+                        tempBufferLeaseId);
                 }
             }
         }
@@ -178,14 +144,6 @@ namespace MemoryPack.Formatters
     [Preserve]
     public sealed class InterfaceCollectionFormatter<T> : MemoryPackFormatter<ICollection<T?>>
     {
-        static InterfaceCollectionFormatter()
-        {
-            if (!MemoryPackFormatterProvider.IsRegistered<List<T?>>())
-            {
-                MemoryPackFormatterProvider.Register(new ListFormatter<T>());
-            }
-        }
-
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref ICollection<T?>? value)
         {
@@ -202,14 +160,6 @@ namespace MemoryPack.Formatters
     [Preserve]
     public sealed class InterfaceReadOnlyCollectionFormatter<T> : MemoryPackFormatter<IReadOnlyCollection<T?>>
     {
-        static InterfaceReadOnlyCollectionFormatter()
-        {
-            if (!MemoryPackFormatterProvider.IsRegistered<List<T?>>())
-            {
-                MemoryPackFormatterProvider.Register(new ListFormatter<T>());
-            }
-        }
-
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref IReadOnlyCollection<T?>? value)
         {
@@ -226,14 +176,6 @@ namespace MemoryPack.Formatters
     [Preserve]
     public sealed class InterfaceListFormatter<T> : MemoryPackFormatter<IList<T?>>
     {
-        static InterfaceListFormatter()
-        {
-            if (!MemoryPackFormatterProvider.IsRegistered<List<T?>>())
-            {
-                MemoryPackFormatterProvider.Register(new ListFormatter<T>());
-            }
-        }
-
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref IList<T?>? value)
         {
@@ -250,14 +192,6 @@ namespace MemoryPack.Formatters
     [Preserve]
     public sealed class InterfaceReadOnlyListFormatter<T> : MemoryPackFormatter<IReadOnlyList<T?>>
     {
-        static InterfaceReadOnlyListFormatter()
-        {
-            if (!MemoryPackFormatterProvider.IsRegistered<List<T?>>())
-            {
-                MemoryPackFormatterProvider.Register(new ListFormatter<T>());
-            }
-        }
-
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref IReadOnlyList<T?>? value)
         {
@@ -316,7 +250,9 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var dict = new Dictionary<TKey, TValue?>(equalityComparer);
+            var dict = new Dictionary<TKey, TValue?>(
+                Math.Min(length, 4096),
+                equalityComparer);
 
             var keyFormatter = reader.GetFormatter<TKey>();
             var valueFormatter = reader.GetFormatter<TValue>();
@@ -375,7 +311,9 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var dict = new Dictionary<TKey, TValue?>(equalityComparer);
+            var dict = new Dictionary<TKey, TValue?>(
+                Math.Min(length, 4096),
+                equalityComparer);
 
             var keyFormatter = reader.GetFormatter<TKey>();
             var valueFormatter = reader.GetFormatter<TValue>();
@@ -393,14 +331,6 @@ namespace MemoryPack.Formatters
     public sealed class InterfaceLookupFormatter<TKey, TElement> : MemoryPackFormatter<ILookup<TKey, TElement>>
         where TKey : notnull
     {
-        static InterfaceLookupFormatter()
-        {
-            if (!MemoryPackFormatterProvider.IsRegistered<IGrouping<TKey, TElement>>())
-            {
-                MemoryPackFormatterProvider.Register(new InterfaceGroupingFormatter<TKey, TElement>());
-            }
-        }
-
         readonly IEqualityComparer<TKey>? equalityComparer;
 
         public InterfaceLookupFormatter()
@@ -442,7 +372,9 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var dict = new Dictionary<TKey, IGrouping<TKey, TElement>>(equalityComparer);
+            var dict = new Dictionary<TKey, IGrouping<TKey, TElement>>(
+                Math.Min(length, 4096),
+                equalityComparer);
 
             var formatter = reader.GetFormatter<IGrouping<TKey, TElement>>();
             for (int i = 0; i < length; i++)
@@ -463,14 +395,6 @@ namespace MemoryPack.Formatters
         where TKey : notnull
     {
         // serialize as {key, [collection]}
-
-        static InterfaceGroupingFormatter()
-        {
-            if (!MemoryPackFormatterProvider.IsRegistered<IEnumerable<TElement>>())
-            {
-                MemoryPackFormatterProvider.Register(new InterfaceEnumerableFormatter<TElement>());
-            }
-        }
 
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref IGrouping<TKey, TElement>? value)
@@ -511,14 +435,6 @@ namespace MemoryPack.Formatters
     [Preserve]
     public sealed class InterfaceSetFormatter<T> : MemoryPackFormatter<ISet<T?>>
     {
-        static InterfaceSetFormatter()
-        {
-            if (!MemoryPackFormatterProvider.IsRegistered<HashSet<T>>())
-            {
-                MemoryPackFormatterProvider.Register(new HashSetFormatter<T>());
-            }
-        }
-
         readonly IEqualityComparer<T?>? equalityComparer;
 
         public InterfaceSetFormatter()
@@ -558,7 +474,9 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var set = new HashSet<T?>(length, equalityComparer);
+            var set = new HashSet<T?>(
+                FormatterValidation.InitialCapacity(length),
+                equalityComparer);
 
             var formatter = reader.GetFormatter<T>();
             for (int i = 0; i < length; i++)
@@ -572,19 +490,10 @@ namespace MemoryPack.Formatters
         }
     }
 
-#if NET7_0_OR_GREATER
 
     [Preserve]
     public sealed class InterfaceReadOnlySetFormatter<T> : MemoryPackFormatter<IReadOnlySet<T?>>
     {
-        static InterfaceReadOnlySetFormatter()
-        {
-            if (!MemoryPackFormatterProvider.IsRegistered<HashSet<T>>())
-            {
-                MemoryPackFormatterProvider.Register(new HashSetFormatter<T>());
-            }
-        }
-
         readonly IEqualityComparer<T?>? equalityComparer;
 
         public InterfaceReadOnlySetFormatter()
@@ -624,7 +533,9 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var set = new HashSet<T?>(length, equalityComparer);
+            var set = new HashSet<T?>(
+                FormatterValidation.InitialCapacity(length),
+                equalityComparer);
 
             var formatter = reader.GetFormatter<T>();
             for (int i = 0; i < length; i++)
@@ -638,7 +549,6 @@ namespace MemoryPack.Formatters
         }
     }
 
-#endif
 
     [Preserve]
     internal sealed class Grouping<TKey, TElement> : IGrouping<TKey, TElement>

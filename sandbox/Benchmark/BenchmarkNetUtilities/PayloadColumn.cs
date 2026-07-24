@@ -39,7 +39,7 @@ public class PayloadColumn : IColumn
         {
             var instance = Activator.CreateInstance(benchmarkCase.Descriptor.Type);
             var result = (byte[])methodInfo.Invoke(instance, null)!;
-            return new SizeValue(result.LongLength).ToString(null);
+            return $"{result.LongLength:N0} B";
         }
         else
         {

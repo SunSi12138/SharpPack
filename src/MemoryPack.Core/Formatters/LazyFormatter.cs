@@ -1,8 +1,13 @@
-﻿using MemoryPack.Internal;
+using MemoryPack.Internal;
+using System.Diagnostics.CodeAnalysis;
 
 namespace MemoryPack.Formatters;
 
 [Preserve]
+[UnconditionalSuppressMessage(
+    "Trimming",
+    "IL2091",
+    Justification = "Lazy<T> is constructed from an already deserialized value and does not require T's constructor.")]
 public sealed class LazyFormatter<T> : MemoryPackFormatter<Lazy<T?>>
 {
     [Preserve]

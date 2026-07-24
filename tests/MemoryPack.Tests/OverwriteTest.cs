@@ -1,4 +1,4 @@
-﻿using MemoryPack.Tests.Models;
+using MemoryPack.Tests.Models;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

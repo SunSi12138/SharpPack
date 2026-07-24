@@ -1,4 +1,4 @@
-﻿using MemoryPack.Formatters;
+using MemoryPack.Formatters;
 using MemoryPack.Internal;
 using System.Buffers;
 using System.Collections.Immutable;
@@ -6,29 +6,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 // Immutable Collections formatters
-
-namespace MemoryPack
-{
-    public static partial class MemoryPackFormatterProvider
-    {
-        static readonly Dictionary<Type, Type> ImmutableCollectionFormatters = new Dictionary<Type, Type>()
-        {
-            { typeof(ImmutableArray<>), typeof(ImmutableArrayFormatter<>) },
-            { typeof(ImmutableList<>), typeof(ImmutableListFormatter<>) },
-            { typeof(ImmutableQueue<>), typeof(ImmutableQueueFormatter<>) },
-            { typeof(ImmutableStack<>), typeof(ImmutableStackFormatter<>) },
-            { typeof(ImmutableDictionary<,>), typeof(ImmutableDictionaryFormatter<,>) },
-            { typeof(ImmutableSortedDictionary<,>), typeof(ImmutableSortedDictionaryFormatter<,>) },
-            { typeof(ImmutableSortedSet<>), typeof(ImmutableSortedSetFormatter<>) },
-            { typeof(ImmutableHashSet<>), typeof(ImmutableHashSetFormatter<>) },
-            { typeof(IImmutableList<>), typeof(InterfaceImmutableListFormatter<>) },
-            { typeof(IImmutableQueue<>), typeof(InterfaceImmutableQueueFormatter<>) },
-            { typeof(IImmutableStack<>), typeof(InterfaceImmutableStackFormatter<>) },
-            { typeof(IImmutableDictionary<,>), typeof(InterfaceImmutableDictionaryFormatter<,>) },
-            { typeof(IImmutableSet<>), typeof(InterfaceImmutableSetFormatter<>) },
-        };
-    }
-}
 
 namespace MemoryPack.Formatters
 {
@@ -64,14 +41,7 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-#if NET8_0_OR_GREATER
             value = ImmutableCollectionsMarshal.AsImmutableArray(array);
-#else
-            // create Empty and replace inner T[] field(avoid defensive copy of Create)
-            value = ImmutableArray.Create<T?>();
-            ref var view = ref Unsafe.As<ImmutableArray<T?>, ImmutableArrayView<T?>>(ref value);
-            view.array = array;
-#endif
         }
     }
 
@@ -152,7 +122,8 @@ namespace MemoryPack.Formatters
 
             // ImmutableQueue<T> has no Count, so use similar serialization of IEnumerable<T>
 
-            var tempBuffer = ReusableLinkedArrayBufferWriterPool.Rent();
+            var tempBuffer = ReusableLinkedArrayBufferWriterPool.Rent(
+                out var tempBufferLeaseId);
             try
             {
                 var tempWriter = new MemoryPackWriter<ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
@@ -174,7 +145,9 @@ namespace MemoryPack.Formatters
             }
             finally
             {
-                ReusableLinkedArrayBufferWriterPool.Return(tempBuffer);
+                ReusableLinkedArrayBufferWriterPool.Return(
+                    tempBuffer,
+                    tempBufferLeaseId);
             }
         }
 
@@ -200,33 +173,16 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            // ImmutableQueue<T> has no builder
-
-            var rentArray = ArrayPool<T?>.Shared.Rent(length);
-            try
+            var items = new List<T?>(
+                FormatterValidation.InitialCapacity(length));
+            var formatter = reader.GetFormatter<T?>();
+            for (int i = 0; i < length; i++)
             {
-                var formatter = reader.GetFormatter<T?>();
-                for (int i = 0; i < length; i++)
-                {
-                    formatter.Deserialize(ref reader, ref rentArray[i]);
-                }
-
-                if (rentArray.Length == length)
-                {
-                    // we can use T[] ctor
-                    value = ImmutableQueue.Create(rentArray);
-                    return;
-                }
-                else
-                {
-                    // IEnumerable<T> method
-                    value = ImmutableQueue.CreateRange((new ArraySegment<T?>(rentArray, 0, length)).AsEnumerable());
-                }
+                T? item = default;
+                formatter.Deserialize(ref reader, ref item);
+                items.Add(item);
             }
-            finally
-            {
-                ArrayPool<T?>.Shared.Return(rentArray, clearArray: RuntimeHelpers.IsReferenceOrContainsReferences<T>());
-            }
+            value = ImmutableQueue.CreateRange(items);
         }
     }
 
@@ -244,7 +200,8 @@ namespace MemoryPack.Formatters
 
             // ImmutableStack<T> has no Count, so use similar serialization of IEnumerable<T>
 
-            var tempBuffer = ReusableLinkedArrayBufferWriterPool.Rent();
+            var tempBuffer = ReusableLinkedArrayBufferWriterPool.Rent(
+                out var tempBufferLeaseId);
             try
             {
                 var tempWriter = new MemoryPackWriter<ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
@@ -267,7 +224,9 @@ namespace MemoryPack.Formatters
             }
             finally
             {
-                ReusableLinkedArrayBufferWriterPool.Return(tempBuffer);
+                ReusableLinkedArrayBufferWriterPool.Return(
+                    tempBuffer,
+                    tempBufferLeaseId);
             }
         }
 
@@ -293,33 +252,16 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            // ImmutableStack<T> has no builder
-
-            var rentArray = ArrayPool<T?>.Shared.Rent(length);
-            try
+            var items = new List<T?>(
+                FormatterValidation.InitialCapacity(length));
+            var formatter = reader.GetFormatter<T?>();
+            for (int i = 0; i < length; i++)
             {
-                var formatter = reader.GetFormatter<T?>();
-                for (int i = 0; i < length; i++)
-                {
-                    formatter.Deserialize(ref reader, ref rentArray[i]);
-                }
-
-                if (rentArray.Length == length)
-                {
-                    // we can use T[] ctor
-                    value = ImmutableStack.Create(rentArray);
-                    return;
-                }
-                else
-                {
-                    // IEnumerable<T> method
-                    value = ImmutableStack.CreateRange((new ArraySegment<T?>(rentArray, 0, length)).AsEnumerable());
-                }
+                T? item = default;
+                formatter.Deserialize(ref reader, ref item);
+                items.Add(item);
             }
-            finally
-            {
-                ArrayPool<T?>.Shared.Return(rentArray, clearArray: RuntimeHelpers.IsReferenceOrContainsReferences<T>());
-            }
+            value = ImmutableStack.CreateRange(items);
         }
     }
 
@@ -684,7 +626,8 @@ namespace MemoryPack.Formatters
 
             // ImmutableQueue<T> has no Count, so use similar serialization of IEnumerable<T>
 
-            var tempBuffer = ReusableLinkedArrayBufferWriterPool.Rent();
+            var tempBuffer = ReusableLinkedArrayBufferWriterPool.Rent(
+                out var tempBufferLeaseId);
             try
             {
                 var tempWriter = new MemoryPackWriter<ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
@@ -706,7 +649,9 @@ namespace MemoryPack.Formatters
             }
             finally
             {
-                ReusableLinkedArrayBufferWriterPool.Return(tempBuffer);
+                ReusableLinkedArrayBufferWriterPool.Return(
+                    tempBuffer,
+                    tempBufferLeaseId);
             }
         }
 
@@ -732,33 +677,16 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            // ImmutableQueue<T> has no builder
-
-            var rentArray = ArrayPool<T?>.Shared.Rent(length);
-            try
+            var items = new List<T?>(
+                FormatterValidation.InitialCapacity(length));
+            var formatter = reader.GetFormatter<T?>();
+            for (int i = 0; i < length; i++)
             {
-                var formatter = reader.GetFormatter<T?>();
-                for (int i = 0; i < length; i++)
-                {
-                    formatter.Deserialize(ref reader, ref rentArray[i]);
-                }
-
-                if (rentArray.Length == length)
-                {
-                    // we can use T[] ctor
-                    value = ImmutableQueue.Create(rentArray);
-                    return;
-                }
-                else
-                {
-                    // IEnumerable<T> method
-                    value = ImmutableQueue.CreateRange((new ArraySegment<T?>(rentArray, 0, length)).AsEnumerable());
-                }
+                T? item = default;
+                formatter.Deserialize(ref reader, ref item);
+                items.Add(item);
             }
-            finally
-            {
-                ArrayPool<T?>.Shared.Return(rentArray, clearArray: RuntimeHelpers.IsReferenceOrContainsReferences<T>());
-            }
+            value = ImmutableQueue.CreateRange(items);
         }
     }
 
@@ -776,7 +704,8 @@ namespace MemoryPack.Formatters
 
             // ImmutableStack<T> has no Count, so use similar serialization of IEnumerable<T>
 
-            var tempBuffer = ReusableLinkedArrayBufferWriterPool.Rent();
+            var tempBuffer = ReusableLinkedArrayBufferWriterPool.Rent(
+                out var tempBufferLeaseId);
             try
             {
                 var tempWriter = new MemoryPackWriter<ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
@@ -798,7 +727,9 @@ namespace MemoryPack.Formatters
             }
             finally
             {
-                ReusableLinkedArrayBufferWriterPool.Return(tempBuffer);
+                ReusableLinkedArrayBufferWriterPool.Return(
+                    tempBuffer,
+                    tempBufferLeaseId);
             }
         }
 
@@ -824,33 +755,16 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            // ImmutableStack<T> has no builder
-
-            var rentArray = ArrayPool<T?>.Shared.Rent(length);
-            try
+            var items = new List<T?>(
+                FormatterValidation.InitialCapacity(length));
+            var formatter = reader.GetFormatter<T?>();
+            for (int i = 0; i < length; i++)
             {
-                var formatter = reader.GetFormatter<T?>();
-                for (int i = 0; i < length; i++)
-                {
-                    formatter.Deserialize(ref reader, ref rentArray[i]);
-                }
-
-                if (rentArray.Length == length)
-                {
-                    // we can use T[] ctor
-                    value = ImmutableStack.Create(rentArray);
-                    return;
-                }
-                else
-                {
-                    // IEnumerable<T> method
-                    value = ImmutableStack.CreateRange((new ArraySegment<T?>(rentArray, 0, length)).AsEnumerable());
-                }
+                T? item = default;
+                formatter.Deserialize(ref reader, ref item);
+                items.Add(item);
             }
-            finally
-            {
-                ArrayPool<T?>.Shared.Return(rentArray, clearArray: RuntimeHelpers.IsReferenceOrContainsReferences<T>());
-            }
+            value = ImmutableStack.CreateRange(items);
         }
     }
 

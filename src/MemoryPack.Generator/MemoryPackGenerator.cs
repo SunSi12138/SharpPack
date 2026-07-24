@@ -63,8 +63,7 @@ public partial class MemoryPackGenerator : IIncrementalGenerator
             {
                 var csOptions = (CSharpParseOptions)parseOptions;
                 var langVersion = csOptions.LanguageVersion;
-                var net7 = csOptions.PreprocessorSymbolNames.Contains("NET7_0_OR_GREATER");
-                return (langVersion, net7);
+                return langVersion;
             })
             .WithTrackingName("MemoryPack.MemoryPackable.0_ParseOptionsProvider");
 
@@ -99,7 +98,6 @@ public partial class MemoryPackGenerator : IIncrementalGenerator
         {
             var source = typeDeclarations
                 .Combine(context.CompilationProvider)
-                .WithComparer(Comparer.Instance)
                 .Combine(logProvider)
                 .Combine(parseOptions)
                 .WithTrackingName("MemoryPack.MemoryPackable.2_MemoryPackableCombined");
@@ -108,15 +106,14 @@ public partial class MemoryPackGenerator : IIncrementalGenerator
             {
                 var (typeDeclaration, compilation) = source.Left.Item1;
                 var logPath = source.Left.Item2;
-                var (langVersion, net7) = source.Right;
+                var langVersion = source.Right;
 
-                Generate(typeDeclaration, compilation, logPath, new GeneratorContext(context, langVersion, net7));
+                Generate(typeDeclaration, compilation, logPath, new GeneratorContext(context, langVersion));
             });
         }
         {
             var source = typeDeclarations2
                 .Combine(context.CompilationProvider)
-                .WithComparer(Comparer.Instance)
                 .Combine(logProvider)
                 .Combine(parseOptions)
                 .WithTrackingName("MemoryPack.MemoryPackable.2_MemoryPackUnionCombined");
@@ -125,9 +122,29 @@ public partial class MemoryPackGenerator : IIncrementalGenerator
             {
                 var (typeDeclaration, compilation) = source.Left.Item1;
                 var logPath = source.Left.Item2;
-                var (langVersion, net7) = source.Right;
+                var langVersion = source.Right;
 
-                Generate(typeDeclaration, compilation, logPath, new GeneratorContext(context, langVersion, net7));
+                Generate(typeDeclaration, compilation, logPath, new GeneratorContext(context, langVersion));
+            });
+        }
+        {
+            var source = typeDeclarations2
+                .Collect()
+                .Combine(context.CompilationProvider)
+                .Combine(parseOptions)
+                .WithTrackingName(
+                    "MemoryPack.MemoryPackable.2_ExternalUnionFactoriesCombined");
+
+            context.RegisterSourceOutput(source, static (context, source) =>
+            {
+                var declarations = source.Left.Left;
+                var compilation = source.Left.Right;
+                var langVersion = source.Right;
+
+                GenerateExternalUnionTargetFactories(
+                    declarations,
+                    compilation,
+                    new GeneratorContext(context, langVersion));
             });
         }
     }
@@ -191,7 +208,6 @@ public partial class MemoryPackGenerator : IIncrementalGenerator
 
         var typeScriptGenerateSource = typeScriptDeclarations
             .Combine(context.CompilationProvider)
-            .WithComparer(Comparer.Instance)
             .Combine(typeScriptEnabled)
             .Where(x => x.Right != null) // filter
             .Collect();
@@ -278,39 +294,19 @@ public partial class MemoryPackGenerator : IIncrementalGenerator
         });
     }
 
-    class Comparer : IEqualityComparer<(TypeDeclarationSyntax, Compilation)>
-    {
-        public static readonly Comparer Instance = new Comparer();
-
-        public bool Equals((TypeDeclarationSyntax, Compilation) x, (TypeDeclarationSyntax, Compilation) y)
-        {
-            return x.Item1.Equals(y.Item1);
-        }
-
-        public int GetHashCode((TypeDeclarationSyntax, Compilation) obj)
-        {
-            return obj.Item1.GetHashCode();
-        }
-    }
-
     class GeneratorContext : IGeneratorContext
     {
         SourceProductionContext context;
 
-        public GeneratorContext(SourceProductionContext context, LanguageVersion languageVersion, bool isNet70OrGreater)
+        public GeneratorContext(SourceProductionContext context, LanguageVersion languageVersion)
         {
             this.context = context;
             this.LanguageVersion = languageVersion;
-            this.IsNet7OrGreater = isNet70OrGreater;
         }
 
         public CancellationToken CancellationToken => context.CancellationToken;
 
         public Microsoft.CodeAnalysis.CSharp.LanguageVersion LanguageVersion { get; }
-
-        public bool IsNet7OrGreater { get; }
-
-        public bool IsForUnity => false;
 
         public void AddSource(string hintName, string source)
         {

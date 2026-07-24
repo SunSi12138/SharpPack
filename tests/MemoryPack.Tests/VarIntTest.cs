@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
@@ -79,5 +79,34 @@ public class VarIntTest
         l[23].Should().Be(-100000000000);
     }
 
+    [Fact]
+    public void ByteReaderConsumesEntireUInt16PayloadBeforeOverflow()
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        using var writerState = MemoryPackWriterOptionalStatePool.Rent();
+        var writer = new MemoryPackWriter<ArrayBufferWriter<byte>>(
+            ref buffer,
+            writerState);
+        writer.WriteVarInt((ushort)256);
+        writer.WriteVarInt((byte)7);
+        writer.Flush();
+
+        using var readerState = MemoryPackReaderOptionalStatePool.Rent();
+        var reader = new MemoryPackReader(buffer.WrittenSpan, readerState);
+
+        var overflow = false;
+        try
+        {
+            reader.ReadVarIntByte();
+        }
+        catch (OverflowException)
+        {
+            overflow = true;
+        }
+
+        overflow.Should().BeTrue();
+        reader.ReadVarIntByte().Should().Be(7);
+        reader.Remaining.Should().Be(0);
+    }
 
 }

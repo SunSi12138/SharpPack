@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Buffers.Binary;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -194,6 +195,47 @@ public class ArrayFormatterTest
         two[2, 0].Should().Be(6);
         two[2, 1].Should().Be(7);
         two[2, 2].Should().Be(8);
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(5)]
+    public void MultiDimensionalRejectsPayloadLengthMismatch(int payloadLength)
+    {
+        var value = new int[,] { { 1, 2 }, { 3, 4 } };
+        var payload = MemoryPackSerializer.Serialize(value);
+        BinaryPrimitives.WriteInt32LittleEndian(
+            payload.AsSpan(1 + sizeof(int) * 2),
+            payloadLength);
+
+        Assert.Throws<MemoryPackSerializationException>(
+            () => MemoryPackSerializer.Deserialize<int[,]>(payload));
+        Assert.Throws<MemoryPackSerializationException>(
+            () => MemoryPackSerializer.Deserialize<int[,]>(
+                payload,
+                new MemoryPackSerializerContext()));
+    }
+
+    [Fact]
+    public void MultiDimensionalRejectsNegativeAndOverflowingDimensions()
+    {
+        var source = new int[,] { { 1, 2 }, { 3, 4 } };
+
+        var negative = MemoryPackSerializer.Serialize(source);
+        BinaryPrimitives.WriteInt32LittleEndian(negative.AsSpan(1), -1);
+
+        var overflow = MemoryPackSerializer.Serialize(source);
+        BinaryPrimitives.WriteInt32LittleEndian(
+            overflow.AsSpan(1),
+            int.MaxValue);
+        BinaryPrimitives.WriteInt32LittleEndian(
+            overflow.AsSpan(1 + sizeof(int)),
+            2);
+
+        Assert.Throws<MemoryPackSerializationException>(
+            () => MemoryPackSerializer.Deserialize<int[,]>(negative));
+        Assert.Throws<MemoryPackSerializationException>(
+            () => MemoryPackSerializer.Deserialize<int[,]>(overflow));
     }
 }
 

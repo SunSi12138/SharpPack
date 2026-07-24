@@ -1,4 +1,4 @@
-﻿using MemoryPack.Formatters;
+using MemoryPack.Formatters;
 using MemoryPack.Internal;
 using System.Buffers;
 using System.Collections.Concurrent;
@@ -15,37 +15,6 @@ using System.Runtime.InteropServices;
 // Not supported clear
 // ReadOnlyCollection, ReadOnlyObservableCollection, BlockingCollection
 
-namespace MemoryPack
-{
-    public static partial class MemoryPackFormatterProvider
-    {
-        static readonly Dictionary<Type, Type> CollectionFormatters = new Dictionary<Type, Type>(18)
-        {
-            { typeof(List<>), typeof(ListFormatter<>) },
-            { typeof(Stack<>), typeof(StackFormatter<>) },
-            { typeof(Queue<>), typeof(QueueFormatter<>) },
-            { typeof(LinkedList<>), typeof(LinkedListFormatter<>) },
-            { typeof(HashSet<>), typeof(HashSetFormatter<>) },
-            { typeof(SortedSet<>), typeof(SortedSetFormatter<>) },
-#if NET7_0_OR_GREATER
-            { typeof(PriorityQueue<,>), typeof(PriorityQueueFormatter<,>) },
-#endif
-            { typeof(ObservableCollection<>), typeof(ObservableCollectionFormatter<>) },
-            { typeof(Collection<>), typeof(CollectionFormatter<>) },
-            { typeof(ConcurrentQueue<>), typeof(ConcurrentQueueFormatter<>) },
-            { typeof(ConcurrentStack<>), typeof(ConcurrentStackFormatter<>) },
-            { typeof(ConcurrentBag<>), typeof(ConcurrentBagFormatter<>) },
-            { typeof(Dictionary<,>), typeof(DictionaryFormatter<,>) },
-            { typeof(SortedDictionary<,>), typeof(SortedDictionaryFormatter<,>) },
-            { typeof(SortedList<,>), typeof(SortedListFormatter<,>) },
-            { typeof(ConcurrentDictionary<,>), typeof(ConcurrentDictionaryFormatter<,>) },
-            { typeof(ReadOnlyCollection<>), typeof(ReadOnlyCollectionFormatter<>) },
-            { typeof(ReadOnlyObservableCollection<>), typeof(ReadOnlyObservableCollectionFormatter<>) },
-            { typeof(BlockingCollection<>), typeof(BlockingCollectionFormatter<>) },
-        };
-    }
-}
-
 namespace MemoryPack.Formatters
 {
     [Preserve]
@@ -55,11 +24,7 @@ namespace MemoryPack.Formatters
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void SerializePackable<T, TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, List<T?>? value)
             where T : IMemoryPackable<T>
-#if NET7_0_OR_GREATER
             where TBufferWriter : IBufferWriter<byte>
-#else
-            where TBufferWriter : class, IBufferWriter<byte>
-#endif
         {
             if (value == null)
             {
@@ -67,17 +32,7 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-#if NET7_0_OR_GREATER
             writer.WritePackableSpan(CollectionsMarshal.AsSpan(value));
-#else
-            var formatter = writer.GetFormatter<T?>();
-            writer.WriteCollectionHeader(value.Count);
-            foreach (var item in value)
-            {
-                var v = item;
-                formatter.Serialize(ref writer, ref v);
-            }
-#endif
         }
 
         [Preserve]
@@ -103,29 +58,25 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new List<T?>(length);
+                value = new List<T?>(
+                    FormatterValidation.InitialCapacity(length));
             }
-#if NET7_0_OR_GREATER
-            else if (value.Count == length)
+
+            if (length > FormatterValidation.MaximumInitialCollectionCapacity &&
+                value.Capacity < length)
             {
                 value.Clear();
+                value.EnsureCapacity(
+                    FormatterValidation.MaximumInitialCollectionCapacity);
+                for (int i = 0; i < length; i++)
+                {
+                    value.Add(reader.ReadValue<T>());
+                }
+                return;
             }
 
             var span = CollectionsMarshalEx.CreateSpan(value, length);
             reader.ReadPackableSpanWithoutReadLengthHeader(length, ref span);
-#else
-            else
-            {
-                value.Clear();
-            }
-            var formatter = reader.GetFormatter<T?>();
-            for (var i = 0; i < length; i++)
-            {
-                T? v = default;
-                formatter.Deserialize(ref reader, ref v);
-                value.Add(v);
-            }
-#endif
         }
     }
 
@@ -140,17 +91,7 @@ namespace MemoryPack.Formatters
                 writer.WriteNullCollectionHeader();
                 return;
             }
-#if NET7_0_OR_GREATER
             writer.WriteSpan(CollectionsMarshal.AsSpan(value));
-#else
-            var formatter = writer.GetFormatter<T?>();
-            writer.WriteCollectionHeader(value.Count);
-            foreach (var item in value)
-            {
-                var v = item;
-                formatter.Serialize(ref writer, ref v);
-            }
-#endif
         }
 
         [Preserve]
@@ -164,29 +105,28 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new List<T?>(length);
+                value = new List<T?>(
+                    FormatterValidation.InitialCapacity(length));
             }
-#if NET7_0_OR_GREATER
-            else if (value.Count == length)
+
+            if (length > FormatterValidation.MaximumInitialCollectionCapacity &&
+                value.Capacity < length)
             {
                 value.Clear();
+                value.EnsureCapacity(
+                    FormatterValidation.MaximumInitialCollectionCapacity);
+                var formatter = reader.GetFormatter<T?>();
+                for (int i = 0; i < length; i++)
+                {
+                    T? item = default;
+                    formatter.Deserialize(ref reader, ref item);
+                    value.Add(item);
+                }
+                return;
             }
 
             var span = CollectionsMarshalEx.CreateSpan(value, length);
             reader.ReadSpanWithoutReadLengthHeader(length, ref span);
-#else
-            else
-            {
-                value.Clear();
-            }
-            var formatter = reader.GetFormatter<T?>();
-            for (var i = 0; i < length; i++)
-            {
-                T? v = default;
-                formatter.Deserialize(ref reader, ref v);
-                value.Add(v);
-            }
-#endif
         }
     }
 
@@ -202,17 +142,7 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-#if NET7_0_OR_GREATER
             writer.WriteSpan(CollectionsMarshalEx.AsSpan(value));
-#else
-            var formatter = writer.GetFormatter<T?>();
-            writer.WriteCollectionHeader(value.Count);
-            foreach (var item in value.Reverse()) // serialize reverse order
-            {
-                var v = item;
-                formatter.Serialize(ref writer, ref v);
-            }
-#endif
         }
 
         [Preserve]
@@ -226,29 +156,21 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new Stack<T?>(length);
+                value = new Stack<T?>(
+                    FormatterValidation.InitialCapacity(length));
             }
-#if NET7_0_OR_GREATER
-            else if (value.Count != length)
-            {
-                value.Clear();
-            }
-
-            var span = CollectionsMarshalEx.CreateSpan(value, length);
-            reader.ReadSpanWithoutReadLengthHeader(length, ref span);
-#else
             else
             {
                 value.Clear();
             }
+
             var formatter = reader.GetFormatter<T?>();
             for (int i = 0; i < length; i++)
             {
-                T? v = default;
-                formatter.Deserialize(ref reader, ref v);
-                value.Push(v);
+                T? item = default;
+                formatter.Deserialize(ref reader, ref item);
+                value.Push(item);
             }
-#endif
         }
     }
 
@@ -286,14 +208,14 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new Queue<T?>(length);
+                value = new Queue<T?>(
+                    FormatterValidation.InitialCapacity(length));
             }
             else
             {
                 value.Clear();
-#if NET7_0_OR_GREATER
-                value.EnsureCapacity(length);
-#endif
+                value.EnsureCapacity(
+                    FormatterValidation.InitialCapacity(length));
             }
 
             var formatter = reader.GetFormatter<T?>();
@@ -399,7 +321,9 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new HashSet<T?>(length, equalityComparer);
+                value = new HashSet<T?>(
+                    FormatterValidation.InitialCapacity(length),
+                    equalityComparer);
             }
             else
             {
@@ -477,19 +401,10 @@ namespace MemoryPack.Formatters
         }
     }
 
-#if NET7_0_OR_GREATER
 
     [Preserve]
     public sealed class PriorityQueueFormatter<TElement, TPriority> : MemoryPackFormatter<PriorityQueue<TElement?, TPriority?>>
     {
-        static PriorityQueueFormatter()
-        {
-            if (!MemoryPackFormatterProvider.IsRegistered<(TElement?, TPriority?)>())
-            {
-                MemoryPackFormatterProvider.Register(new ValueTupleFormatter<TElement?, TPriority?>());
-            }
-        }
-
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref PriorityQueue<TElement?, TPriority?>? value)
         {
@@ -520,7 +435,8 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new PriorityQueue<TElement?, TPriority?>(length);
+                value = new PriorityQueue<TElement?, TPriority?>(
+                    FormatterValidation.InitialCapacity(length));
             }
             else
             {
@@ -537,7 +453,6 @@ namespace MemoryPack.Formatters
         }
     }
 
-#endif
 
     [Preserve]
     public sealed class CollectionFormatter<T> : MemoryPackFormatter<Collection<T?>>
@@ -860,7 +775,9 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new Dictionary<TKey, TValue?>(length, equalityComparer);
+                value = new Dictionary<TKey, TValue?>(
+                    FormatterValidation.InitialCapacity(length),
+                    equalityComparer);
             }
             else
             {
@@ -988,7 +905,9 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new SortedList<TKey, TValue?>(length, comparer);
+                value = new SortedList<TKey, TValue?>(
+                    FormatterValidation.InitialCapacity(length),
+                    comparer);
             }
             else
             {
@@ -1057,7 +976,12 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new ConcurrentDictionary<TKey, TValue?>(equalityComparer);
+                value = length == 0
+                    ? new ConcurrentDictionary<TKey, TValue?>(equalityComparer)
+                    : new ConcurrentDictionary<TKey, TValue?>(
+                        Environment.ProcessorCount,
+                        Math.Min(length, 4096),
+                        equalityComparer ?? EqualityComparer<TKey>.Default);
             }
             else
             {

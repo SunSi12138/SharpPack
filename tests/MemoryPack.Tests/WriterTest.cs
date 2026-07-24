@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 
 namespace MemoryPack.Tests;
@@ -10,7 +10,7 @@ public class WriterTest
     {
         var buffer = new SpanControlWriter();
 
-        var state = MemoryPackWriterOptionalStatePool.Rent(MemoryPackSerializerOptions.Default);
+        var state = MemoryPackWriterOptionalStatePool.Rent();
         try
         {
             var writer = new MemoryPackWriter<SpanControlWriter>(ref buffer, state);
@@ -53,12 +53,72 @@ public class WriterTest
     }
 
     [Fact]
+    public void NegativeAdvanceAndSpanRequestAreRejected()
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        using var state = MemoryPackWriterOptionalStatePool.Rent();
+        var writer = new MemoryPackWriter<ArrayBufferWriter<byte>>(
+            ref buffer,
+            state);
+
+        var advanceError = false;
+        try
+        {
+            writer.Advance(-1);
+        }
+        catch (MemoryPackSerializationException)
+        {
+            advanceError = true;
+        }
+
+        var spanError = false;
+        try
+        {
+            writer.GetSpanReference(-1);
+        }
+        catch (MemoryPackSerializationException)
+        {
+            spanError = true;
+        }
+
+        advanceError.Should().BeTrue();
+        spanError.Should().BeTrue();
+        writer.WrittenCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void FormatterExceptionDoesNotCorruptWriterDepth()
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        using var state = MemoryPackWriterOptionalStatePool.Rent();
+        var writer = new MemoryPackWriter<ArrayBufferWriter<byte>>(
+            ref buffer,
+            state);
+        var formatter = new ThrowingIntFormatter();
+
+        var error = false;
+        try
+        {
+            writer.WriteValueWithFormatter(formatter, 1);
+        }
+        catch (InvalidOperationException)
+        {
+            error = true;
+        }
+
+        error.Should().BeTrue();
+        writer.WriteValue(42);
+        writer.Flush();
+        MemoryPackSerializer.Deserialize<int>(buffer.WrittenSpan).Should().Be(42);
+    }
+
+    [Fact]
     public void WriteObjectHeaderTest()
     {
         var buffer = new ArrayBufferWriter<byte>();
 
         {
-            var state = MemoryPackWriterOptionalStatePool.Rent(MemoryPackSerializerOptions.Default);
+            var state = MemoryPackWriterOptionalStatePool.Rent();
             var writer = new MemoryPackWriter<ArrayBufferWriter<byte>>(ref buffer, state);
 
             writer.WriteNullObjectHeader();
@@ -70,7 +130,7 @@ public class WriterTest
         }
         for (var i = 0; i < 250; i++)
         {
-            var state = MemoryPackWriterOptionalStatePool.Rent(MemoryPackSerializerOptions.Default);
+            var state = MemoryPackWriterOptionalStatePool.Rent();
             var writer = new MemoryPackWriter<ArrayBufferWriter<byte>>(ref buffer, state);
             writer.WriteObjectHeader((byte)i);
             writer.Flush();
@@ -83,7 +143,7 @@ public class WriterTest
         for (byte i = MemoryPackCode.Reserved1; i <= MemoryPackCode.NullObject; i++)
         {
             if (i == 0) break;
-            var state = MemoryPackWriterOptionalStatePool.Rent(MemoryPackSerializerOptions.Default);
+            var state = MemoryPackWriterOptionalStatePool.Rent();
             var writer = new MemoryPackWriter<ArrayBufferWriter<byte>>(ref buffer, state);
             var error = false;
             try
@@ -154,6 +214,19 @@ public class WriterTest
             SpanRequested++;
             return new byte[Math.Max(sizeHint, ProvideSpanLength)];
         }
+    }
+
+    sealed class ThrowingIntFormatter : MemoryPackFormatter<int>
+    {
+        public override void Serialize<TBufferWriter>(
+            ref MemoryPackWriter<TBufferWriter> writer,
+            scoped ref int value)
+            => throw new InvalidOperationException();
+
+        public override void Deserialize(
+            ref MemoryPackReader reader,
+            scoped ref int value)
+            => throw new InvalidOperationException();
     }
 }
 

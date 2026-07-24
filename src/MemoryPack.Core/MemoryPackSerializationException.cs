@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 
 namespace MemoryPack;
@@ -52,6 +52,18 @@ public class MemoryPackSerializationException : Exception
     }
 
     [DoesNotReturn]
+    public static void ThrowInvalidLength(int length)
+    {
+        throw new MemoryPackSerializationException($"Length must be non-negative, actual: {length}.");
+    }
+
+    [DoesNotReturn]
+    public static void ThrowSizeOverflow()
+    {
+        throw new MemoryPackSerializationException("The requested serialization size exceeds the supported buffer size.");
+    }
+
+    [DoesNotReturn]
     public static void ThrowSequenceReachedEnd()
     {
         throw new MemoryPackSerializationException($"Sequence reached end, reader can not provide more buffer.");
@@ -67,18 +79,6 @@ public class MemoryPackSerializationException : Exception
     public static void ThrowInsufficientBufferUnless(int length)
     {
         throw new MemoryPackSerializationException($"Length header size is larger than buffer size, length: {length}.");
-    }
-
-    [DoesNotReturn]
-    public static void ThrowNotRegisteredInProvider(Type type)
-    {
-        throw new MemoryPackSerializationException($"{type.FullName} is not registered in this provider.");
-    }
-
-    [DoesNotReturn]
-    public static void ThrowRegisterInProviderFailed(Type type, Exception innerException)
-    {
-        throw new MemoryPackSerializationException($"{type.FullName} is failed in provider at creating formatter.", innerException);
     }
 
     [DoesNotReturn]
@@ -115,6 +115,12 @@ public class MemoryPackSerializationException : Exception
     public static void ThrowFailedEncoding(OperationStatus status)
     {
         throw new MemoryPackSerializationException($"Failed in Utf8 encoding/decoding process, status: {status}.");
+    }
+
+    [DoesNotReturn]
+    public static void ThrowInvalidEncodingLength()
+    {
+        throw new MemoryPackSerializationException("The encoded payload length does not match its string header.");
     }
 
     [DoesNotReturn]

@@ -1,4 +1,4 @@
-﻿#pragma warning disable CS8602
+#pragma warning disable CS8602
 
 using MemoryPack.Tests.Models;
 using System;
@@ -149,6 +149,23 @@ public class CircularReferenceTest
         SequentialCircularReference? tylerDeserialized = MemoryPackSerializer.Deserialize<SequentialCircularReference>(bin);
 
         tylerDeserialized?.DirectReports?[0].Manager.Should().BeSameAs(tylerDeserialized);
+    }
+
+    [Fact]
+    public void ExplicitContext_PreservesSelfMutualAndSharedReferences()
+    {
+        var root = new Node();
+        var child = new Node { Parent = root };
+        root.Parent = root;
+        root.Children = [child, child];
+        var context = new MemoryPackSerializerContext();
+
+        var payload = MemoryPackSerializer.Serialize(root, context);
+        var decoded = MemoryPackSerializer.Deserialize<Node>(payload, context)!;
+
+        decoded.Parent.Should().BeSameAs(decoded);
+        decoded.Children![0].Parent.Should().BeSameAs(decoded);
+        decoded.Children[0].Should().BeSameAs(decoded.Children[1]);
     }
 
 }

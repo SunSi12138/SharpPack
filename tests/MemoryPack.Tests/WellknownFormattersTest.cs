@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Buffers.Binary;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -11,6 +12,24 @@ namespace MemoryPack.Tests;
 
 public class WellknownFormattersTest
 {
+    [Fact]
+    public void BitArrayRejectsInconsistentBackingArrayLength()
+    {
+        var payload = MemoryPackSerializer.Serialize(new BitArray(33));
+
+        // object header, bit length, then the internal int[] collection header
+        BinaryPrimitives.WriteInt32LittleEndian(
+            payload.AsSpan(1 + sizeof(int)),
+            1);
+
+        Assert.Throws<MemoryPackSerializationException>(
+            () => MemoryPackSerializer.Deserialize<BitArray>(payload));
+        Assert.Throws<MemoryPackSerializationException>(
+            () => MemoryPackSerializer.Deserialize<BitArray>(
+                payload,
+                new MemoryPackSerializerContext()));
+    }
+
     private T Convert<T>(T value)
     {
         return MemoryPackSerializer.Deserialize<T>(MemoryPackSerializer.Serialize(value))!;

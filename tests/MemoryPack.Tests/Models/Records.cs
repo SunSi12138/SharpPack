@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -21,7 +21,6 @@ public partial struct IncludesReferenceStruct
     public string? Y;
 }
 
-#if NET7_0_OR_GREATER
 
 [MemoryPackable]
 public partial class RequiredType
@@ -42,7 +41,6 @@ public partial struct RequiredType2
     }
 }
 
-#endif
 
 [MemoryPackable]
 public partial struct StructWithConstructor1

@@ -1,4 +1,4 @@
-﻿using MemoryPack.Internal;
+using MemoryPack.Internal;
 using System.Buffers;
 using System.IO.Compression;
 using System.Runtime.CompilerServices;
@@ -88,19 +88,31 @@ public sealed class BrotliFormatter : MemoryPackFormatter<byte[]>
     public override void Deserialize(ref MemoryPackReader reader, scoped ref byte[]? value)
     {
         var uncompressedLength = reader.ReadUnmanaged<int>();
+        if (uncompressedLength == MemoryPackCode.NullCollection)
+        {
+            value = null;
+            return;
+        }
+        if (uncompressedLength == 0)
+        {
+            value = Array.Empty<byte>();
+            return;
+        }
+        if (uncompressedLength < 0)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(uncompressedLength);
+        }
 
         reader.DangerousReadUnmanagedSpanView<byte>(out var isNull, out var compressedBuffer);
 
         if (isNull)
         {
-            value = null;
-            return;
+            MemoryPackSerializationException.ThrowCompressionFailed();
         }
 
         if (compressedBuffer.Length == 0)
         {
-            value = Array.Empty<byte>();
-            return;
+            MemoryPackSerializationException.ThrowCompressionFailed();
         }
 
         // security, require to check length
@@ -139,6 +151,7 @@ public sealed class BrotliFormatter<T> : MemoryPackFormatter<T>
 
     readonly System.IO.Compression.CompressionLevel compressionLevel;
     readonly int window;
+    readonly int decompressionSizeLimit;
 
     public BrotliFormatter()
         : this(System.IO.Compression.CompressionLevel.Fastest)
@@ -152,9 +165,19 @@ public sealed class BrotliFormatter<T> : MemoryPackFormatter<T>
     }
 
     public BrotliFormatter(System.IO.Compression.CompressionLevel compressionLevel, int window)
+        : this(compressionLevel, window, DefaultDecompssionSizeLimit)
     {
+    }
+
+    public BrotliFormatter(
+        System.IO.Compression.CompressionLevel compressionLevel,
+        int window,
+        int decompressionSizeLimit)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(decompressionSizeLimit);
         this.compressionLevel = compressionLevel;
         this.window = window;
+        this.decompressionSizeLimit = decompressionSizeLimit;
     }
 
     [Preserve]
@@ -179,7 +202,7 @@ public sealed class BrotliFormatter<T> : MemoryPackFormatter<T>
     [Preserve]
     public override void Deserialize(ref MemoryPackReader reader, scoped ref T? value)
     {
-        using var decompressor = new BrotliDecompressor();
+        using var decompressor = new BrotliDecompressor(decompressionSizeLimit);
 
         reader.GetRemainingSource(out var singleSource, out var remainingSource);
 
@@ -196,6 +219,10 @@ public sealed class BrotliFormatter<T> : MemoryPackFormatter<T>
 
         using var coReader = new MemoryPackReader(decompressedSource, reader.OptionalState);
         coReader.ReadValue(ref value);
+        if (coReader.Remaining != 0)
+        {
+            MemoryPackSerializationException.ThrowCompressionFailed();
+        }
 
         reader.Advance(consumed);
     }

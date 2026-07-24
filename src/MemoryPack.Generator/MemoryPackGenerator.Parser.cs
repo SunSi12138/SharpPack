@@ -345,16 +345,7 @@ public partial class TypeMeta
                     ? structLayout.ConstructorArguments[0].Value
                     : null;
 
-                if (layoutKind == null || (LayoutKind)layoutKind == LayoutKind.Sequential)
-                {
-                    var autoTypes = string.Join(", ", structLayoutFields.Select(x => x!.Item1.Name));
-
-                    if (!context.IsNet7OrGreater)
-                    {
-                        context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnamangedStructWithLayoutAutoField, syntax.Identifier.GetLocation(), Symbol.Name, autoTypes));
-                        noError = false;
-                    }
-                }
+                _ = layoutKind;
             }
         }
         else
@@ -616,6 +607,7 @@ partial class MemberMeta
     public string Name { get; }
     public ITypeSymbol MemberType { get; }
     public INamedTypeSymbol? CustomFormatter { get; }
+    public AttributeData? CustomFormatterAttribute { get; }
     public string? CustomFormatterName { get; }
     public bool IsField { get; }
     public bool IsProperty { get; }
@@ -707,6 +699,7 @@ partial class MemberMeta
             if (customFormatterAttr != null)
             {
                 CustomFormatter = customFormatterAttr.AttributeClass!;
+                CustomFormatterAttribute = customFormatterAttr;
                 Kind = MemberKind.CustomFormatter;
 
                 string formatterName;

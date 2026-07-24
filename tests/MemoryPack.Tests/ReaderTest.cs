@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -117,6 +117,54 @@ public class ReaderTest
             error = true;
         }
         error.Should().BeTrue();
+    }
+
+    [Fact]
+    public void NegativeAdvanceAndSpanRequestAreRejectedWithoutMovingReader()
+    {
+        using var state = MemoryPackReaderOptionalStatePool.Rent();
+        var reader = new MemoryPackReader(new byte[] { 1, 2, 3 }, state);
+
+        var advanceError = false;
+        try
+        {
+            reader.Advance(-1);
+        }
+        catch (MemoryPackSerializationException)
+        {
+            advanceError = true;
+        }
+
+        var spanError = false;
+        try
+        {
+            reader.GetSpanReference(-1);
+        }
+        catch (MemoryPackSerializationException)
+        {
+            spanError = true;
+        }
+
+        advanceError.Should().BeTrue();
+        spanError.Should().BeTrue();
+        reader.Consumed.Should().Be(0);
+        reader.ReadUnmanaged<byte>().Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData(-2)]
+    [InlineData(int.MinValue)]
+    public void InvalidCollectionLengthIsRejected(int length)
+    {
+        var bytes = new byte[4];
+        BinaryPrimitives.WriteInt32LittleEndian(bytes, length);
+
+        Assert.Throws<MemoryPackSerializationException>(
+            () => MemoryPackSerializer.Deserialize<byte[]>(bytes));
+        Assert.Throws<MemoryPackSerializationException>(
+            () => MemoryPackSerializer.Deserialize<byte[]>(
+                bytes,
+                new MemoryPackSerializerContext()));
     }
 
     [Fact]

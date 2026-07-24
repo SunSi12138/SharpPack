@@ -1,21 +1,8 @@
-﻿#if NET8_0_OR_GREATER
 using MemoryPack.Formatters;
 using MemoryPack.Internal;
 using System.Collections.Frozen;
 
 // Frozen Collections formatters
-
-namespace MemoryPack
-{
-    public static partial class MemoryPackFormatterProvider
-    {
-        static readonly Dictionary<Type, Type> FrozenCollectionFormatters = new Dictionary<Type, Type>()
-        {
-            { typeof(FrozenDictionary<,>), typeof(FrozenDictionaryFormatter<,>) },
-            { typeof(FrozenSet<>), typeof(FrozenSetFormatter<>) },
-        };
-    }
-}
 
 namespace MemoryPack.Formatters
 {
@@ -68,7 +55,9 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var dict = new Dictionary<TKey, TValue?>(length, equalityComparer);
+            var dict = new Dictionary<TKey, TValue?>(
+                FormatterValidation.InitialCapacity(length),
+                equalityComparer);
 
             var keyFormatter = reader.GetFormatter<TKey>();
             var valueFormatter = reader.GetFormatter<TValue>();
@@ -121,7 +110,9 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var set = new HashSet<T>(length, equalityComparer);
+            var set = new HashSet<T>(
+                FormatterValidation.InitialCapacity(length),
+                equalityComparer);
 
             var formatter = reader.GetFormatter<T?>();
             for (int i = 0; i < length; i++)
@@ -135,4 +126,3 @@ namespace MemoryPack.Formatters
         }
     }
 }
-#endif

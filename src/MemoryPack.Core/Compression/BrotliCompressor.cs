@@ -1,4 +1,4 @@
-﻿using MemoryPack.Internal;
+using MemoryPack.Internal;
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
@@ -7,23 +7,16 @@ using System.Runtime.InteropServices;
 
 namespace MemoryPack.Compression;
 
-#if !NET7_0_OR_GREATER
-#pragma warning disable CS8602
-#endif
 
 public
-#if NET7_0_OR_GREATER
     struct
-#else
-    class
-#endif
     BrotliCompressor : IBufferWriter<byte>, IDisposable
 {
     ReusableLinkedArrayBufferWriter? bufferWriter;
+    readonly long bufferWriterLeaseId;
     readonly int quality;
     readonly int window;
 
-#if NET7_0_OR_GREATER
 
     public BrotliCompressor()
         : this(CompressionLevel.Fastest)
@@ -31,7 +24,6 @@ public
 
     }
 
-#endif
 
     public BrotliCompressor(CompressionLevel compressionLevel)
         : this(BrotliUtils.GetQualityFromCompressionLevel(compressionLevel), BrotliUtils.WindowBits_Default)
@@ -47,7 +39,8 @@ public
 
     public BrotliCompressor(int quality = 1, int window = 22)
     {
-        this.bufferWriter = ReusableLinkedArrayBufferWriterPool.Rent();
+        this.bufferWriter =
+            ReusableLinkedArrayBufferWriterPool.Rent(out bufferWriterLeaseId);
         this.quality = quality;
         this.window = window;
     }
@@ -111,6 +104,10 @@ public
 
             // call BrotliEncoderOperation.Finish
             var finalStatus = encoder.Compress(ReadOnlySpan<byte>.Empty, destination, out var consumed, out var written, isFinalBlock: true);
+            if (finalStatus != OperationStatus.Done || consumed != 0)
+            {
+                MemoryPackSerializationException.ThrowCompressionFailed(finalStatus);
+            }
             writtenCount += written;
 
             return finalBuffer.AsSpan(0, writtenCount).ToArray();
@@ -129,15 +126,13 @@ public
         var encoder = new BrotliEncoder(quality, window);
         try
         {
-            var writtenNotAdvanced = 0;
             foreach (var item in bufferWriter)
             {
-                writtenNotAdvanced = CompressCore(ref encoder, item.Span, ref Unsafe.AsRef(in destBufferWriter), initialLength: null, isFinalBlock: false);
+                CompressCore(ref encoder, item.Span, ref Unsafe.AsRef(in destBufferWriter), initialLength: null, isFinalBlock: false);
             }
 
             // call BrotliEncoderOperation.Finish
-            var finalBlockLength = (writtenNotAdvanced == 0) ? null : (int?)(writtenNotAdvanced + 10);
-            CompressCore(ref encoder, ReadOnlySpan<byte>.Empty, ref Unsafe.AsRef(in destBufferWriter), initialLength: finalBlockLength, isFinalBlock: true);
+            CompressCore(ref encoder, ReadOnlySpan<byte>.Empty, ref Unsafe.AsRef(in destBufferWriter), initialLength: 16, isFinalBlock: true);
         }
         finally
         {
@@ -171,19 +166,24 @@ public
                         source = source.Slice(bytesConsumed);
                     }
                 }
+                if (lastResult != OperationStatus.Done || source.Length != 0)
+                {
+                    MemoryPackSerializationException.ThrowCompressionFailed(lastResult);
+                }
             }
 
             // call BrotliEncoderOperation.Finish
             var finalStatus = OperationStatus.DestinationTooSmall;
+            var finalConsumed = 0;
             while (finalStatus == OperationStatus.DestinationTooSmall)
             {
-                finalStatus = encoder.Compress(ReadOnlySpan<byte>.Empty, buffer, out var consumed, out var written, isFinalBlock: true);
+                finalStatus = encoder.Compress(ReadOnlySpan<byte>.Empty, buffer, out finalConsumed, out var written, isFinalBlock: true);
                 if (written > 0)
                 {
                     await stream.WriteAsync(buffer.AsMemory(0, written), cancellationToken).ConfigureAwait(false);
                 }
             }
-            if (finalStatus != OperationStatus.Done)
+            if (finalStatus != OperationStatus.Done || finalConsumed != 0)
             {
                 MemoryPackSerializationException.ThrowCompressionFailed(finalStatus);
             }
@@ -195,28 +195,22 @@ public
     }
 
     public void CopyTo<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> memoryPackWriter)
-#if NET7_0_OR_GREATER
         where TBufferWriter : IBufferWriter<byte>
-#else
-        where TBufferWriter : class, IBufferWriter<byte>
-#endif
     {
         ThrowIfDisposed();
 
         var encoder = new BrotliEncoder(quality, window);
         try
         {
-            var bytesWritten = 0;
             foreach (var item in bufferWriter)
             {
                 var span = item.Span;
                 if (span.Length <= 0) continue;
-                bytesWritten += CompressCore(ref encoder, span, ref memoryPackWriter, initialLength: null, isFinalBlock: false);
+                CompressCore(ref encoder, span, ref memoryPackWriter, initialLength: null, isFinalBlock: false);
             }
 
             // call BrotliEncoderOperation.Finish
-            var finalBlockMaxLength = BrotliUtils.BrotliEncoderMaxCompressedSize(bytesWritten) - bytesWritten;
-            CompressCore(ref encoder, ReadOnlySpan<byte>.Empty, ref memoryPackWriter, initialLength: finalBlockMaxLength, isFinalBlock: true);
+            CompressCore(ref encoder, ReadOnlySpan<byte>.Empty, ref memoryPackWriter, initialLength: 16, isFinalBlock: true);
         }
         finally
         {
@@ -227,21 +221,17 @@ public
     static int CompressCore<TBufferWriter>(ref BrotliEncoder encoder, ReadOnlySpan<byte> source, ref TBufferWriter destBufferWriter, int? initialLength, bool isFinalBlock)
         where TBufferWriter : IBufferWriter<byte>
     {
-        var writtenNotAdvanced = 0;
-
         var lastResult = OperationStatus.DestinationTooSmall;
         while (lastResult == OperationStatus.DestinationTooSmall)
         {
             var dest = destBufferWriter.GetSpan(initialLength ?? source.Length);
 
             lastResult = encoder.Compress(source, dest, out int bytesConsumed, out int bytesWritten, isFinalBlock: isFinalBlock);
-            writtenNotAdvanced += bytesConsumed;
 
             if (lastResult == OperationStatus.InvalidData) MemoryPackSerializationException.ThrowCompressionFailed();
             if (bytesWritten > 0)
             {
                 destBufferWriter.Advance(bytesWritten);
-                writtenNotAdvanced = 0;
             }
             if (bytesConsumed > 0)
             {
@@ -249,15 +239,16 @@ public
             }
         }
 
-        return writtenNotAdvanced;
+        if (lastResult != OperationStatus.Done || source.Length != 0)
+        {
+            MemoryPackSerializationException.ThrowCompressionFailed(lastResult);
+        }
+
+        return 0;
     }
 
     static int CompressCore<TBufferWriter>(ref BrotliEncoder encoder, ReadOnlySpan<byte> source, ref MemoryPackWriter<TBufferWriter> destBufferWriter, int? initialLength, bool isFinalBlock)
-#if NET7_0_OR_GREATER
         where TBufferWriter : IBufferWriter<byte>
-#else
-        where TBufferWriter : class, IBufferWriter<byte>
-#endif
     {
         var totalWritten = 0;
 
@@ -283,6 +274,11 @@ public
             }
         }
 
+        if (lastResult != OperationStatus.Done || source.Length != 0)
+        {
+            MemoryPackSerializationException.ThrowCompressionFailed(lastResult);
+        }
+
         return totalWritten;
     }
 
@@ -290,14 +286,13 @@ public
     {
         if (bufferWriter == null) return;
 
-        bufferWriter.Reset();
-        ReusableLinkedArrayBufferWriterPool.Return(bufferWriter);
+        ReusableLinkedArrayBufferWriterPool.Return(
+            bufferWriter,
+            bufferWriterLeaseId);
         bufferWriter = null!;
     }
 
-#if NET7_0_OR_GREATER
     [MemberNotNull(nameof(bufferWriter))]
-#endif
     void ThrowIfDisposed()
     {
         if (bufferWriter == null)
@@ -323,9 +318,7 @@ internal static partial class BrotliUtils
             CompressionLevel.NoCompression => Quality_Min,
             CompressionLevel.Fastest => 1,
             CompressionLevel.Optimal => Quality_Default,
-#if NET7_0_OR_GREATER
             CompressionLevel.SmallestSize => Quality_Max,
-#endif
             _ => throw new ArgumentException()
         };
 

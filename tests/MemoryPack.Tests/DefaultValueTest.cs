@@ -1,4 +1,4 @@
-﻿using MemoryPack.Tests.Models;
+using MemoryPack.Tests.Models;
 
 namespace MemoryPack.Tests;
 

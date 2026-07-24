@@ -1,4 +1,4 @@
-﻿using MemoryPack.Formatters;
+using MemoryPack.Formatters;
 using MemoryPack.Internal;
 using System.Buffers;
 using System.Collections.Concurrent;
@@ -13,59 +13,53 @@ using System.Runtime.CompilerServices;
 // ArraySegment
 // ReadOnlySequence
 
-namespace MemoryPack
-{
-    public static partial class MemoryPackFormatterProvider
-    {
-        static readonly Dictionary<Type, Type> ArrayLikeFormatters = new Dictionary<Type, Type>(4)
-        {
-            // If T[], choose UnmanagedArrayFormatter or DangerousUnmanagedTypeArrayFormatter or ArrayFormatter
-            { typeof(ArraySegment<>), typeof(ArraySegmentFormatter<>) },
-            { typeof(Memory<>), typeof(MemoryFormatter<>) },
-            { typeof(ReadOnlyMemory<>), typeof(ReadOnlyMemoryFormatter<>) },
-            { typeof(ReadOnlySequence<>), typeof(ReadOnlySequenceFormatter<>) },
-        };
-    }
-}
-
 namespace MemoryPack.Formatters
 {
     [Preserve]
     public sealed class UnmanagedArrayFormatter<T> : MemoryPackFormatter<T[]>
             where T : unmanaged
     {
+        internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+            => graph.HasFormatterOverride<T>();
+
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref T[]? value)
         {
-            writer.WriteUnmanagedArray(value);
+            writer.WriteArray(value);
         }
 
         [Preserve]
         public override void Deserialize(ref MemoryPackReader reader, scoped ref T[]? value)
         {
-            reader.ReadUnmanagedArray<T>(ref value);
+            reader.ReadArray(ref value);
         }
     }
 
     [Preserve]
     public sealed class DangerousUnmanagedArrayFormatter<T> : MemoryPackFormatter<T[]>
     {
+        internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+            => graph.HasFormatterOverride<T>();
+
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref T[]? value)
         {
-            writer.DangerousWriteUnmanagedArray(value);
+            writer.WriteArray(value);
         }
 
         [Preserve]
         public override void Deserialize(ref MemoryPackReader reader, scoped ref T[]? value)
         {
-            reader.DangerousReadUnmanagedArray<T>(ref value);
+            reader.ReadArray(ref Unsafe.As<T[]?, T?[]?>(ref value));
         }
     }
 
     [Preserve]
     public sealed class ArrayFormatter<T> : MemoryPackFormatter<T?[]>
     {
+        internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+            => graph.HasFormatterOverride<T>();
+
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref T?[]? value)
         {
@@ -82,6 +76,9 @@ namespace MemoryPack.Formatters
     [Preserve]
     public sealed class ArraySegmentFormatter<T> : MemoryPackFormatter<ArraySegment<T?>>
     {
+        internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+            => graph.HasFormatterOverride<T>();
+
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref ArraySegment<T?> value)
         {
@@ -99,6 +96,9 @@ namespace MemoryPack.Formatters
     [Preserve]
     public sealed class MemoryFormatter<T> : MemoryPackFormatter<Memory<T?>>
     {
+        internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+            => graph.HasFormatterOverride<T>();
+
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref Memory<T?> value)
         {
@@ -115,6 +115,9 @@ namespace MemoryPack.Formatters
     [Preserve]
     public sealed class ReadOnlyMemoryFormatter<T> : MemoryPackFormatter<ReadOnlyMemory<T?>>
     {
+        internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+            => graph.HasFormatterOverride<T>();
+
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref ReadOnlyMemory<T?> value)
         {
@@ -131,6 +134,9 @@ namespace MemoryPack.Formatters
     [Preserve]
     public sealed class ReadOnlySequenceFormatter<T> : MemoryPackFormatter<ReadOnlySequence<T?>>
     {
+        internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
+            => graph.HasFormatterOverride<T>();
+
         [Preserve]
         public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref ReadOnlySequence<T?> value)
         {
@@ -179,10 +185,22 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var memory = ArrayPool<T?>.Shared.Rent(length).AsMemory(0, length);
-            var span = memory.Span;
-            reader.ReadSpanWithoutReadLengthHeader(length, ref span);
-            value = memory;
+            var array = ArrayPool<T?>.Shared.Rent(length);
+            try
+            {
+                var memory = array.AsMemory(0, length);
+                var span = memory.Span;
+                reader.ReadSpanWithoutReadLengthHeader(length, ref span);
+                value = memory;
+            }
+            catch
+            {
+                ArrayPool<T?>.Shared.Return(
+                    array,
+                    clearArray:
+                        RuntimeHelpers.IsReferenceOrContainsReferences<T?>());
+                throw;
+            }
         }
     }
 
@@ -210,10 +228,22 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var memory = ArrayPool<T?>.Shared.Rent(length).AsMemory(0, length);
-            var span = memory.Span;
-            reader.ReadSpanWithoutReadLengthHeader(length, ref span);
-            value = memory;
+            var array = ArrayPool<T?>.Shared.Rent(length);
+            try
+            {
+                var memory = array.AsMemory(0, length);
+                var span = memory.Span;
+                reader.ReadSpanWithoutReadLengthHeader(length, ref span);
+                value = memory;
+            }
+            catch
+            {
+                ArrayPool<T?>.Shared.Return(
+                    array,
+                    clearArray:
+                        RuntimeHelpers.IsReferenceOrContainsReferences<T?>());
+                throw;
+            }
         }
     }
 }

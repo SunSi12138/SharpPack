@@ -1,4 +1,4 @@
-﻿using MemoryPack.Internal;
+using MemoryPack.Internal;
 using System.Buffers;
 using System.Diagnostics;
 using System.IO.Compression;
@@ -7,7 +7,26 @@ namespace MemoryPack.Compression;
 
 public struct BrotliDecompressor : IDisposable
 {
+    const int DefaultDecompressionSizeLimit = 1024 * 1024 * 128;
+
     ReusableReadOnlySequenceBuilder? sequenceBuilder;
+    long sequenceBuilderLeaseId;
+    readonly int decompressionSizeLimit;
+    int decompressedLength;
+
+    public BrotliDecompressor()
+        : this(DefaultDecompressionSizeLimit)
+    {
+    }
+
+    public BrotliDecompressor(int decompressionSizeLimit)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(decompressionSizeLimit);
+        sequenceBuilder = null;
+        sequenceBuilderLeaseId = 0;
+        this.decompressionSizeLimit = decompressionSizeLimit;
+        decompressedLength = 0;
+    }
 
     public ReadOnlySequence<byte> Decompress(ReadOnlySpan<byte> compressedSpan)
     {
@@ -21,7 +40,9 @@ public struct BrotliDecompressor : IDisposable
             MemoryPackSerializationException.ThrowAlreadyDecompressed();
         }
 
-        sequenceBuilder = ReusableReadOnlySequenceBuilderPool.Rent();
+        sequenceBuilder = ReusableReadOnlySequenceBuilderPool.Rent(
+            out sequenceBuilderLeaseId);
+        decompressedLength = 0;
         var decoder = new BrotliDecoder();
         try
         {
@@ -31,6 +52,11 @@ public struct BrotliDecompressor : IDisposable
             {
                 MemoryPackSerializationException.ThrowCompressionFailed(status);
             }
+        }
+        catch
+        {
+            ReleaseBuilder();
+            throw;
         }
         finally
         {
@@ -52,7 +78,9 @@ public struct BrotliDecompressor : IDisposable
             MemoryPackSerializationException.ThrowAlreadyDecompressed();
         }
 
-        sequenceBuilder = ReusableReadOnlySequenceBuilderPool.Rent();
+        sequenceBuilder = ReusableReadOnlySequenceBuilderPool.Rent(
+            out sequenceBuilderLeaseId);
+        decompressedLength = 0;
         var decoder = new BrotliDecoder();
         try
         {
@@ -61,13 +89,26 @@ public struct BrotliDecompressor : IDisposable
             foreach (var item in compressedSequence)
             {
                 DecompressCore(ref status, ref decoder, item.Span, out var bytesConsumed);
+                if (bytesConsumed > int.MaxValue - consumed)
+                {
+                    MemoryPackSerializationException.ThrowSizeOverflow();
+                }
                 consumed += bytesConsumed;
+                if (status == OperationStatus.Done)
+                {
+                    break;
+                }
             }
 
             if (status == OperationStatus.NeedMoreData)
             {
                 MemoryPackSerializationException.ThrowCompressionFailed(status);
             }
+        }
+        catch
+        {
+            ReleaseBuilder();
+            throw;
         }
         finally
         {
@@ -83,69 +124,118 @@ public struct BrotliDecompressor : IDisposable
         consumed = 0;
 
         byte[]? buffer = null;
-        status = OperationStatus.DestinationTooSmall;
-        var nextCapacity = source.Length;
-        while (status == OperationStatus.DestinationTooSmall)
+        var bufferLength = 0;
+        try
         {
-            if (buffer == null)
+            status = OperationStatus.DestinationTooSmall;
+            while (status == OperationStatus.DestinationTooSmall)
             {
-                nextCapacity = GetDoubleCapacity(nextCapacity);
-                buffer = ArrayPool<byte>.Shared.Rent(nextCapacity);
-            }
+                if (buffer == null)
+                {
+                    bufferLength = GetOutputBufferCapacity(source.Length);
+                    buffer = ArrayPool<byte>.Shared.Rent(bufferLength);
+                }
 
-            status = decoder.Decompress(source, buffer, out var bytesConsumed, out var bytesWritten);
-            consumed += bytesConsumed;
+                status = decoder.Decompress(
+                    source,
+                    buffer.AsSpan(0, bufferLength),
+                    out var bytesConsumed,
+                    out var bytesWritten);
+                consumed += bytesConsumed;
 
-            if (status == OperationStatus.InvalidData)
-            {
-                MemoryPackSerializationException.ThrowCompressionFailed(status);
-            }
+                if (status == OperationStatus.InvalidData)
+                {
+                    MemoryPackSerializationException.ThrowCompressionFailed(status);
+                }
 
-            if (status == OperationStatus.NeedMoreData)
-            {
                 if (bytesWritten > 0)
                 {
+                    AddOutput(bytesWritten);
                     sequenceBuilder.Add(buffer.AsMemory(0, bytesWritten), true);
+                    buffer = null;
+                    bufferLength = 0;
                 }
+
+                if (status == OperationStatus.NeedMoreData)
+                {
+                    if (bytesConsumed > 0)
+                    {
+                        source = source.Slice(bytesConsumed);
+                    }
+                    if (source.Length != 0)
+                    {
+                        MemoryPackSerializationException.ThrowCompressionFailed();
+                    }
+
+                    return;
+                }
+
                 if (bytesConsumed > 0)
                 {
                     source = source.Slice(bytesConsumed);
                 }
-                if (source.Length != 0)
-                {
-                    // not consumed source fully
-                    MemoryPackSerializationException.ThrowCompressionFailed();
-                }
-
-                // continue for next sequence. 
-                return;
             }
-
-            if (bytesConsumed > 0)
+        }
+        finally
+        {
+            if (buffer is not null)
             {
-                source = source.Slice(bytesConsumed);
-            }
-            if (bytesWritten > 0)
-            {
-                sequenceBuilder.Add(buffer.AsMemory(0, bytesWritten), true);
-                buffer = null;
+                ArrayPool<byte>.Shared.Return(buffer);
             }
         }
     }
 
     public void Dispose()
     {
-        if (sequenceBuilder != null)
-        {
-            ReusableReadOnlySequenceBuilderPool.Return(sequenceBuilder);
-            sequenceBuilder = null;
-        }
+        ReleaseBuilder();
     }
 
-    int GetDoubleCapacity(int length)
+    int GetOutputBufferCapacity(int compressedLength)
     {
-        var newCapacity = unchecked(length * 2);
-        if ((uint)newCapacity > int.MaxValue) newCapacity = int.MaxValue;
-        return Math.Max(newCapacity, 4096);
+        var limit = decompressionSizeLimit == 0
+            ? DefaultDecompressionSizeLimit
+            : decompressionSizeLimit;
+        var remaining = limit - decompressedLength;
+        if (remaining <= 0)
+        {
+            MemoryPackSerializationException.ThrowDecompressionSizeLimitExceeded(
+                limit,
+                decompressedLength);
+        }
+
+        var requested = Math.Max(
+            4096L,
+            Math.Min((long)compressedLength * 2, 256 * 1024));
+        return (int)Math.Min(requested, remaining);
+    }
+
+    void AddOutput(int bytesWritten)
+    {
+        var newLength = (long)decompressedLength + bytesWritten;
+        var limit = decompressionSizeLimit == 0
+            ? DefaultDecompressionSizeLimit
+            : decompressionSizeLimit;
+        if (newLength > limit)
+        {
+            MemoryPackSerializationException.ThrowDecompressionSizeLimitExceeded(
+                limit,
+                newLength > int.MaxValue ? int.MaxValue : (int)newLength);
+        }
+        decompressedLength = (int)newLength;
+    }
+
+    void ReleaseBuilder()
+    {
+        if (sequenceBuilder is null)
+        {
+            return;
+        }
+
+        ReusableReadOnlySequenceBuilderPool.Return(
+            sequenceBuilder,
+            sequenceBuilderLeaseId);
+        sequenceBuilder = null;
+        sequenceBuilderLeaseId = 0;
+        decompressedLength = 0;
     }
 }

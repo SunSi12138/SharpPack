@@ -104,6 +104,8 @@ AppPackages/
 sql
 TestResults
 [Tt]est[Rr]esult*
+/BenchmarkDotNet.Artifacts/
+**/BenchmarkDotNet.Artifacts/
 *.Cache
 ClientBin
 [Ss]tyle[Cc]op.*

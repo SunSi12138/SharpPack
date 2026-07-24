@@ -1,4 +1,4 @@
-﻿using MemoryPack.Internal;
+using MemoryPack.Internal;
 using System.Collections;
 using System.Runtime.CompilerServices;
 
@@ -37,10 +37,22 @@ public sealed class BitArrayFormatter : MemoryPackFormatter<BitArray>
 
         reader.ReadUnmanaged(out int length);
 
-        var bitArray = new BitArray(length, false); // create internal int[] and set m_length to length
+        if (length < 0)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(length);
+        }
 
+        var words = reader.ReadUnmanagedArray<int>();
+        var requiredWordCount = (int)(((long)length + 31) / 32);
+        if (words is null || words.Length < requiredWordCount)
+        {
+            MemoryPackSerializationException.ThrowMessage(
+                $"BitArray length {length} requires at least {requiredWordCount} words.");
+        }
+
+        var bitArray = new BitArray(length, false);
         ref var view = ref Unsafe.As<BitArray, BitArrayView>(ref bitArray);
-        reader.ReadUnmanagedArray(ref view.m_array!);
+        words.AsSpan(0, requiredWordCount).CopyTo(view.m_array);
 
         value = bitArray;
     }

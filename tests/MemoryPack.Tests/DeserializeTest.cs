@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Dynamic;
@@ -29,6 +29,24 @@ public partial class DeserializeTest
 
         stream = new RandomStream(bytes);
         result = await MemoryPackSerializer.DeserializeAsync<int[]>(stream);
+        result.Should().Equal(expected);
+    }
+
+    [Fact]
+    public async Task LargeSegmentedStreamWorksWithDefaultAndContext()
+    {
+        var expected = new byte[(2 * 1024 * 1024) + 17];
+        Random.Shared.NextBytes(expected);
+        var bytes = MemoryPackSerializer.Serialize(expected);
+
+        var result = await MemoryPackSerializer.DeserializeAsync<byte[]>(
+            new RandomStream(bytes));
+        result.Should().Equal(expected);
+
+        var context = new MemoryPackSerializerContext();
+        result = await MemoryPackSerializer.DeserializeAsync<byte[]>(
+            new RandomStream(bytes),
+            context);
         result.Should().Equal(expected);
     }
 
@@ -109,7 +127,8 @@ public partial class DeserializeTest
     [MemoryPackable]
     private partial class PrePaddedString : IEquatable<PrePaddedString>
     {
-        private PrePaddedInt _padding;
+        private PrePaddedInt _padding = default;
+        private int Padding => _padding.Value;
         public string Value { get; set; } = "";
 
         public bool Equals(PrePaddedString? other)

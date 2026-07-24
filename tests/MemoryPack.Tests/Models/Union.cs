@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis.Operations;
+using Microsoft.CodeAnalysis.Operations;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -133,9 +133,27 @@ public partial class ForExternalUnionFormatter2<T>
 }
 
 [MemoryPackUnionFormatter(typeof(IGenericsUnion<string>))]
-[MemoryPackUnion(0, typeof(BForOne<string>))]
-[MemoryPackUnion(1, typeof(BForTwo<string>))]
+[MemoryPackUnion(10, typeof(BForOne<string>))]
+[MemoryPackUnion(11, typeof(BForTwo<string>))]
 public partial class ForExternalUnionFormatter3
+{
+}
+
+[MemoryPackable(GenerateType.NoGenerate)]
+public partial interface IClosedGenericsUnion<T>
+{
+    public T? Value { get; set; }
+}
+
+[MemoryPackable]
+public partial class ClosedGenericsUnionValue<T> : IClosedGenericsUnion<T>
+{
+    public T? Value { get; set; }
+}
+
+[MemoryPackUnionFormatter(typeof(IClosedGenericsUnion<string>))]
+[MemoryPackUnion(7, typeof(ClosedGenericsUnionValue<string>))]
+public partial class ClosedGenericsUnionFormatter
 {
 }
 

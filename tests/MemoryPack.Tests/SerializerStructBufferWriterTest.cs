@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using MemoryPack.Tests.Models;
 
@@ -10,7 +10,7 @@ public class SerializerStructBufferWriterTest
     public void Serialize_ShouldSupportStructAsBufferWriter_WhenValueIsNotReferenceAndNotContainsReferences()
     {
         var writer = new TestBufferWriter();
-        MemoryPackSerializer.Serialize(writer, 16);
+        MemoryPackSerializer.Serialize(ref writer, 16);
         Assert.Equal(4, writer.WrittenSize);
     }
 
@@ -18,7 +18,7 @@ public class SerializerStructBufferWriterTest
     public void Serialize_ShouldSupportStructAsBufferWriter_WhenValueIsUnmanagedSZArray()
     {
         var writer = new TestBufferWriter();
-        MemoryPackSerializer.Serialize(writer, new UnmanagedStruct[] { new() { X = 1, Y = 2, Z = 3 } });
+        MemoryPackSerializer.Serialize(ref writer, new UnmanagedStruct[] { new() { X = 1, Y = 2, Z = 3 } });
         Assert.Equal(16, writer.WrittenSize);
     }
 
@@ -26,7 +26,7 @@ public class SerializerStructBufferWriterTest
     public void Serialize_ShouldSupportStructAsBufferWriter_WhenFormatterRequired()
     {
         var writer = new TestBufferWriter();
-        MemoryPackSerializer.Serialize(writer, new TestData(1));
+        MemoryPackSerializer.Serialize(ref writer, new TestData(1));
         Assert.Equal(5, writer.WrittenSize);
     }
 }

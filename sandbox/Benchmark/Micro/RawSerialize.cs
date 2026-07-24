@@ -41,13 +41,13 @@ public class RawSerialize
         var len1 = f.Length * 2;
         ref readonly var p2 = ref f.GetPinnableReference();
         Unsafe.WriteUnaligned(ref Unsafe.Add(ref p, 12), f.Length);
-        Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref p, 16), ref Unsafe.As<char, byte>(ref Unsafe.AsRef(p2)), (uint)len1);
+        Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref p, 16), ref Unsafe.As<char, byte>(ref Unsafe.AsRef(in p2)), (uint)len1);
 
         var l = value.LastName!;
         var len2 = l.Length * 2;
         ref readonly var p3 = ref l.GetPinnableReference();
         Unsafe.WriteUnaligned(ref Unsafe.Add(ref p, 16 + len1), l.Length); ;
-        Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref p, 20 + len1), ref Unsafe.As<char, byte>(ref Unsafe.AsRef(p3)), (uint)len2);
+        Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref p, 20 + len1), ref Unsafe.As<char, byte>(ref Unsafe.AsRef(in p3)), (uint)len2);
 
         var result = GC.AllocateUninitializedArray<byte>(20 + len1 + len2);
 

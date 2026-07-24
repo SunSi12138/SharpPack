@@ -1,4 +1,5 @@
-﻿using MemoryPack.Tests.Models;
+using MemoryPack.Tests.Models;
+using MemoryPack.Compression;
 using Newtonsoft.Json;
 using System;
 using System.Buffers;
@@ -12,6 +13,9 @@ namespace MemoryPack.Tests;
 
 public class ArrayTest
 {
+    static readonly int[] BitPackBoundaryLengths =
+        [0, 1, 7, 8, 31, 32, 33, 63, 64, 65, 255, 256, 4096];
+
     [Fact]
     public void Check()
     {
@@ -80,6 +84,91 @@ public class ArrayTest
             value2.Data.Should().Equal(data);
             value2.AAA.Should().Be(i);
         }
+    }
+
+    [Fact]
+    public void BitPackBoundariesReuseAndSegmentedInput()
+    {
+        var random = new Random(42);
+        foreach (var length in BitPackBoundaryLengths)
+        {
+            var expected = Enumerable.Range(0, length)
+                .Select(_ => random.Next(2) != 0)
+                .ToArray();
+            var bufferWriter = new ArrayBufferWriter<byte>();
+            using var writerState = MemoryPackWriterOptionalStatePool.Rent();
+            var writer = new MemoryPackWriter<ArrayBufferWriter<byte>>(
+                ref bufferWriter,
+                writerState);
+            bool[]? source = expected;
+            BitPackFormatter.Default.Serialize(ref writer, ref source);
+            writer.Flush();
+
+            var segments = bufferWriter.WrittenSpan
+                .ToArray()
+                .Select(static item => new[] { item })
+                .ToArray();
+            var sequence = ReadOnlySequenceBuilder.Create(segments);
+            using var readerState = MemoryPackReaderOptionalStatePool.Rent();
+            var reader = new MemoryPackReader(sequence, readerState);
+            bool[]? destination = new bool[length];
+            var originalDestination = destination;
+
+            try
+            {
+                BitPackFormatter.Default.Deserialize(
+                    ref reader,
+                    ref destination);
+            }
+            finally
+            {
+                reader.Dispose();
+            }
+
+            if (length != 0)
+            {
+                destination.Should().BeSameAs(originalDestination);
+            }
+            destination.Should().Equal(expected);
+        }
+    }
+
+    [Fact]
+    public void BitPackRejectsTruncatedInput()
+    {
+        bool[]? source = Enumerable.Range(0, 65)
+            .Select(static index => (index & 1) == 0)
+            .ToArray();
+        var bufferWriter = new ArrayBufferWriter<byte>();
+        using var writerState = MemoryPackWriterOptionalStatePool.Rent();
+        var writer = new MemoryPackWriter<ArrayBufferWriter<byte>>(
+            ref bufferWriter,
+            writerState);
+        BitPackFormatter.Default.Serialize(ref writer, ref source);
+        writer.Flush();
+
+        using var readerState = MemoryPackReaderOptionalStatePool.Rent();
+        var reader = new MemoryPackReader(
+            bufferWriter.WrittenSpan[..^1],
+            readerState);
+        bool[]? destination = null;
+        var threw = false;
+        try
+        {
+            BitPackFormatter.Default.Deserialize(
+                ref reader,
+                ref destination);
+        }
+        catch (MemoryPackSerializationException)
+        {
+            threw = true;
+        }
+        finally
+        {
+            reader.Dispose();
+        }
+
+        threw.Should().BeTrue();
     }
 
     //[Fact]

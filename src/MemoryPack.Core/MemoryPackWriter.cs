@@ -1,36 +1,21 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
-#if NET7_0_OR_GREATER
 using System.Text.Unicode;
-#endif
 
 namespace MemoryPack;
 
-#if NET7_0_OR_GREATER
 using static MemoryMarshal;
-#else
-using static MemoryPack.Internal.MemoryMarshalEx;
-#endif
 
 [StructLayout(LayoutKind.Auto)]
 public ref partial struct MemoryPackWriter<TBufferWriter>
-#if NET7_0_OR_GREATER
     where TBufferWriter : IBufferWriter<byte>
-#else
-    where TBufferWriter : class, IBufferWriter<byte>
-#endif
 {
     const int DepthLimit = 1000;
 
-#if NET7_0_OR_GREATER
     ref TBufferWriter bufferWriter;
     ref byte bufferReference;
-#else
-    TBufferWriter bufferWriter;
-    Span<byte> bufferReference;
-#endif
     int bufferLength;
     int advancedCount;
     int depth; // check recursive serialize
@@ -41,73 +26,58 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
     public int WrittenCount => writtenCount;
     public int BufferLength => bufferLength;
     public MemoryPackWriterOptionalState OptionalState => optionalState;
-    public MemoryPackSerializerOptions Options => optionalState.Options;
+    public MemoryPackSerializerConfiguration Configuration => optionalState.Configuration;
 
     public MemoryPackWriter(ref TBufferWriter writer, MemoryPackWriterOptionalState optionalState)
     {
-#if NET7_0_OR_GREATER
         this.bufferWriter = ref writer;
         this.bufferReference = ref Unsafe.NullRef<byte>();
-#else
-        this.bufferWriter = writer;
-        this.bufferReference = default;
-#endif
         this.bufferLength = 0;
         this.advancedCount = 0;
         this.writtenCount = 0;
         this.depth = 0;
-        this.serializeStringAsUtf8 = optionalState.Options.StringEncoding == StringEncoding.Utf8;
+        this.serializeStringAsUtf8 = optionalState.Configuration.StringEncoding == MemoryPackStringEncoding.Utf8;
         this.optionalState = optionalState;
     }
 
     // optimized ctor, avoid first GetSpan call if we can.
     public MemoryPackWriter(ref TBufferWriter writer, byte[] firstBufferOfWriter, MemoryPackWriterOptionalState optionalState)
     {
-#if NET7_0_OR_GREATER
         this.bufferWriter = ref writer;
         this.bufferReference = ref GetArrayDataReference(firstBufferOfWriter);
-#else
-        this.bufferWriter = writer;
-        this.bufferReference = firstBufferOfWriter.AsSpan();
-#endif
         this.bufferLength = firstBufferOfWriter.Length;
         this.advancedCount = 0;
         this.writtenCount = 0;
         this.depth = 0;
-        this.serializeStringAsUtf8 = optionalState.Options.StringEncoding == StringEncoding.Utf8;
+        this.serializeStringAsUtf8 = optionalState.Configuration.StringEncoding == MemoryPackStringEncoding.Utf8;
         this.optionalState = optionalState;
     }
 
     public MemoryPackWriter(ref TBufferWriter writer, Span<byte> firstBufferOfWriter, MemoryPackWriterOptionalState optionalState)
     {
-#if NET7_0_OR_GREATER
         this.bufferWriter = ref writer;
         this.bufferReference = ref MemoryMarshal.GetReference(firstBufferOfWriter);
-#else
-        this.bufferWriter = writer;
-        this.bufferReference = firstBufferOfWriter;
-#endif
         this.bufferLength = firstBufferOfWriter.Length;
         this.advancedCount = 0;
         this.writtenCount = 0;
         this.depth = 0;
-        this.serializeStringAsUtf8 = optionalState.Options.StringEncoding == StringEncoding.Utf8;
+        this.serializeStringAsUtf8 = optionalState.Configuration.StringEncoding == MemoryPackStringEncoding.Utf8;
         this.optionalState = optionalState;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ref byte GetSpanReference(int sizeHint)
     {
+        if (sizeHint < 0)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(sizeHint);
+        }
         if (bufferLength < sizeHint)
         {
             RequestNewBuffer(sizeHint);
         }
 
-#if NET7_0_OR_GREATER
         return ref bufferReference;
-#else
-        return ref MemoryMarshal.GetReference(bufferReference);
-#endif
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -119,17 +89,17 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
             advancedCount = 0;
         }
         var span = bufferWriter.GetSpan(sizeHint);
-#if NET7_0_OR_GREATER
         bufferReference = ref MemoryMarshal.GetReference(span);
-#else
-        bufferReference = span;
-#endif
         bufferLength = span.Length;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Advance(int count)
     {
+        if (count < 0)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(count);
+        }
         if (count == 0) return;
 
         var rest = bufferLength - count;
@@ -139,11 +109,7 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
         }
 
         bufferLength = rest;
-#if NET7_0_OR_GREATER
         bufferReference = ref Unsafe.Add(ref bufferReference, count);
-#else
-        bufferReference = bufferReference.Slice(count);
-#endif
         advancedCount += count;
         writtenCount += count;
     }
@@ -156,26 +122,36 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
             bufferWriter.Advance(advancedCount);
             advancedCount = 0;
         }
-#if NET7_0_OR_GREATER
         bufferReference = ref Unsafe.NullRef<byte>();
-#else
-        bufferReference = default;
-#endif
         bufferLength = 0;
         writtenCount = 0;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public IMemoryPackFormatter GetFormatter(Type type)
+    public MemoryPackFormatter<T> GetFormatter<T>()
     {
-        return MemoryPackFormatterProvider.GetFormatter(type);
+        if (optionalState.FormatterGraph is { } graph)
+        {
+            return graph.GetFormatter<T>();
+        }
+        if (FormatterTypeTraits<T>.ContainsCollectibleType &&
+            optionalState.SerializerContext is { } context)
+        {
+            return GetCollectibleContextFormatter<T>(context);
+        }
+        return FormatterSlot<T>.Formatter;
     }
 
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static MemoryPackFormatter<T> GetCollectibleContextFormatter<T>(
+        MemoryPackSerializerContext context)
+        => context.Graph.GetFormatter<T>();
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public IMemoryPackFormatter<T> GetFormatter<T>()
-    {
-        return MemoryPackFormatterProvider.GetFormatter<T>();
-    }
+    internal bool HasFormatterOverride<T>()
+        => optionalState.HasFormatterOverride<T>();
+
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int GetStringWriteLength(string? value)
@@ -204,7 +180,7 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
             return 4;
         }
 
-        return (Unsafe.SizeOf<T>() * value.Length) + 4;
+        return CheckedAdd(GetUnmanagedByteCount<T>(value.Length), 4);
     }
 
     // Write methods
@@ -261,6 +237,7 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteCollectionHeader(int length)
     {
+        ValidateLength(length);
         Unsafe.WriteUnaligned(ref GetSpanReference(4), length);
         Advance(4);
     }
@@ -302,17 +279,14 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
 
         var copyByteCount = checked(value.Length * 2);
 
-        ref var dest = ref GetSpanReference(copyByteCount + 4);
+        var totalLength = CheckedAdd(copyByteCount, 4);
+        ref var dest = ref GetSpanReference(totalLength);
         Unsafe.WriteUnaligned(ref dest, value.Length);
 
-#if NET7_0_OR_GREATER
         ref var src = ref Unsafe.As<char, byte>(ref Unsafe.AsRef(in value.GetPinnableReference()));
         Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref dest, 4), ref src, (uint)copyByteCount);
-#else
-        MemoryMarshal.AsBytes(value.AsSpan()).CopyTo(MemoryMarshal.CreateSpan(ref Unsafe.Add(ref dest, 4), copyByteCount));
-#endif
 
-        Advance(copyByteCount + 4);
+        Advance(totalLength);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -326,10 +300,11 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
 
         var copyByteCount = checked(value.Length * 2);
 
-        ref var dest = ref GetSpanReference(copyByteCount + 4);
+        var totalLength = CheckedAdd(copyByteCount, 4);
+        ref var dest = ref GetSpanReference(totalLength);
         Unsafe.WriteUnaligned(ref dest, value.Length);
         MemoryMarshal.AsBytes(value).CopyTo(MemoryMarshal.CreateSpan(ref Unsafe.Add(ref dest, 4), copyByteCount));
-        Advance(copyByteCount + 4);
+        Advance(totalLength);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -351,28 +326,24 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
 
         var source = value.AsSpan();
 
-        // UTF8.GetMaxByteCount -> (length + 1) * 3
-        var maxByteCount = (source.Length + 1) * 3;
+        var maxByteCount = Encoding.UTF8.GetMaxByteCount(source.Length);
+        var requiredLength = CheckedAdd(maxByteCount, 8);
 
-        ref var destPointer = ref GetSpanReference(maxByteCount + 8); // header
+        ref var destPointer = ref GetSpanReference(requiredLength); // header
 
         // write utf16-length
         Unsafe.WriteUnaligned(ref Unsafe.Add(ref destPointer, 4), source.Length);
 
         var dest = MemoryMarshal.CreateSpan(ref Unsafe.Add(ref destPointer, 8), maxByteCount);
-#if NET7_0_OR_GREATER
         var status = Utf8.FromUtf16(source, dest, out var _, out var bytesWritten, replaceInvalidSequences: false);
         if (status != OperationStatus.Done)
         {
             MemoryPackSerializationException.ThrowFailedEncoding(status);
         }
-#else
-        var bytesWritten = Encoding.UTF8.GetBytes(value, dest);
-#endif
 
         // write written utf8-length in header, that is ~length
         Unsafe.WriteUnaligned(ref destPointer, ~bytesWritten);
-        Advance(bytesWritten + 8); // + header
+        Advance(CheckedAdd(bytesWritten, 8)); // + header
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -386,7 +357,8 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
 
         // (int ~utf8-byte-count, int utf16-length, utf8-bytes)
 
-        ref var destPointer = ref GetSpanReference(utf8Value.Length + 8); // header
+        var requiredLength = CheckedAdd(utf8Value.Length, 8);
+        ref var destPointer = ref GetSpanReference(requiredLength); // header
 
         Unsafe.WriteUnaligned(ref destPointer, ~utf8Value.Length);
         Unsafe.WriteUnaligned(ref Unsafe.Add(ref destPointer, 4), utf16Length);
@@ -394,58 +366,60 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
         var dest = MemoryMarshal.CreateSpan(ref Unsafe.Add(ref destPointer, 8), utf8Value.Length);
         utf8Value.CopyTo(dest);
 
-        Advance(utf8Value.Length + 8);
+        Advance(requiredLength);
     }
 
-#if NET7_0_OR_GREATER
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WritePackable<T>(scoped in T? value)
         where T : IMemoryPackable<T>
     {
-        depth++;
-        if (depth == DepthLimit) MemoryPackSerializationException.ThrowReachedDepthLimit(typeof(T));
-        T.Serialize(ref this, ref Unsafe.AsRef(in value));
-        depth--;
+        if (optionalState.FormatterGraph is not null)
+        {
+            WriteValue(value);
+            return;
+        }
+
+        EnterDepth<T>();
+        try
+        {
+            T.Serialize(ref this, ref Unsafe.AsRef(in value));
+        }
+        finally
+        {
+            depth--;
+        }
     }
 
-#else
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void WritePackable<T>(scoped in T? value)
-        where T : IMemoryPackable<T>
-    {
-        WriteValue(value);
-    }
-
-#endif
 
     // non packable, get formatter dynamically.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteValue<T>(scoped in T? value)
     {
-        depth++;
-        if (depth == DepthLimit) MemoryPackSerializationException.ThrowReachedDepthLimit(typeof(T));
-        GetFormatter<T>().Serialize(ref this, ref Unsafe.AsRef(in value));
-        depth--;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void WriteValue(Type type, object? value)
-    {
-        depth++;
-        if (depth == DepthLimit) MemoryPackSerializationException.ThrowReachedDepthLimit(type);
-        GetFormatter(type).Serialize(ref this, ref value);
-        depth--;
+        EnterDepth<T>();
+        try
+        {
+            GetFormatter<T>().Serialize(ref this, ref Unsafe.AsRef(in value));
+        }
+        finally
+        {
+            depth--;
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteValueWithFormatter<TFormatter, T>(TFormatter formatter, scoped in T? value)
         where TFormatter : IMemoryPackFormatter<T>
     {
-        depth++;
-        formatter.Serialize(ref this, ref Unsafe.AsRef(in value));
-        depth--;
+        EnterDepth<T>();
+        try
+        {
+            formatter.Serialize(ref this, ref Unsafe.AsRef(in value));
+        }
+        finally
+        {
+            depth--;
+        }
     }
 
     #region WriteArray/Span
@@ -453,7 +427,8 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteArray<T>(T?[]? value)
     {
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !HasFormatterOverride<T>())
         {
             DangerousWriteUnmanagedArray(value);
             return;
@@ -476,7 +451,8 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteSpan<T>(scoped Span<T?> value)
     {
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !HasFormatterOverride<T>())
         {
             DangerousWriteUnmanagedSpan(value);
             return;
@@ -493,7 +469,8 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteSpan<T>(scoped ReadOnlySpan<T?> value)
     {
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !HasFormatterOverride<T>())
         {
             DangerousWriteUnmanagedSpan(value);
             return;
@@ -511,10 +488,12 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
     public void WritePackableArray<T>(T?[]? value)
         where T : IMemoryPackable<T>
     {
-#if !NET7_0_OR_GREATER
-        WriteArray(value);
-        return;
-#else
+
+        if (optionalState.FormatterGraph is not null)
+        {
+            WriteArray(value);
+            return;
+        }
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
@@ -533,17 +512,18 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
         {
             T.Serialize(ref this, ref value[i]);
         }
-#endif
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WritePackableSpan<T>(scoped Span<T?> value)
         where T : IMemoryPackable<T>
     {
-#if !NET7_0_OR_GREATER
-        WriteSpan(value);
-        return;
-#else
+        if (optionalState.FormatterGraph is not null)
+        {
+            WriteSpan(value);
+            return;
+        }
+
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
             DangerousWriteUnmanagedSpan(value);
@@ -555,17 +535,18 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
         {
             T.Serialize(ref this, ref value[i]);
         }
-#endif
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WritePackableSpan<T>(scoped ReadOnlySpan<T?> value)
         where T : IMemoryPackable<T>
     {
-#if !NET7_0_OR_GREATER
-        WriteSpan(value);
-        return;
-#else
+        if (optionalState.FormatterGraph is not null)
+        {
+            WriteSpan(value);
+            return;
+        }
+
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
             DangerousWriteUnmanagedSpan(value);
@@ -577,7 +558,6 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
         {
             T.Serialize(ref this, ref Unsafe.AsRef(in value[i]));
         }
-#endif
     }
 
     #endregion
@@ -619,8 +599,8 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
             return;
         }
 
-        var srcLength = Unsafe.SizeOf<T>() * value.Length;
-        var allocSize = srcLength + 4;
+        var srcLength = GetUnmanagedByteCount<T>(value.Length);
+        var allocSize = CheckedAdd(srcLength, 4);
 
         ref var dest = ref GetSpanReference(allocSize);
         ref var src = ref Unsafe.As<T, byte>(ref GetArrayDataReference(value));
@@ -640,8 +620,8 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
             return;
         }
 
-        var srcLength = Unsafe.SizeOf<T>() * value.Length;
-        var allocSize = srcLength + 4;
+        var srcLength = GetUnmanagedByteCount<T>(value.Length);
+        var allocSize = CheckedAdd(srcLength, 4);
 
         ref var dest = ref GetSpanReference(allocSize);
         ref var src = ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(value));
@@ -661,8 +641,8 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
             return;
         }
 
-        var srcLength = Unsafe.SizeOf<T>() * value.Length;
-        var allocSize = srcLength + 4;
+        var srcLength = GetUnmanagedByteCount<T>(value.Length);
+        var allocSize = CheckedAdd(srcLength, 4);
 
         ref var dest = ref GetSpanReference(allocSize);
         ref var src = ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(value));
@@ -681,9 +661,10 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
     {
         if (value.Length == 0) return;
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !HasFormatterOverride<T>())
         {
-            var srcLength = Unsafe.SizeOf<T>() * value.Length;
+            var srcLength = GetUnmanagedByteCount<T>(value.Length);
             ref var dest = ref GetSpanReference(srcLength);
             ref var src = ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(value)!);
 
@@ -699,6 +680,49 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
             {
                 formatter.Serialize(ref this, ref Unsafe.AsRef(in value[i]));
             }
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static void ValidateLength(int length)
+    {
+        if (length < 0)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(length);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static int CheckedAdd(int left, int right)
+    {
+        var result = (long)left + right;
+        if ((ulong)result > int.MaxValue)
+        {
+            MemoryPackSerializationException.ThrowSizeOverflow();
+        }
+        return (int)result;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static int GetUnmanagedByteCount<T>(int length)
+    {
+        ValidateLength(length);
+        var byteCount = (long)length * Unsafe.SizeOf<T>();
+        if ((ulong)byteCount > int.MaxValue)
+        {
+            MemoryPackSerializationException.ThrowSizeOverflow();
+        }
+        return (int)byteCount;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    void EnterDepth<T>()
+    {
+        depth++;
+        if (depth >= DepthLimit)
+        {
+            depth--;
+            MemoryPackSerializationException.ThrowReachedDepthLimit(typeof(T));
         }
     }
 }

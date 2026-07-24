@@ -1,4 +1,4 @@
-﻿using MemoryPack.Generator;
+using MemoryPack.Generator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -33,13 +33,22 @@ global using MemoryPack;
             .Where(x => !x.IsDynamic && !string.IsNullOrWhiteSpace(x.Location));
 
         var references = systemAssemblies
+            .Append(typeof(System.ComponentModel.DataAnnotations.RequiredAttribute).Assembly)
             .Append(typeof(MemoryPackableAttribute).Assembly) // System Assemblies + MemoryPack.Core.dll
+            .Distinct()
             .Select(x => MetadataReference.CreateFromFile(x.Location))
             .ToArray();
 
+        var parseOptions = new CSharpParseOptions(LanguageVersion.CSharp14);
         var compilation = CSharpCompilation.Create("generatortest",
             references: references,
-            syntaxTrees: [CSharpSyntaxTree.ParseText(globalUsings, path: "GlobalUsings.cs")],
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(
+                    globalUsings,
+                    parseOptions,
+                    path: "GlobalUsings.cs"),
+            ],
             options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
 
         baseCompilation = compilation;
@@ -49,9 +58,9 @@ global using MemoryPack;
     {
         if (preprocessorSymbols == null)
         {
-            preprocessorSymbols = new[] { "NET7_0_OR_GREATER" };
+            preprocessorSymbols = new[] { "NET10_0_OR_GREATER" };
         }
-        var parseOptions = new CSharpParseOptions(LanguageVersion.CSharp11, preprocessorSymbols: preprocessorSymbols);
+        var parseOptions = new CSharpParseOptions(LanguageVersion.CSharp14, preprocessorSymbols: preprocessorSymbols);
 
         var driver = CSharpGeneratorDriver.Create(new MemoryPackGenerator()).WithUpdatedParseOptions(parseOptions);
         if (options != null)
@@ -68,7 +77,7 @@ global using MemoryPack;
 
     public static (string Key, string Reasons)[][] GetIncrementalGeneratorTrackedStepsReasons(string keyPrefixFilter, params string[] sources)
     {
-        var parseOptions = new CSharpParseOptions(LanguageVersion.CSharp11);
+        var parseOptions = new CSharpParseOptions(LanguageVersion.CSharp14);
         var driver = CSharpGeneratorDriver.Create(
             [new MemoryPackGenerator().AsSourceGenerator()],
             driverOptions: new GeneratorDriverOptions(IncrementalGeneratorOutputKind.None, trackIncrementalGeneratorSteps: true))
