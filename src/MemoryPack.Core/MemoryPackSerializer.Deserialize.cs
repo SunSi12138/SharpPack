@@ -8,6 +8,8 @@ namespace MemoryPack;
 
 public static partial class MemoryPackSerializer
 {
+    const int MaximumStreamSegmentSize = 256 * 1024;
+
     [ThreadStatic]
     static MemoryPackReaderOptionalState? threadStaticReaderOptionalState;
 
@@ -152,7 +154,10 @@ public static partial class MemoryPackSerializer
                 if (offset == buffer.Length)
                 {
                     builder.Add(buffer, returnToPool: true);
-                    buffer = ArrayPool<byte>.Shared.Rent(MathEx.NewArrayCapacity(buffer.Length));
+                    buffer = ArrayPool<byte>.Shared.Rent(
+                        Math.Min(
+                            MathEx.NewArrayCapacity(buffer.Length),
+                            MaximumStreamSegmentSize));
                     offset = 0;
                 }
 

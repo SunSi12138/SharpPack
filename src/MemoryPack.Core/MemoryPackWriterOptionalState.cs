@@ -36,6 +36,8 @@ public static class MemoryPackWriterOptionalStatePool
 
 public sealed class MemoryPackWriterOptionalState : IDisposable
 {
+    const int MaxRetainedReferenceCount = 4096;
+
     internal static readonly MemoryPackWriterOptionalState NullState =
         new(MemoryPackSerializerConfiguration.Default);
 
@@ -91,7 +93,15 @@ public sealed class MemoryPackWriterOptionalState : IDisposable
 
     public void Reset()
     {
-        objectToRef?.Clear();
+        if (objectToRef is { Count: > MaxRetainedReferenceCount })
+        {
+            objectToRef = null;
+        }
+        else
+        {
+            objectToRef?.Clear();
+        }
+
         Configuration = default;
         SerializerContext = null;
         FormatterGraph = null;

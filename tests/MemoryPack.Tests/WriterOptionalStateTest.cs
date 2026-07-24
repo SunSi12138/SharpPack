@@ -43,4 +43,46 @@ public class WriterOptionalStateTest
 
         state.Reset();
     }
+
+    [Fact]
+    public void ReaderReferencesSupportSequentialSparseAndOutOfOrderIds()
+    {
+        var state = new MemoryPackReaderOptionalState();
+        var zero = new object();
+        var one = new object();
+        var two = new object();
+        var large = new object();
+
+        state.AddObjectReference(0, zero);
+        state.AddObjectReference(2, two);
+        state.AddObjectReference(1, one);
+        state.AddObjectReference(uint.MaxValue, large);
+
+        state.GetObjectReference(0).Should().BeSameAs(zero);
+        state.GetObjectReference(1).Should().BeSameAs(one);
+        state.GetObjectReference(2).Should().BeSameAs(two);
+        state.GetObjectReference(uint.MaxValue).Should().BeSameAs(large);
+    }
+
+    [Fact]
+    public void ReaderReferencesRejectDuplicateAndUnknownIds()
+    {
+        var state = new MemoryPackReaderOptionalState();
+        state.AddObjectReference(0, new object());
+        state.AddObjectReference(2, new object());
+
+        var duplicateSequential = () =>
+            state.AddObjectReference(0, new object());
+        var duplicateSparse = () =>
+            state.AddObjectReference(2, new object());
+        var unknown = () => state.GetObjectReference(1);
+
+        duplicateSequential.Should()
+            .Throw<MemoryPackSerializationException>();
+        duplicateSparse.Should()
+            .Throw<MemoryPackSerializationException>();
+        unknown.Should()
+            .Throw<MemoryPackSerializationException>();
+    }
+
 }

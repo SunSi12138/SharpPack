@@ -33,6 +33,24 @@ public partial class DeserializeTest
     }
 
     [Fact]
+    public async Task LargeSegmentedStreamWorksWithDefaultAndContext()
+    {
+        var expected = new byte[(2 * 1024 * 1024) + 17];
+        Random.Shared.NextBytes(expected);
+        var bytes = MemoryPackSerializer.Serialize(expected);
+
+        var result = await MemoryPackSerializer.DeserializeAsync<byte[]>(
+            new RandomStream(bytes));
+        result.Should().Equal(expected);
+
+        var context = new MemoryPackSerializerContext();
+        result = await MemoryPackSerializer.DeserializeAsync<byte[]>(
+            new RandomStream(bytes),
+            context);
+        result.Should().Equal(expected);
+    }
+
+    [Fact]
     public void GenericValueStructTest()
     {
         GenericStruct<int> value = new() { Id = 75, Value = 23 };

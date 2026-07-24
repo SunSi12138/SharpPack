@@ -35,7 +35,10 @@ public static class MemoryPackReaderOptionalStatePool
 
 public sealed class MemoryPackReaderOptionalState : IDisposable
 {
-    Dictionary<uint, object>? refToObject;
+    const int MaxRetainedReferenceCount = 4096;
+
+    List<object>? sequentialReferences;
+    Dictionary<uint, object>? sparseReferences;
     bool isInUse;
 
     internal MemoryPackSerializerContext? SerializerContext { get; private set; }
@@ -71,8 +74,14 @@ public sealed class MemoryPackReaderOptionalState : IDisposable
 
     public object GetObjectReference(uint id)
     {
-        if (refToObject is not null &&
-            refToObject.TryGetValue(id, out var value))
+        if (sequentialReferences is { } sequential &&
+            id < (uint)sequential.Count)
+        {
+            return sequential[(int)id];
+        }
+
+        if (sparseReferences is not null &&
+            sparseReferences.TryGetValue(id, out var value))
         {
             return value;
         }
@@ -84,8 +93,21 @@ public sealed class MemoryPackReaderOptionalState : IDisposable
 
     public void AddObjectReference(uint id, object value)
     {
-        refToObject ??= [];
-        if (!refToObject.TryAdd(id, value))
+        sequentialReferences ??= [];
+        if (id == (uint)sequentialReferences.Count)
+        {
+            if (sparseReferences?.ContainsKey(id) == true)
+            {
+                MemoryPackSerializationException.ThrowMessage(
+                    "Object is already added, id:" + id);
+            }
+
+            sequentialReferences.Add(value);
+            return;
+        }
+
+        if (id < (uint)sequentialReferences.Count ||
+            !(sparseReferences ??= []).TryAdd(id, value))
         {
             MemoryPackSerializationException.ThrowMessage(
                 "Object is already added, id:" + id);
@@ -94,7 +116,24 @@ public sealed class MemoryPackReaderOptionalState : IDisposable
 
     public void Reset()
     {
-        refToObject?.Clear();
+        if (sequentialReferences is { Count: > MaxRetainedReferenceCount })
+        {
+            sequentialReferences = null;
+        }
+        else
+        {
+            sequentialReferences?.Clear();
+        }
+
+        if (sparseReferences is { Count: > MaxRetainedReferenceCount })
+        {
+            sparseReferences = null;
+        }
+        else
+        {
+            sparseReferences?.Clear();
+        }
+
         SerializerContext = null;
         FormatterGraph = null;
     }

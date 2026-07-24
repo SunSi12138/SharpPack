@@ -6,6 +6,7 @@ using System.IO;
 using System.IO.Pipelines;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace MemoryPack.Tests.Streaming;
@@ -59,9 +60,117 @@ public class StreamingSerializer
             list.Should().Equal(seq);
         }
 
+    }
 
+    [Fact]
+    public async Task DeserializeHandlesEmptyAndFinalPartialBatch()
+    {
+        foreach (var expected in new[] { Array.Empty<int>(), [1, 2, 3, 4, 5] })
+        {
+            var pipe = new Pipe();
+            pipe.Writer.Write(MemoryPackSerializer.Serialize(expected));
+            await pipe.Writer.CompleteAsync();
 
+            var actual = new List<int>();
+            await foreach (var item in MemoryPackStreamingSerializer.DeserializeAsync<int>(
+                pipe.Reader,
+                bufferAtLeast: 4,
+                readMinimumSize: 4))
+            {
+                actual.Add(item);
+            }
 
+            actual.Should().Equal(expected);
+            await pipe.Reader.CompleteAsync();
+        }
+    }
+
+    [Fact]
+    public async Task DeserializeHandlesByteAtATimePipe()
+    {
+        var expected = Enumerable.Range(0, 257).ToArray();
+        var payload = MemoryPackSerializer.Serialize(expected);
+        var pipe = new Pipe();
+
+        var producer = Task.Run(async () =>
+        {
+            foreach (var value in payload)
+            {
+                pipe.Writer.Write([value]);
+                await pipe.Writer.FlushAsync();
+            }
+
+            await pipe.Writer.CompleteAsync();
+        });
+
+        var actual = new List<int>();
+        await foreach (var item in MemoryPackStreamingSerializer.DeserializeAsync<int>(
+            pipe.Reader,
+            bufferAtLeast: 4,
+            readMinimumSize: 4))
+        {
+            actual.Add(item);
+        }
+
+        await producer;
+        actual.Should().Equal(expected);
+        await pipe.Reader.CompleteAsync();
+    }
+
+    [Fact]
+    public async Task DeserializeHonorsCancellationAndEarlyTermination()
+    {
+        var canceledPipe = new Pipe();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+        {
+            await foreach (var _ in MemoryPackStreamingSerializer.DeserializeAsync<int>(
+                canceledPipe.Reader,
+                cancellationToken: cancellation.Token))
+            {
+            }
+        });
+        await canceledPipe.Reader.CompleteAsync();
+        await canceledPipe.Writer.CompleteAsync();
+
+        var pipe = new Pipe();
+        pipe.Writer.Write(MemoryPackSerializer.Serialize(
+            Enumerable.Range(0, 100).ToArray()));
+        await pipe.Writer.CompleteAsync();
+
+        await foreach (var item in MemoryPackStreamingSerializer.DeserializeAsync<int>(
+            pipe.Reader,
+            bufferAtLeast: 4,
+            readMinimumSize: 4))
+        {
+            item.Should().Be(0);
+            break;
+        }
+
+        await pipe.Reader.CompleteAsync();
+    }
+
+    [Fact]
+    public async Task DeserializeRejectsTruncatedFinalItem()
+    {
+        var payload = MemoryPackSerializer.Serialize(new[] { 1, 2, 3 });
+        var pipe = new Pipe();
+        pipe.Writer.Write(payload.AsSpan(0, payload.Length - 1));
+        await pipe.Writer.CompleteAsync();
+
+        await Assert.ThrowsAsync<MemoryPackSerializationException>(async () =>
+        {
+            await foreach (var _ in MemoryPackStreamingSerializer.DeserializeAsync<int>(
+                pipe.Reader,
+                bufferAtLeast: 4,
+                readMinimumSize: 4))
+            {
+            }
+        });
+
+        await pipe.Reader.CompleteAsync();
     }
 
     [Fact]
@@ -105,7 +214,6 @@ public class StreamingSerializer
                 pipe.Reader,
                 payload.Length + 1));
     }
-
 }
 
 

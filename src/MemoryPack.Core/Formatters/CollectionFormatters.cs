@@ -938,7 +938,12 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new ConcurrentDictionary<TKey, TValue?>(equalityComparer);
+                value = length == 0
+                    ? new ConcurrentDictionary<TKey, TValue?>(equalityComparer)
+                    : new ConcurrentDictionary<TKey, TValue?>(
+                        Environment.ProcessorCount,
+                        Math.Min(length, 4096),
+                        equalityComparer ?? EqualityComparer<TKey>.Default);
             }
             else
             {
