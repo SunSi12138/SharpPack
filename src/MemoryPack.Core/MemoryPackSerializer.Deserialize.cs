@@ -1,4 +1,4 @@
-﻿using MemoryPack.Internal;
+using MemoryPack.Internal;
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -12,21 +12,17 @@ public static partial class MemoryPackSerializer
     static MemoryPackReaderOptionalState? threadStaticReaderOptionalState;
 
     public static T? Deserialize<
-#if NET5_0_OR_GREATER
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
-#endif
-        T>(ReadOnlySpan<byte> buffer, MemoryPackSerializerOptions? options = default)
+        T>(ReadOnlySpan<byte> buffer)
     {
         T? value = default;
-        Deserialize(buffer, ref value, options);
+        Deserialize(buffer, ref value);
         return value;
     }
 
     public static int Deserialize<
-#if NET5_0_OR_GREATER
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
-#endif
-        T>(ReadOnlySpan<byte> buffer, ref T? value, MemoryPackSerializerOptions? options = default)
+        T>(ReadOnlySpan<byte> buffer, ref T? value)
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
@@ -38,12 +34,8 @@ public static partial class MemoryPackSerializer
             return Unsafe.SizeOf<T>();
         }
 
-        var state = threadStaticReaderOptionalState;
-        if (state == null)
-        {
-            state = threadStaticReaderOptionalState = new MemoryPackReaderOptionalState();
-        }
-        state.Init(options);
+        var state = AcquireReaderOptionalState();
+        state.InitDefault();
 
         var reader = new MemoryPackReader(buffer, state);
         try
@@ -55,25 +47,22 @@ public static partial class MemoryPackSerializer
         {
             reader.Dispose();
             state.Reset();
+            state.Exit();
         }
     }
 
     public static T? Deserialize<
-#if NET5_0_OR_GREATER
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
-#endif
-        T>(in ReadOnlySequence<byte> buffer, MemoryPackSerializerOptions? options = default)
+        T>(in ReadOnlySequence<byte> buffer)
     {
         T? value = default;
-        Deserialize<T>(buffer, ref value, options);
+        Deserialize<T>(buffer, ref value);
         return value;
     }
 
     public static int Deserialize<
-#if NET5_0_OR_GREATER
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
-#endif
-        T>(in ReadOnlySequence<byte> buffer, ref T? value, MemoryPackSerializerOptions? options = default)
+        T>(in ReadOnlySequence<byte> buffer, ref T? value)
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
@@ -120,12 +109,8 @@ public static partial class MemoryPackSerializer
             }
         }
 
-        var state = threadStaticReaderOptionalState;
-        if (state == null)
-        {
-            state = threadStaticReaderOptionalState = new MemoryPackReaderOptionalState();
-        }
-        state.Init(options);
+        var state = AcquireReaderOptionalState();
+        state.InitDefault();
 
         var reader = new MemoryPackReader(buffer, state);
         try
@@ -137,20 +122,19 @@ public static partial class MemoryPackSerializer
         {
             reader.Dispose();
             state.Reset();
+            state.Exit();
         }
     }
 
     public static async ValueTask<T?> DeserializeAsync<
-#if NET5_0_OR_GREATER
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
-#endif
-        T>(Stream stream, MemoryPackSerializerOptions? options = default, CancellationToken cancellationToken = default)
+        T>(Stream stream, CancellationToken cancellationToken = default)
     {
         if (stream is MemoryStream ms && ms.TryGetBuffer(out ArraySegment<byte> streamBuffer))
         {
             cancellationToken.ThrowIfCancellationRequested();
             T? value = default;
-            var bytesRead = Deserialize<T>(streamBuffer.AsSpan(checked((int)ms.Position)), ref value, options);
+            var bytesRead = Deserialize<T>(streamBuffer.AsSpan(checked((int)ms.Position)), ref value);
 
             // Emulate that we had actually "read" from the stream.
             ms.Seek(bytesRead, SeekOrigin.Current);
@@ -197,18 +181,38 @@ public static partial class MemoryPackSerializer
             // If single buffer, we can avoid ReadOnlySequence build cost.
             if (builder.TryGetSingleMemory(out var memory))
             {
-                return Deserialize<T>(memory.Span, options);
+                return Deserialize<T>(memory.Span);
             }
             else
             {
                 var seq = builder.Build();
-                var result = Deserialize<T>(seq, options);
+                var result = Deserialize<T>(seq);
                 return result;
             }
         }
         finally
         {
-            builder.Reset();
+            ReusableReadOnlySequenceBuilderPool.Return(builder);
         }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static MemoryPackReaderOptionalState AcquireReaderOptionalState()
+    {
+        var state = threadStaticReaderOptionalState;
+        if (state is null)
+        {
+            state = threadStaticReaderOptionalState =
+                new MemoryPackReaderOptionalState();
+        }
+
+        if (state.TryEnter())
+        {
+            return state;
+        }
+
+        var nestedState = new MemoryPackReaderOptionalState();
+        _ = nestedState.TryEnter();
+        return nestedState;
     }
 }

@@ -1,4 +1,4 @@
-﻿using MemoryPack.Internal;
+using MemoryPack.Internal;
 using System.Collections;
 using System.Runtime.CompilerServices;
 

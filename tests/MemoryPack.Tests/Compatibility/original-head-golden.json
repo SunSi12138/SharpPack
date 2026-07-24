@@ -1,0 +1,1631 @@
+{
+  "SourceCommit": "85ab9ad76c380aca48c09ff3a0ad955ee5a2902b",
+  "WellKnownFormatterCount": 117,
+  "GenericShapeCount": 68,
+  "Entries": [
+    {
+      "Category": "well-known",
+      "Type": "System.Boolean, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01",
+      "Deterministic": true,
+      "Decoded": "True"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Boolean[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0100000001",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Byte, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "A5",
+      "Deterministic": true,
+      "Decoded": "165"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Byte[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01000000A5",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Char, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "4C75",
+      "Deterministic": true,
+      "Decoded": "界"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Char[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000004C75",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Collections.BitArray, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0204000000040000000D000000000000000000000000000000",
+      "Deterministic": false,
+      "Decoded": "collection:4"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Collections.BitArray[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000204000000040000000D000000000000000000000000000000",
+      "Deterministic": false,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.DateOnly, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "46460B00",
+      "Deterministic": true,
+      "Decoded": "2024/1/2"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.DateOnly[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0100000046460B00",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.DateTime, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "00009CE86A0DDC48",
+      "Deterministic": true,
+      "Decoded": "2024/1/4 21:20:00"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.DateTimeOffset, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "000000000000000000009CE86A0DDC08",
+      "Deterministic": true,
+      "Decoded": "2024/1/4 21:20:00 +00:00"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.DateTimeOffset[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01000000000000000000000000009CE86A0DDC08",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.DateTime[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0100000000009CE86A0DDC48",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Decimal, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0000040000000000351CDCDF02000000",
+      "Deterministic": true,
+      "Decoded": "1234567.8901"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Decimal[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000000040000000000351CDCDF02000000",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Double, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000404AC3C0",
+      "Deterministic": true,
+      "Decoded": "-9876.5"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Double[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0100000000000000404AC3C0",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Globalization.CultureInfo, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FAFFFFFF05000000656E2D5553",
+      "Deterministic": true,
+      "Decoded": "en-US"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Globalization.CultureInfo[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01000000FAFFFFFF05000000656E2D5553",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Guid, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "33221100554477668899AABBCCDDEEFF",
+      "Deterministic": true,
+      "Decoded": "00112233-4455-6677-8899-aabbccddeeff"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Guid[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0100000033221100554477668899AABBCCDDEEFF",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Half, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "404A",
+      "Deterministic": true,
+      "Decoded": "12.5"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Half[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01000000404A",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Int128, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "2EF5C0B1111F8C3C09F01671FEFFFFFF",
+      "Deterministic": true,
+      "Decoded": "-123456789012345678901234567890"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Int128[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000002EF5C0B1111F8C3C09F01671FEFFFFFF",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Int16, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "2EFB",
+      "Deterministic": true,
+      "Decoded": "-1234"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Int16[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000002EFB",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "EB32A4F8",
+      "Deterministic": true,
+      "Decoded": "-123456789"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Int32[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01000000EB32A4F8",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Int64, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "EB7E16820BEFDDEE",
+      "Deterministic": true,
+      "Decoded": "-1234567890123456789"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Int64[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01000000EB7E16820BEFDDEE",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.IntPtr, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "40E2010000000000",
+      "Deterministic": true,
+      "Decoded": "123456"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.IntPtr[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0100000040E2010000000000",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Boolean, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0101",
+      "Deterministic": false,
+      "Decoded": "True"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Byte, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01A5",
+      "Deterministic": false,
+      "Decoded": "165"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Char, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01174C75",
+      "Deterministic": false,
+      "Decoded": "界"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.DateOnly, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0117716B46460B00",
+      "Deterministic": false,
+      "Decoded": "2024/1/2"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.DateTime, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000000000000009CE86A0DDC48",
+      "Deterministic": false,
+      "Decoded": "2024/1/4 21:20:00"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.DateTimeOffset, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0117716B01000000000000000000000000009CE86A0DDC08",
+      "Deterministic": false,
+      "Decoded": "2024/1/4 21:20:00 +00:00"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Decimal, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0117716B010000000000040000000000351CDCDF02000000",
+      "Deterministic": false,
+      "Decoded": "1234567.8901"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Double, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000000000000000000404AC3C0",
+      "Deterministic": false,
+      "Decoded": "-9876.5"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Guid, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0117716B33221100554477668899AABBCCDDEEFF",
+      "Deterministic": false,
+      "Decoded": "00112233-4455-6677-8899-aabbccddeeff"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Half, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0117404A",
+      "Deterministic": false,
+      "Decoded": "12.5"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Int128, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0100000037000000500F716B010000002EF5C0B1111F8C3C09F01671FEFFFFFF",
+      "Deterministic": false,
+      "Decoded": "-123456789012345678901234567890"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Int16, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01172EFB",
+      "Deterministic": false,
+      "Decoded": "-1234"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0117716BEB32A4F8",
+      "Deterministic": false,
+      "Decoded": "-123456789"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Int64, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0100000000000000EB7E16820BEFDDEE",
+      "Deterministic": false,
+      "Decoded": "-1234567890123456789"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.IntPtr, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000000000040E2010000000000",
+      "Deterministic": false,
+      "Decoded": "123456"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Numerics.Complex, System.Runtime.Numerics, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0117716B01000000000000000000F43F00000000000004C0",
+      "Deterministic": false,
+      "Decoded": "<1.25; -2.5>"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Numerics.Matrix3x2, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000000803F0000004000004040000080400000A0400000C040",
+      "Deterministic": false,
+      "Decoded": "{ {M11:1 M12:2} {M21:3 M22:4} {M31:5 M32:6} }"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Numerics.Matrix4x4, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "011A716B0000803F000000000000000000000000000000000000803F000000000000000000000000000000000000803F000000000000000000000000000000000000803F",
+      "Deterministic": false,
+      "Decoded": "{ {M11:1 M12:0 M13:0 M14:0} {M21:0 M22:1 M23:0 M24:0} {M31:0 M32:0 M33:1 M34:0} {M41:0 M42:0 M43:0 M44:1} }"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Numerics.Plane, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0117716B0000803F000000400000404000008040",
+      "Deterministic": false,
+      "Decoded": "{Normal:<1, 2, 3> D:4}"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Numerics.Quaternion, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0117716B0000803F000000400000404000008040",
+      "Deterministic": false,
+      "Decoded": "{X:1 Y:2 Z:3 W:4}"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Numerics.Vector2, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000000803F00000040",
+      "Deterministic": false,
+      "Decoded": "<1, 2>"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Numerics.Vector3, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000000803F0000004000004040",
+      "Deterministic": false,
+      "Decoded": "<1, 2, 3>"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Numerics.Vector4, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0117716B0000803F000000400000404000008040",
+      "Deterministic": false,
+      "Decoded": "<1, 2, 3, 4>"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.SByte, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01D6",
+      "Deterministic": false,
+      "Decoded": "-42"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Single, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0117716B0080F642",
+      "Deterministic": false,
+      "Decoded": "123.25"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.Text.Rune, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0117716B4C750000",
+      "Deterministic": false,
+      "Decoded": "界"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.TimeOnly, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0100000000000000E02A56B719000000",
+      "Deterministic": false,
+      "Decoded": "03:04"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.TimeSpan, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000000000015CD5B0700000000",
+      "Deterministic": false,
+      "Decoded": "00:00:12.3456789"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.UInt128, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0100000037000000500F716B01000000D20A3F4EEEE073C3F60FE98E01000000",
+      "Deterministic": false,
+      "Decoded": "123456789012345678901234567890"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.UInt16, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "011731D4",
+      "Deterministic": false,
+      "Decoded": "54321"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.UInt32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0117716B146A0ACE",
+      "Deterministic": false,
+      "Decoded": "3456789012"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.UInt64, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0100000000000000D20A1FEB8CA954AB",
+      "Deterministic": false,
+      "Decoded": "12345678901234567890"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Nullable`1[[System.UIntPtr, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000000000040E2010000000000",
+      "Deterministic": false,
+      "Decoded": "123456"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.BigInteger, System.Runtime.Numerics, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "F20000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "Deterministic": false,
+      "Decoded": "0"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.BigInteger[], System.Runtime.Numerics, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "01000000F20000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "Deterministic": false,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.Complex, System.Runtime.Numerics, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "000000000000F43F00000000000004C0",
+      "Deterministic": true,
+      "Decoded": "<1.25; -2.5>"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.Complex[], System.Runtime.Numerics, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "01000000000000000000F43F00000000000004C0",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.Matrix3x2, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0000803F0000004000004040000080400000A0400000C040",
+      "Deterministic": true,
+      "Decoded": "{ {M11:1 M12:2} {M21:3 M22:4} {M31:5 M32:6} }"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.Matrix3x2[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000000803F0000004000004040000080400000A0400000C040",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.Matrix4x4, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0000803F000000000000000000000000000000000000803F000000000000000000000000000000000000803F000000000000000000000000000000000000803F",
+      "Deterministic": true,
+      "Decoded": "{ {M11:1 M12:0 M13:0 M14:0} {M21:0 M22:1 M23:0 M24:0} {M31:0 M32:0 M33:1 M34:0} {M41:0 M42:0 M43:0 M44:1} }"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.Matrix4x4[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000000803F000000000000000000000000000000000000803F000000000000000000000000000000000000803F000000000000000000000000000000000000803F",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.Plane, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0000803F000000400000404000008040",
+      "Deterministic": true,
+      "Decoded": "{Normal:<1, 2, 3> D:4}"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.Plane[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000000803F000000400000404000008040",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.Quaternion, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0000803F000000400000404000008040",
+      "Deterministic": true,
+      "Decoded": "{X:1 Y:2 Z:3 W:4}"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.Quaternion[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000000803F000000400000404000008040",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.Vector2, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0000803F00000040",
+      "Deterministic": true,
+      "Decoded": "<1, 2>"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.Vector2[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000000803F00000040",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.Vector3, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0000803F0000004000004040",
+      "Deterministic": true,
+      "Decoded": "<1, 2, 3>"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.Vector3[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000000803F0000004000004040",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.Vector4, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0000803F000000400000404000008040",
+      "Deterministic": true,
+      "Decoded": "<1, 2, 3, 4>"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Numerics.Vector4[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000000803F000000400000404000008040",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.SByte, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "D6",
+      "Deterministic": true,
+      "Decoded": "-42"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.SByte[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01000000D6",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Single, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0080F642",
+      "Deterministic": true,
+      "Decoded": "123.25"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Single[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000080F642",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "EEFFFFFF0D0000004D656D6F72795061636B2FE585BCE5AEB9",
+      "Deterministic": true,
+      "Decoded": "MemoryPack/兼容"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.String[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01000000EEFFFFFF0D0000004D656D6F72795061636B2FE585BCE5AEB9",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Text.Rune, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "4C750000",
+      "Deterministic": true,
+      "Decoded": "界"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Text.Rune[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000004C750000",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Text.StringBuilder, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0D0000004D0065006D006F00720079005000610063006B002F007C51B95B",
+      "Deterministic": true,
+      "Decoded": "MemoryPack/兼容"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Text.StringBuilder[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000D0000004D0065006D006F00720079005000610063006B002F007C51B95B",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.TimeOnly, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "E02A56B719000000",
+      "Deterministic": true,
+      "Decoded": "03:04"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.TimeOnly[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01000000E02A56B719000000",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.TimeSpan, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "15CD5B0700000000",
+      "Deterministic": true,
+      "Decoded": "00:00:12.3456789"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.TimeSpan[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0100000015CD5B0700000000",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.TimeZoneInfo, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "C2FFFFFF1F0000005554433B303B285554432920E58D8FE8B083E4B896E7958CE697B63BE58D8FE8B083E4B896E7958CE697B63BE58D8FE8B083E4B896E7958CE697B63B3B",
+      "Deterministic": true,
+      "Decoded": "(UTC) 协调世界时"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.TimeZoneInfo[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01000000C2FFFFFF1F0000005554433B303B285554432920E58D8FE8B083E4B896E7958CE697B63BE58D8FE8B083E4B896E7958CE697B63BE58D8FE8B083E4B896E7958CE697B63B3B",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Type, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "70FFFFFF8F00000053797374656D2E436F6C6C656374696F6E732E47656E657269632E44696374696F6E61727960325B5B53797374656D2E537472696E672C2053797374656D2E507269766174652E436F72654C69625D2C5B53797374656D2E496E7433322C2053797374656D2E507269766174652E436F72654C69625D5D2C2053797374656D2E507269766174652E436F72654C6962",
+      "Deterministic": true,
+      "Decoded": "System.Collections.Generic.Dictionary`2[System.String,System.Int32]"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Type[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0100000070FFFFFF8F00000053797374656D2E436F6C6C656374696F6E732E47656E657269632E44696374696F6E61727960325B5B53797374656D2E537472696E672C2053797374656D2E507269766174652E436F72654C69625D2C5B53797374656D2E496E7433322C2053797374656D2E507269766174652E436F72654C69625D5D2C2053797374656D2E507269766174652E436F72654C6962",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.UInt128, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "D20A3F4EEEE073C3F60FE98E01000000",
+      "Deterministic": true,
+      "Decoded": "123456789012345678901234567890"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.UInt128[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01000000D20A3F4EEEE073C3F60FE98E01000000",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.UInt16, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "31D4",
+      "Deterministic": true,
+      "Decoded": "54321"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.UInt16[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0100000031D4",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.UInt32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "146A0ACE",
+      "Deterministic": true,
+      "Decoded": "3456789012"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.UInt32[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01000000146A0ACE",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.UInt64, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "D20A1FEB8CA954AB",
+      "Deterministic": true,
+      "Decoded": "12345678901234567890"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.UInt64[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "01000000D20A1FEB8CA954AB",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.UIntPtr, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "40E2010000000000",
+      "Deterministic": true,
+      "Decoded": "123456"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.UIntPtr[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0100000040E2010000000000",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Uri, System.Private.Uri, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "DDFFFFFF2200000068747470733A2F2F6578616D706C652E636F6D2F6D656D6F72797061636B3F713D31",
+      "Deterministic": true,
+      "Decoded": "https://example.com/memorypack?q=1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Uri[], System.Private.Uri, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "01000000DDFFFFFF2200000068747470733A2F2F6578616D706C652E636F6D2F6D656D6F72797061636B3F713D31",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Version, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0401000000020000000300000004000000",
+      "Deterministic": true,
+      "Decoded": "1.2.3.4"
+    },
+    {
+      "Category": "well-known",
+      "Type": "System.Version[], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "010000000401000000020000000300000004000000",
+      "Deterministic": true,
+      "Decoded": "array:1:1"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.ArraySegment`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": true,
+      "Decoded": "System.ArraySegment`1[System.Int32]"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Buffers.ReadOnlySequence`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Memory, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": true,
+      "Decoded": "System.Buffers.ReadOnlySequence<Int32>[0]"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Concurrent.BlockingCollection`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Concurrent, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": false,
+      "Decoded": "collection:0"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Concurrent.ConcurrentBag`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Concurrent, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": false,
+      "Decoded": "collection:0"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Concurrent.ConcurrentDictionary`2[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Concurrent, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": false,
+      "Decoded": "collection:0"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Concurrent.ConcurrentQueue`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": false,
+      "Decoded": "collection:0"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Concurrent.ConcurrentStack`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Concurrent, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": false,
+      "Decoded": "collection:0"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Frozen.FrozenDictionary`2[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": false,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Frozen.FrozenSet`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": false,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.Dictionary`2[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": false,
+      "Decoded": "collection:0"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.HashSet`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": false,
+      "Decoded": "System.Collections.Generic.HashSet`1[System.Int32]"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.ICollection`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.IDictionary`2[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": false,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.IEnumerable`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.IList`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.IReadOnlyCollection`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.IReadOnlyDictionary`2[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": false,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.IReadOnlyList`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.IReadOnlySet`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.ISet`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.KeyValuePair`2[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF00000000",
+      "Deterministic": true,
+      "Decoded": "[, 0]"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.LinkedList`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": true,
+      "Decoded": "collection:0"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.List`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": true,
+      "Decoded": "collection:0"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.PriorityQueue`2[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": true,
+      "Decoded": "System.Collections.Generic.PriorityQueue`2[System.String,System.Int32]"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.Queue`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": true,
+      "Decoded": "collection:0"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.SortedDictionary`2[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": false,
+      "Decoded": "collection:0"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.SortedList`2[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": true,
+      "Decoded": "collection:0"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.SortedSet`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": true,
+      "Decoded": "collection:0"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Generic.Stack`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": true,
+      "Decoded": "collection:0"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Immutable.IImmutableDictionary`2[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": false,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Immutable.IImmutableList`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Immutable.IImmutableQueue`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Immutable.IImmutableSet`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Immutable.IImmutableStack`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Immutable.ImmutableArray`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "collection:default"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Immutable.ImmutableDictionary`2[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": false,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Immutable.ImmutableHashSet`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": false,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Immutable.ImmutableList`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Immutable.ImmutableQueue`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Immutable.ImmutableSortedDictionary`2[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": false,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Immutable.ImmutableSortedSet`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.Immutable.ImmutableStack`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.ObjectModel.Collection`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": true,
+      "Decoded": "collection:0"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.ObjectModel.ObservableCollection`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.ObjectModel, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": true,
+      "Decoded": "collection:0"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.ObjectModel.ReadOnlyCollection`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Collections.ObjectModel.ReadOnlyObservableCollection`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.ObjectModel, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Lazy`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0100000000",
+      "Deterministic": true,
+      "Decoded": "0"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Linq.IGrouping`2[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Linq, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Linq.ILookup`2[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Linq, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF",
+      "Deterministic": false,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Memory`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": true,
+      "Decoded": "System.Memory<Int32>[0]"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Nullable`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0000000000000000",
+      "Deterministic": false,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.ReadOnlyMemory`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": true,
+      "Decoded": "System.ReadOnlyMemory<Int32>[0]"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Tuple`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Tuple`2[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Tuple`3[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Tuple`4[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Tuple`5[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Tuple`6[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Tuple`7[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.Tuple`8[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Tuple`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FF",
+      "Deterministic": true,
+      "Decoded": "null"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.ValueTuple`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "00000000",
+      "Deterministic": true,
+      "Decoded": "(0)"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.ValueTuple`2[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF00000000",
+      "Deterministic": true,
+      "Decoded": "(, 0)"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.ValueTuple`3[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF0000000000000000",
+      "Deterministic": true,
+      "Decoded": "(, 0, 0)"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.ValueTuple`4[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF000000000000000000000000",
+      "Deterministic": true,
+      "Decoded": "(, 0, 0, 0)"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.ValueTuple`5[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF00000000000000000000000000000000",
+      "Deterministic": true,
+      "Decoded": "(, 0, 0, 0, 0)"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.ValueTuple`6[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF0000000000000000000000000000000000000000",
+      "Deterministic": true,
+      "Decoded": "(, 0, 0, 0, 0, 0)"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.ValueTuple`7[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF000000000000000000000000000000000000000000000000",
+      "Deterministic": true,
+      "Decoded": "(, 0, 0, 0, 0, 0, 0)"
+    },
+    {
+      "Category": "generic-shape",
+      "Type": "System.ValueTuple`8[[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.ValueTuple`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "FFFFFFFF00000000000000000000000000000000000000000000000000000000",
+      "Deterministic": true,
+      "Decoded": "(, 0, 0, 0, 0, 0, 0, 0)"
+    },
+    {
+      "Category": "array-rank",
+      "Type": "System.Int32[,], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0302000000020000000400000001000000020000000300000004000000",
+      "Deterministic": true,
+      "Decoded": "array:2:4"
+    },
+    {
+      "Category": "array-rank",
+      "Type": "System.Int32[,,], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "04010000000100000002000000020000000500000006000000",
+      "Deterministic": true,
+      "Decoded": "array:3:2"
+    },
+    {
+      "Category": "array-rank",
+      "Type": "System.Int32[,,,], System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf8",
+      "PayloadHex": "0501000000010000000100000002000000020000000700000008000000",
+      "Deterministic": true,
+      "Decoded": "array:4:2"
+    },
+    {
+      "Category": "configuration",
+      "Type": "System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e",
+      "Configuration": "Utf16",
+      "PayloadHex": "130000004D0065006D006F00720079005000610063006B002F007C51B95B2F0055005400460031003600",
+      "Deterministic": true,
+      "Decoded": "MemoryPack/兼容/UTF16"
+    },
+    {
+      "Category": "object",
+      "Type": "BaselineObject, GoldenCorpus, Version=1.0.0.0, Culture=neutral, PublicKeyToken=df4c250b14d82627",
+      "Configuration": "Utf8",
+      "PayloadHex": "032A000000F9FFFFFF06000000676F6C64656E03000000010000000300000005000000",
+      "Deterministic": true,
+      "Decoded": "BaselineObject"
+    },
+    {
+      "Category": "version-tolerant",
+      "Type": "BaselineVersionTolerant, GoldenCorpus, Version=1.0.0.0, Culture=neutral, PublicKeyToken=df4c250b14d82627",
+      "Configuration": "Utf8",
+      "PayloadHex": "02040A11000000FDFFFFFF020000007674",
+      "Deterministic": true,
+      "Decoded": "BaselineVersionTolerant"
+    },
+    {
+      "Category": "circular-reference",
+      "Type": "BaselineCircular, GoldenCorpus, Version=1.0.0.0, Culture=neutral, PublicKeyToken=df4c250b14d82627",
+      "Configuration": "Utf8",
+      "PayloadHex": "020C0200FBFFFFFF0400000073656C66FA00",
+      "Deterministic": true,
+      "Decoded": "BaselineCircular"
+    },
+    {
+      "Category": "static-union",
+      "Type": "IBaselineUnion, GoldenCorpus, Version=1.0.0.0, Culture=neutral, PublicKeyToken=df4c250b14d82627",
+      "Configuration": "Utf8",
+      "PayloadHex": "0301D2040000",
+      "Deterministic": true,
+      "Decoded": "BaselineUnionA"
+    },
+    {
+      "Category": "dynamic-union",
+      "Type": "BaselineDynamicBase, GoldenCorpus, Version=1.0.0.0, Culture=neutral, PublicKeyToken=df4c250b14d82627",
+      "Configuration": "Utf8",
+      "PayloadHex": "07012E160000",
+      "Deterministic": true,
+      "Decoded": "BaselineDynamicA"
+    },
+    {
+      "Category": "dynamic-union",
+      "Type": "BaselineDynamicBase, GoldenCorpus, Version=1.0.0.0, Culture=neutral, PublicKeyToken=df4c250b14d82627",
+      "Configuration": "Utf8",
+      "PayloadHex": "2A01F8FFFFFF0700000064796E616D6963",
+      "Deterministic": true,
+      "Decoded": "BaselineDynamicB"
+    },
+    {
+      "Category": "external-union",
+      "Type": "IBaselineExternalUnion, GoldenCorpus, Version=1.0.0.0, Culture=neutral, PublicKeyToken=df4c250b14d82627",
+      "Configuration": "Utf8",
+      "PayloadHex": "0501A4090000",
+      "Deterministic": true,
+      "Decoded": "BaselineExternalUnionA"
+    },
+    {
+      "Category": "custom-formatter",
+      "Type": "BaselineCustom, GoldenCorpus, Version=1.0.0.0, Culture=neutral, PublicKeyToken=df4c250b14d82627",
+      "Configuration": "Utf8",
+      "PayloadHex": "01B77A0000",
+      "Deterministic": true,
+      "Decoded": "BaselineCustom"
+    },
+    {
+      "Category": "custom-generic",
+      "Type": "BaselineGeneric`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], GoldenCorpus, Version=1.0.0.0, Culture=neutral, PublicKeyToken=df4c250b14d82627",
+      "Configuration": "Utf8",
+      "PayloadHex": "019E0A0000",
+      "Deterministic": true,
+      "Decoded": "BaselineGeneric`1[System.Int32]"
+    },
+    {
+      "Category": "custom-collection",
+      "Type": "BaselineList, GoldenCorpus, Version=1.0.0.0, Culture=neutral, PublicKeyToken=df4c250b14d82627",
+      "Configuration": "Utf8",
+      "PayloadHex": "0400000002000000040000000600000008000000",
+      "Deterministic": true,
+      "Decoded": "collection:4"
+    },
+    {
+      "Category": "compression",
+      "Type": "BaselineCompression, GoldenCorpus, Version=1.0.0.0, Culture=neutral, PublicKeyToken=df4c250b14d82627",
+      "Configuration": "Utf8",
+      "PayloadHex": "04070000004D0000001B0000001F0000000B0D8062726F746C692F62726F746C692F62726F746C692FE585BCE5AEB9031E0000008B1D000080AAAAAAEA1F8F37399DF5AC37BD282880822A80AA1CF57C51D88073D9210C30509C1DC03A83AB39B6340DE14AC7B074E18FBDF2EB0B13800363000000F5FFFFFF0A000000636F6D707265737365640300000009000000080000000700000003",
+      "Deterministic": true,
+      "Decoded": "BaselineCompression"
+    },
+    {
+      "Category": "collection-value",
+      "Type": "System.Collections.Concurrent.ConcurrentDictionary`2[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Concurrent, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "0200000001000000FCFFFFFF030000006F6E6502000000FCFFFFFF0300000074776F",
+      "Deterministic": false,
+      "Decoded": "collection:2"
+    },
+    {
+      "Category": "collection-value",
+      "Type": "System.Collections.Immutable.ImmutableList`1[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "03000000010000000200000003000000",
+      "Deterministic": true,
+      "Decoded": "collection:3"
+    },
+    {
+      "Category": "collection-value",
+      "Type": "System.Collections.Frozen.FrozenDictionary`2[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.String, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a",
+      "Configuration": "Utf8",
+      "PayloadHex": "0200000001000000FCFFFFFF030000006F6E6502000000FCFFFFFF0300000074776F",
+      "Deterministic": false,
+      "Decoded": "collection:2"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-﻿#pragma warning disable CS8602
+#pragma warning disable CS8602
 
 using MemoryPack.Tests.Models;
 using System;
@@ -31,18 +31,18 @@ public class CustomFormatterTest
         };
 
 
-        var bin1 = MemoryPackSerializer.Serialize(value, MemoryPackSerializerOptions.Utf8);
-        var bin2 = MemoryPackSerializer.Serialize(value, MemoryPackSerializerOptions.Utf16);
+        var utf8 = new MemoryPackSerializerContext(MemoryPackSerializerConfiguration.Utf8);
+        var utf16 = new MemoryPackSerializerContext(MemoryPackSerializerConfiguration.Utf16);
+        var bin1 = MemoryPackSerializer.Serialize(value, utf8);
+        var bin2 = MemoryPackSerializer.Serialize(value, utf16);
 
-        var v1 = MemoryPackSerializer.Deserialize<CustomFormatterCheck>(bin1);
-        var v2 = MemoryPackSerializer.Deserialize<CustomFormatterCheck>(bin2);
+        var v1 = MemoryPackSerializer.Deserialize<CustomFormatterCheck>(bin1, utf8);
+        var v2 = MemoryPackSerializer.Deserialize<CustomFormatterCheck>(bin2, utf16);
 
-#if NET7_0_OR_GREATER
         v1.PropDict["zoom"].Should().Be(999);
         v1.PropDict["DDDDN"].Should().Be(10000);
         v1.FieldDict["HOGE"].Should().Be("hugahuga");
         v1.FieldDict["hage"].Should().Be("nanonano");
-#endif
 
         v1.Prop1.Should().Be(value.Prop1);
         v1.Field1.Should().Be(value.Field1);
@@ -50,7 +50,6 @@ public class CustomFormatterTest
         v2.Field1.Should().Be(value.Field1);
     }
 
-#if NET7_0_OR_GREATER
 
     [Fact]
     public void Pool()
@@ -93,9 +92,7 @@ public class CustomFormatterTest
         return 16 << size;
     }
 
-#endif
 }
-#if NET7_0_OR_GREATER
 
 [MemoryPackable]
 public partial class MemoryPoolModel : IDisposable
@@ -151,5 +148,3 @@ public partial class StdData
 {
     public int MyProperty { get; set; }
 }
-
-#endif

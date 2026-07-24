@@ -113,21 +113,3 @@ public partial class LisList : List<int>
 {
 
 }
-
-
-
-
-[MemoryPackable]
-public partial class InstantiateFromServiceProvider
-{
-    public int MyProperty { get; private set; }
-
-    [MemoryPackOnDeserializing]
-    static void OnDeserializing(ref MemoryPackReader reader, ref InstantiateFromServiceProvider value)
-    {
-        if (value != null) return;
-        value = reader.Options.ServiceProvider!.GetRequiredService<InstantiateFromServiceProvider>();
-    }
-}
-
-

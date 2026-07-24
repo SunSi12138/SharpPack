@@ -7,7 +7,96 @@ namespace MemoryPack.Streaming;
 
 public static class MemoryPackStreamingSerializer
 {
-    public static async ValueTask SerializeAsync<T>(PipeWriter pipeWriter, int count, IEnumerable<T> source, int flushRate = 4096, MemoryPackSerializerOptions? options = default, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Serializes one framed RPC payload directly into a pipe without an
+    /// intermediate byte array. The caller owns the frame header.
+    /// </summary>
+    public static async ValueTask<int> SerializeFrameAsync<T>(
+        PipeWriter pipeWriter,
+        T? value,
+        MemoryPackSerializerContext? context = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(pipeWriter);
+
+        var written = context is null
+            ? MemoryPackSerializer.Serialize(ref pipeWriter, value)
+            : MemoryPackSerializer.Serialize(ref pipeWriter, value, context);
+
+        var result = await pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
+        if (result.IsCanceled)
+        {
+            throw new OperationCanceledException(cancellationToken);
+        }
+
+        return written;
+    }
+
+    /// <summary>
+    /// Deserializes one length-delimited RPC payload directly from a pipe.
+    /// Exactly <paramref name="payloadLength"/> bytes are consumed.
+    /// </summary>
+    public static async ValueTask<T?> DeserializeFrameAsync<T>(
+        PipeReader pipeReader,
+        int payloadLength,
+        MemoryPackSerializerContext? context = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(pipeReader);
+        ArgumentOutOfRangeException.ThrowIfNegative(payloadLength);
+
+        var result = await pipeReader
+            .ReadAtLeastAsync(payloadLength, cancellationToken)
+            .ConfigureAwait(false);
+        var buffer = result.Buffer;
+
+        if (result.IsCanceled)
+        {
+            pipeReader.AdvanceTo(buffer.Start, buffer.Start);
+            throw new OperationCanceledException(cancellationToken);
+        }
+
+        if (buffer.Length < payloadLength)
+        {
+            pipeReader.AdvanceTo(buffer.Start, buffer.End);
+            throw new EndOfStreamException(
+                $"The pipe completed with {buffer.Length} bytes available; " +
+                $"{payloadLength} bytes were required.");
+        }
+
+        var payload = buffer.Slice(0, payloadLength);
+        try
+        {
+            T? value = default;
+            var consumed = context is null
+                ? MemoryPackSerializer.Deserialize(payload, ref value)
+                : MemoryPackSerializer.Deserialize(payload, ref value, context);
+
+            if (consumed != payloadLength)
+            {
+                throw new MemoryPackSerializationException(
+                    $"The formatter consumed {consumed} of the " +
+                    $"{payloadLength}-byte RPC payload.");
+            }
+
+            var payloadEnd = buffer.GetPosition(payloadLength);
+            pipeReader.AdvanceTo(payloadEnd, payloadEnd);
+            return value;
+        }
+        catch
+        {
+            pipeReader.AdvanceTo(buffer.Start, buffer.End);
+            throw;
+        }
+    }
+
+    public static async ValueTask SerializeAsync<T>(
+        PipeWriter pipeWriter,
+        int count,
+        IEnumerable<T> source,
+        int flushRate = 4096,
+        MemoryPackSerializerContext? context = null,
+        CancellationToken cancellationToken = default)
     {
         static void WriteCollectionHeader(PipeWriter pipeWriter, int count, MemoryPackWriterOptionalState state)
         {
@@ -33,7 +122,7 @@ public static class MemoryPackStreamingSerializer
             return false; // false when completed.
         }
 
-        using var state = MemoryPackWriterOptionalStatePool.Rent(options);
+        using var state = MemoryPackWriterOptionalStatePool.Rent(context);
 
         WriteCollectionHeader(pipeWriter, count, state);
 
@@ -47,7 +136,13 @@ public static class MemoryPackStreamingSerializer
         await pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public static async ValueTask SerializeAsync<T>(Stream stream, int count, IEnumerable<T> source, int flushRate = 4096, MemoryPackSerializerOptions? options = default, CancellationToken cancellationToken = default)
+    public static async ValueTask SerializeAsync<T>(
+        Stream stream,
+        int count,
+        IEnumerable<T> source,
+        int flushRate = 4096,
+        MemoryPackSerializerContext? context = null,
+        CancellationToken cancellationToken = default)
     {
         static void WriteCollectionHeader(ReusableLinkedArrayBufferWriter bufferWriter, int count, MemoryPackWriterOptionalState state)
         {
@@ -73,7 +168,7 @@ public static class MemoryPackStreamingSerializer
             return false; // false when completed.
         }
 
-        using var state = MemoryPackWriterOptionalStatePool.Rent(options);
+        using var state = MemoryPackWriterOptionalStatePool.Rent(context);
 
         var tempWriter = ReusableLinkedArrayBufferWriterPool.Rent();
         try
@@ -94,7 +189,12 @@ public static class MemoryPackStreamingSerializer
         }
     }
 
-    public static async IAsyncEnumerable<T?> DeserializeAsync<T>(PipeReader pipeReader, int bufferAtLeast = 4096, int readMinimumSize = 8192, MemoryPackSerializerOptions? options = default, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public static async IAsyncEnumerable<T?> DeserializeAsync<T>(
+        PipeReader pipeReader,
+        int bufferAtLeast = 4096,
+        int readMinimumSize = 8192,
+        MemoryPackSerializerContext? context = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         static bool ReadCollectionHeader(in ReadOnlySequence<byte> buffer, MemoryPackReaderOptionalState state, out int length)
         {
@@ -104,22 +204,28 @@ public static class MemoryPackStreamingSerializer
             return reader.DangerousTryReadCollectionHeader(out length);
         }
 
-        static int Deserialize(in ReadOnlySequence<byte> buffer, int bufferAtLeast, List<T?> itemBuffer, StrongBox<int> remain, bool bufferIsFull, MemoryPackReaderOptionalState state)
+        static (int Consumed, int Remain) Deserialize(
+            in ReadOnlySequence<byte> buffer,
+            int bufferAtLeast,
+            List<T?> itemBuffer,
+            int remain,
+            bool bufferIsFull,
+            MemoryPackReaderOptionalState state)
         {
             using var reader = new MemoryPackReader(buffer, state);
 
             while (bufferIsFull || bufferAtLeast < reader.Remaining)
             {
-                if (remain.Value == 0)
+                if (remain == 0)
                 {
-                    return reader.Consumed;
+                    return (reader.Consumed, remain);
                 }
 
                 itemBuffer.Add(reader.ReadValue<T?>());
-                remain.Value--;
+                remain--;
             }
 
-            return reader.Consumed;
+            return (reader.Consumed, remain);
         }
 
         if (readMinimumSize < bufferAtLeast)
@@ -127,7 +233,7 @@ public static class MemoryPackStreamingSerializer
             throw new ArgumentException($"readMinimumSize must larger than bufferAtLeast. readMinimumSize: {readMinimumSize} bufferAtLeast:{bufferAtLeast}");
         }
 
-        using var state = MemoryPackReaderOptionalStatePool.Rent(options);
+        using var state = MemoryPackReaderOptionalStatePool.Rent(context);
 
         var itemBuffer = new List<T?>();
         var readResult = await pipeReader.ReadAtLeastAsync(readMinimumSize, cancellationToken).ConfigureAwait(false);
@@ -143,8 +249,13 @@ public static class MemoryPackStreamingSerializer
                     buffer = buffer.Slice(4);
                 }
 
-                var remain = new StrongBox<int>(length);
-                while (remain.Value != 0)
+                var remain = length;
+                if (remain > 0)
+                {
+                    itemBuffer.EnsureCapacity(Math.Min(remain, 256));
+                }
+
+                while (remain != 0)
                 {
                     if (!readResult.IsCompleted)
                     {
@@ -157,7 +268,15 @@ public static class MemoryPackStreamingSerializer
                         yield break;
                     }
 
-                    var consumedByteCount = Deserialize(buffer, bufferAtLeast, itemBuffer, remain, readResult.IsCompleted, state);
+                    var result = Deserialize(
+                        buffer,
+                        bufferAtLeast,
+                        itemBuffer,
+                        remain,
+                        readResult.IsCompleted,
+                        state);
+                    var consumedByteCount = result.Consumed;
+                    remain = result.Remain;
 
                     if (itemBuffer.Count > 0)
                     {
@@ -192,8 +311,18 @@ public static class MemoryPackStreamingSerializer
         }
     }
 
-    public static IAsyncEnumerable<T?> DeserializeAsync<T>(Stream stream, int bufferAtLeast = 4096, int readMinimumSize = 8192, MemoryPackSerializerOptions? options = default, CancellationToken cancellationToken = default)
+    public static IAsyncEnumerable<T?> DeserializeAsync<T>(
+        Stream stream,
+        int bufferAtLeast = 4096,
+        int readMinimumSize = 8192,
+        MemoryPackSerializerContext? context = null,
+        CancellationToken cancellationToken = default)
     {
-        return DeserializeAsync<T>(PipeReader.Create(stream), bufferAtLeast, readMinimumSize, options, cancellationToken);
+        return DeserializeAsync<T>(
+            PipeReader.Create(stream),
+            bufferAtLeast,
+            readMinimumSize,
+            context,
+            cancellationToken);
     }
 }

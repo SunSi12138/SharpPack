@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
@@ -51,11 +51,7 @@ public partial class EmitIdData
 
     [MemoryPackOnSerializing]
     static void WriteId<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, ref EmitIdData? value)
-#if NET7_0_OR_GREATER
         where TBufferWriter : IBufferWriter<byte>
-#else
-        where TBufferWriter : class, IBufferWriter<byte>
-#endif
     {
         writer.WriteUnmanaged(Guid.NewGuid()); // emit GUID in header.
     }
@@ -74,7 +70,7 @@ public partial class EmitIdData
 [MemoryPackable]
 public partial class EmitFromOther
 {
-    public static EmitFromOther other;
+    public static EmitFromOther other = null!;
 
     public int MyProperty { get; private set; }
 

@@ -345,16 +345,7 @@ public partial class TypeMeta
                     ? structLayout.ConstructorArguments[0].Value
                     : null;
 
-                if (layoutKind == null || (LayoutKind)layoutKind == LayoutKind.Sequential)
-                {
-                    var autoTypes = string.Join(", ", structLayoutFields.Select(x => x!.Item1.Name));
-
-                    if (!context.IsNet7OrGreater)
-                    {
-                        context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnamangedStructWithLayoutAutoField, syntax.Identifier.GetLocation(), Symbol.Name, autoTypes));
-                        noError = false;
-                    }
-                }
+                _ = layoutKind;
             }
         }
         else

@@ -1,6 +1,6 @@
-﻿namespace MemoryPack.Internal;
+namespace MemoryPack.Internal;
 
-// Preserve for Unity IL2CPP(internal but used for code generator)
+// Preserved for generated-code and trimming scenarios.
 
 public sealed class PreserveAttribute : System.Attribute
 {

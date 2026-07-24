@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Dynamic;
@@ -109,7 +109,8 @@ public partial class DeserializeTest
     [MemoryPackable]
     private partial class PrePaddedString : IEquatable<PrePaddedString>
     {
-        private PrePaddedInt _padding;
+        private PrePaddedInt _padding = default;
+        private int Padding => _padding.Value;
         public string Value { get; set; } = "";
 
         public bool Equals(PrePaddedString? other)

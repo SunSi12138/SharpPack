@@ -22,10 +22,14 @@ var config = ManualConfig.CreateMinimumViable()
     .AddDiagnoser(MemoryDiagnoser.Default)
     // .AddColumn(StatisticColumn.OperationsPerSecond)
     //.AddExporter(DefaultExporters.Plain)
-    .AddExporter(MarkdownExporter.Default)
-    .AddJob(Job.Default.WithWarmupCount(1).WithIterationCount(1)); // .AddJob(Job.ShortRun);
+    .AddExporter(MarkdownExporter.Default);
 
-//BenchmarkSwitcher.FromAssembly(Assembly.GetEntryAssembly()!).Run(args, config);
+if (!args.Contains("--job", StringComparer.OrdinalIgnoreCase))
+{
+    config.AddJob(Job.Default);
+}
+
+BenchmarkSwitcher.FromAssembly(Assembly.GetEntryAssembly()!).Run(args, config);
 
 
 //BenchmarkRunner.Run<Hyper>(config, args);
@@ -72,7 +76,7 @@ var config = ManualConfig.CreateMinimumViable()
 
 //BenchmarkRunner.Run<VersionTolerant>(config, args);
 
-BenchmarkRunner.Run(typeof(JilBenchmark<>), config, args);
+//BenchmarkRunner.Run(typeof(JilBenchmark<>), config, args);
 
 //BenchmarkSwitcher.FromTypes(new[]{
 //    typeof(SerializeTest<>),
@@ -85,7 +89,7 @@ BenchmarkRunner.Run(typeof(JilBenchmark<>), config, args);
 #if DEBUG
 
 //MessagePack.MessagePackSerializerOptions
-//MemoryPack.MemoryPackSerializerOptions
+//MemoryPack.MemoryPackSerializerConfiguration
 //System.Text.Json.JsonSerializerOptions
 
 //new JilBenchmark<Question>().OrleansDeserializeStream();
@@ -107,9 +111,10 @@ c.DeserializeImprovement();
 var model = new JsonResponseModel(true);
 var model2 = Enumerable.Repeat(new Vector3 { X = 10.3f, Y = 40.5f, Z = 13411.3f }, 1000).ToArray();
 
-using var compressor = new BrotliCompressor();
-MemoryPackSerializer.Serialize(compressor, model2);
+var compressor = new BrotliCompressor();
+MemoryPackSerializer.Serialize(ref compressor, model2);
 var foo = compressor.ToArray();
+compressor.Dispose();
 
 using var decompressor = new BrotliDecompressor();
 

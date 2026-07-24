@@ -1,21 +1,8 @@
-﻿#if NET8_0_OR_GREATER
 using MemoryPack.Formatters;
 using MemoryPack.Internal;
 using System.Collections.Frozen;
 
 // Frozen Collections formatters
-
-namespace MemoryPack
-{
-    public static partial class MemoryPackFormatterProvider
-    {
-        static readonly Dictionary<Type, Type> FrozenCollectionFormatters = new Dictionary<Type, Type>()
-        {
-            { typeof(FrozenDictionary<,>), typeof(FrozenDictionaryFormatter<,>) },
-            { typeof(FrozenSet<>), typeof(FrozenSetFormatter<>) },
-        };
-    }
-}
 
 namespace MemoryPack.Formatters
 {
@@ -135,4 +122,3 @@ namespace MemoryPack.Formatters
         }
     }
 }
-#endif

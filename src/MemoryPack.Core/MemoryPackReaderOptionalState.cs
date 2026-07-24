@@ -1,19 +1,28 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 
 namespace MemoryPack;
 
 public static class MemoryPackReaderOptionalStatePool
 {
-    static readonly ConcurrentQueue<MemoryPackReaderOptionalState> queue = new ConcurrentQueue<MemoryPackReaderOptionalState>();
+    static readonly ConcurrentQueue<MemoryPackReaderOptionalState> queue = new();
 
-    public static MemoryPackReaderOptionalState Rent(MemoryPackSerializerOptions? options)
+    public static MemoryPackReaderOptionalState Rent(
+        MemoryPackSerializerContext? context = null)
     {
         if (!queue.TryDequeue(out var state))
         {
             state = new MemoryPackReaderOptionalState();
         }
 
-        state.Init(options);
+        if (context is null)
+        {
+            state.InitDefault();
+        }
+        else
+        {
+            state.Init(context);
+        }
         return state;
     }
 
@@ -26,46 +35,70 @@ public static class MemoryPackReaderOptionalStatePool
 
 public sealed class MemoryPackReaderOptionalState : IDisposable
 {
-    readonly Dictionary<uint, object> refToObject;
-    public MemoryPackSerializerOptions Options { get; private set; }
+    Dictionary<uint, object>? refToObject;
+    bool isInUse;
 
-    internal MemoryPackReaderOptionalState()
+    internal MemoryPackSerializerContext? SerializerContext { get; private set; }
+    internal FormatterGraph? FormatterGraph { get; private set; }
+
+    internal void InitDefault()
     {
-        refToObject = new Dictionary<uint, object>();
-        Options = null!;
+        SerializerContext = null;
+        FormatterGraph = null;
     }
 
-    internal void Init(MemoryPackSerializerOptions? options)
+    internal void Init(MemoryPackSerializerContext context)
     {
-        Options = options ?? MemoryPackSerializerOptions.Default;
+        SerializerContext = context;
+        FormatterGraph = context.OverrideGraph;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool TryEnter()
+    {
+        if (isInUse)
+        {
+            return false;
+        }
+
+        isInUse = true;
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void Exit()
+        => isInUse = false;
 
     public object GetObjectReference(uint id)
     {
-        if (refToObject.TryGetValue(id, out var value))
+        if (refToObject is not null &&
+            refToObject.TryGetValue(id, out var value))
         {
             return value;
         }
-        MemoryPackSerializationException.ThrowMessage("Object is not found in this reference id:" + id);
+
+        MemoryPackSerializationException.ThrowMessage(
+            "Object is not found in this reference id:" + id);
         return null!;
     }
 
     public void AddObjectReference(uint id, object value)
     {
+        refToObject ??= [];
         if (!refToObject.TryAdd(id, value))
         {
-            MemoryPackSerializationException.ThrowMessage("Object is already added, id:" + id);
+            MemoryPackSerializationException.ThrowMessage(
+                "Object is already added, id:" + id);
         }
     }
 
     public void Reset()
     {
-        refToObject.Clear();
-        Options = null!;
+        refToObject?.Clear();
+        SerializerContext = null;
+        FormatterGraph = null;
     }
 
     void IDisposable.Dispose()
-    {
-        MemoryPackReaderOptionalStatePool.Return(this);
-    }
+        => MemoryPackReaderOptionalStatePool.Return(this);
 }

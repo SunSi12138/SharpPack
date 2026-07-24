@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis.Operations;
+using Microsoft.CodeAnalysis.Operations;
 using System;
 using System.Buffers;
 using System.Collections.Generic;

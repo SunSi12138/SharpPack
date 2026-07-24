@@ -1,4 +1,3 @@
-﻿#if NET8_0_OR_GREATER
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Frozen;
@@ -35,4 +34,3 @@ public class FrozenCollectionFormatterTest
         MemoryPackSerializer.Deserialize<FrozenDictionary<int, int>>(bin).Should().BeEquivalentTo(value);
     }
 }
-#endif

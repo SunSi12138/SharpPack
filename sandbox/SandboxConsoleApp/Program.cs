@@ -28,8 +28,6 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Xml.Linq;
 
-using MemoryPack;
-using System.Runtime.InteropServices;
 using System.Diagnostics;
 
 CollectionTest sourceCollection = new CollectionTest();
@@ -72,7 +70,7 @@ public partial class ByteVector3
 {
     public byte x, y, z;
 
-    public override bool Equals(object obj)
+    public override bool Equals(object? obj)
     {
         // If the object is null, return false.
         if (obj == null || GetType() != obj.GetType())
@@ -631,23 +629,6 @@ public partial class DictionaryGenerics<TK, TV> : Dictionary<TK, TV>
 }
 
 
-//public class MyCollection<T> : List<T>, IMemoryPackFormatterRegister
-//{
-//    static MyCollection()
-//    {
-//        if (!MemoryPackFormatterProvider.IsRegistered<MyCollection<T>>())
-//        {
-//            MemoryPackFormatterProvider.Register<MyCollection<T>>();
-//        }
-//    }
-
-//    static void IMemoryPackFormatterRegister.RegisterFormatter()
-//    {
-//        MemoryPackFormatterProvider.RegisterCollection<MyCollection<T?>, T>();
-//    }
-//}
-
-
 //[MemoryPackable]
 //public partial class Packable<T>
 //{
@@ -786,4 +767,3 @@ public partial struct HogeEEE
         this.Y = y;
     }
 }
-

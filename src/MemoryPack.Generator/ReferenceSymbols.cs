@@ -14,8 +14,8 @@ public class ReferenceSymbols
     public INamedTypeSymbol MemoryPackConstructorAttribute { get; }
     public INamedTypeSymbol MemoryPackAllowSerializeAttribute { get; }
     public INamedTypeSymbol MemoryPackOrderAttribute { get; }
-    public INamedTypeSymbol? MemoryPackCustomFormatterAttribute { get; } // Unity is null.
-    public INamedTypeSymbol? MemoryPackCustomFormatter2Attribute { get; } // Unity is null.
+    public INamedTypeSymbol? MemoryPackCustomFormatterAttribute { get; }
+    public INamedTypeSymbol? MemoryPackCustomFormatter2Attribute { get; }
     public INamedTypeSymbol MemoryPackIgnoreAttribute { get; }
     public INamedTypeSymbol MemoryPackIncludeAttribute { get; }
     public INamedTypeSymbol MemoryPackOnSerializingAttribute { get; }
@@ -337,4 +337,3 @@ public class ReferenceSymbols
         INamedTypeSymbol GetTypeByMetadataName(string metadataName) => parent.GetTypeByMetadataName(metadataName);
     }
 }
-

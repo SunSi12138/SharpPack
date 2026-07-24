@@ -1,29 +1,6 @@
-﻿using MemoryPack.Internal;
+using MemoryPack.Internal;
 
 namespace MemoryPack.Formatters;
-
-internal static class TupleFormatterTypes
-{
-    public static readonly Dictionary<Type, Type> TupleFormatters = new Dictionary<Type, Type>(16)
-    {
-        { typeof(Tuple<>), typeof(TupleFormatter<>) },
-        { typeof(ValueTuple<>), typeof(ValueTupleFormatter<>) },
-        { typeof(Tuple<,>), typeof(TupleFormatter<,>) },
-        { typeof(ValueTuple<,>), typeof(ValueTupleFormatter<,>) },
-        { typeof(Tuple<,,>), typeof(TupleFormatter<,,>) },
-        { typeof(ValueTuple<,,>), typeof(ValueTupleFormatter<,,>) },
-        { typeof(Tuple<,,,>), typeof(TupleFormatter<,,,>) },
-        { typeof(ValueTuple<,,,>), typeof(ValueTupleFormatter<,,,>) },
-        { typeof(Tuple<,,,,>), typeof(TupleFormatter<,,,,>) },
-        { typeof(ValueTuple<,,,,>), typeof(ValueTupleFormatter<,,,,>) },
-        { typeof(Tuple<,,,,,>), typeof(TupleFormatter<,,,,,>) },
-        { typeof(ValueTuple<,,,,,>), typeof(ValueTupleFormatter<,,,,,>) },
-        { typeof(Tuple<,,,,,,>), typeof(TupleFormatter<,,,,,,>) },
-        { typeof(ValueTuple<,,,,,,>), typeof(ValueTupleFormatter<,,,,,,>) },
-        { typeof(Tuple<,,,,,,,>), typeof(TupleFormatter<,,,,,,,>) },
-        { typeof(ValueTuple<,,,,,,,>), typeof(ValueTupleFormatter<,,,,,,,>) },
-    };
-}
 
 [Preserve]
 public sealed class TupleFormatter<T1> : MemoryPackFormatter<Tuple<T1?>>
@@ -643,4 +620,3 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5, T6, T7, TRest> : Mem
         );
     }
 }
-

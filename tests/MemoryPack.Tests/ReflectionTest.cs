@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -14,16 +14,38 @@ public class ReflectionTest
     {
         var type = typeof(ReflecCheck);
 
-#if NET7_0_OR_GREATER
-        var m = type.GetMethod("MemoryPack.IMemoryPackFormatterRegister.RegisterFormatter", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+        var m = type
+            .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
+            .Single(method => method.Name.EndsWith(".CreateFormatter", StringComparison.Ordinal));
         m.Should().NotBeNull();
+        m.Invoke(null, null).Should().BeAssignableTo<MemoryPackFormatter<ReflecCheck>>();
 
         var p = type.GetProperty("global::MemoryPack.IFixedSizeMemoryPackable.Size", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
         p.Should().NotBeNull();
-#else
-        var m = type.GetMethod("RegisterFormatter", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-        m.Should().NotBeNull();
-#endif
+    }
+
+    [Fact]
+    public void PublicSurface_IsGenericOnlyAndHasNoLegacyRegistry()
+    {
+        var assembly = typeof(MemoryPackSerializer).Assembly;
+
+        assembly.GetType("MemoryPack.MemoryPackFormatterProvider").Should().BeNull();
+        assembly.GetType("MemoryPack.MemoryPackSerializerOptions").Should().BeNull();
+        assembly.GetType("MemoryPack.DefaultMemoryPackSerializerContext").Should().BeNull();
+        assembly.GetType("MemoryPack.IMemoryPackFormatter").Should().BeNull();
+        assembly.GetType("MemoryPack.IMemoryPackFormatterRegister").Should().BeNull();
+        typeof(MemoryPackSerializerContext)
+            .GetProperty(
+                "Default",
+                BindingFlags.Public | BindingFlags.Static)
+            .Should().BeNull();
+
+        typeof(MemoryPackSerializer)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Where(static method =>
+                method.Name is "Serialize" or "SerializeAsync" or
+                "Deserialize" or "DeserializeAsync")
+            .Should().OnlyContain(static method => method.IsGenericMethodDefinition);
     }
 }
 

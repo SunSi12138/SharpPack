@@ -1,4 +1,4 @@
-﻿using MemoryPack.Formatters;
+using MemoryPack.Formatters;
 using MemoryPack.Internal;
 using System.Buffers;
 using System.Collections.Concurrent;
@@ -12,21 +12,6 @@ using System.Runtime.CompilerServices;
 // ReadOnlyMemory
 // ArraySegment
 // ReadOnlySequence
-
-namespace MemoryPack
-{
-    public static partial class MemoryPackFormatterProvider
-    {
-        static readonly Dictionary<Type, Type> ArrayLikeFormatters = new Dictionary<Type, Type>(4)
-        {
-            // If T[], choose UnmanagedArrayFormatter or DangerousUnmanagedTypeArrayFormatter or ArrayFormatter
-            { typeof(ArraySegment<>), typeof(ArraySegmentFormatter<>) },
-            { typeof(Memory<>), typeof(MemoryFormatter<>) },
-            { typeof(ReadOnlyMemory<>), typeof(ReadOnlyMemoryFormatter<>) },
-            { typeof(ReadOnlySequence<>), typeof(ReadOnlySequenceFormatter<>) },
-        };
-    }
-}
 
 namespace MemoryPack.Formatters
 {

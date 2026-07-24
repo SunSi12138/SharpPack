@@ -1,16 +1,12 @@
-﻿using MemoryPack.Internal;
+using MemoryPack.Internal;
 using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace MemoryPack;
 
-#if NET7_0_OR_GREATER
 using static MemoryMarshal;
 using static GC;
-#else
-using static MemoryPack.Internal.MemoryMarshalEx;
-#endif
 
 public static partial class MemoryPackSerializer
 {
@@ -19,7 +15,12 @@ public static partial class MemoryPackSerializer
     [ThreadStatic]
     static MemoryPackWriterOptionalState? threadStaticWriterOptionalState;
 
-    public static byte[] Serialize<T>(in T? value, MemoryPackSerializerOptions? options = default)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static byte[] Serialize<T>(in T? value)
+        => SerializeCore(value);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static byte[] SerializeCore<T>(in T? value)
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
@@ -27,7 +28,6 @@ public static partial class MemoryPackSerializer
             Unsafe.WriteUnaligned(ref GetArrayDataReference(array), value);
             return array;
         }
-#if NET7_0_OR_GREATER
         var typeKind = TypeHelpers.TryGetUnmanagedSZArrayElementSizeOrMemoryPackableFixedSize<T>(out var elementSize);
         if (typeKind == TypeHelpers.TypeKind.None)
         {
@@ -64,14 +64,9 @@ public static partial class MemoryPackSerializer
             Serialize(ref writer, value);
             return bufferWriter.GetFilledBuffer();
         }
-#endif
 
-        var state = threadStaticState;
-        if (state == null)
-        {
-            state = threadStaticState = new SerializerWriterThreadStaticState();
-        }
-        state.Init(options);
+        var state = AcquireWriterState();
+        state.InitDefault();
 
         try
         {
@@ -82,94 +77,96 @@ public static partial class MemoryPackSerializer
         finally
         {
             state.Reset();
+            state.Exit();
         }
     }
 
-    public static unsafe void Serialize<T, TBufferWriter>(in TBufferWriter bufferWriter, in T? value, MemoryPackSerializerOptions? options = default)
-#if NET7_0_OR_GREATER
+    public static int Serialize<T, TBufferWriter>(
+        ref TBufferWriter bufferWriter,
+        scoped in T? value)
         where TBufferWriter : IBufferWriter<byte>
-#else
-        where TBufferWriter : class, IBufferWriter<byte>
-#endif
     {
-        ref var bufferWriterRef = ref Unsafe.AsRef(in bufferWriter);
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
-            var buffer = bufferWriterRef.GetSpan(Unsafe.SizeOf<T>());
+            var buffer = bufferWriter.GetSpan(Unsafe.SizeOf<T>());
             Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(buffer), value);
-            bufferWriterRef.Advance(Unsafe.SizeOf<T>());
-            return;
+            bufferWriter.Advance(Unsafe.SizeOf<T>());
+            return Unsafe.SizeOf<T>();
         }
-#if NET7_0_OR_GREATER
         var typeKind = TypeHelpers.TryGetUnmanagedSZArrayElementSizeOrMemoryPackableFixedSize<T>(out var elementSize);
         if (typeKind == TypeHelpers.TypeKind.UnmanagedSZArray)
         {
             if (value == null)
             {
-                var span = bufferWriterRef.GetSpan(4);
+                var span = bufferWriter.GetSpan(4);
                 MemoryPackCode.NullCollectionData.CopyTo(span);
-                bufferWriterRef.Advance(4);
-                return;
+                bufferWriter.Advance(4);
+                return 4;
             }
 
             var srcArray = ((Array)(object)value!);
             var length = srcArray.Length;
             if (length == 0)
             {
-                var span = bufferWriterRef.GetSpan(4);
+                var span = bufferWriter.GetSpan(4);
                 MemoryPackCode.ZeroCollectionData.CopyTo(span);
-                bufferWriterRef.Advance(4);
-                return;
+                bufferWriter.Advance(4);
+                return 4;
             }
 
             var dataSize = elementSize * length;
-            var destSpan = bufferWriterRef.GetSpan(dataSize + 4);
+            var destSpan = bufferWriter.GetSpan(dataSize + 4);
             ref var head = ref MemoryMarshal.GetReference(destSpan);
 
             Unsafe.WriteUnaligned(ref head, length);
             Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref head, 4), ref MemoryMarshal.GetArrayDataReference(srcArray), (uint)dataSize);
 
-            bufferWriterRef.Advance(dataSize + 4);
-            return;
+            bufferWriter.Advance(dataSize + 4);
+            return dataSize + 4;
         }
-#endif
 
-        var state = threadStaticWriterOptionalState;
-        if (state == null)
-        {
-            state = threadStaticWriterOptionalState = new MemoryPackWriterOptionalState();
-        }
-        state.Init(options);
+        var state = AcquireWriterOptionalState();
+        state.InitDefault();
 
         try
         {
-            var writer = new MemoryPackWriter<TBufferWriter>(ref bufferWriterRef, state);
-            Serialize(ref writer, value);
+            var writer = new MemoryPackWriter<TBufferWriter>(ref bufferWriter, state);
+            return Serialize(ref writer, value);
         }
         finally
         {
             state.Reset();
+            state.Exit();
         }
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void Serialize<T, TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, in T? value)
-#if NET7_0_OR_GREATER
-        where TBufferWriter : IBufferWriter<byte>
-#else
+    public static int Serialize<T, TBufferWriter>(
+        TBufferWriter bufferWriter,
+        scoped in T? value)
         where TBufferWriter : class, IBufferWriter<byte>
-#endif
+        => Serialize(ref bufferWriter, value);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int Serialize<T, TBufferWriter>(
+        ref MemoryPackWriter<TBufferWriter> writer,
+        scoped in T? value)
+        where TBufferWriter : IBufferWriter<byte>
     {
         writer.WriteValue(value);
+        var written = writer.WrittenCount;
         writer.Flush();
+        return written;
     }
 
-    public static async ValueTask SerializeAsync<T>(Stream stream, T? value, MemoryPackSerializerOptions? options = default, CancellationToken cancellationToken = default)
+    public static async ValueTask SerializeAsync<T>(
+        Stream stream,
+        T? value,
+        CancellationToken cancellationToken = default)
     {
         var tempWriter = ReusableLinkedArrayBufferWriterPool.Rent();
         try
         {
-            Serialize(tempWriter, value, options);
+            _ = Serialize(ref tempWriter, value);
             await tempWriter.WriteToAndResetAsync(stream, cancellationToken).ConfigureAwait(false);
             await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -181,18 +178,43 @@ public static partial class MemoryPackSerializer
 
     sealed class SerializerWriterThreadStaticState
     {
+        bool isInUse;
+
         public ReusableLinkedArrayBufferWriter BufferWriter;
         public MemoryPackWriterOptionalState OptionalState;
 
         public SerializerWriterThreadStaticState()
         {
-            BufferWriter = new ReusableLinkedArrayBufferWriter(useFirstBuffer: true, pinned: true);
+            BufferWriter = new ReusableLinkedArrayBufferWriter(
+                useFirstBuffer: true,
+                pinned: false);
             OptionalState = new MemoryPackWriterOptionalState();
         }
 
-        public void Init(MemoryPackSerializerOptions? options)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryEnter()
         {
-            OptionalState.Init(options);
+            if (isInUse)
+            {
+                return false;
+            }
+
+            isInUse = true;
+            return true;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Exit()
+            => isInUse = false;
+
+        public void Init(MemoryPackSerializerContext context)
+        {
+            OptionalState.Init(context);
+        }
+
+        public void InitDefault()
+        {
+            OptionalState.InitDefault();
         }
 
         public void Reset()
@@ -200,5 +222,44 @@ public static partial class MemoryPackSerializer
             BufferWriter.Reset();
             OptionalState.Reset();
         }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static SerializerWriterThreadStaticState AcquireWriterState()
+    {
+        var state = threadStaticState;
+        if (state is null)
+        {
+            state = threadStaticState = new SerializerWriterThreadStaticState();
+        }
+
+        if (state.TryEnter())
+        {
+            return state;
+        }
+
+        var nestedState = new SerializerWriterThreadStaticState();
+        _ = nestedState.TryEnter();
+        return nestedState;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static MemoryPackWriterOptionalState AcquireWriterOptionalState()
+    {
+        var state = threadStaticWriterOptionalState;
+        if (state is null)
+        {
+            state = threadStaticWriterOptionalState =
+                new MemoryPackWriterOptionalState();
+        }
+
+        if (state.TryEnter())
+        {
+            return state;
+        }
+
+        var nestedState = new MemoryPackWriterOptionalState();
+        _ = nestedState.TryEnter();
+        return nestedState;
     }
 }

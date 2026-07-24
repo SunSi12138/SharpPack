@@ -1,4 +1,4 @@
-﻿using MemoryPack.Formatters;
+using MemoryPack.Formatters;
 using MemoryPack.Tests.Models;
 using System;
 using System.Collections.Generic;
@@ -42,41 +42,56 @@ public class UnionTest
     }
 
     [Fact]
-    public void Dynamic()
+    public void DynamicUnion_IsGenericContextOwnedAndWireCompatible()
     {
-        var f = new DynamicUnionFormatter<IDynamicBase>(
-            (0, typeof(Gen1)),
-            (1, typeof(Gen2)));
+        var formatter = new DynamicUnionFormatterBuilder<IDynamicBase>()
+            .Add<Gen1>(7)
+            .Add<Gen2>(42)
+            .Build();
+        var context = new MemoryPackSerializerContextBuilder()
+            .Register(formatter)
+            .Build();
 
-        MemoryPackFormatterProvider.Register(f);
+        IDynamicBase first = new Gen1 { MyProperty = 5678 };
+        IDynamicBase second = new Gen2 { MyProperty = "dynamic" };
 
-        var one = new Gen1() { MyProperty = 999 };
-        var two = new Gen2() { MyProperty = "aabbbC" };
+        var firstPayload = MemoryPackSerializer.Serialize(first, context);
+        var secondPayload = MemoryPackSerializer.Serialize(second, context);
 
-        var bin1 = MemoryPackSerializer.Serialize<IDynamicBase>(one);
-        var bin2 = MemoryPackSerializer.Serialize<IDynamicBase>(two);
+        Convert.ToHexString(firstPayload).Should().Be("07012E160000");
+        Convert.ToHexString(secondPayload).Should()
+            .Be("2A01F8FFFFFF0700000064796E616D6963");
+        MemoryPackSerializer.Deserialize<IDynamicBase>(firstPayload, context)
+            .Should().BeOfType<Gen1>().Which.MyProperty.Should().Be(5678);
+        MemoryPackSerializer.Deserialize<IDynamicBase>(secondPayload, context)
+            .Should().BeOfType<Gen2>().Which.MyProperty.Should().Be("dynamic");
+    }
 
-        var d1 = MemoryPackSerializer.Deserialize<IDynamicBase>(bin1);
-        var d2 = MemoryPackSerializer.Deserialize<IDynamicBase>(bin2);
+    [Fact]
+    public void DynamicUnion_RejectsDuplicateTypesAndTags()
+    {
+        var duplicateType = new DynamicUnionFormatterBuilder<IDynamicBase>()
+            .Add<Gen1>(1);
+        Assert.Throws<ArgumentException>(() => duplicateType.Add<Gen1>(2));
 
-        (d1 as Gen1)!.MyProperty.Should().Be(999);
-        (d2 as Gen2)!.MyProperty.Should().Be("aabbbC");
+        var duplicateTag = new DynamicUnionFormatterBuilder<IDynamicBase>()
+            .Add<Gen1>(1);
+        Assert.Throws<ArgumentException>(() => duplicateTag.Add<Gen2>(1));
     }
 }
 
 [MemoryPackable(GenerateType.NoGenerate)]
-public partial class IDynamicBase
+public partial interface IDynamicBase
 {
 }
 
-
-[MemoryPackable(GenerateType.Object)]
+[MemoryPackable]
 public partial class Gen1 : IDynamicBase
 {
     public int MyProperty { get; set; }
 }
 
-[MemoryPackable(GenerateType.Object)]
+[MemoryPackable]
 public partial class Gen2 : IDynamicBase
 {
     public string? MyProperty { get; set; }

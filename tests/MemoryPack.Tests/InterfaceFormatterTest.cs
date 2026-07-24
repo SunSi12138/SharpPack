@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -136,14 +136,12 @@ public class InterfaceFormatterTest
             MemoryPackSerializer.Deserialize<ISet<int>>(bin)
                 .Should().BeEquivalentTo(collection);
         }
-#if NET7_0_OR_GREATER
         {
             var bin = MemoryPackSerializer.Serialize<IReadOnlySet<int>>(collection);
             MemoryPackSerializer.Deserialize<IReadOnlySet<int>>(bin)
                 .Should().BeEquivalentTo(collection);
         }
 
-#endif
     }
 
     IEnumerable<int> Iterate(int from, int to)

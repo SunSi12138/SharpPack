@@ -1,4 +1,5 @@
-﻿using MemoryPack.Internal;
+using MemoryPack.Internal;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 
 namespace MemoryPack.Formatters;
@@ -10,17 +11,10 @@ public sealed partial class TypeFormatter : MemoryPackFormatter<Type>
     // Result will be "TypeName, Assembly"
     // see:http://msdn.microsoft.com/en-us/library/w3f99sx1.aspx
 
-#if NET7_0_OR_GREATER
 
     [GeneratedRegex(@", Version=\d+.\d+.\d+.\d+, Culture=[\w-]+, PublicKeyToken=(?:null|[a-f0-9]{16})")]
     private static partial Regex ShortTypeNameRegex();
 
-#else
-
-    static readonly Regex _shortTypeNameRegex = new Regex(@", Version=\d+.\d+.\d+.\d+, Culture=[\w-]+, PublicKeyToken=(?:null|[a-f0-9]{16})", RegexOptions.Compiled);
-    static Regex ShortTypeNameRegex() => _shortTypeNameRegex;
-
-#endif
 
     [Preserve]
     public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref Type? value)
@@ -32,11 +26,20 @@ public sealed partial class TypeFormatter : MemoryPackFormatter<Type>
             return;
         }
 
+        writer.OptionalState.SerializerContext?.AddType(value!);
         var shortName = ShortTypeNameRegex().Replace(full, "");
         writer.WriteString(shortName);
     }
 
     [Preserve]
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2057",
+        Justification = "Serialized Type values are inherently data-driven; applications must preserve the types they exchange.")]
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2026",
+        Justification = "Serialized Type values are inherently data-driven; applications must preserve the types they exchange.")]
     public override void Deserialize(ref MemoryPackReader reader, scoped ref Type? value)
     {
         var typeName = reader.ReadString();
@@ -46,6 +49,16 @@ public sealed partial class TypeFormatter : MemoryPackFormatter<Type>
             return;
         }
 
-        value = Type.GetType(typeName, throwOnError: true);
+        if (reader.OptionalState.SerializerContext is { } context)
+        {
+            value = Type.GetType(
+                typeName,
+                context.ResolveAssembly,
+                static (assembly, name, ignoreCase) =>
+                    assembly?.GetType(name, throwOnError: false, ignoreCase),
+                throwOnError: false);
+        }
+
+        value ??= Type.GetType(typeName, throwOnError: true);
     }
 }

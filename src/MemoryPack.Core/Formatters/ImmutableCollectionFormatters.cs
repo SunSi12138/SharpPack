@@ -1,4 +1,4 @@
-﻿using MemoryPack.Formatters;
+using MemoryPack.Formatters;
 using MemoryPack.Internal;
 using System.Buffers;
 using System.Collections.Immutable;
@@ -6,29 +6,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 // Immutable Collections formatters
-
-namespace MemoryPack
-{
-    public static partial class MemoryPackFormatterProvider
-    {
-        static readonly Dictionary<Type, Type> ImmutableCollectionFormatters = new Dictionary<Type, Type>()
-        {
-            { typeof(ImmutableArray<>), typeof(ImmutableArrayFormatter<>) },
-            { typeof(ImmutableList<>), typeof(ImmutableListFormatter<>) },
-            { typeof(ImmutableQueue<>), typeof(ImmutableQueueFormatter<>) },
-            { typeof(ImmutableStack<>), typeof(ImmutableStackFormatter<>) },
-            { typeof(ImmutableDictionary<,>), typeof(ImmutableDictionaryFormatter<,>) },
-            { typeof(ImmutableSortedDictionary<,>), typeof(ImmutableSortedDictionaryFormatter<,>) },
-            { typeof(ImmutableSortedSet<>), typeof(ImmutableSortedSetFormatter<>) },
-            { typeof(ImmutableHashSet<>), typeof(ImmutableHashSetFormatter<>) },
-            { typeof(IImmutableList<>), typeof(InterfaceImmutableListFormatter<>) },
-            { typeof(IImmutableQueue<>), typeof(InterfaceImmutableQueueFormatter<>) },
-            { typeof(IImmutableStack<>), typeof(InterfaceImmutableStackFormatter<>) },
-            { typeof(IImmutableDictionary<,>), typeof(InterfaceImmutableDictionaryFormatter<,>) },
-            { typeof(IImmutableSet<>), typeof(InterfaceImmutableSetFormatter<>) },
-        };
-    }
-}
 
 namespace MemoryPack.Formatters
 {
@@ -64,14 +41,7 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-#if NET8_0_OR_GREATER
             value = ImmutableCollectionsMarshal.AsImmutableArray(array);
-#else
-            // create Empty and replace inner T[] field(avoid defensive copy of Create)
-            value = ImmutableArray.Create<T?>();
-            ref var view = ref Unsafe.As<ImmutableArray<T?>, ImmutableArrayView<T?>>(ref value);
-            view.array = array;
-#endif
         }
     }
 

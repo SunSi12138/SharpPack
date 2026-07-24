@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,7 +14,7 @@ public class PrimitiveTest
     {
         var buffer = new ArrayBufferWriter<byte>(1024);
 
-        MemoryPackSerializer.Serialize(buffer, 123);
+        MemoryPackSerializer.Serialize(ref buffer, 123);
 
         buffer.WrittenCount.Should().Be(4);
 
@@ -29,7 +29,7 @@ public class PrimitiveTest
         var i = MemoryPackSerializer.Deserialize<int>(bin);
         i.Should().Be(123);
 
-        var j = (int)MemoryPackSerializer.Deserialize(typeof(int), bin)!;
+        var j = MemoryPackSerializer.Deserialize<int>(bin);
         j.Should().Be(123);
     }
 }

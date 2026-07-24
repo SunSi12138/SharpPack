@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+using System.Reflection;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -46,6 +47,19 @@ internal static class TypeHelpers
                && type.IsDefined(typeof(CompilerGeneratedAttribute), false);
     }
 
+    [UnconditionalSuppressMessage(
+        "AOT",
+        "IL3050",
+        Justification = "Used only by the cold reflection compatibility fallback; generated and explicitly registered formatter paths do not use it.")]
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2060",
+        Justification = "Used only by the cold reflection compatibility fallback; NativeAOT callers must directly reference their closed formatter graph.")]
+    public static bool IsReferenceOrContainsReferences(Type type)
+    {
+        return (bool)isReferenceOrContainsReferences.MakeGenericMethod(type).Invoke(null, null)!;
+    }
+
     static class Cache<T>
     {
         public static bool IsReferenceOrNullable;
@@ -54,6 +68,18 @@ internal static class TypeHelpers
         public static bool IsFixedSizeMemoryPackable = false;
         public static int MemoryPackableFixedSize = 0;
 
+        [UnconditionalSuppressMessage(
+            "AOT",
+            "IL3050",
+            Justification = "This optional array/fixed-size fast-path probe safely falls back to the regular generated formatter path when a reflected generic instantiation is unavailable.")]
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2060",
+            Justification = "This optional array fast-path probe safely falls back to the regular generated formatter path when the reflected generic method is unavailable.")]
+        [UnconditionalSuppressMessage(
+            "Trimming",
+            "IL2090",
+            Justification = "The reflected explicit static Size property is only an optimization; if trimmed, serialization uses the regular generated formatter path.")]
         static Cache()
         {
             try
@@ -71,7 +97,6 @@ internal static class TypeHelpers
                         UnmanagedSZArrayElementSize = (int)unsafeSizeOf.MakeGenericMethod(elementType!).Invoke(null, null)!;
                     }
                 }
-#if NET7_0_OR_GREATER
                 else
                 {
                     if (typeof(IFixedSizeMemoryPackable).IsAssignableFrom(type))
@@ -84,7 +109,6 @@ internal static class TypeHelpers
                         }
                     }
                 }
-#endif
             }
             catch
             {

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -11,8 +11,9 @@ public class StringTest
     {
         var text = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほわをん";
 
-        var bin = MemoryPackSerializer.Serialize(text, MemoryPackSerializerOptions.Utf16);
-        var newText = MemoryPackSerializer.Deserialize<string>(bin);
+        var context = new MemoryPackSerializerContext(MemoryPackSerializerConfiguration.Utf16);
+        var bin = MemoryPackSerializer.Serialize(text, context);
+        var newText = MemoryPackSerializer.Deserialize<string>(bin, context);
 
         text.Should().Be(newText);
     }
@@ -22,8 +23,9 @@ public class StringTest
     {
         var text = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほわをん";
 
-        var bin = MemoryPackSerializer.Serialize(text, MemoryPackSerializerOptions.Utf8);
-        var newText = MemoryPackSerializer.Deserialize<string>(bin);
+        var context = new MemoryPackSerializerContext(MemoryPackSerializerConfiguration.Utf8);
+        var bin = MemoryPackSerializer.Serialize(text, context);
+        var newText = MemoryPackSerializer.Deserialize<string>(bin, context);
 
         text.Should().Be(newText);
     }
@@ -33,7 +35,8 @@ public class StringTest
     {
         var text = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほわをん";
 
-        var bin = MemoryPackSerializer.Serialize(text, MemoryPackSerializerOptions.Utf8);
+        var context = new MemoryPackSerializerContext(MemoryPackSerializerConfiguration.Utf8);
+        var bin = MemoryPackSerializer.Serialize(text, context);
 
         ref var head = ref MemoryMarshal.GetArrayDataReference(bin);
 
@@ -42,7 +45,8 @@ public class StringTest
 
         Unsafe.WriteUnaligned(ref Unsafe.Add(ref head, 4), 9999);
 
-        Assert.Throws<MemoryPackSerializationException>(() => MemoryPackSerializer.Deserialize<string>(bin));
+        Assert.Throws<MemoryPackSerializationException>(
+            () => MemoryPackSerializer.Deserialize<string>(bin, context));
     }
 
     [Fact]

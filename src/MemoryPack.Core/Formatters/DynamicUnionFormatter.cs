@@ -1,54 +1,150 @@
-﻿namespace MemoryPack.Formatters;
+using System.Buffers;
+using System.Collections.Frozen;
 
-public sealed class DynamicUnionFormatter<T> : MemoryPackFormatter<T>
-    where T : class
+namespace MemoryPack.Formatters;
+
+/// <summary>
+/// Builds a context-owned union formatter without using the non-generic serializer path.
+/// </summary>
+public sealed class DynamicUnionFormatterBuilder<TBase>
+    where TBase : class
 {
-    readonly Dictionary<Type, ushort> typeToTag;
-    readonly Dictionary<ushort, Type> tagToType;
+    readonly Dictionary<Type, DynamicUnionCase<TBase>> typeToCase = [];
+    readonly Dictionary<ushort, DynamicUnionCase<TBase>> tagToCase = [];
+    bool built;
 
-    public DynamicUnionFormatter(params (ushort Tag, Type Type)[] memoryPackUnions)
+    public DynamicUnionFormatterBuilder<TBase> Add<TDerived>(ushort tag)
+        where TDerived : TBase
     {
-        typeToTag = memoryPackUnions.ToDictionary(x => x.Type, x => x.Tag);
-        tagToType = memoryPackUnions.ToDictionary(x => x.Tag, x => x.Type);
+        if (built)
+        {
+            throw new InvalidOperationException("This dynamic union builder has already been built.");
+        }
+
+        var type = typeof(TDerived);
+        if (typeToCase.ContainsKey(type))
+        {
+            throw new ArgumentException(
+                $"The derived type {type.FullName} is already registered.",
+                nameof(TDerived));
+        }
+
+        if (tagToCase.ContainsKey(tag))
+        {
+            throw new ArgumentException(
+                $"The union tag {tag} is already registered.",
+                nameof(tag));
+        }
+
+        var unionCase = new DynamicUnionCase<TBase, TDerived>(tag);
+        typeToCase.Add(type, unionCase);
+        tagToCase.Add(tag, unionCase);
+        return this;
     }
 
-    public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref T? value)
+    public DynamicUnionFormatter<TBase> Build()
     {
-        if (value == null)
+        if (built)
+        {
+            throw new InvalidOperationException("This dynamic union builder has already been built.");
+        }
+
+        built = true;
+        return new DynamicUnionFormatter<TBase>(
+            typeToCase.ToFrozenDictionary(),
+            tagToCase.ToFrozenDictionary());
+    }
+}
+
+public sealed class DynamicUnionFormatter<TBase> : MemoryPackFormatter<TBase>
+    where TBase : class
+{
+    readonly FrozenDictionary<Type, DynamicUnionCase<TBase>> typeToCase;
+    readonly FrozenDictionary<ushort, DynamicUnionCase<TBase>> tagToCase;
+
+    internal DynamicUnionFormatter(
+        FrozenDictionary<Type, DynamicUnionCase<TBase>> typeToCase,
+        FrozenDictionary<ushort, DynamicUnionCase<TBase>> tagToCase)
+    {
+        this.typeToCase = typeToCase;
+        this.tagToCase = tagToCase;
+    }
+
+    public override void Serialize<TBufferWriter>(
+        ref MemoryPackWriter<TBufferWriter> writer,
+        scoped ref TBase? value)
+    {
+        if (value is null)
         {
             writer.WriteNullUnionHeader();
             return;
         }
 
-        var type = value.GetType();
-        if (typeToTag.TryGetValue(type, out var tag))
+        var actualType = value.GetType();
+        if (!typeToCase.TryGetValue(actualType, out var unionCase))
         {
-            writer.WriteUnionHeader(tag);
-            writer.WriteValue(type, value);
+            MemoryPackSerializationException.ThrowNotFoundInUnionType(
+                actualType,
+                typeof(TBase));
         }
-        else
-        {
-            MemoryPackSerializationException.ThrowNotFoundInUnionType(type, typeof(T));
-        }
+
+        writer.WriteUnionHeader(unionCase.Tag);
+        unionCase.Serialize(ref writer, value);
     }
 
-    public override void Deserialize(ref MemoryPackReader reader, scoped ref T? value)
+    public override void Deserialize(
+        ref MemoryPackReader reader,
+        scoped ref TBase? value)
     {
         if (!reader.TryReadUnionHeader(out var tag))
         {
-            value = default;
+            value = null;
             return;
         }
-        
-        if (tagToType.TryGetValue(tag, out var type))
+
+        if (!tagToCase.TryGetValue(tag, out var unionCase))
         {
-            object? v = value;
-            reader.ReadValue(type, ref v);
-            value = (T?)v;
+            MemoryPackSerializationException.ThrowInvalidTag(tag, typeof(TBase));
         }
-        else
-        {
-            MemoryPackSerializationException.ThrowInvalidTag(tag, typeof(T));
-        }
+
+        value = unionCase.Deserialize(ref reader, value);
+    }
+}
+
+internal abstract class DynamicUnionCase<TBase>(ushort tag)
+    where TBase : class
+{
+    internal ushort Tag { get; } = tag;
+
+    internal abstract void Serialize<TBufferWriter>(
+        ref MemoryPackWriter<TBufferWriter> writer,
+        TBase value)
+        where TBufferWriter : IBufferWriter<byte>;
+
+    internal abstract TBase? Deserialize(
+        ref MemoryPackReader reader,
+        TBase? value);
+}
+
+internal sealed class DynamicUnionCase<TBase, TDerived>(ushort tag)
+    : DynamicUnionCase<TBase>(tag)
+    where TBase : class
+    where TDerived : TBase
+{
+    internal override void Serialize<TBufferWriter>(
+        ref MemoryPackWriter<TBufferWriter> writer,
+        TBase value)
+    {
+        var typedValue = (TDerived)value;
+        writer.WriteValue(typedValue);
+    }
+
+    internal override TBase? Deserialize(
+        ref MemoryPackReader reader,
+        TBase? value)
+    {
+        var typedValue = value is TDerived existing ? existing : default;
+        reader.ReadValue(ref typedValue);
+        return typedValue;
     }
 }

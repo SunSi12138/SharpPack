@@ -1,5 +1,6 @@
-﻿using MemoryPack.Streaming;
+using MemoryPack.Streaming;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Pipelines;
@@ -61,6 +62,48 @@ public class StreamingSerializer
 
 
 
+    }
+
+    [Fact]
+    public async Task SingleMessagePipeApi_IsZeroCopyAndFrameBounded()
+    {
+        var context = new MemoryPackSerializerContext();
+        var value = new SampleClassForMemoryPack(42, "rpc");
+        var expected = MemoryPackSerializer.Serialize(value, context);
+        var pipe = new Pipe();
+
+        var written = await MemoryPackStreamingSerializer.SerializeFrameAsync(
+            pipe.Writer,
+            value,
+            context);
+        pipe.Writer.Write(new byte[] { 0xCA, 0xFE });
+        await pipe.Writer.FlushAsync();
+
+        written.Should().Be(expected.Length);
+        var restored = await MemoryPackStreamingSerializer.DeserializeFrameAsync<SampleClassForMemoryPack>(
+            pipe.Reader,
+            written,
+            context);
+
+        restored.Should().Be(value);
+        var remainder = await pipe.Reader.ReadAsync();
+        remainder.Buffer.ToArray().Should().Equal(0xCA, 0xFE);
+        pipe.Reader.AdvanceTo(remainder.Buffer.End);
+    }
+
+    [Fact]
+    public async Task SingleMessagePipeApi_RejectsTrailingFrameBytes()
+    {
+        var payload = MemoryPackSerializer.Serialize(123);
+        var pipe = new Pipe();
+        pipe.Writer.Write(payload);
+        pipe.Writer.Write(new byte[] { 0x00 });
+        await pipe.Writer.FlushAsync();
+
+        await Assert.ThrowsAsync<MemoryPackSerializationException>(
+            async () => await MemoryPackStreamingSerializer.DeserializeFrameAsync<int>(
+                pipe.Reader,
+                payload.Length + 1));
     }
 
 }

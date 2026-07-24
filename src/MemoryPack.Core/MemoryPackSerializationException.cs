@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 
 namespace MemoryPack;
@@ -67,18 +67,6 @@ public class MemoryPackSerializationException : Exception
     public static void ThrowInsufficientBufferUnless(int length)
     {
         throw new MemoryPackSerializationException($"Length header size is larger than buffer size, length: {length}.");
-    }
-
-    [DoesNotReturn]
-    public static void ThrowNotRegisteredInProvider(Type type)
-    {
-        throw new MemoryPackSerializationException($"{type.FullName} is not registered in this provider.");
-    }
-
-    [DoesNotReturn]
-    public static void ThrowRegisterInProviderFailed(Type type, Exception innerException)
-    {
-        throw new MemoryPackSerializationException($"{type.FullName} is failed in provider at creating formatter.", innerException);
     }
 
     [DoesNotReturn]

@@ -1,4 +1,4 @@
-﻿using MemoryPack.Compression;
+using MemoryPack.Compression;
 using System;
 using System.Buffers;
 using System.IO.Compression;
@@ -73,9 +73,16 @@ public partial class SaveData
 
     public byte[] MemCmpSerialize()
     {
-        using var cp = new BrotliCompressor();
-        MemoryPackSerializer.Serialize(cp, this);
-        return cp.ToArray();
+        var cp = new BrotliCompressor();
+        try
+        {
+            MemoryPackSerializer.Serialize(ref cp, this);
+            return cp.ToArray();
+        }
+        finally
+        {
+            cp.Dispose();
+        }
     }
 
     public bool MemDecmpDeserialize(byte[] bin)

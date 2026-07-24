@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
@@ -6,12 +6,8 @@ using System.Runtime.InteropServices;
 
 namespace MemoryPack.Internal;
 
-#if NET7_0_OR_GREATER
 using static GC;
 using static MemoryMarshal;
-#else
-using static MemoryPack.Internal.MemoryMarshalEx;
-#endif
 
 // internal but used by generator code
 
@@ -35,10 +31,9 @@ public static class ReusableLinkedArrayBufferWriterPool
     }
 }
 
-// This class has large buffer so should cache [ThreadStatic] or Pool.
 public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
 {
-    const int InitialBufferSize = 262144; // 256K(32768, 65536, 131072, 262144)
+    const int InitialBufferSize = 4096;
     static readonly byte[] noUseFirstBufferSentinel = new byte[0];
 
     List<BufferSegment> buffers; // add freezed buffer.
@@ -88,7 +83,7 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
         else
         {
             var buffer = current.FreeBuffer;
-            if (buffer.Length > sizeHint)
+            if (buffer.Length >= sizeHint)
             {
                 return buffer;
             }
@@ -108,6 +103,10 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
         if (current.WrittenCount != 0)
         {
             buffers.Add(current);
+        }
+        else if (!current.IsNull)
+        {
+            current.Clear();
         }
         current = next;
         return next.FreeBuffer;
@@ -129,7 +128,11 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
 
     public byte[] ToArrayAndReset()
     {
-        if (totalWritten == 0) return Array.Empty<byte>();
+        if (totalWritten == 0)
+        {
+            Reset();
+            return Array.Empty<byte>();
+        }
 
         var result = AllocateUninitializedArray<byte>(totalWritten);
         var dest = result.AsSpan();
@@ -142,11 +145,7 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
 
         if (buffers.Count > 0)
         {
-#if NET7_0_OR_GREATER
             foreach (ref var item in CollectionsMarshal.AsSpan(buffers))
-#else
-            foreach (var item in buffers)
-#endif
             {
                 item.WrittenBuffer.CopyTo(dest);
                 dest = dest.Slice(item.WrittenCount);
@@ -165,13 +164,13 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
     }
 
     public void WriteToAndReset<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer)
-#if NET7_0_OR_GREATER
         where TBufferWriter : IBufferWriter<byte>
-#else
-        where TBufferWriter : class, IBufferWriter<byte>
-#endif
     {
-        if (totalWritten == 0) return;
+        if (totalWritten == 0)
+        {
+            Reset();
+            return;
+        }
 
         if (UseFirstBuffer)
         {
@@ -182,11 +181,7 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
 
         if (buffers.Count > 0)
         {
-#if NET7_0_OR_GREATER
             foreach (ref var item in CollectionsMarshal.AsSpan(buffers))
-#else
-            foreach (var item in buffers)
-#endif
             {
                 ref var spanRef = ref writer.GetSpanReference(item.WrittenCount);
                 item.WrittenBuffer.CopyTo(MemoryMarshal.CreateSpan(ref spanRef, item.WrittenCount));
@@ -208,7 +203,11 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
 
     public async ValueTask WriteToAndResetAsync(Stream stream, CancellationToken cancellationToken)
     {
-        if (totalWritten == 0) return;
+        if (totalWritten == 0)
+        {
+            Reset();
+            return;
+        }
 
         if (UseFirstBuffer)
         {
@@ -252,12 +251,7 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Reset()
     {
-        if (totalWritten == 0) return;
-#if NET7_0_OR_GREATER
         foreach (ref var item in CollectionsMarshal.AsSpan(buffers))
-#else
-        foreach (var item in buffers)
-#endif
         {
             item.Clear();
         }

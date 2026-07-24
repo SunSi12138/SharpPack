@@ -1,4 +1,4 @@
-﻿namespace MemoryPack;
+namespace MemoryPack;
 
 // VarInt, first sbyte is value or typeCode
 

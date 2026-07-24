@@ -1,4 +1,4 @@
-﻿using RandomFixtureKit;
+using RandomFixtureKit;
 using System;
 using System.Collections.Generic;
 using System.Linq;

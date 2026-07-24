@@ -1,4 +1,4 @@
-﻿namespace MemoryPack;
+namespace MemoryPack;
 
 public static class MemoryPackCode
 {

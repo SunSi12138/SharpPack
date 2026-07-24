@@ -1,4 +1,3 @@
-﻿#if NET7_0_OR_GREATER
 
 #pragma warning disable CS8618
 #pragma warning disable CS0649
@@ -52,5 +51,3 @@ internal static class CollectionsMarshalEx
         public int _version;
     }
 }
-
-#endif

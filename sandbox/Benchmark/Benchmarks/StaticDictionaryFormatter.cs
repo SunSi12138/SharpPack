@@ -90,14 +90,6 @@ public class StaticDictionaryFormatterCheck
 sealed class DictionaryFormatter<TKey, TValue> : MemoryPackFormatter<Dictionary<TKey, TValue?>>
     where TKey : notnull
 {
-    static DictionaryFormatter()
-    {
-        if (!MemoryPackFormatterProvider.IsRegistered<KeyValuePair<TKey, TValue?>>())
-        {
-            MemoryPackFormatterProvider.Register(new KeyValuePairFormatter<TKey, TValue?>());
-        }
-    }
-
     readonly IEqualityComparer<TKey>? equalityComparer;
 
     public DictionaryFormatter()
