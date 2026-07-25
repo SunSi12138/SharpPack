@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using SharpPack.Formatters;
 
@@ -46,6 +47,11 @@ public sealed class SharpPackSerializerContext
             !FormatterTypeTraits<T>.ContainsCollectibleType
             ? FormatterSlot<T>.Formatter
             : graph.GetFormatter<T>();
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool HasFormatterOverrideDependency<T>()
+        => graph.HasFormatterOverride<T>();
 
     internal FormatterGraph? OverrideGraph
         => graph.HasRegistrations ? graph : null;

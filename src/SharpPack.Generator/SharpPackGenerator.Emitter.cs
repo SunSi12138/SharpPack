@@ -377,7 +377,23 @@ public partial class TypeMeta
         }
 
         var contextFactoryInterface =
-            $", global::SharpPack.ISharpPackFormatterFactory<{TypeName}>";
+            $", global::SharpPack.ISharpPackFormatterFactory<{TypeName}>" +
+            $", global::SharpPack.ISharpPackContextFormatterFactory<{TypeName}>";
+        var contextDependencyCondition = IsUnmanagedType
+            ? ""
+            : EmitFormatterOverrideDependencyCondition(
+                "context",
+                useOptionalState: false);
+        var contextFormatterSelection =
+            contextDependencyCondition.Length == 0
+                ? $"return new global::SharpPack.Formatters.SharpPackableFormatter<{TypeName}>();"
+                : $$"""
+        if ({{contextDependencyCondition}})
+        {
+            return new __SharpPackContextFormatter();
+        }
+        return new global::SharpPack.Formatters.SharpPackableFormatter<{{TypeName}}>();
+""";
         var contextFactoryMethod = $$"""
 
     [global::SharpPack.Internal.Preserve]
@@ -385,6 +401,14 @@ public partial class TypeMeta
     {
 {{EmitAotFormatterRoots("        ")}}
         return new global::SharpPack.Formatters.SharpPackableFormatter<{{TypeName}}>();
+    }
+
+    [global::SharpPack.Internal.Preserve]
+    static global::SharpPack.SharpPackFormatter<{{TypeName}}> global::SharpPack.ISharpPackContextFormatterFactory<{{TypeName}}>.CreateFormatter(
+        global::SharpPack.SharpPackSerializerContext context)
+    {
+{{EmitAotFormatterRoots("        ")}}
+        {{contextFormatterSelection}}
     }
 """;
 
@@ -433,24 +457,8 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 
     private string EmitDeserializeBody()
     {
-        var formatterOverrideDependencyCondition =
-            EmitFormatterOverrideDependencyCondition("reader");
-        var defaultBody = EmitDeserializeBodyCore(
+        return EmitDeserializeBodyCore(
             honorFormatterOverrides: false);
-        if (formatterOverrideDependencyCondition.Length == 0)
-        {
-            return defaultBody;
-        }
-
-        var helperName = GetFormatterOverrideHelperName(serialize: false);
-        return $$"""
-        if (reader.OptionalState.HasFormatterOverrides &&
-            {{helperName}}(ref reader, ref value))
-        {
-            goto END;
-        }
-{{defaultBody}}
-""";
     }
 
     private string EmitDeserializeBodyCore(bool honorFormatterOverrides)
@@ -737,12 +745,9 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 
     string EmitSerializeBody()
     {
-        var formatterOverrideDependencyCondition =
-            EmitFormatterOverrideDependencyCondition("writer");
-
         if (this.GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference)
         {
-            var defaultBody = Members.All(x =>
+            return Members.All(x =>
                 x.Kind is MemberKind.Unmanaged
                     or MemberKind.String
                     or MemberKind.Enum
@@ -752,39 +757,9 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
                 ? EmitVersionTorelantSerializeBodyOptimized()
                 : EmitVersionTorelantSerializeBody(
                     honorFormatterOverrides: false);
-            if (formatterOverrideDependencyCondition.Length == 0)
-            {
-                return defaultBody;
-            }
-
-            var helperName = GetFormatterOverrideHelperName(serialize: true);
-            return $$"""
-        if (writer.OptionalState.HasFormatterOverrides &&
-            {{helperName}}(ref writer, ref value))
-        {
-            goto END;
-        }
-{{defaultBody}}
-""";
         }
 
-        var defaultObjectBody =
-            EmitObjectSerializeBody(honorFormatterOverrides: false);
-        if (formatterOverrideDependencyCondition.Length == 0)
-        {
-            return defaultObjectBody;
-        }
-
-        var objectHelperName =
-            GetFormatterOverrideHelperName(serialize: true);
-        return $$"""
-        if (writer.OptionalState.HasFormatterOverrides &&
-            {{objectHelperName}}(ref writer, ref value))
-        {
-            goto END;
-        }
-{{defaultObjectBody}}
-""";
+        return EmitObjectSerializeBody(honorFormatterOverrides: false);
     }
 
     string EmitFormatterOverrideMethods()
@@ -814,33 +789,44 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 
     [global::System.Runtime.CompilerServices.MethodImpl(
         global::System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-    static bool {{serializeHelperName}}<TBufferWriter>(
+    static void {{serializeHelperName}}<TBufferWriter>(
         ref global::SharpPack.SharpPackWriter<TBufferWriter> writer,
         scoped ref {{TypeName}}{{nullable}} value)
         where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
     {
-        if (!({{writerCondition}}))
-        {
-            return false;
-        }
+{{OnSerializing.Select(x => "        " + x.Emit()).NewLine()}}
 {{overrideSerializeBody}}
     END:
-        return true;
+{{OnSerialized.Select(x => "        " + x.Emit()).NewLine()}}
+        return;
     }
 
     [global::System.Runtime.CompilerServices.MethodImpl(
         global::System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-    static bool {{deserializeHelperName}}(
+    static void {{deserializeHelperName}}(
         ref global::SharpPack.SharpPackReader reader,
         scoped ref {{TypeName}}{{nullable}} value)
     {
-        if (!({{EmitFormatterOverrideDependencyCondition("reader")}}))
-        {
-            return false;
-        }
+{{OnDeserializing.Select(x => "        " + x.Emit()).NewLine()}}
 {{overrideDeserializeBody}}
     END:
-        return true;
+{{OnDeserialized.Select(x => "        " + x.Emit()).NewLine()}}
+        return;
+    }
+
+    [global::SharpPack.Internal.Preserve]
+    sealed class __SharpPackContextFormatter
+        : global::SharpPack.SharpPackFormatter<{{TypeName}}>
+    {
+        public override void Serialize<TBufferWriter>(
+            ref global::SharpPack.SharpPackWriter<TBufferWriter> writer,
+            scoped ref {{TypeName}}{{nullable}} value)
+            => {{serializeHelperName}}(ref writer, ref value);
+
+        public override void Deserialize(
+            ref global::SharpPack.SharpPackReader reader,
+            scoped ref {{TypeName}}{{nullable}} value)
+            => {{deserializeHelperName}}(ref reader, ref value);
     }
 """;
     }
@@ -1169,7 +1155,9 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         return sb.ToString();
     }
 
-    string EmitFormatterOverrideDependencyCondition(string readerOrWriter)
+    string EmitFormatterOverrideDependencyCondition(
+        string receiver,
+        bool useOptionalState = true)
     {
         var types = new List<ITypeSymbol>();
         foreach (var member in Members)
@@ -1186,8 +1174,9 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
                 type.ToDisplayString(
                     SymbolDisplayFormat.FullyQualifiedFormat))
             .Distinct(StringComparer.Ordinal)
-            .Select(type =>
-                $"{readerOrWriter}.OptionalState.HasFormatterOverride<{type}>()");
+            .Select(type => useOptionalState
+                ? $"{receiver}.OptionalState.HasFormatterOverride<{type}>()"
+                : $"{receiver}.HasFormatterOverrideDependency<{type}>()");
         var registrationCondition = string.Join(" || ", registrations);
         return registrationCondition;
 

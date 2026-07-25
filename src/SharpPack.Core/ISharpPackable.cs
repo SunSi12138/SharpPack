@@ -15,6 +15,13 @@ public interface ISharpPackFormatterFactory<T>
 }
 
 
+public interface ISharpPackContextFormatterFactory<T>
+{
+    static abstract SharpPackFormatter<T> CreateFormatter(
+        SharpPackSerializerContext context);
+}
+
+
 public interface ISharpPackable<T>
 {
     // note: serialize parameter should be `ref readonly` but current lang spec can not.

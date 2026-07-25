@@ -46,7 +46,7 @@ public partial class Model
         generated.Should().Contain(
             "__SharpPackSerializeWithFormatterOverrides_<TBufferWriter>");
         generated.Should().Contain(
-            "bool __SharpPackDeserializeWithFormatterOverrides_(");
+            "void __SharpPackDeserializeWithFormatterOverrides_(");
     }
 
     [Fact]
@@ -89,8 +89,14 @@ public partial class Model
         generated.Should().Contain(
             "__SharpPackDeserializeWithFormatterOverrides");
         generated.Should().Contain(
-            "writer.OptionalState.HasFormatterOverrides &&");
+            "ISharpPackContextFormatterFactory<Model>.CreateFormatter(");
         generated.Should().Contain(
+            "context.HasFormatterOverrideDependency<int>()");
+        generated.Should().Contain(
+            "sealed class __SharpPackContextFormatter");
+        generated.Should().NotContain(
+            "writer.OptionalState.HasFormatterOverrides &&");
+        generated.Should().NotContain(
             "reader.OptionalState.HasFormatterOverrides &&");
         generated.Should().Contain(
             "writer.WriteUnmanagedArray(value.@Values);");
