@@ -42,25 +42,30 @@ internal sealed class FormatterGraph
 
         lock (formatterCreationLock)
         {
-            if (ContextFormatterSlot<T>.TryGet(this, out formatter))
-            {
-                return formatter;
-            }
+            return GetFormatterLocked<T>();
+        }
+    }
 
-            var type = typeof(T);
-            if (!creatingFormatterTypes.Add(type))
-            {
-                return FormatterSlot<T>.Formatter;
-            }
+    SharpPackFormatter<T> GetFormatterLocked<T>()
+    {
+        if (ContextFormatterSlot<T>.TryGet(this, out var formatter))
+        {
+            return formatter;
+        }
 
-            try
-            {
-                return ContextFormatterSlot<T>.Get(this);
-            }
-            finally
-            {
-                creatingFormatterTypes.Remove(type);
-            }
+        var type = typeof(T);
+        if (!creatingFormatterTypes.Add(type))
+        {
+            return FormatterSlot<T>.Formatter;
+        }
+
+        try
+        {
+            return ContextFormatterSlot<T>.Get(this);
+        }
+        finally
+        {
+            creatingFormatterTypes.Remove(type);
         }
     }
 
@@ -84,7 +89,8 @@ internal sealed class FormatterGraph
                 return true;
             }
 
-            return GetFormatter<T>().HasFormatterOverrideDependency(this);
+            return GetFormatterLocked<T>()
+                .HasFormatterOverrideDependency(this);
         }
     }
 

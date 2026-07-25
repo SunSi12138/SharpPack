@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.ComponentModel;
 
 namespace SharpPack;
 
@@ -15,6 +16,7 @@ public interface ISharpPackFormatterFactory<T>
 }
 
 
+[EditorBrowsable(EditorBrowsableState.Never)]
 public interface ISharpPackContextFormatterFactory<T>
 {
     static abstract SharpPackFormatter<T> CreateFormatter(

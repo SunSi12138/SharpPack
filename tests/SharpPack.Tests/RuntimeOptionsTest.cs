@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Threading.Tasks;
 
 namespace SharpPack.Tests;
 
@@ -39,10 +40,27 @@ public class RuntimeOptionsTest
             var options = Activator.CreateInstance(optionsType)!;
             optionsType.GetProperty("ThreadBufferSize")!
                 .SetValue(options, 80 * 1024);
+            optionsType.GetProperty("PinThreadBuffer")!
+                .SetValue(options, true);
 
             var configure = serializerType.GetMethod(
                 "ConfigureRuntime",
                 BindingFlags.Public | BindingFlags.Static)!;
+            configure.Invoke(null, [options]);
+
+            var stateType = serializerType.GetNestedType(
+                "SerializerWriterThreadStaticState",
+                BindingFlags.NonPublic)!;
+            var stateConstructor = stateType.GetConstructor(
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
+                binder: null,
+                [typeof(bool)],
+                modifiers: null)!;
+            var temporaryState = stateConstructor.Invoke([false]);
+            GetFirstBuffer(temporaryState, stateType).Should().BeEmpty();
+
+            // Creating a non-retained reentrant state must not freeze the
+            // configured state used by subsequent long-lived thread states.
             configure.Invoke(null, [options]);
 
             var serialize = serializerType
@@ -58,15 +76,9 @@ public class RuntimeOptionsTest
                 "threadStaticState",
                 BindingFlags.NonPublic | BindingFlags.Static)!
                 .GetValue(null)!;
-            var bufferWriter = state.GetType().GetField(
-                "BufferWriter",
-                BindingFlags.Public | BindingFlags.Instance)!
-                .GetValue(state)!;
-            var firstBuffer = (byte[])bufferWriter.GetType().GetMethod(
-                "DangerousGetFirstBuffer",
-                BindingFlags.Public | BindingFlags.Instance)!
-                .Invoke(bufferWriter, null)!;
+            var firstBuffer = GetFirstBuffer(state, state.GetType());
             firstBuffer.Length.Should().Be(80 * 1024);
+            GC.GetGeneration(firstBuffer).Should().Be(2);
 
             var secondConfigure = () => configure.Invoke(null, [options]);
             secondConfigure.Should().Throw<TargetInvocationException>()
@@ -76,5 +88,83 @@ public class RuntimeOptionsTest
         {
             loadContext.Unload();
         }
+    }
+
+    [Fact]
+    public void ReentrantState_DoesNotRetainAFirstBuffer()
+    {
+        var serializerType = typeof(SharpPackSerializer);
+        var stateType = serializerType.GetNestedType(
+            "SerializerWriterThreadStaticState",
+            BindingFlags.NonPublic)!;
+        var constructor = stateType.GetConstructor(
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
+            binder: null,
+            [typeof(bool)],
+            modifiers: null)!;
+
+        var temporaryState = constructor.Invoke([false]);
+        GetFirstBuffer(temporaryState, stateType).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ConcurrentFirstUse_UsesOneFrozenConfiguration()
+    {
+        var loadContext = new AssemblyLoadContext(
+            nameof(ConcurrentFirstUse_UsesOneFrozenConfiguration),
+            isCollectible: true);
+        try
+        {
+            var assembly = loadContext.LoadFromAssemblyPath(
+                typeof(SharpPackSerializer).Assembly.Location);
+            var serializerType = assembly.GetType(
+                "SharpPack.SharpPackSerializer",
+                throwOnError: true)!;
+            var optionsType = assembly.GetType(
+                "SharpPack.SharpPackSerializerRuntimeOptions",
+                throwOnError: true)!;
+            var options = Activator.CreateInstance(optionsType)!;
+            optionsType.GetProperty("ThreadBufferSize")!
+                .SetValue(options, 12_345);
+            serializerType.GetMethod(
+                "ConfigureRuntime",
+                BindingFlags.Public | BindingFlags.Static)!
+                .Invoke(null, [options]);
+
+            var stateType = serializerType.GetNestedType(
+                "SerializerWriterThreadStaticState",
+                BindingFlags.NonPublic)!;
+            var constructor = stateType.GetConstructor(
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
+                binder: null,
+                [typeof(bool)],
+                modifiers: null)!;
+
+            var lengths = await Task.WhenAll(
+                Enumerable.Range(0, Environment.ProcessorCount * 4)
+                    .Select(_ => Task.Run(() =>
+                    {
+                        var state = constructor.Invoke([true]);
+                        return GetFirstBuffer(state, stateType).Length;
+                    })));
+
+            lengths.Should().OnlyContain(static length => length == 12_345);
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
+    }
+
+    static byte[] GetFirstBuffer(object state, Type stateType)
+    {
+        var bufferWriter = stateType.GetField(
+            "BufferWriter",
+            BindingFlags.Public | BindingFlags.Instance)!
+            .GetValue(state)!;
+        return (byte[])bufferWriter.GetType().GetMethod(
+            "DangerousGetFirstBuffer",
+            BindingFlags.Public | BindingFlags.Instance)!
+            .Invoke(bufferWriter, null)!;
     }
 }

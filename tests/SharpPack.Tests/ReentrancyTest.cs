@@ -28,6 +28,11 @@ public class ReentrancyTest
             context);
 
         decoded.Should().BeEquivalentTo(value);
+
+        var secondPayload = SharpPackSerializer.Serialize(value, context);
+        SharpPackSerializer.Deserialize<ReentrantEnvelope>(
+            secondPayload,
+            context).Should().BeEquivalentTo(value);
     }
 }
 

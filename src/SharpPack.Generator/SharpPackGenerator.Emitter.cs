@@ -394,12 +394,32 @@ public partial class TypeMeta
         }
         return new global::SharpPack.Formatters.SharpPackableFormatter<{{TypeName}}>();
 """;
+        var aotFormatterRoots = EmitAotFormatterRoots("        ");
+        var aotRootMethodName = "__SharpPackEnsureAotFormatterRoots";
+        while (Symbol.GetAllMembers().Any(
+            member => member.Name == aotRootMethodName))
+        {
+            aotRootMethodName += "_";
+        }
+        var aotRootCall = aotFormatterRoots.Length == 0
+            ? ""
+            : $"        {aotRootMethodName}();";
+        var aotRootMethod = aotFormatterRoots.Length == 0
+            ? ""
+            : $$"""
+
+    [global::SharpPack.Internal.Preserve]
+    static void {{aotRootMethodName}}()
+    {
+{{aotFormatterRoots}}
+    }
+""";
         var contextFactoryMethod = $$"""
 
     [global::SharpPack.Internal.Preserve]
     static global::SharpPack.SharpPackFormatter<{{TypeName}}> global::SharpPack.ISharpPackFormatterFactory<{{TypeName}}>.CreateFormatter()
     {
-{{EmitAotFormatterRoots("        ")}}
+{{aotRootCall}}
         return new global::SharpPack.Formatters.SharpPackableFormatter<{{TypeName}}>();
     }
 
@@ -407,9 +427,10 @@ public partial class TypeMeta
     static global::SharpPack.SharpPackFormatter<{{TypeName}}> global::SharpPack.ISharpPackContextFormatterFactory<{{TypeName}}>.CreateFormatter(
         global::SharpPack.SharpPackSerializerContext context)
     {
-{{EmitAotFormatterRoots("        ")}}
+{{aotRootCall}}
         {{contextFormatterSelection}}
     }
+{{aotRootMethod}}
 """;
 
         writer.AppendLine($$"""

@@ -227,13 +227,22 @@ public static partial class SharpPackSerializer
         public ReusableLinkedArrayBufferWriter BufferWriter;
         public SharpPackWriterOptionalState OptionalState;
 
-        public SerializerWriterThreadStaticState()
+        public SerializerWriterThreadStaticState(bool retainConfiguredBuffer)
         {
-            var options = GetRuntimeOptionsAndFreeze();
-            BufferWriter = new ReusableLinkedArrayBufferWriter(
-                useFirstBuffer: true,
-                pinned: options.PinThreadBuffer,
-                firstBufferSize: options.ThreadBufferSize);
+            if (retainConfiguredBuffer)
+            {
+                var options = GetRuntimeOptionsAndFreeze();
+                BufferWriter = new ReusableLinkedArrayBufferWriter(
+                    useFirstBuffer: true,
+                    pinned: options.PinThreadBuffer,
+                    firstBufferSize: options.ThreadBufferSize);
+            }
+            else
+            {
+                BufferWriter = new ReusableLinkedArrayBufferWriter(
+                    useFirstBuffer: false,
+                    pinned: false);
+            }
             OptionalState = new SharpPackWriterOptionalState();
         }
 
@@ -271,7 +280,8 @@ public static partial class SharpPackSerializer
         var state = threadStaticState;
         if (state is null)
         {
-            state = threadStaticState = new SerializerWriterThreadStaticState();
+            state = threadStaticState = new SerializerWriterThreadStaticState(
+                retainConfiguredBuffer: true);
         }
 
         if (state.TryEnter())
@@ -279,7 +289,8 @@ public static partial class SharpPackSerializer
             return state;
         }
 
-        var nestedState = new SerializerWriterThreadStaticState();
+        var nestedState = new SerializerWriterThreadStaticState(
+            retainConfiguredBuffer: false);
         _ = nestedState.TryEnter();
         return nestedState;
     }

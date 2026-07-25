@@ -3,6 +3,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace SharpPack.Tests;
 
@@ -132,6 +133,76 @@ public class SharpPackSerializerContextTest
         SharpPackSerializer.Deserialize<int>(primitiveBytes, context).Should().Be(10);
         SharpPackSerializer.Deserialize<ContextGraph>(graphBytes, context)
             .Should().BeEquivalentTo(value);
+    }
+
+    [Fact]
+    public void Registration_PropagatesThroughGeneratedGrandchildGraph()
+    {
+        var context = new SharpPackSerializerContextBuilder()
+            .Register(new IntOffsetFormatter(100))
+            .Build();
+        var value = new ContextNestedRoot
+        {
+            Child = new ContextNestedChild { Value = 42 },
+        };
+
+        var defaultPayload = SharpPackSerializer.Serialize(value);
+        var contextPayload = SharpPackSerializer.Serialize(value, context);
+
+        contextPayload.Should().NotEqual(defaultPayload);
+        SharpPackSerializer.Deserialize<ContextNestedRoot>(
+            contextPayload,
+            context)!.Child!.Value.Should().Be(42);
+    }
+
+    [Fact]
+    public async Task ContextFormatterCreation_IsSafeUnderConcurrentFirstUse()
+    {
+        var context = new SharpPackSerializerContextBuilder()
+            .Register(new IntOffsetFormatter(100))
+            .Build();
+        var value = new ContextNestedRoot
+        {
+            Child = new ContextNestedChild { Value = 42 },
+        };
+
+        var payloads = await Task.WhenAll(
+            Enumerable.Range(0, Environment.ProcessorCount * 4)
+                .Select(_ => Task.Run(() =>
+                {
+                    var payload = SharpPackSerializer.Serialize(value, context);
+                    return SharpPackSerializer.Deserialize<ContextNestedRoot>(
+                        payload,
+                        context);
+                })));
+
+        payloads.Should().OnlyContain(
+            static value =>
+                value != null &&
+                value.Child != null &&
+                value.Child.Value == 42);
+    }
+
+    [Fact]
+    public void RecursiveGeneratedGraph_WithLeafOverride_RoundTrips()
+    {
+        var context = new SharpPackSerializerContextBuilder()
+            .Register(new IntOffsetFormatter(100))
+            .Build();
+        var value = new ContextRecursiveNode
+        {
+            Value = 1,
+            Next = new ContextRecursiveNode { Value = 2 },
+        };
+
+        var payload = SharpPackSerializer.Serialize(value, context);
+        payload.Should().NotEqual(SharpPackSerializer.Serialize(value));
+
+        var decoded = SharpPackSerializer.Deserialize<ContextRecursiveNode>(
+            payload,
+            context);
+        decoded!.Value.Should().Be(1);
+        decoded.Next!.Value.Should().Be(2);
     }
 
     [Fact]
@@ -640,6 +711,25 @@ public partial class ContextGraph
     public Dictionary<string, StandardTypeOne>? Map { get; set; }
     public (int, string)? Pair { get; set; }
     public int? Optional { get; set; }
+}
+
+[SharpPackable]
+public partial class ContextNestedRoot
+{
+    public ContextNestedChild? Child { get; set; }
+}
+
+[SharpPackable]
+public partial class ContextNestedChild
+{
+    public int Value { get; set; }
+}
+
+[SharpPackable]
+public partial class ContextRecursiveNode
+{
+    public int Value { get; set; }
+    public ContextRecursiveNode? Next { get; set; }
 }
 
 [SharpPackable]
