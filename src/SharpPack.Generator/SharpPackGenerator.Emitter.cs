@@ -336,6 +336,8 @@ public partial class TypeMeta
         const string constraint = "";
         var fixedSizeInterface = "";
         var fixedSizeMethod = "";
+        var exactSizeInterface = "";
+        var exactSizeMethod = "";
 
         var fixedSize = Members.All(x =>
             x.Kind is MemberKind.Unmanaged
@@ -366,6 +368,25 @@ public partial class TypeMeta
     static int global::SharpPack.IFixedSizeSharpPackable.Size => {{headerPlus}}{{sizeOf}};
 
 """;
+        }
+
+        var exactSizeEligible =
+            !IsValueType &&
+            !fixedSize &&
+            GenerateType == GenerateType.Object &&
+            callbackCount == 0 &&
+            Members.All(static member => member.HasExactSizeSafeAccessor &&
+                member.Kind is
+                MemberKind.Unmanaged or
+                MemberKind.Enum or
+                MemberKind.UnmanagedNullable or
+                MemberKind.String or
+                MemberKind.UnmanagedArray);
+        if (exactSizeEligible)
+        {
+            exactSizeInterface =
+                $", global::SharpPack.ISharpPackExactSizeSerializable<{TypeName}>";
+            exactSizeMethod = EmitExactSizeSerializeMethod();
         }
         const string serializeMethodSignarture =
             "Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter>";
@@ -434,7 +455,7 @@ public partial class TypeMeta
 """;
 
         writer.AppendLine($$"""
-partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{fixedSizeInterface}}{{contextFactoryInterface}}
+partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{fixedSizeInterface}}{{exactSizeInterface}}{{contextFactoryInterface}}
 {
 {{EmitCustomFormatters()}}
     static partial void StaticConstructor();
@@ -444,6 +465,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         StaticConstructor();
     }
 {{fixedSizeMethod}}
+{{exactSizeMethod}}
 {{contextFactoryMethod}}
 {{formatterOverrideMethods}}
 
@@ -781,6 +803,74 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         }
 
         return EmitObjectSerializeBody(honorFormatterOverrides: false);
+    }
+
+    string EmitExactSizeSerializeMethod()
+    {
+        var captureMembers = Members
+            .Select((member, index) => member.Kind == MemberKind.String
+                ? $"""
+        var __value{index} = this.@{member.Name};
+        var __utf8Length{index} = __value{index} is null || __value{index}.Length == 0
+            ? 0
+            : global::System.Text.Encoding.UTF8.GetByteCount(__value{index});
+"""
+                : $"        var __value{index} = this.@{member.Name};")
+            .NewLine();
+        var sizeTerms = Members
+            .Select((member, index) => member.Kind switch
+            {
+                MemberKind.Unmanaged or
+                MemberKind.Enum or
+                MemberKind.UnmanagedNullable =>
+                    $"global::System.Runtime.CompilerServices.Unsafe.SizeOf<{member.MemberType.FullyQualifiedToString()}>()",
+                MemberKind.String =>
+                    $"(__value{index} is null || __value{index}.Length == 0 ? 4L : (long)__utf8Length{index} + 8)",
+                MemberKind.UnmanagedArray =>
+                    $"(__value{index} is null || __value{index}.Length == 0 ? 4L : (long)__value{index}.Length * global::System.Runtime.CompilerServices.Unsafe.SizeOf<{((IArrayTypeSymbol)member.MemberType).ElementType.FullyQualifiedToString()}>() + 4)",
+                _ => throw new InvalidOperationException(),
+            });
+        var writeMembers = Members
+            .Select((member, index) => member.Kind switch
+            {
+                MemberKind.Unmanaged or MemberKind.Enum =>
+                    $"        writer.WriteUnmanaged(__value{index});",
+                MemberKind.UnmanagedNullable =>
+                    $"        writer.DangerousWriteUnmanaged(__value{index});",
+                MemberKind.String =>
+                    $"        writer.WriteUtf8Exact(__value{index}, __utf8Length{index});",
+                MemberKind.UnmanagedArray =>
+                    $"        writer.WriteUnmanagedArray(__value{index});",
+                _ => throw new InvalidOperationException(),
+            })
+            .NewLine();
+        var sizeExpression = string.Join(
+            " + " + Environment.NewLine + "            ",
+            sizeTerms);
+
+        return $$"""
+
+    [global::SharpPack.Internal.Preserve]
+    byte[] global::SharpPack.ISharpPackExactSizeSerializable<{{TypeName}}>.SerializeExact()
+    {
+{{captureMembers}}
+        var size = 1L +
+            {{sizeExpression}};
+        if ((ulong)size > (ulong)global::System.Array.MaxLength)
+        {
+            global::SharpPack.SharpPackSerializationException.ThrowSizeOverflow();
+        }
+        var buffer = global::System.GC.AllocateUninitializedArray<byte>((int)size);
+        var bufferWriter =
+            new global::SharpPack.Internal.SharpPackExactArrayBufferWriter(buffer);
+        var writer = global::SharpPack.SharpPackSerializer.CreateExactWriter(
+            ref bufferWriter);
+        writer.WriteObjectHeader({{Members.Length}});
+{{writeMembers}}
+        writer.Flush();
+        return bufferWriter.GetFilledBuffer();
+    }
+""";
     }
 
     string EmitFormatterOverrideMethods()

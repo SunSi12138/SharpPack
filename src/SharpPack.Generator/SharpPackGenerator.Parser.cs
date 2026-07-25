@@ -613,6 +613,7 @@ partial class MemberMeta
     public bool IsProperty { get; }
     public bool IsSettable { get; }
     public bool IsAssignable { get; }
+    public bool HasExactSizeSafeAccessor { get; }
     public bool IsConstructorParameter { get; }
     public string? ConstructorParameterName { get; }
     public int Order { get; }
@@ -659,6 +660,7 @@ partial class MemberMeta
 
         if (symbol is IFieldSymbol f)
         {
+            HasExactSizeSafeAccessor = true;
             IsProperty = false;
             IsField = true;
             IsSettable = !f.IsReadOnly; // readonly field can not set.
@@ -671,6 +673,20 @@ partial class MemberMeta
         }
         else if (symbol is IPropertySymbol p)
         {
+            HasExactSizeSafeAccessor =
+                !p.IsVirtual &&
+                !p.IsOverride &&
+                !p.IsAbstract &&
+                p.DeclaringSyntaxReferences.Length != 0 &&
+                p.DeclaringSyntaxReferences
+                .Select(static reference => reference.GetSyntax())
+                .All(static syntax =>
+                    syntax is ParameterSyntax ||
+                    syntax is PropertyDeclarationSyntax
+                    { AccessorList: { } accessors } &&
+                    accessors.Accessors.All(static accessor =>
+                        accessor.Body is null &&
+                        accessor.ExpressionBody is null));
             IsProperty = true;
             IsField = false;
             IsSettable = !p.IsReadOnly;

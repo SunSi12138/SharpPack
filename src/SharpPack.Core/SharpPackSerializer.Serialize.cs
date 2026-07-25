@@ -1,5 +1,6 @@
 using SharpPack.Internal;
 using System.Buffers;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -57,6 +58,9 @@ public static partial class SharpPackSerializer
         }
     }
 
+    internal static void FreezeRuntimeOptions()
+        => _ = GetRuntimeOptionsAndFreeze();
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static byte[] Serialize<T>(in T? value)
         => SerializeCore(value);
@@ -70,12 +74,9 @@ public static partial class SharpPackSerializer
             Unsafe.WriteUnaligned(ref GetArrayDataReference(array), value);
             return array;
         }
-        var typeKind = TypeHelpers.TryGetUnmanagedSZArrayElementSizeOrSharpPackableFixedSize<T>(out var elementSize);
-        if (typeKind == TypeHelpers.TypeKind.None)
-        {
-            // do nothing
-        }
-        else if (typeKind == TypeHelpers.TypeKind.UnmanagedSZArray)
+        var typeKind = TypeHelpers.TryGetUnmanagedSZArrayElementSizeOrSharpPackableFixedSize<T>(
+            out var elementSize);
+        if (typeKind == TypeHelpers.TypeKind.UnmanagedSZArray)
         {
             if (value == null)
             {
@@ -98,13 +99,22 @@ public static partial class SharpPackSerializer
 
             return destArray;
         }
-        else if (typeKind == TypeHelpers.TypeKind.FixedSizeSharpPackable)
+        if (typeKind == TypeHelpers.TypeKind.FixedSizeSharpPackable)
         {
             var buffer = new byte[(value == null) ? 1 : elementSize];
             var bufferWriter = new FixedArrayBufferWriter(buffer);
             var writer = new SharpPackWriter<FixedArrayBufferWriter>(ref bufferWriter, buffer, SharpPackWriterOptionalState.NullState);
             Serialize(ref writer, value);
             return bufferWriter.GetFilledBuffer();
+        }
+        if (TypeHelpers.IsExactSizeSharpPackable<T>())
+        {
+            if (value == null)
+            {
+                return [SharpPackCode.NullObject];
+            }
+            return ((ISharpPackExactSizeSerializable<T>)(object)value)
+                .SerializeExact();
         }
 
         var state = AcquireWriterState();
@@ -135,7 +145,8 @@ public static partial class SharpPackSerializer
             bufferWriter.Advance(Unsafe.SizeOf<T>());
             return Unsafe.SizeOf<T>();
         }
-        var typeKind = TypeHelpers.TryGetUnmanagedSZArrayElementSizeOrSharpPackableFixedSize<T>(out var elementSize);
+        var typeKind = TypeHelpers.TryGetUnmanagedSZArrayElementSizeOrSharpPackableFixedSize<T>(
+            out var elementSize);
         if (typeKind == TypeHelpers.TypeKind.UnmanagedSZArray)
         {
             if (value == null)
@@ -186,6 +197,15 @@ public static partial class SharpPackSerializer
         scoped in T? value)
         where TBufferWriter : class, IBufferWriter<byte>
         => Serialize(ref bufferWriter, value);
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static SharpPackWriter<SharpPackExactArrayBufferWriter>
+        CreateExactWriter(
+            ref SharpPackExactArrayBufferWriter bufferWriter)
+        => new(
+            ref bufferWriter,
+            bufferWriter.DangerousGetBuffer(),
+            SharpPackWriterOptionalState.NullState);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Serialize<T, TBufferWriter>(

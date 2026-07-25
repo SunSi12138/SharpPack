@@ -7,6 +7,95 @@ namespace SharpPack.Tests.SourceGeneratorTests;
 public class FormatterGenerationTest
 {
     [Fact]
+    public void ExactSizeContract_IsEmittedOnlyForEligibleObjects()
+    {
+        var source = """
+namespace Generated;
+
+[SharpPackable]
+public partial class Eligible
+{
+    public int Id { get; set; }
+    public string? Text { get; set; }
+    public byte[]? Bytes { get; set; }
+}
+
+[SharpPackable(GenerateType.VersionTolerant)]
+public partial class Versioned
+{
+    [SharpPackOrder(0)]
+    public int Id { get; set; }
+}
+
+[SharpPackable]
+public partial class WithCallback
+{
+    public int Id { get; set; }
+
+    [SharpPackOnSerializing]
+    static void Before() { }
+}
+
+[SharpPackable]
+public partial class WithCustomGetter
+{
+    int value;
+    public int Value => value;
+}
+
+[SharpPackable]
+public partial record PositionalRecord(int Id, string Text);
+
+[SharpPackable]
+public partial class WithVirtualProperty
+{
+    public virtual int Value { get; set; }
+}
+
+[SharpPackable]
+public partial class WithPartialProperty
+{
+    public partial int Value { get; }
+    public partial int Value => 42;
+}
+""";
+        var (compilation, diagnostics) =
+            CSharpGeneratorRunner.RunGenerator(source);
+
+        diagnostics.Should().BeEmpty();
+        compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error)
+            .Should().BeEmpty();
+        var generated = string.Join(
+            Environment.NewLine,
+            compilation.SyntaxTrees
+                .Where(static tree => tree.FilePath.EndsWith(
+                    ".g.cs",
+                    StringComparison.Ordinal))
+                .Select(static tree => tree.ToString()));
+
+        generated.Should().Contain(
+            "ISharpPackExactSizeSerializable<Eligible>");
+        generated.Should().Contain(
+            "ISharpPackExactSizeSerializable<PositionalRecord>");
+        generated.Should().Contain("SerializeExact()");
+        generated.Should().Contain("var size = 1L +");
+        generated.Should().Contain("(ulong)global::System.Array.MaxLength");
+        generated.Should().Contain("ThrowSizeOverflow()");
+        generated.Should().NotContain(
+            "ISharpPackExactSizeSerializable<Versioned>");
+        generated.Should().NotContain(
+            "ISharpPackExactSizeSerializable<WithCallback>");
+        generated.Should().NotContain(
+            "ISharpPackExactSizeSerializable<WithCustomGetter>");
+        generated.Should().NotContain(
+            "ISharpPackExactSizeSerializable<WithVirtualProperty>");
+        generated.Should().NotContain(
+            "ISharpPackExactSizeSerializable<WithPartialProperty>");
+    }
+
+    [Fact]
     public void FormatterOverrideHelpers_AvoidUserMemberNameCollisions()
     {
         var source = """

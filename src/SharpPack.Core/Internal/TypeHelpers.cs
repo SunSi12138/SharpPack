@@ -37,6 +37,10 @@ internal static class TypeHelpers
         return TypeKind.None;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsExactSizeSharpPackable<T>()
+        => ExactSizeCache<T>.Value;
+
     public static bool IsAnonymous(Type type)
     {
         return type.Namespace == null
@@ -65,8 +69,8 @@ internal static class TypeHelpers
         public static bool IsReferenceOrNullable;
         public static bool IsUnmanagedSZArray;
         public static int UnmanagedSZArrayElementSize;
-        public static bool IsFixedSizeSharpPackable = false;
-        public static int SharpPackableFixedSize = 0;
+        public static bool IsFixedSizeSharpPackable;
+        public static int SharpPackableFixedSize;
 
         [UnconditionalSuppressMessage(
             "AOT",
@@ -115,6 +119,22 @@ internal static class TypeHelpers
                 IsUnmanagedSZArray = false;
                 IsFixedSizeSharpPackable = false;
             }
+        }
+    }
+
+    static class ExactSizeCache<T>
+    {
+        public static readonly bool Value = Initialize();
+
+        static bool Initialize()
+        {
+            var value = typeof(ISharpPackExactSizeSerializable<T>)
+                .IsAssignableFrom(typeof(T));
+            if (value)
+            {
+                SharpPackSerializer.FreezeRuntimeOptions();
+            }
+            return value;
         }
     }
 

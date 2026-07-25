@@ -108,6 +108,54 @@ public class RuntimeOptionsTest
     }
 
     [Fact]
+    public void ExactSizeFirstUse_FreezesRuntimeConfiguration()
+    {
+        var loadContext = new AssemblyLoadContext(
+            nameof(ExactSizeFirstUse_FreezesRuntimeConfiguration),
+            isCollectible: true);
+        try
+        {
+            var coreAssembly = loadContext.LoadFromAssemblyPath(
+                typeof(SharpPackSerializer).Assembly.Location);
+            var testAssembly = loadContext.LoadFromAssemblyPath(
+                typeof(ExactSizeSerializationTest).Assembly.Location);
+            var serializerType = coreAssembly.GetType(
+                "SharpPack.SharpPackSerializer",
+                throwOnError: true)!;
+            var modelType = testAssembly.GetType(
+                "SharpPack.Tests.ExactSizeModel",
+                throwOnError: true)!;
+            var model = Activator.CreateInstance(modelType)!;
+            modelType.GetProperty("Text")!.SetValue(model, "freeze");
+
+            serializerType
+                .GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .Single(static method =>
+                    method.Name == "Serialize" &&
+                    method.IsGenericMethodDefinition &&
+                    method.GetParameters().Length == 1)
+                .MakeGenericMethod(modelType)
+                .Invoke(null, [model]);
+
+            var optionsType = coreAssembly.GetType(
+                "SharpPack.SharpPackSerializerRuntimeOptions",
+                throwOnError: true)!;
+            var options = Activator.CreateInstance(optionsType)!;
+            var configure = serializerType.GetMethod(
+                "ConfigureRuntime",
+                BindingFlags.Public | BindingFlags.Static)!;
+
+            var secondConfigure = () => configure.Invoke(null, [options]);
+            secondConfigure.Should().Throw<TargetInvocationException>()
+                .WithInnerException<InvalidOperationException>();
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
+    }
+
+    [Fact]
     public async Task ConcurrentFirstUse_UsesOneFrozenConfiguration()
     {
         var loadContext = new AssemblyLoadContext(

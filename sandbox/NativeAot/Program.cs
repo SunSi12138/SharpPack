@@ -15,6 +15,22 @@ AssertModel(
     SharpPackSerializer.Deserialize<AotSharpPackModel>(defaultPayload),
     value);
 
+var exactValue = new AotExactSizeModel
+{
+    Id = 7,
+    Name = "exact-aot",
+    Payload = [1, 2, 3, 4],
+};
+var exactPayload = SharpPackSerializer.Serialize(exactValue);
+var exactRoundTrip =
+    SharpPackSerializer.Deserialize<AotExactSizeModel>(exactPayload);
+if (exactRoundTrip is not
+    { Id: 7, Name: "exact-aot", Payload: [1, 2, 3, 4] })
+{
+    throw new InvalidOperationException(
+        "The generated exact-size serializer failed under NativeAOT.");
+}
+
 var context = new SharpPackSerializerContext();
 var contextPayload = SharpPackSerializer.Serialize(value, context);
 if (!defaultPayload.AsSpan().SequenceEqual(contextPayload))
@@ -95,6 +111,14 @@ public partial class AotSharpPackModel
     public AotSharpPackModel? OptionalNext { get; set; }
 
     public IAotUnion? Item { get; set; }
+}
+
+[SharpPackable]
+public partial class AotExactSizeModel
+{
+    public int Id { get; set; }
+    public string? Name { get; set; }
+    public byte[]? Payload { get; set; }
 }
 
 [SharpPackable]

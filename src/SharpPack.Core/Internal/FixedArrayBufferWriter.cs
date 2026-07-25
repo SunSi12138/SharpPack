@@ -56,3 +56,68 @@ internal struct FixedArrayBufferWriter : IBufferWriter<byte>
         return buffer;
     }
 }
+
+[System.ComponentModel.EditorBrowsable(
+    System.ComponentModel.EditorBrowsableState.Never)]
+public struct SharpPackExactArrayBufferWriter : IBufferWriter<byte>
+{
+    readonly byte[] buffer;
+    int written;
+
+    public SharpPackExactArrayBufferWriter(byte[] buffer)
+    {
+        ArgumentNullException.ThrowIfNull(buffer);
+        this.buffer = buffer;
+        written = 0;
+    }
+
+    public void Advance(int count)
+    {
+        if (count < 0)
+        {
+            SharpPackSerializationException.ThrowInvalidLength(count);
+        }
+        if (count > buffer.Length - written)
+        {
+            SharpPackSerializationException.ThrowInvalidAdvance();
+        }
+        written += count;
+    }
+
+    public Memory<byte> GetMemory(int sizeHint = 0)
+    {
+        ValidateSizeHint(sizeHint);
+        return buffer.AsMemory(written);
+    }
+
+    public Span<byte> GetSpan(int sizeHint = 0)
+    {
+        ValidateSizeHint(sizeHint);
+        return buffer.AsSpan(written);
+    }
+
+    public byte[] GetFilledBuffer()
+    {
+        if (written != buffer.Length)
+        {
+            SharpPackSerializationException.ThrowMessage(
+                "The generated exact-size serializer did not fill its payload.");
+        }
+        return buffer;
+    }
+
+    internal byte[] DangerousGetBuffer() => buffer;
+
+    void ValidateSizeHint(int sizeHint)
+    {
+        if (sizeHint < 0)
+        {
+            SharpPackSerializationException.ThrowInvalidLength(sizeHint);
+        }
+        if (sizeHint > buffer.Length - written)
+        {
+            SharpPackSerializationException.ThrowMessage(
+                "The generated exact-size serializer underestimated its payload.");
+        }
+    }
+}

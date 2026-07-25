@@ -24,6 +24,13 @@ public interface ISharpPackContextFormatterFactory<T>
 }
 
 
+[EditorBrowsable(EditorBrowsableState.Never)]
+public interface ISharpPackExactSizeSerializable<T>
+{
+    byte[] SerializeExact();
+}
+
+
 public interface ISharpPackable<T>
 {
     // note: serialize parameter should be `ref readonly` but current lang spec can not.
