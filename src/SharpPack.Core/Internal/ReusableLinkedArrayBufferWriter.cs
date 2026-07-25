@@ -45,13 +45,14 @@ public static class ReusableLinkedArrayBufferWriterPool
 
 public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
 {
-    const int InitialBufferSize = 4096;
+    const int DefaultInitialBufferSize = 4096;
     static readonly byte[] noUseFirstBufferSentinel = new byte[0];
 
     List<BufferSegment> buffers; // add freezed buffer.
 
     byte[] firstBuffer; // cache firstBuffer to avoid call ArrayPoo.Rent/Return
     int firstBufferWritten;
+    readonly int initialBufferSize;
 
     BufferSegment current;
     int nextBufferSize;
@@ -63,15 +64,26 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
     public int TotalWritten => totalWritten;
     bool UseFirstBuffer => firstBuffer != noUseFirstBufferSentinel;
 
-    public ReusableLinkedArrayBufferWriter(bool useFirstBuffer, bool pinned)
+    public ReusableLinkedArrayBufferWriter(
+        bool useFirstBuffer,
+        bool pinned,
+        int firstBufferSize = DefaultInitialBufferSize)
     {
+        if (firstBufferSize <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(firstBufferSize));
+        }
+
         this.buffers = new List<BufferSegment>();
         this.firstBuffer = useFirstBuffer
-            ? AllocateUninitializedArray<byte>(InitialBufferSize, pinned)
+            ? AllocateUninitializedArray<byte>(firstBufferSize, pinned)
             : noUseFirstBufferSentinel;
         this.firstBufferWritten = 0;
+        this.initialBufferSize = useFirstBuffer
+            ? Math.Min(firstBufferSize, DefaultInitialBufferSize)
+            : DefaultInitialBufferSize;
         this.current = default;
-        this.nextBufferSize = InitialBufferSize;
+        this.nextBufferSize = initialBufferSize;
         this.totalWritten = 0;
         this.leaseGeneration = 0;
         this.leaseState = 0;
@@ -270,7 +282,7 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
         }
         totalWritten = 0;
         current = default;
-        nextBufferSize = InitialBufferSize;
+        nextBufferSize = initialBufferSize;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

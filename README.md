@@ -77,6 +77,21 @@ var val = SharpPackSerializer.Deserialize<Person>(bin);
 `Deserialize` supports `ReadOnlySpan<byte>`, `ReadOnlySequence<byte>` and
 `Stream`. Serializer operations are generic-only.
 
+The default `byte[]` serializer retains an 8 KB unpinned first buffer per
+thread. Applications dominated by payloads around 64 KB can select the 80 KB
+high-throughput preset during startup, before the first `Serialize<T>` call:
+
+```csharp
+SharpPackSerializer.ConfigureRuntime(
+    SharpPackSerializerRuntimeOptions.HighThroughput);
+```
+
+You can also create `SharpPackSerializerRuntimeOptions` with a custom
+`ThreadBufferSize`. `PinThreadBuffer` is an advanced native-interop option; it
+does not normally improve managed serialization. Runtime options freeze when
+the first byte-array serializer state is created. `IBufferWriter<byte>`, Stream
+and Streaming paths continue to use their caller-owned or pooled buffers.
+
 Collectible AssemblyLoadContext
 ---
 

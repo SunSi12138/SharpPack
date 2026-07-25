@@ -10,10 +10,52 @@ using static GC;
 
 public static partial class SharpPackSerializer
 {
+    static readonly Lock runtimeOptionsLock = new();
+    static SharpPackSerializerRuntimeOptions runtimeOptions =
+        SharpPackSerializerRuntimeOptions.Default;
+    static bool runtimeOptionsFrozen;
+
     [ThreadStatic]
     static SerializerWriterThreadStaticState? threadStaticState;
     [ThreadStatic]
     static SharpPackWriterOptionalState? threadStaticWriterOptionalState;
+
+    /// <summary>
+    /// Configures process-wide resource settings for byte-array serialization.
+    /// This must be called during startup, before the first byte-array serialize operation.
+    /// </summary>
+    public static void ConfigureRuntime(
+        SharpPackSerializerRuntimeOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.ThreadBufferSize <= 0 ||
+            options.ThreadBufferSize > Array.MaxLength)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                $"ThreadBufferSize must be between 1 and {Array.MaxLength}.");
+        }
+
+        lock (runtimeOptionsLock)
+        {
+            if (runtimeOptionsFrozen)
+            {
+                throw new InvalidOperationException(
+                    "SharpPack runtime options are frozen after the first byte-array serialization.");
+            }
+
+            runtimeOptions = options;
+        }
+    }
+
+    static SharpPackSerializerRuntimeOptions GetRuntimeOptionsAndFreeze()
+    {
+        lock (runtimeOptionsLock)
+        {
+            runtimeOptionsFrozen = true;
+            return runtimeOptions;
+        }
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static byte[] Serialize<T>(in T? value)
@@ -187,9 +229,11 @@ public static partial class SharpPackSerializer
 
         public SerializerWriterThreadStaticState()
         {
+            var options = GetRuntimeOptionsAndFreeze();
             BufferWriter = new ReusableLinkedArrayBufferWriter(
                 useFirstBuffer: true,
-                pinned: false);
+                pinned: options.PinThreadBuffer,
+                firstBufferSize: options.ThreadBufferSize);
             OptionalState = new SharpPackWriterOptionalState();
         }
 
