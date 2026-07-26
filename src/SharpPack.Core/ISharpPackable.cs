@@ -25,6 +25,34 @@ public interface ISharpPackContextFormatterFactory<T>
 
 
 [EditorBrowsable(EditorBrowsableState.Never)]
+public interface ISharpPackContextOverrideFormatter
+{
+}
+
+
+[EditorBrowsable(EditorBrowsableState.Never)]
+public interface ISharpPackUnmanagedRawCopyDisabled
+{
+}
+
+
+[EditorBrowsable(EditorBrowsableState.Never)]
+public interface ISharpPackConditionalFormatterAware
+{
+    bool RequiresFormatterAwareSerialization { get; }
+}
+
+
+[EditorBrowsable(EditorBrowsableState.Never)]
+public static class SharpPackFormatterPolicy
+{
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static bool RequiresFormatterAwareSerialization<T>()
+        => Internal.TypeHelpers.RequiresFormatterAwareSerialization<T>();
+}
+
+
+[EditorBrowsable(EditorBrowsableState.Never)]
 public interface ISharpPackExactSizeSerializable<T>
 {
     byte[] SerializeExact();

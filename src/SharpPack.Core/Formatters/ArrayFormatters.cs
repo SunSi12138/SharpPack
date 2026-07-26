@@ -19,6 +19,12 @@ namespace SharpPack.Formatters
     public sealed class UnmanagedArrayFormatter<T> : SharpPackFormatter<T[]>
             where T : unmanaged
     {
+        internal override SharpPackFormatter<T[]> BindContext(
+            FormatterGraph graph)
+            => graph.HasFormatterOverride<T>()
+                ? new ContextArrayFormatter<T>()
+                : new DangerousUnmanagedArrayFormatter<T>();
+
         internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
             => graph.HasFormatterOverride<T>();
 
@@ -38,19 +44,82 @@ namespace SharpPack.Formatters
     [Preserve]
     public sealed class DangerousUnmanagedArrayFormatter<T> : SharpPackFormatter<T[]>
     {
+        internal override SharpPackFormatter<T[]> BindContext(
+            FormatterGraph graph)
+            => graph.HasFormatterOverride<T>()
+                ? new ContextArrayFormatter<T>()
+                : this;
+
         internal override bool HasFormatterOverrideDependency(FormatterGraph graph)
             => graph.HasFormatterOverride<T>();
 
         [Preserve]
         public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref T[]? value)
         {
-            writer.WriteArray(value);
+            writer.DangerousWriteUnmanagedArray(value);
         }
 
         [Preserve]
         public override void Deserialize(ref SharpPackReader reader, scoped ref T[]? value)
         {
-            reader.ReadArray(ref Unsafe.As<T[]?, T?[]?>(ref value));
+            reader.DangerousReadUnmanagedArray(ref value);
+        }
+    }
+
+    [Preserve]
+    internal sealed class ContextArrayFormatter<T>
+        : SharpPackFormatter<T[]>, ISharpPackContextOverrideFormatter
+    {
+        [Preserve]
+        public override void Serialize<TBufferWriter>(
+            ref SharpPackWriter<TBufferWriter> writer,
+            scoped ref T[]? value)
+        {
+            if (value == null)
+            {
+                writer.WriteNullCollectionHeader();
+                return;
+            }
+
+            writer.WriteCollectionHeader(value.Length);
+            var formatter = writer.GetFormatter<T>();
+            for (int i = 0; i < value.Length; i++)
+            {
+                formatter.Serialize(
+                    ref writer,
+                    ref Unsafe.As<T, T?>(ref value[i]));
+            }
+        }
+
+        [Preserve]
+        public override void Deserialize(
+            ref SharpPackReader reader,
+            scoped ref T[]? value)
+        {
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
+
+            if (length == 0)
+            {
+                value = Array.Empty<T>();
+                return;
+            }
+
+            if (value == null || value.Length != length)
+            {
+                value = new T[length];
+            }
+
+            var formatter = reader.GetFormatter<T>();
+            for (int i = 0; i < length; i++)
+            {
+                formatter.Deserialize(
+                    ref reader,
+                    ref Unsafe.As<T, T?>(ref value[i]));
+            }
         }
     }
 

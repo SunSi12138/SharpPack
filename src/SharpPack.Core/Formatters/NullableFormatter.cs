@@ -17,6 +17,7 @@ public sealed class NullableFormatter<T> : SharpPackFormatter<T?>
     public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref T? value)
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !writer.HasFormatterOverride<T>())
         {
             writer.DangerousWriteUnmanaged(value);
@@ -40,6 +41,7 @@ public sealed class NullableFormatter<T> : SharpPackFormatter<T?>
     public override void Deserialize(ref SharpPackReader reader, scoped ref T? value)
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !reader.HasFormatterOverride<T>())
         {
             reader.DangerousReadUnmanaged(out value);

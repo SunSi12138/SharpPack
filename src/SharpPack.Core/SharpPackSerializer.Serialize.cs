@@ -23,7 +23,8 @@ public static partial class SharpPackSerializer
 
     /// <summary>
     /// Configures process-wide resource settings for byte-array serialization.
-    /// This must be called during startup, before the first byte-array serialize operation.
+    /// This must be called during startup, before the first retained byte-array
+    /// serializer state is created.
     /// </summary>
     public static void ConfigureRuntime(
         SharpPackSerializerRuntimeOptions options)
@@ -42,7 +43,7 @@ public static partial class SharpPackSerializer
             if (runtimeOptionsFrozen)
             {
                 throw new InvalidOperationException(
-                    "SharpPack runtime options are frozen after the first byte-array serialization.");
+                    "SharpPack runtime options are frozen after the retained byte-array serializer state is initialized.");
             }
 
             runtimeOptions = options;
@@ -58,22 +59,15 @@ public static partial class SharpPackSerializer
         }
     }
 
-    internal static void FreezeRuntimeOptions()
-        => _ = GetRuntimeOptionsAndFreeze();
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static byte[] Serialize<T>(in T? value)
-        => SerializeCore(value);
+        => !RuntimeHelpers.IsReferenceOrContainsReferences<T>()
+            ? SerializeUnmanaged(value)
+            : SerializeReference(value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    static byte[] SerializeCore<T>(in T? value)
+    static byte[] SerializeReference<T>(in T? value)
     {
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
-        {
-            var array = AllocateUninitializedArray<byte>(Unsafe.SizeOf<T>());
-            Unsafe.WriteUnaligned(ref GetArrayDataReference(array), value);
-            return array;
-        }
         var typeKind = TypeHelpers.TryGetUnmanagedSZArrayElementSizeOrSharpPackableFixedSize<T>(
             out var elementSize);
         if (typeKind == TypeHelpers.TypeKind.UnmanagedSZArray)
@@ -107,7 +101,7 @@ public static partial class SharpPackSerializer
             Serialize(ref writer, value);
             return bufferWriter.GetFilledBuffer();
         }
-        if (TypeHelpers.IsExactSizeSharpPackable<T>())
+        if (typeKind == TypeHelpers.TypeKind.ExactSizeSharpPackable)
         {
             if (value == null)
             {
@@ -133,6 +127,19 @@ public static partial class SharpPackSerializer
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static byte[] SerializeUnmanaged<T>(in T? value)
+    {
+        if (!TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
+        {
+            var array = AllocateUninitializedArray<byte>(Unsafe.SizeOf<T>());
+            Unsafe.WriteUnaligned(ref GetArrayDataReference(array), value);
+            return array;
+        }
+
+        return SerializeCustomFormatterUnmanaged(value);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Serialize<T, TBufferWriter>(
         ref TBufferWriter bufferWriter,
         scoped in T? value)
@@ -140,11 +147,9 @@ public static partial class SharpPackSerializer
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
-            var buffer = bufferWriter.GetSpan(Unsafe.SizeOf<T>());
-            Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(buffer), value);
-            bufferWriter.Advance(Unsafe.SizeOf<T>());
-            return Unsafe.SizeOf<T>();
+            return SerializeUnmanaged(ref bufferWriter, value);
         }
+
         var typeKind = TypeHelpers.TryGetUnmanagedSZArrayElementSizeOrSharpPackableFixedSize<T>(
             out var elementSize);
         if (typeKind == TypeHelpers.TypeKind.UnmanagedSZArray)
@@ -184,6 +189,65 @@ public static partial class SharpPackSerializer
         try
         {
             var writer = new SharpPackWriter<TBufferWriter>(ref bufferWriter, state);
+            return Serialize(ref writer, value);
+        }
+        finally
+        {
+            state.ResetAndExit();
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static int SerializeUnmanaged<T, TBufferWriter>(
+        ref TBufferWriter bufferWriter,
+        scoped in T? value)
+        where TBufferWriter : IBufferWriter<byte>
+    {
+        if (!TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
+        {
+            var buffer = bufferWriter.GetSpan(Unsafe.SizeOf<T>());
+            Unsafe.WriteUnaligned(
+                ref MemoryMarshal.GetReference(buffer),
+                value);
+            bufferWriter.Advance(Unsafe.SizeOf<T>());
+            return Unsafe.SizeOf<T>();
+        }
+
+        return SerializeCustomFormatterUnmanaged(ref bufferWriter, value);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static byte[] SerializeCustomFormatterUnmanaged<T>(in T? value)
+    {
+        var state = AcquireWriterState();
+        try
+        {
+            var writer = new SharpPackWriter<ReusableLinkedArrayBufferWriter>(
+                ref state.BufferWriter,
+                state.BufferWriter.DangerousGetFirstBuffer(),
+                state.OptionalState);
+            Serialize(ref writer, value);
+            return state.BufferWriter.ToArrayAndReset();
+        }
+        finally
+        {
+            state.Reset();
+            state.Exit();
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static int SerializeCustomFormatterUnmanaged<T, TBufferWriter>(
+        ref TBufferWriter bufferWriter,
+        scoped in T? value)
+        where TBufferWriter : IBufferWriter<byte>
+    {
+        var state = AcquireWriterOptionalState();
+        try
+        {
+            var writer = new SharpPackWriter<TBufferWriter>(
+                ref bufferWriter,
+                state);
             return Serialize(ref writer, value);
         }
         finally

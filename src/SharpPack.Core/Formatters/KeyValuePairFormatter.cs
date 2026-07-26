@@ -15,6 +15,7 @@ public static class KeyValuePairFormatter
         where TBufferWriter : IBufferWriter<byte>
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<KeyValuePair<TKey?, TValue?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<KeyValuePair<TKey?, TValue?>>() &&
             !writer.HasFormatterOverride<TKey>() &&
             !writer.HasFormatterOverride<TValue>())
         {
@@ -32,6 +33,7 @@ public static class KeyValuePairFormatter
     public static void Deserialize<TKey, TValue>(ISharpPackFormatter<TKey> keyFormatter, ISharpPackFormatter<TValue> valueFormatter, ref SharpPackReader reader, out TKey? key, out TValue? value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<KeyValuePair<TKey?, TValue?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<KeyValuePair<TKey?, TValue?>>() &&
             !reader.HasFormatterOverride<TKey>() &&
             !reader.HasFormatterOverride<TValue>())
         {
@@ -47,7 +49,6 @@ public static class KeyValuePairFormatter
         valueFormatter.Deserialize(ref reader, ref value);
     }
 }
-
 [Preserve]
 public sealed class KeyValuePairFormatter<TKey, TValue> : SharpPackFormatter<KeyValuePair<TKey?, TValue?>>
 {
@@ -59,6 +60,7 @@ public sealed class KeyValuePairFormatter<TKey, TValue> : SharpPackFormatter<Key
     public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref KeyValuePair<TKey?, TValue?> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<KeyValuePair<TKey?, TValue?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<KeyValuePair<TKey?, TValue?>>() &&
             !writer.HasFormatterOverride<TKey>() &&
             !writer.HasFormatterOverride<TValue>())
         {
@@ -74,6 +76,7 @@ public sealed class KeyValuePairFormatter<TKey, TValue> : SharpPackFormatter<Key
     public override void Deserialize(ref SharpPackReader reader, scoped ref KeyValuePair<TKey?, TValue?> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<KeyValuePair<TKey?, TValue?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<KeyValuePair<TKey?, TValue?>>() &&
             !reader.HasFormatterOverride<TKey>() &&
             !reader.HasFormatterOverride<TValue>())
         {

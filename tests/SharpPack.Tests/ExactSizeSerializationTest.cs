@@ -230,6 +230,28 @@ public class ExactSizeSerializationTest
             .Should().Throw<SharpPackSerializationException>();
     }
 
+    [Fact]
+    public void ExactUtf8Writer_RejectsNegativeLengthBeforeWriting()
+    {
+        var buffer = Enumerable.Repeat((byte)0xCC, 8).ToArray();
+        var bufferWriter = new SharpPackExactArrayBufferWriter(buffer);
+        var writer = SharpPackSerializer.CreateExactWriter(
+            ref bufferWriter);
+
+        var threw = false;
+        try
+        {
+            writer.WriteUtf8Exact("x", -1);
+        }
+        catch (SharpPackSerializationException)
+        {
+            threw = true;
+        }
+
+        threw.Should().BeTrue();
+        buffer.Should().OnlyContain(static value => value == 0xCC);
+    }
+
     static void AssertMatchesGeneralPath(ExactSizeModel value)
     {
         var baselineWriter = new ArrayBufferWriter<byte>();

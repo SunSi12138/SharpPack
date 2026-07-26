@@ -96,7 +96,7 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static T? Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(ReadOnlySpan<byte> buffer, SharpPackSerializerContext context)
     {
         T? value = default;
@@ -106,7 +106,7 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(
         ReadOnlySpan<byte> buffer,
         ref T? value,
@@ -130,7 +130,7 @@ public static partial class SharpPackSerializer
     }
 
     public static T? Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(
         in ReadOnlySequence<byte> buffer,
         SharpPackSerializerContext context)
@@ -141,7 +141,7 @@ public static partial class SharpPackSerializer
     }
 
     public static int Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(
         in ReadOnlySequence<byte> buffer,
         ref T? value,
@@ -175,7 +175,7 @@ public static partial class SharpPackSerializer
     /// Use the payload-length overload for framed or concatenated messages.
     /// </remarks>
     public static async ValueTask<T?> DeserializeAsync<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(
         Stream stream,
         SharpPackSerializerContext context,
@@ -255,7 +255,7 @@ public static partial class SharpPackSerializer
     /// serializer context.
     /// </summary>
     public static ValueTask<T?> DeserializeAsync<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(
         Stream stream,
         int payloadLength,

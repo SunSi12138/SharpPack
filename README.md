@@ -37,7 +37,7 @@ SharpPack 1.x targets .NET 10 and uses C# 14.
 Install the aggregate runtime and source-generator package from NuGet:
 
 ```shell
-dotnet add package SharpPack --version 1.0.2
+dotnet add package SharpPack --version 1.0.3
 ```
 
 Versioned packages and symbols are also attached to
@@ -77,20 +77,37 @@ var val = SharpPackSerializer.Deserialize<Person>(bin);
 `Deserialize` supports `ReadOnlySpan<byte>`, `ReadOnlySequence<byte>` and
 `Stream`. Serializer operations are generic-only.
 
-The default `byte[]` serializer retains an 8 KB unpinned first buffer per
-thread. Applications dominated by payloads around 64 KB can select the 80 KB
-high-throughput preset during startup, before the first `Serialize<T>` call:
+The ordinary `byte[]` serializer path, with or without an explicit Context,
+retains an 8 KB unpinned first buffer per thread. Applications dominated by
+payloads around 64 KB can select the 80 KB
+high-throughput preset during startup, before the first retained serializer
+state is created:
 
 ```csharp
 SharpPackSerializer.ConfigureRuntime(
     SharpPackSerializerRuntimeOptions.HighThroughput);
 ```
 
-You can also create `SharpPackSerializerRuntimeOptions` with a custom
-`ThreadBufferSize`. `PinThreadBuffer` is an advanced native-interop option; it
-does not normally improve managed serialization. Runtime options freeze when
-the first byte-array serializer state is created. `IBufferWriter<byte>`, Stream
-and Streaming paths continue to use their caller-owned or pooled buffers.
+You can also create `SharpPackSerializerRuntimeOptions` with any custom
+`ThreadBufferSize` from 1 through `Array.MaxLength`; the presets are only
+convenience choices. For example:
+
+```csharp
+SharpPackSerializer.ConfigureRuntime(new()
+{
+    ThreadBufferSize = 128 * 1024,
+    PinThreadBuffer = false,
+});
+```
+
+The retained buffer is allocated once per thread that reaches an ordinary
+`byte[]` return path, so increasing it trades process memory for fewer pooled
+segments and copies. Direct raw-unmanaged, fixed-size and exact-size paths do
+not create or freeze this state. `PinThreadBuffer` is an advanced
+native-interop option; it does not normally improve managed serialization.
+Runtime options freeze when the first retained byte-array serializer state is
+created. `IBufferWriter<byte>`, Stream and Streaming paths continue to use
+their caller-owned or pooled buffers.
 
 Collectible AssemblyLoadContext
 ---
@@ -136,7 +153,12 @@ example is available in
 [`sandbox/CollectibleAlcSample`](sandbox/CollectibleAlcSample).
 
 See [SharpPack versus MemoryPack benchmarks](docs/benchmarks.md) for the
-reproducible comparison and current measured results.
+reproducible NuGet-only comparison and current latency, throughput and
+allocation results. On the published comparison workload, SharpPack 1.0.3
+deserialization is 1%–2% faster than MemoryPack 1.21.4, small serialization is
+within 0%–3%, and the 1024-item serialization cases are 4%–6% slower. Managed
+allocations are identical, including zero serializer allocation on the
+pre-sized `IBufferWriter<byte>` path.
 
 Built-in supported types
 ---
@@ -160,7 +182,14 @@ These types can be serialized by default:
 
 Define `[SharpPackable]` `class` / `struct` / `record` / `record struct`
 ---
-`[SharpPackable]` can annotate to any `class`, `struct`, `record`, `record struct` and `interface`. If a type is `struct` or `record struct` which contains no reference types ([C# Unmanaged types](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/unmanaged-types)) any additional annotation (ignore, include, constructor, callbacks) is not used, that serialize/deserialize directly from the memory.
+`[SharpPackable]` can annotate any `class`, `struct`, `record`, `record struct`
+or `interface`. An unmanaged `struct` or `record struct` with no formatter-aware
+members is serialized directly from its memory layout. If a serialized member
+uses `[SharpPackCustomFormatter]`, SharpPack deliberately leaves the raw-copy
+path and invokes the generated member formatter; this rule is propagated
+through supported generated and collection shapes. Other object-style
+annotations such as ignore/include, constructors and callbacks are not applied
+to an otherwise raw-copied unmanaged type.
 
 Otherwise, by default, `[SharpPackable]` serializes public instance properties or fields. You can use `[SharpPackIgnore]` to remove serialization target, `[SharpPackInclude]` promotes a private member to serialization target.
 
@@ -597,6 +626,17 @@ For length-prefixed transports, `SharpPack.Streaming` exposes `SerializeFrameAsy
 Native AOT
 ---
 Generated formatters and the generic runtime path are designed for Native AOT. Reflection-based cold shape discovery must be preserved when trimming an application that relies on runtime generic shapes.
+
+Closed generic shapes used only as serializer roots, such as a custom
+`T[]`, may not otherwise have native generic code rooted by a generated
+model. Reference their closed formatter statically, or register it through a
+Context during startup. For example, a custom public factory can be rooted
+without reflection by using
+`SharpPackSerializerContextBuilder.RegisterFactory<T, TFactory>()`. The
+default generated factories are explicit static interface implementations and
+are preserved automatically. A public `CreateFormatter` discovered only by
+reflection remains a JIT compatibility path; NativeAOT callers should use the
+static registration API.
 
 Binary wire format specification
 ---

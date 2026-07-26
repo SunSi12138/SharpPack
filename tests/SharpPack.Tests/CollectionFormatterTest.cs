@@ -55,6 +55,68 @@ public class CollectionFormatterTest
     }
 
     [Fact]
+    public void NullableUnmanagedList_DefaultAndContextPathsRoundTrip()
+    {
+        var value = new List<int?> { 1, null, 30_000 };
+
+        var defaultPayload = SharpPackSerializer.Serialize(value);
+        SharpPackSerializer.Deserialize<List<int?>>(defaultPayload)
+            .Should().Equal(value);
+
+        var emptyContext = new SharpPackSerializerContext();
+        SharpPackSerializer.Serialize(value, emptyContext)
+            .Should().Equal(defaultPayload);
+        SharpPackSerializer.Deserialize<List<int?>>(
+            defaultPayload,
+            emptyContext).Should().Equal(value);
+
+        var overrideContext = new SharpPackSerializerContextBuilder()
+            .Register(new NullableListIntOffsetFormatter())
+            .Build();
+        var overridePayload = SharpPackSerializer.Serialize(
+            value,
+            overrideContext);
+        overridePayload.Should().NotEqual(defaultPayload);
+        SharpPackSerializer.Deserialize<List<int?>>(
+            overridePayload,
+            overrideContext).Should().Equal(value);
+    }
+
+    [Fact]
+    public void UnmanagedList_TruncatedPayloadDoesNotMutateExistingList()
+    {
+        byte[] truncated = new byte[12];
+        BitConverter.GetBytes(8).CopyTo(truncated, 0);
+        var existing = new List<int>(capacity: 3) { 10, 20, 30 };
+        var originalCapacity = existing.Capacity;
+
+        var error = Assert.Throws<SharpPackSerializationException>(() =>
+            SharpPackSerializer.Deserialize(truncated, ref existing));
+
+        error.Message.Should().Contain("Requires size is 32");
+        existing.Should().Equal(10, 20, 30);
+        existing.Capacity.Should().Be(originalCapacity);
+    }
+
+    [Fact]
+    public void UnmanagedList_SegmentedTruncatedPayloadDoesNotMutateExistingList()
+    {
+        byte[] truncated = new byte[12];
+        BitConverter.GetBytes(8).CopyTo(truncated, 0);
+        var sequence = Tests.Utils.ReadOnlySequenceBuilder.Create(
+            truncated.Select(static item => new[] { item }).ToArray());
+        var existing = new List<int>(capacity: 3) { 10, 20, 30 };
+        var originalCapacity = existing.Capacity;
+
+        var error = Assert.Throws<SharpPackSerializationException>(() =>
+            SharpPackSerializer.Deserialize(sequence, ref existing));
+
+        error.Message.Should().Contain("Requires size is 32");
+        existing.Should().Equal(10, 20, 30);
+        existing.Capacity.Should().Be(originalCapacity);
+    }
+
+    [Fact]
     public void Stack()
     {
         void Push(Stack<int> stack, params int[] values)
@@ -244,5 +306,23 @@ public class CollectionFormatterTest
             var bin = SharpPackSerializer.Serialize(dict);
             SharpPackSerializer.Deserialize<ConcurrentDictionary<int, int>>(bin).Should().BeEquivalentTo(dict);
         }
+    }
+}
+
+sealed class NullableListIntOffsetFormatter : SharpPackFormatter<int>
+{
+    public override void Serialize<TBufferWriter>(
+        ref SharpPackWriter<TBufferWriter> writer,
+        scoped ref int value)
+    {
+        writer.WriteUnmanaged(value + 1);
+    }
+
+    public override void Deserialize(
+        ref SharpPackReader reader,
+        scoped ref int value)
+    {
+        reader.ReadUnmanaged(out value);
+        value--;
     }
 }

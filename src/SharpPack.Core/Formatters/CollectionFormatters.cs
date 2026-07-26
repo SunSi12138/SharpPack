@@ -22,6 +22,59 @@ namespace SharpPack.Formatters
     {
         [Preserve]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void SerializePackableUnmanaged<T, TBufferWriter>(
+            ref SharpPackWriter<TBufferWriter> writer,
+            List<T>? value)
+            where T : unmanaged, ISharpPackable<T>
+            where TBufferWriter : IBufferWriter<byte>
+        {
+            if (value == null)
+            {
+                writer.WriteNullCollectionHeader();
+                return;
+            }
+
+            writer.DangerousWriteUnmanagedSpan(
+                CollectionsMarshal.AsSpan(value));
+        }
+
+        [Preserve]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static List<T>? DeserializePackableUnmanaged<T>(
+            ref SharpPackReader reader)
+            where T : unmanaged, ISharpPackable<T>
+        {
+            List<T>? value = default;
+            DeserializePackableUnmanaged(ref reader, ref value);
+            return value;
+        }
+
+        [Preserve]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void DeserializePackableUnmanaged<T>(
+            ref SharpPackReader reader,
+            scoped ref List<T>? value)
+            where T : unmanaged, ISharpPackable<T>
+        {
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
+
+            var byteCount = reader.GetValidatedUnmanagedByteCount<T>(
+                length);
+            value ??= new List<T>(
+                FormatterValidation.InitialCapacity(length));
+            var span = CollectionsMarshalEx.CreateSpan(value, length);
+            reader.DangerousReadUnmanagedSpanWithoutReadLengthHeader(
+                length,
+                byteCount,
+                ref span);
+        }
+
+        [Preserve]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void SerializePackable<T, TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, List<T?>? value)
             where T : ISharpPackable<T>
             where TBufferWriter : IBufferWriter<byte>
@@ -83,6 +136,16 @@ namespace SharpPack.Formatters
     [Preserve]
     public sealed class ListFormatter<T> : SharpPackFormatter<List<T?>>
     {
+        internal override SharpPackFormatter<List<T?>> BindContext(
+            FormatterGraph graph)
+            => graph.HasFormatterOverride<T>()
+                ? new ContextListFormatter<T>()
+                : this;
+
+        internal override bool HasFormatterOverrideDependency(
+            FormatterGraph graph)
+            => graph.HasFormatterOverride<T>();
+
         [Preserve]
         public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref List<T?>? value)
         {
@@ -91,6 +154,7 @@ namespace SharpPack.Formatters
                 writer.WriteNullCollectionHeader();
                 return;
             }
+
             writer.WriteSpan(CollectionsMarshal.AsSpan(value));
         }
 
@@ -115,11 +179,11 @@ namespace SharpPack.Formatters
                 value.Clear();
                 value.EnsureCapacity(
                     FormatterValidation.MaximumInitialCollectionCapacity);
-                var formatter = reader.GetFormatter<T?>();
+                var largeFormatter = reader.GetFormatter<T?>();
                 for (int i = 0; i < length; i++)
                 {
                     T? item = default;
-                    formatter.Deserialize(ref reader, ref item);
+                    largeFormatter.Deserialize(ref reader, ref item);
                     value.Add(item);
                 }
                 return;
@@ -127,6 +191,128 @@ namespace SharpPack.Formatters
 
             var span = CollectionsMarshalEx.CreateSpan(value, length);
             reader.ReadSpanWithoutReadLengthHeader(length, ref span);
+        }
+    }
+
+    [Preserve]
+    internal sealed class ContextListFormatter<T>
+        : SharpPackFormatter<List<T?>>, ISharpPackContextOverrideFormatter
+    {
+        [Preserve]
+        public override void Serialize<TBufferWriter>(
+            ref SharpPackWriter<TBufferWriter> writer,
+            scoped ref List<T?>? value)
+        {
+            if (value == null)
+            {
+                writer.WriteNullCollectionHeader();
+                return;
+            }
+
+            writer.WriteCollectionHeader(value.Count);
+            var formatter = writer.GetFormatter<T>();
+            var span = CollectionsMarshal.AsSpan(value);
+            for (int i = 0; i < span.Length; i++)
+            {
+                formatter.Serialize(ref writer, ref span[i]);
+            }
+        }
+
+        [Preserve]
+        public override void Deserialize(
+            ref SharpPackReader reader,
+            scoped ref List<T?>? value)
+        {
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
+
+            if (value == null)
+            {
+                value = new List<T?>(
+                    FormatterValidation.InitialCapacity(length));
+            }
+
+            if (length > FormatterValidation.MaximumInitialCollectionCapacity &&
+                value.Capacity < length)
+            {
+                value.Clear();
+                value.EnsureCapacity(
+                    FormatterValidation.MaximumInitialCollectionCapacity);
+                var largeFormatter = reader.GetFormatter<T?>();
+                for (int i = 0; i < length; i++)
+                {
+                    T? item = default;
+                    largeFormatter.Deserialize(ref reader, ref item);
+                    value.Add(item);
+                }
+                return;
+            }
+
+            var span = CollectionsMarshalEx.CreateSpan(value, length);
+            var formatter = reader.GetFormatter<T>();
+            for (int i = 0; i < span.Length; i++)
+            {
+                formatter.Deserialize(ref reader, ref span[i]);
+            }
+        }
+    }
+
+    [Preserve]
+    internal sealed class DangerousUnmanagedListFormatter<T>
+        : SharpPackFormatter<List<T?>>
+    {
+        public DangerousUnmanagedListFormatter()
+        {
+        }
+
+        internal override SharpPackFormatter<List<T?>> BindContext(
+            FormatterGraph graph)
+            => graph.HasFormatterOverride<T>()
+                ? new ContextListFormatter<T>()
+                : this;
+
+        internal override bool HasFormatterOverrideDependency(
+            FormatterGraph graph)
+            => graph.HasFormatterOverride<T>();
+
+        [Preserve]
+        public override void Serialize<TBufferWriter>(
+            ref SharpPackWriter<TBufferWriter> writer,
+            scoped ref List<T?>? value)
+        {
+            if (value == null)
+            {
+                writer.WriteNullCollectionHeader();
+                return;
+            }
+
+            writer.DangerousWriteUnmanagedSpan(
+                CollectionsMarshal.AsSpan(value));
+        }
+
+        [Preserve]
+        public override void Deserialize(
+            ref SharpPackReader reader,
+            scoped ref List<T?>? value)
+        {
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
+
+            var byteCount = reader.GetValidatedUnmanagedByteCount<T>(
+                length);
+            value ??= new List<T?>(
+                FormatterValidation.InitialCapacity(length));
+            var span = CollectionsMarshalEx.CreateSpan(value, length);
+            reader.DangerousReadUnmanagedSpanWithoutReadLengthHeader(
+                length,
+                byteCount,
+                ref span);
         }
     }
 

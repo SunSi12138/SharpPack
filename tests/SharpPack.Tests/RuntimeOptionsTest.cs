@@ -108,10 +108,10 @@ public class RuntimeOptionsTest
     }
 
     [Fact]
-    public void ExactSizeFirstUse_FreezesRuntimeConfiguration()
+    public void ExactSizeFastPath_DoesNotFreezeRetainedBufferConfiguration()
     {
         var loadContext = new AssemblyLoadContext(
-            nameof(ExactSizeFirstUse_FreezesRuntimeConfiguration),
+            nameof(ExactSizeFastPath_DoesNotFreezeRetainedBufferConfiguration),
             isCollectible: true);
         try
         {
@@ -145,14 +145,28 @@ public class RuntimeOptionsTest
                 "ConfigureRuntime",
                 BindingFlags.Public | BindingFlags.Static)!;
 
-            var secondConfigure = () => configure.Invoke(null, [options]);
-            secondConfigure.Should().Throw<TargetInvocationException>()
-                .WithInnerException<InvalidOperationException>();
+            configure.Invoke(null, [options]);
         }
         finally
         {
             loadContext.Unload();
         }
+    }
+
+    [Fact]
+    public void SmallRetainedBuffer_DoesNotShrinkPooledSegmentFloor()
+    {
+        var writer = new global::SharpPack.Internal.ReusableLinkedArrayBufferWriter(
+            useFirstBuffer: true,
+            pinned: false,
+            firstBufferSize: 64);
+
+        _ = writer.GetSpan(64);
+        writer.Advance(64);
+        var pooledSegment = writer.GetSpan(1);
+
+        pooledSegment.Length.Should().BeGreaterThanOrEqualTo(4 * 1024);
+        writer.Reset();
     }
 
     [Fact]
@@ -197,6 +211,218 @@ public class RuntimeOptionsTest
                     })));
 
             lengths.Should().OnlyContain(static length => length == 12_345);
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(12_345)]
+    [InlineData(128 * 1024)]
+    public void CustomRetainedBufferSize_IsNotLimitedToPresets(int bufferSize)
+    {
+        var loadContext = new AssemblyLoadContext(
+            $"{nameof(CustomRetainedBufferSize_IsNotLimitedToPresets)}-{bufferSize}",
+            isCollectible: true);
+        try
+        {
+            var assembly = loadContext.LoadFromAssemblyPath(
+                typeof(SharpPackSerializer).Assembly.Location);
+            var serializerType = assembly.GetType(
+                "SharpPack.SharpPackSerializer",
+                throwOnError: true)!;
+            var optionsType = assembly.GetType(
+                "SharpPack.SharpPackSerializerRuntimeOptions",
+                throwOnError: true)!;
+            var options = Activator.CreateInstance(optionsType)!;
+            optionsType.GetProperty("ThreadBufferSize")!
+                .SetValue(options, bufferSize);
+            serializerType.GetMethod(
+                "ConfigureRuntime",
+                BindingFlags.Public | BindingFlags.Static)!
+                .Invoke(null, [options]);
+
+            var stateType = serializerType.GetNestedType(
+                "SerializerWriterThreadStaticState",
+                BindingFlags.NonPublic)!;
+            var constructor = stateType.GetConstructor(
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
+                binder: null,
+                [typeof(bool)],
+                modifiers: null)!;
+            var state = constructor.Invoke([true]);
+
+            GetFirstBuffer(state, stateType).Should().HaveCount(bufferSize);
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
+    }
+
+    [Fact]
+    public void CustomRetainedBuffer_IsUsedAndReusedByByteArraySerialization()
+    {
+        var loadContext = new AssemblyLoadContext(
+            nameof(CustomRetainedBuffer_IsUsedAndReusedByByteArraySerialization),
+            isCollectible: true);
+        try
+        {
+            var assembly = loadContext.LoadFromAssemblyPath(
+                typeof(SharpPackSerializer).Assembly.Location);
+            var serializerType = assembly.GetType(
+                "SharpPack.SharpPackSerializer",
+                throwOnError: true)!;
+            var optionsType = assembly.GetType(
+                "SharpPack.SharpPackSerializerRuntimeOptions",
+                throwOnError: true)!;
+            var options = Activator.CreateInstance(optionsType)!;
+            optionsType.GetProperty("ThreadBufferSize")!
+                .SetValue(options, 3);
+            serializerType.GetMethod(
+                "ConfigureRuntime",
+                BindingFlags.Public | BindingFlags.Static)!
+                .Invoke(null, [options]);
+
+            var serialize = serializerType
+                .GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .Single(static method =>
+                    method.Name == "Serialize" &&
+                    method.IsGenericMethodDefinition &&
+                    method.GetParameters().Length == 1)
+                .MakeGenericMethod(typeof(string));
+            const string value =
+                "a payload that must cross the three-byte retained buffer";
+            var expectedPayload = SharpPackSerializer.Serialize(value);
+
+            var firstPayload = (byte[])serialize.Invoke(null, [value])!;
+            var stateType = serializerType.GetNestedType(
+                "SerializerWriterThreadStaticState",
+                BindingFlags.NonPublic)!;
+            var state = serializerType.GetField(
+                "threadStaticState",
+                BindingFlags.NonPublic | BindingFlags.Static)!
+                .GetValue(null)!;
+            var firstBuffer = GetFirstBuffer(state, stateType);
+            var secondPayload = (byte[])serialize.Invoke(null, [value])!;
+            var reusedBuffer = GetFirstBuffer(state, stateType);
+
+            firstBuffer.Should().HaveCount(3);
+            reusedBuffer.Should().BeSameAs(firstBuffer);
+            firstPayload.Should().Equal(expectedPayload);
+            secondPayload.Should().Equal(firstPayload);
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
+    }
+
+    [Fact]
+    public void ContextByteArrayPath_UsesAndFreezesRetainedBufferConfiguration()
+    {
+        var loadContext = new AssemblyLoadContext(
+            nameof(ContextByteArrayPath_UsesAndFreezesRetainedBufferConfiguration),
+            isCollectible: true);
+        try
+        {
+            var assembly = loadContext.LoadFromAssemblyPath(
+                typeof(SharpPackSerializer).Assembly.Location);
+            var serializerType = assembly.GetType(
+                "SharpPack.SharpPackSerializer",
+                throwOnError: true)!;
+            var contextType = assembly.GetType(
+                "SharpPack.SharpPackSerializerContext",
+                throwOnError: true)!;
+            var optionsType = assembly.GetType(
+                "SharpPack.SharpPackSerializerRuntimeOptions",
+                throwOnError: true)!;
+            var options = Activator.CreateInstance(optionsType)!;
+            optionsType.GetProperty("ThreadBufferSize")!
+                .SetValue(options, 17);
+            var configure = serializerType.GetMethod(
+                "ConfigureRuntime",
+                BindingFlags.Public | BindingFlags.Static)!;
+            configure.Invoke(null, [options]);
+
+            var context = Activator.CreateInstance(contextType)!;
+            var serialize = serializerType
+                .GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .Single(method =>
+                    method.Name == "Serialize" &&
+                    method.IsGenericMethodDefinition &&
+                    method.GetParameters() is
+                    [_, { ParameterType: var parameterType }] &&
+                    parameterType == contextType)
+                .MakeGenericMethod(typeof(string));
+            _ = serialize.Invoke(null,
+                ["context retained buffer payload", context]);
+
+            var stateType = serializerType.GetNestedType(
+                "SerializerWriterThreadStaticState",
+                BindingFlags.NonPublic)!;
+            var state = serializerType.GetField(
+                "threadStaticState",
+                BindingFlags.NonPublic | BindingFlags.Static)!
+                .GetValue(null)!;
+            var contextBuffer = GetFirstBuffer(state, stateType);
+            contextBuffer.Should().HaveCount(17);
+
+            var defaultSerialize = serializerType
+                .GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .Single(static method =>
+                    method.Name == "Serialize" &&
+                    method.IsGenericMethodDefinition &&
+                    method.GetParameters().Length == 1)
+                .MakeGenericMethod(typeof(string));
+            _ = defaultSerialize.Invoke(null, ["default retained payload"]);
+            GetFirstBuffer(state, stateType).Should().BeSameAs(contextBuffer);
+
+            var secondConfigure = () => configure.Invoke(null, [options]);
+            secondConfigure.Should().Throw<TargetInvocationException>()
+                .WithInnerException<InvalidOperationException>();
+        }
+        finally
+        {
+            loadContext.Unload();
+        }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(int.MaxValue)]
+    public void InvalidCustomRetainedBufferSize_IsRejected(int bufferSize)
+    {
+        // Use an isolated load context so this test
+        // cannot observe or freeze the process-wide test runner state.
+        var loadContext = new AssemblyLoadContext(
+            $"{nameof(InvalidCustomRetainedBufferSize_IsRejected)}-{bufferSize}",
+            isCollectible: true);
+        try
+        {
+            var assembly = loadContext.LoadFromAssemblyPath(
+                typeof(SharpPackSerializer).Assembly.Location);
+            var serializerType = assembly.GetType(
+                "SharpPack.SharpPackSerializer",
+                throwOnError: true)!;
+            var optionsType = assembly.GetType(
+                "SharpPack.SharpPackSerializerRuntimeOptions",
+                throwOnError: true)!;
+            var isolatedOptions = Activator.CreateInstance(optionsType)!;
+            optionsType.GetProperty("ThreadBufferSize")!
+                .SetValue(isolatedOptions, bufferSize);
+            var configure = serializerType.GetMethod(
+                "ConfigureRuntime",
+                BindingFlags.Public | BindingFlags.Static)!;
+
+            var action = () => configure.Invoke(null, [isolatedOptions]);
+
+            action.Should().Throw<TargetInvocationException>()
+                .WithInnerException<ArgumentOutOfRangeException>();
         }
         finally
         {

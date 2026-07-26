@@ -15,7 +15,7 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static T? Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(ReadOnlySpan<byte> buffer)
     {
         T? value = default;
@@ -25,19 +25,17 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        T>(ReadOnlySpan<byte> buffer, ref T? value)
+        => !RuntimeHelpers.IsReferenceOrContainsReferences<T>()
+            ? DeserializeUnmanaged(buffer, ref value)
+            : DeserializeReference(buffer, ref value);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static int DeserializeReference<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(ReadOnlySpan<byte> buffer, ref T? value)
     {
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
-        {
-            if (buffer.Length < Unsafe.SizeOf<T>())
-            {
-                SharpPackSerializationException.ThrowInvalidRange(Unsafe.SizeOf<T>(), buffer.Length);
-            }
-            value = Unsafe.ReadUnaligned<T>(ref MemoryMarshal.GetReference(buffer));
-            return Unsafe.SizeOf<T>();
-        }
-
         var state = AcquireReaderOptionalState();
 
         var reader = new SharpPackReader(buffer, state);
@@ -53,8 +51,29 @@ public static partial class SharpPackSerializer
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static int DeserializeUnmanaged<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        T>(ReadOnlySpan<byte> buffer, ref T? value)
+    {
+        if (!TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
+        {
+            if (buffer.Length < Unsafe.SizeOf<T>())
+            {
+                SharpPackSerializationException.ThrowInvalidRange(
+                    Unsafe.SizeOf<T>(),
+                    buffer.Length);
+            }
+            value = Unsafe.ReadUnaligned<T>(
+                ref MemoryMarshal.GetReference(buffer));
+            return Unsafe.SizeOf<T>();
+        }
+
+        return DeserializeCustomFormatterUnmanaged(buffer, ref value);
+    }
+
     public static T? Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(in ReadOnlySequence<byte> buffer)
     {
         T? value = default;
@@ -63,56 +82,109 @@ public static partial class SharpPackSerializer
     }
 
     public static int Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        T>(in ReadOnlySequence<byte> buffer, ref T? value)
+        => !RuntimeHelpers.IsReferenceOrContainsReferences<T>()
+            ? DeserializeUnmanaged(buffer, ref value)
+            : DeserializeReference(buffer, ref value);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static int DeserializeReference<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(in ReadOnlySequence<byte> buffer, ref T? value)
     {
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
-        {
-            int sizeOfT = Unsafe.SizeOf<T>();
-            if (buffer.Length < sizeOfT)
-            {
-                SharpPackSerializationException.ThrowInvalidRange(Unsafe.SizeOf<T>(), (int)buffer.Length);
-            }
-
-            ReadOnlySequence<byte> sliced = buffer.Slice(0, sizeOfT);
-
-            if (sliced.IsSingleSegment)
-            {
-                value = Unsafe.ReadUnaligned<T>(ref MemoryMarshal.GetReference(sliced.FirstSpan));
-                return sizeOfT;
-            }
-            else
-            {
-                // We can't read directly from ReadOnlySequence<byte> to T, so we copy to a temp array.
-                // if less than 512 bytes, use stackalloc, otherwise use MemoryPool<byte>
-                byte[]? tempArray = null;
-
-                Span<byte> tempSpan = sizeOfT <= 512 ? stackalloc byte[sizeOfT] : default;
-
-                try
-                {
-                    if (sizeOfT > 512)
-                    {
-                        tempArray = ArrayPool<byte>.Shared.Rent(sizeOfT);
-                        tempSpan = tempArray;
-                    }
-
-                    sliced.CopyTo(tempSpan);
-                    value = Unsafe.ReadUnaligned<T>(ref MemoryMarshal.GetReference(tempSpan));
-                    return sizeOfT;
-                }
-                finally
-                {
-                    if (tempArray is not null)
-                    {
-                        ArrayPool<byte>.Shared.Return(tempArray);
-                    }
-                }
-            }
-        }
-
         var state = AcquireReaderOptionalState();
 
+        var reader = new SharpPackReader(buffer, state);
+        try
+        {
+            reader.ReadValue(ref value);
+            return reader.Consumed;
+        }
+        finally
+        {
+            reader.Dispose();
+            state.ResetAndExit();
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static int DeserializeUnmanaged<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        T>(in ReadOnlySequence<byte> buffer, ref T? value)
+    {
+        if (TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
+        {
+            return DeserializeCustomFormatterUnmanaged(buffer, ref value);
+        }
+
+        int sizeOfT = Unsafe.SizeOf<T>();
+        if (buffer.Length < sizeOfT)
+        {
+            SharpPackSerializationException.ThrowInvalidRange(
+                sizeOfT,
+                (int)buffer.Length);
+        }
+
+        var sliced = buffer.Slice(0, sizeOfT);
+        if (sliced.IsSingleSegment)
+        {
+            value = Unsafe.ReadUnaligned<T>(
+                ref MemoryMarshal.GetReference(sliced.FirstSpan));
+            return sizeOfT;
+        }
+
+        byte[]? tempArray = null;
+        Span<byte> tempSpan = sizeOfT <= 512
+            ? stackalloc byte[sizeOfT]
+            : default;
+        try
+        {
+            if (sizeOfT > 512)
+            {
+                tempArray = ArrayPool<byte>.Shared.Rent(sizeOfT);
+                tempSpan = tempArray;
+            }
+
+            sliced.CopyTo(tempSpan);
+            value = Unsafe.ReadUnaligned<T>(
+                ref MemoryMarshal.GetReference(tempSpan));
+            return sizeOfT;
+        }
+        finally
+        {
+            if (tempArray is not null)
+            {
+                ArrayPool<byte>.Shared.Return(tempArray);
+            }
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static int DeserializeCustomFormatterUnmanaged<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        T>(ReadOnlySpan<byte> buffer, ref T? value)
+    {
+        var state = AcquireReaderOptionalState();
+        var reader = new SharpPackReader(buffer, state);
+        try
+        {
+            reader.ReadValue(ref value);
+            return reader.Consumed;
+        }
+        finally
+        {
+            reader.Dispose();
+            state.ResetAndExit();
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static int DeserializeCustomFormatterUnmanaged<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        T>(in ReadOnlySequence<byte> buffer, ref T? value)
+    {
+        var state = AcquireReaderOptionalState();
         var reader = new SharpPackReader(buffer, state);
         try
         {
@@ -136,7 +208,7 @@ public static partial class SharpPackSerializer
     /// Use the payload-length overload for framed or concatenated messages.
     /// </remarks>
     public static async ValueTask<T?> DeserializeAsync<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(Stream stream, CancellationToken cancellationToken = default)
     {
         if (stream is MemoryStream ms && ms.TryGetBuffer(out ArraySegment<byte> streamBuffer))
@@ -218,7 +290,7 @@ public static partial class SharpPackSerializer
     /// bytes from a following message.
     /// </summary>
     public static ValueTask<T?> DeserializeAsync<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(
         Stream stream,
         int payloadLength,
@@ -230,7 +302,7 @@ public static partial class SharpPackSerializer
             cancellationToken);
 
     static async ValueTask<T?> DeserializeLengthDelimitedAsync<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(
         Stream stream,
         int payloadLength,

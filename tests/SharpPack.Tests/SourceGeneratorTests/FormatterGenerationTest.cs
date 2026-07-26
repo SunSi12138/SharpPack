@@ -7,6 +7,171 @@ namespace SharpPack.Tests.SourceGeneratorTests;
 public class FormatterGenerationTest
 {
     [Fact]
+    public void UnmanagedCustomFormatter_EmitsSemanticMarkerAndFieldPath()
+    {
+        var source = """
+namespace Generated;
+
+public sealed class VarIntFormatter : SharpPackFormatter<int>
+{
+    public override void Serialize<TBufferWriter>(
+        ref SharpPackWriter<TBufferWriter> writer,
+        scoped ref int value)
+        => writer.WriteVarInt(value);
+
+    public override void Deserialize(
+        ref SharpPackReader reader,
+        scoped ref int value)
+        => value = reader.ReadVarIntInt32();
+}
+
+public sealed class VarIntAttribute
+    : SharpPackCustomFormatterAttribute<VarIntFormatter, int>
+{
+    public override VarIntFormatter GetFormatter() => new();
+}
+
+[SharpPackable]
+public partial struct Formatted
+{
+    [VarInt]
+    public int Value { get; set; }
+    public long Tail { get; set; }
+}
+
+[SharpPackable]
+public partial struct Nested
+{
+    public Formatted Value { get; set; }
+}
+
+[SharpPackable]
+public partial struct Plain
+{
+    public int Value { get; set; }
+}
+""";
+        var (compilation, diagnostics) =
+            CSharpGeneratorRunner.RunGenerator(source);
+
+        diagnostics.Should().BeEmpty();
+        compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error)
+            .Should().BeEmpty();
+        var generated = compilation.SyntaxTrees
+            .Where(static tree => tree.FilePath.EndsWith(
+                ".g.cs",
+                StringComparison.Ordinal))
+            .Select(static tree => tree.ToString())
+            .ToArray();
+        var formatted = generated.Single(static text =>
+            text.Contains("partial struct Formatted",
+                StringComparison.Ordinal));
+        var nested = generated.Single(static text =>
+            text.Contains("partial struct Nested",
+                StringComparison.Ordinal));
+        var plain = generated.Single(static text =>
+            text.Contains("partial struct Plain",
+                StringComparison.Ordinal));
+
+        formatted.Should().Contain(
+            "ISharpPackUnmanagedRawCopyDisabled");
+        formatted.Should().Contain(
+            "WriteValueWithFormatter(__ValueFormatter");
+        formatted.Should().NotContain("writer.WriteUnmanaged(value);");
+        nested.Should().Contain(
+            "ISharpPackUnmanagedRawCopyDisabled");
+        nested.Should().Contain("writer.WritePackable(value.@Value);");
+        plain.Should().NotContain(
+            "ISharpPackUnmanagedRawCopyDisabled");
+        plain.Should().Contain("writer.WriteUnmanaged(value);");
+    }
+
+    [Fact]
+    public void PackableLists_UseBulkHelperOnlyForClosedRawSafeElements()
+    {
+        var source = """
+namespace Generated;
+
+public sealed class VarIntFormatter : SharpPackFormatter<int>
+{
+    public override void Serialize<TBufferWriter>(
+        ref SharpPackWriter<TBufferWriter> writer,
+        scoped ref int value)
+        => writer.WriteVarInt(value);
+
+    public override void Deserialize(
+        ref SharpPackReader reader,
+        scoped ref int value)
+        => value = reader.ReadVarIntInt32();
+}
+
+public sealed class VarIntAttribute
+    : SharpPackCustomFormatterAttribute<VarIntFormatter, int>
+{
+    public override VarIntFormatter GetFormatter() => new();
+}
+
+[SharpPackable]
+public partial struct Plain
+{
+    public int Value { get; set; }
+}
+
+[SharpPackable]
+public partial struct Formatted
+{
+    [VarInt]
+    public int Value { get; set; }
+}
+
+[SharpPackable]
+public partial class PlainListHolder
+{
+    public List<Plain>? Values { get; set; }
+}
+
+[SharpPackable]
+public partial class FormattedListHolder
+{
+    public List<Formatted>? Values { get; set; }
+}
+""";
+        var (compilation, diagnostics) =
+            CSharpGeneratorRunner.RunGenerator(source);
+
+        diagnostics.Should().BeEmpty();
+        compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error)
+            .Should().BeEmpty();
+        var generated = compilation.SyntaxTrees
+            .Where(static tree => tree.FilePath.EndsWith(
+                ".g.cs",
+                StringComparison.Ordinal))
+            .Select(static tree => tree.ToString())
+            .ToArray();
+        var plainHolder = generated.Single(static text =>
+            text.Contains("partial class PlainListHolder",
+                StringComparison.Ordinal));
+        var formattedHolder = generated.Single(static text =>
+            text.Contains("partial class FormattedListHolder",
+                StringComparison.Ordinal));
+
+        plainHolder.Should().Contain(
+            "SerializePackableUnmanaged");
+        plainHolder.Should().Contain(
+            "DeserializePackableUnmanaged");
+        formattedHolder.Should().Contain(
+            "ListFormatter.SerializePackable(");
+        formattedHolder.Should().Contain(
+            "ListFormatter.DeserializePackable<");
+        formattedHolder.Should().NotContain(
+            "PackableUnmanaged");
+    }
+
+    [Fact]
     public void ExactSizeContract_IsEmittedOnlyForEligibleObjects()
     {
         var source = """
@@ -136,6 +301,235 @@ public partial class Model
             "__SharpPackSerializeWithFormatterOverrides_<TBufferWriter>");
         generated.Should().Contain(
             "void __SharpPackDeserializeWithFormatterOverrides_(");
+    }
+
+    [Fact]
+    public void FormatterOverrideHelpers_AvoidTypeParameterCollisions()
+    {
+        var source = """
+namespace Generated;
+
+[SharpPackable]
+public partial class Model<
+    __SharpPackSerializeWithFormatterOverrides,
+    __SharpPackDeserializeWithFormatterOverrides>
+{
+    public int Value { get; set; }
+}
+""";
+
+        var (compilation, diagnostics) =
+            CSharpGeneratorRunner.RunGenerator(source);
+
+        diagnostics.Should().BeEmpty();
+        compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error)
+            .Should().BeEmpty();
+        var generated = string.Join(
+            Environment.NewLine,
+            compilation.SyntaxTrees
+                .Where(static tree => tree.FilePath.EndsWith(
+                    ".g.cs",
+                    StringComparison.Ordinal))
+                .Select(static tree => tree.ToString()));
+
+        generated.Should().Contain(
+            "__SharpPackSerializeWithFormatterOverrides_<TBufferWriter>");
+        generated.Should().Contain(
+            "void __SharpPackDeserializeWithFormatterOverrides_(");
+    }
+
+    [Fact]
+    public void ContextFormatterType_AvoidsUserNestedTypeCollisions()
+    {
+        var source = """
+namespace Generated;
+
+[SharpPackable]
+public partial class Model
+{
+    public int Value { get; set; }
+    public string? Name { get; set; }
+
+    sealed class __SharpPackContextFormatter
+    {
+    }
+}
+""";
+
+        var (compilation, diagnostics) =
+            CSharpGeneratorRunner.RunGenerator(source);
+
+        diagnostics.Should().BeEmpty();
+        compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error)
+            .Should().BeEmpty();
+        var generated = string.Join(
+            Environment.NewLine,
+            compilation.SyntaxTrees
+                .Where(static tree => tree.FilePath.EndsWith(
+                    ".g.cs",
+                    StringComparison.Ordinal))
+                .Select(static tree => tree.ToString()));
+
+        generated.Should().Contain(
+            "sealed class __SharpPackContextFormatter_");
+        generated.Should().Contain(
+            "return new __SharpPackContextFormatter_();");
+    }
+
+    [Fact]
+    public void ContextFormatterType_AvoidsTypeParameterCollisions()
+    {
+        var source = """
+namespace Generated;
+
+[SharpPackable]
+public partial class Model<__SharpPackContextFormatter>
+{
+    public int Value { get; set; }
+}
+""";
+
+        var (compilation, diagnostics) =
+            CSharpGeneratorRunner.RunGenerator(source);
+
+        diagnostics.Should().BeEmpty();
+        compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error)
+            .Should().BeEmpty();
+        var generated = string.Join(
+            Environment.NewLine,
+            compilation.SyntaxTrees
+                .Where(static tree => tree.FilePath.EndsWith(
+                    ".g.cs",
+                    StringComparison.Ordinal))
+                .Select(static tree => tree.ToString()));
+
+        generated.Should().Contain(
+            "sealed class __SharpPackContextFormatter_");
+        generated.Should().Contain(
+            "return new __SharpPackContextFormatter_();");
+    }
+
+    [Fact]
+    public void AotRootHelper_AvoidsTypeParameterCollisions()
+    {
+        var source = """
+namespace Generated;
+
+[SharpPackable]
+public partial class Child
+{
+    public int Value { get; set; }
+}
+
+[SharpPackable]
+public partial class Model<__SharpPackEnsureAotFormatterRoots>
+{
+    public Child? Value { get; set; }
+}
+""";
+
+        var (compilation, diagnostics) =
+            CSharpGeneratorRunner.RunGenerator(source);
+
+        diagnostics.Should().BeEmpty();
+        compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error)
+            .Should().BeEmpty();
+        var generated = string.Join(
+            Environment.NewLine,
+            compilation.SyntaxTrees
+                .Where(static tree => tree.FilePath.EndsWith(
+                    ".g.cs",
+                    StringComparison.Ordinal))
+                .Select(static tree => tree.ToString()));
+
+        generated.Should().Contain(
+            "static void __SharpPackEnsureAotFormatterRoots_()");
+        generated.Should().Contain(
+            "__SharpPackEnsureAotFormatterRoots_();");
+    }
+
+    [Fact]
+    public void GeneratedHelpers_AvoidContainingTypeParameterCollisions()
+    {
+        var source = """
+namespace Generated;
+
+public partial class Outer<
+    __SharpPackContextFormatter,
+    __SharpPackEnsureAotFormatterRoots,
+    __SharpPackSerializeWithFormatterOverrides,
+    __SharpPackDeserializeWithFormatterOverrides>
+{
+    [SharpPackable]
+    public partial class Model
+    {
+        public int Value { get; set; }
+        public string? Name { get; set; }
+    }
+}
+""";
+
+        var (compilation, diagnostics) =
+            CSharpGeneratorRunner.RunGenerator(source);
+
+        diagnostics.Should().BeEmpty();
+        compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error)
+            .Should().BeEmpty();
+    }
+
+    [Fact]
+    public void NestedModels_PreserveRequiredContainingTypeModifiers()
+    {
+        var source = """
+namespace Generated;
+
+public static partial class StaticOuter
+{
+    [SharpPackable]
+    public partial class Model
+    {
+        public int Value { get; set; }
+    }
+}
+
+public readonly partial struct ReadOnlyOuter
+{
+    [SharpPackable]
+    public partial class Model
+    {
+        public int Value { get; set; }
+    }
+}
+
+public ref partial struct RefOuter
+{
+    [SharpPackable]
+    public partial class Model
+    {
+        public int Value { get; set; }
+    }
+}
+
+""";
+
+        var (compilation, diagnostics) =
+            CSharpGeneratorRunner.RunGenerator(source);
+
+        diagnostics.Should().BeEmpty();
+        compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error)
+            .Should().BeEmpty();
     }
 
     [Fact]

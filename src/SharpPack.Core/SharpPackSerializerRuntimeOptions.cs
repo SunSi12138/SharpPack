@@ -1,8 +1,10 @@
 namespace SharpPack;
 
 /// <summary>
-/// Process-wide runtime resource settings for the default byte-array serializer.
-/// Configure once during application startup, before the first serialization.
+/// Process-wide runtime resource settings for ordinary byte-array return paths,
+/// including calls that use an explicit serializer context.
+/// Configure once during application startup, before the first retained
+/// byte-array serializer state is created.
 /// </summary>
 public sealed record SharpPackSerializerRuntimeOptions
 {
@@ -18,8 +20,10 @@ public sealed record SharpPackSerializerRuntimeOptions
         };
 
     /// <summary>
-    /// Per-thread first buffer retained by <c>Serialize&lt;T&gt;()</c>.
+    /// Per-thread first buffer retained by ordinary
+    /// <c>Serialize&lt;T&gt;()</c> byte-array return paths.
     /// Larger values avoid pooled segments for correspondingly sized payloads.
+    /// Any value from 1 through <see cref="Array.MaxLength"/> is accepted.
     /// </summary>
     public int ThreadBufferSize { get; init; } = DefaultThreadBufferSize;
 

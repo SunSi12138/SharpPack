@@ -56,7 +56,8 @@ internal sealed class FormatterGraph
         var type = typeof(T);
         if (!creatingFormatterTypes.Add(type))
         {
-            return FormatterSlot<T>.Formatter;
+            throw new SharpPackSerializationException(
+                $"Recursive formatter construction was detected for {type.FullName}.");
         }
 
         try
@@ -89,8 +90,9 @@ internal sealed class FormatterGraph
                 return true;
             }
 
-            return GetFormatterLocked<T>()
-                .HasFormatterOverrideDependency(this);
+            var formatter = GetFormatterLocked<T>();
+            return formatter is ISharpPackContextOverrideFormatter ||
+                   formatter.HasFormatterOverrideDependency(this);
         }
     }
 

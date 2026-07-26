@@ -10,6 +10,98 @@ namespace SharpPack.Tests;
 public class SharpPackSerializerContextTest
 {
     [Fact]
+    public void RecursiveContextFactory_DoesNotFallBackToDefaultFormatterSlot()
+    {
+        RecursiveContextFactoryModel.DefaultFactoryCalls = 0;
+        var context = new SharpPackSerializerContextBuilder()
+            .Register(new IntOffsetFormatter(1))
+            .Build();
+
+        var serialize = () => SharpPackSerializer.Serialize(
+            new RecursiveContextFactoryModel(),
+            context);
+
+        serialize.Should().Throw<SharpPackSerializationException>();
+        RecursiveContextFactoryModel.DefaultFactoryCalls.Should().Be(0);
+    }
+
+    [Fact]
+    public void GeneratedFactories_WinOverUserMethodsWithMatchingNames()
+    {
+        var value = new FactoryNameCollisionModel
+        {
+            Values = [1, 2, 3],
+        };
+        var context = new SharpPackSerializerContextBuilder()
+            .Register(new IntOffsetFormatter(10))
+            .Build();
+
+        var defaultPayload = SharpPackSerializer.Serialize(value);
+        var contextPayload = SharpPackSerializer.Serialize(value, context);
+
+        SharpPackSerializer.Deserialize<FactoryNameCollisionModel>(
+            defaultPayload)!.Values.Should().Equal(1, 2, 3);
+        SharpPackSerializer.Deserialize<FactoryNameCollisionModel>(
+            contextPayload,
+            context)!.Values.Should().Equal(1, 2, 3);
+    }
+
+    [Fact]
+    public void GeneratedFactories_IgnoreFactoriesForOtherValueTypes()
+    {
+        var value = new FactoryReturnTypeCollisionModel
+        {
+            Value = 42,
+        };
+        var context = new SharpPackSerializerContextBuilder()
+            .Register(new IntOffsetFormatter(10))
+            .Build();
+
+        var defaultPayload = SharpPackSerializer.Serialize(value);
+        var contextPayload = SharpPackSerializer.Serialize(value, context);
+
+        SharpPackSerializer.Deserialize<FactoryReturnTypeCollisionModel>(
+            defaultPayload)!.Value.Should().Be(42);
+        SharpPackSerializer.Deserialize<FactoryReturnTypeCollisionModel>(
+            contextPayload,
+            context)!.Value.Should().Be(42);
+    }
+
+    [Fact]
+    public void GeneratedFactories_WinOverUnrelatedExplicitFactories()
+    {
+        var value = new ExplicitFactoryCollisionModel { Value = 42 };
+        var context = new SharpPackSerializerContextBuilder()
+            .Register(new IntOffsetFormatter(10))
+            .Build();
+
+        var defaultPayload = SharpPackSerializer.Serialize(value);
+        var contextPayload = SharpPackSerializer.Serialize(value, context);
+
+        SharpPackSerializer.Deserialize<ExplicitFactoryCollisionModel>(
+            defaultPayload)!.Value.Should().Be(42);
+        SharpPackSerializer.Deserialize<ExplicitFactoryCollisionModel>(
+            contextPayload,
+            context)!.Value.Should().Be(42);
+    }
+
+    [Fact]
+    public void HandwrittenExplicitFactories_RemainResolvable()
+    {
+        var value = new HandwrittenFactoryModel { Value = 42 };
+        var context = new SharpPackSerializerContext();
+
+        var defaultPayload = SharpPackSerializer.Serialize(value);
+        var contextPayload = SharpPackSerializer.Serialize(value, context);
+
+        SharpPackSerializer.Deserialize<HandwrittenFactoryModel>(
+            defaultPayload)!.Value.Should().Be(42);
+        SharpPackSerializer.Deserialize<HandwrittenFactoryModel>(
+            contextPayload,
+            context)!.Value.Should().Be(42);
+    }
+
+    [Fact]
     public void EmptyContext_PreservesRootUnmanagedStructPayload()
     {
         var value = new ContextUnmanagedStruct
@@ -25,6 +117,60 @@ public class SharpPackSerializerContextTest
         SharpPackSerializer.Deserialize<ContextUnmanagedStruct>(
             defaultPayload,
             context).Should().Be(value);
+    }
+
+    [Fact]
+    public void PrimitiveRegistration_PropagatesThroughGeneratedUnmanagedStruct()
+    {
+        var value = new ContextUnmanagedStruct
+        {
+            Id = 30_000,
+            Timestamp = 123_456_789,
+        };
+        var context = new SharpPackSerializerContextBuilder()
+            .Register(new VarIntIntFormatter())
+            .Build();
+
+        var defaultPayload = SharpPackSerializer.Serialize(value);
+        var contextPayload = SharpPackSerializer.Serialize(value, context);
+
+        contextPayload.Should().NotEqual(defaultPayload);
+        SharpPackSerializer.Deserialize<ContextUnmanagedStruct>(
+            contextPayload,
+            context).Should().Be(value);
+
+        var values = new[]
+        {
+            value,
+            new ContextUnmanagedStruct
+            {
+                Id = 200,
+                Timestamp = 987_654_321,
+            },
+        };
+        var defaultArrayPayload = SharpPackSerializer.Serialize(values);
+        var contextArrayPayload = SharpPackSerializer.Serialize(
+            values,
+            context);
+
+        contextArrayPayload.Should().NotEqual(defaultArrayPayload);
+        SharpPackSerializer.Deserialize<ContextUnmanagedStruct[]>(
+            contextArrayPayload,
+            context).Should().Equal(values);
+
+        var container = new ContextUnmanagedStructContainer
+        {
+            Value = value,
+            Values = values.ToList(),
+        };
+        var containerPayload = SharpPackSerializer.Serialize(
+            container,
+            context);
+        containerPayload.Should().NotEqual(
+            SharpPackSerializer.Serialize(container));
+        SharpPackSerializer.Deserialize<ContextUnmanagedStructContainer>(
+            containerPayload,
+            context).Should().BeEquivalentTo(container);
     }
 
     [Fact]
@@ -206,6 +352,30 @@ public class SharpPackSerializerContextTest
     }
 
     [Fact]
+    public void MutuallyRecursiveGeneratedGraph_PropagatesLeafOverride()
+    {
+        var context = new SharpPackSerializerContextBuilder()
+            .Register(new IntOffsetFormatter(100))
+            .Build();
+        var value = new ContextMutualA
+        {
+            B = new ContextMutualB
+            {
+                Value = 42,
+                A = null,
+            },
+        };
+
+        var defaultPayload = SharpPackSerializer.Serialize(value);
+        var contextPayload = SharpPackSerializer.Serialize(value, context);
+
+        contextPayload.Should().NotEqual(defaultPayload);
+        SharpPackSerializer.Deserialize<ContextMutualA>(
+            contextPayload,
+            context)!.B!.Value.Should().Be(42);
+    }
+
+    [Fact]
     public void PrimitiveRegistration_PropagatesThroughBulkCollectionFastPaths()
     {
         var context = new SharpPackSerializerContextBuilder()
@@ -257,6 +427,82 @@ public class SharpPackSerializerContextTest
         SharpPackSerializer.Deserialize<ContextIntArrayContainer>(
             generatedPayload,
             context)!.Values.Should().Equal(values);
+    }
+
+    [Fact]
+    public void ListFormatter_IsSelectedAndCachedWhenContextIsBuilt()
+    {
+        var emptyContext = new SharpPackSerializerContext();
+        var customContext = new SharpPackSerializerContextBuilder()
+            .Register(new IntOffsetFormatter(100))
+            .Build();
+
+        emptyContext.GetFormatter<List<int>>().GetType().Name
+            .Should().Be("DangerousUnmanagedListFormatter`1");
+
+        var first = customContext.GetFormatter<List<int>>();
+        var second = customContext.GetFormatter<List<int>>();
+
+        first.GetType().Name.Should().Be("ContextListFormatter`1");
+        second.Should().BeSameAs(first);
+    }
+
+    [Fact]
+    public void ArrayFormatter_IsSelectedAndCachedWhenContextIsBuilt()
+    {
+        var emptyContext = new SharpPackSerializerContext();
+        var unrelatedContext = new SharpPackSerializerContextBuilder()
+            .Register(new PrefixStringFormatter())
+            .Build();
+        var customContext = new SharpPackSerializerContextBuilder()
+            .Register(new IntOffsetFormatter(100))
+            .Build();
+
+        emptyContext.GetFormatter<int[]>().GetType().Name
+            .Should().Be("UnmanagedArrayFormatter`1");
+        unrelatedContext.GetFormatter<int[]>().GetType().Name
+            .Should().Be("DangerousUnmanagedArrayFormatter`1");
+
+        var first = customContext.GetFormatter<int[]>();
+        var second = customContext.GetFormatter<int[]>();
+
+        first.GetType().Name.Should().Be("ContextArrayFormatter`1");
+        second.Should().BeSameAs(first);
+    }
+
+    [Fact]
+    public void AbstractConditionalElement_UsesRegisteredFormatterInArray()
+    {
+        var context = new SharpPackSerializerContextBuilder()
+            .Register(new AbstractConditionalNodeFormatter())
+            .Build();
+        AbstractConditionalNode[] value =
+        [
+            new ConcreteConditionalNode { Value = 42 },
+        ];
+
+        var payload = SharpPackSerializer.Serialize(value, context);
+        var decoded = SharpPackSerializer.Deserialize<
+            AbstractConditionalNode[]>(payload, context);
+
+        decoded.Should().ContainSingle()
+            .Which.Value.Should().Be(42);
+    }
+
+    [Fact]
+    public void ExplicitArrayFormatter_ComposesWithElementOverride()
+    {
+        var context = new SharpPackSerializerContextBuilder()
+            .Register(new Formatters.UnmanagedArrayFormatter<int>())
+            .Register(new IntOffsetFormatter(100))
+            .Build();
+        int[] value = [1, 200, 30_000];
+
+        var payload = SharpPackSerializer.Serialize(value, context);
+
+        payload.Should().NotEqual(SharpPackSerializer.Serialize(value));
+        SharpPackSerializer.Deserialize<int[]>(payload, context)
+            .Should().Equal(value);
     }
 
     [Fact]
@@ -676,6 +922,13 @@ public partial struct ContextUnmanagedStruct
     public long Timestamp { get; set; }
 }
 
+[SharpPackable]
+public partial class ContextUnmanagedStructContainer
+{
+    public ContextUnmanagedStruct Value { get; set; }
+    public List<ContextUnmanagedStruct>? Values { get; set; }
+}
+
 public sealed class IntSequenceSegment : ReadOnlySequenceSegment<int>
 {
     public IntSequenceSegment(ReadOnlyMemory<int> memory)
@@ -730,6 +983,19 @@ public partial class ContextRecursiveNode
 {
     public int Value { get; set; }
     public ContextRecursiveNode? Next { get; set; }
+}
+
+[SharpPackable]
+public partial class ContextMutualA
+{
+    public ContextMutualB? B { get; set; }
+}
+
+[SharpPackable]
+public partial class ContextMutualB
+{
+    public ContextMutualA? A { get; set; }
+    public int Value { get; set; }
 }
 
 [SharpPackable]
@@ -1013,5 +1279,228 @@ public sealed class Impl1OffsetFormatter(int offset) : SharpPackFormatter<Impl1>
             MyProperty = property - offset,
             Foo = foo - offset,
         };
+    }
+}
+
+public sealed class RecursiveContextFactoryModel :
+    ISharpPackFormatterFactory<RecursiveContextFactoryModel>,
+    ISharpPackContextFormatterFactory<RecursiveContextFactoryModel>
+{
+    public static int DefaultFactoryCalls;
+
+    static SharpPackFormatter<RecursiveContextFactoryModel>
+        ISharpPackFormatterFactory<RecursiveContextFactoryModel>.CreateFormatter()
+    {
+        DefaultFactoryCalls++;
+        return new RecursiveContextFactoryFormatter();
+    }
+
+    static SharpPackFormatter<RecursiveContextFactoryModel>
+        ISharpPackContextFormatterFactory<RecursiveContextFactoryModel>.CreateFormatter(
+            SharpPackSerializerContext context)
+    {
+        _ = context.GetFormatter<RecursiveContextFactoryModel>();
+        return new RecursiveContextFactoryFormatter();
+    }
+}
+
+public sealed class RecursiveContextFactoryFormatter
+    : SharpPackFormatter<RecursiveContextFactoryModel>
+{
+    public override void Serialize<TBufferWriter>(
+        ref SharpPackWriter<TBufferWriter> writer,
+        scoped ref RecursiveContextFactoryModel? value)
+        => writer.WriteObjectHeader(0);
+
+    public override void Deserialize(
+        ref SharpPackReader reader,
+        scoped ref RecursiveContextFactoryModel? value)
+    {
+        _ = reader.TryReadObjectHeader(out _);
+        value = new RecursiveContextFactoryModel();
+    }
+}
+
+[SharpPackable]
+public partial class FactoryNameCollisionModel
+{
+    public int[]? Values { get; set; }
+
+    public static SharpPackFormatter<FactoryNameCollisionModel> CreateFormatter()
+        => new FactoryNameCollisionFormatter();
+
+    public static SharpPackFormatter<FactoryNameCollisionModel> CreateFormatter(
+        SharpPackSerializerContext context)
+        => new FactoryNameCollisionFormatter();
+}
+
+public sealed class FactoryNameCollisionFormatter
+    : SharpPackFormatter<FactoryNameCollisionModel>
+{
+    public override void Serialize<TBufferWriter>(
+        ref SharpPackWriter<TBufferWriter> writer,
+        scoped ref FactoryNameCollisionModel? value)
+        => throw new InvalidOperationException(
+            "The user factory must not replace the generated factory.");
+
+    public override void Deserialize(
+        ref SharpPackReader reader,
+        scoped ref FactoryNameCollisionModel? value)
+        => throw new InvalidOperationException(
+            "The user factory must not replace the generated factory.");
+}
+
+[SharpPackable]
+public partial class FactoryReturnTypeCollisionModel :
+    ISharpPackFormatterFactory<int>,
+    ISharpPackContextFormatterFactory<int>
+{
+    public int Value { get; set; }
+
+    static SharpPackFormatter<int>
+        ISharpPackFormatterFactory<int>.CreateFormatter()
+        => new IntOffsetFormatter(1_000);
+
+    static SharpPackFormatter<int>
+        ISharpPackContextFormatterFactory<int>.CreateFormatter(
+            SharpPackSerializerContext context)
+        => new IntOffsetFormatter(1_000);
+}
+
+public interface IExplicitFactoryCollision<T>
+{
+    static abstract SharpPackFormatter<T> CreateFormatter();
+
+    static abstract SharpPackFormatter<T> CreateFormatter(
+        SharpPackSerializerContext context);
+}
+
+[SharpPackable]
+public partial class ExplicitFactoryCollisionModel :
+    IExplicitFactoryCollision<ExplicitFactoryCollisionModel>
+{
+    public int Value { get; set; }
+
+    static SharpPackFormatter<ExplicitFactoryCollisionModel>
+        IExplicitFactoryCollision<ExplicitFactoryCollisionModel>.CreateFormatter()
+        => new ThrowingExplicitFactoryCollisionFormatter();
+
+    static SharpPackFormatter<ExplicitFactoryCollisionModel>
+        IExplicitFactoryCollision<ExplicitFactoryCollisionModel>.CreateFormatter(
+            SharpPackSerializerContext context)
+        => new ThrowingExplicitFactoryCollisionFormatter();
+}
+
+public sealed class ThrowingExplicitFactoryCollisionFormatter
+    : SharpPackFormatter<ExplicitFactoryCollisionModel>
+{
+    public override void Serialize<TBufferWriter>(
+        ref SharpPackWriter<TBufferWriter> writer,
+        scoped ref ExplicitFactoryCollisionModel? value)
+        => throw new InvalidOperationException(
+            "An unrelated explicit factory must not replace the generated factory.");
+
+    public override void Deserialize(
+        ref SharpPackReader reader,
+        scoped ref ExplicitFactoryCollisionModel? value)
+        => throw new InvalidOperationException(
+            "An unrelated explicit factory must not replace the generated factory.");
+}
+
+public sealed class HandwrittenFactoryModel :
+    ISharpPackFormatterFactory<HandwrittenFactoryModel>,
+    ISharpPackContextFormatterFactory<HandwrittenFactoryModel>
+{
+    public int Value { get; set; }
+
+    static SharpPackFormatter<HandwrittenFactoryModel>
+        ISharpPackFormatterFactory<HandwrittenFactoryModel>.CreateFormatter()
+        => new HandwrittenFactoryFormatter();
+
+    static SharpPackFormatter<HandwrittenFactoryModel>
+        ISharpPackContextFormatterFactory<HandwrittenFactoryModel>.CreateFormatter(
+            SharpPackSerializerContext context)
+        => new HandwrittenFactoryFormatter();
+}
+
+public sealed class HandwrittenFactoryFormatter
+    : SharpPackFormatter<HandwrittenFactoryModel>
+{
+    public override void Serialize<TBufferWriter>(
+        ref SharpPackWriter<TBufferWriter> writer,
+        scoped ref HandwrittenFactoryModel? value)
+    {
+        if (value is null)
+        {
+            writer.WriteNullObjectHeader();
+            return;
+        }
+
+        writer.WriteObjectHeader(1);
+        writer.WriteUnmanaged(value.Value);
+    }
+
+    public override void Deserialize(
+        ref SharpPackReader reader,
+        scoped ref HandwrittenFactoryModel? value)
+    {
+        if (!reader.TryReadObjectHeader(out _))
+        {
+            value = null;
+            return;
+        }
+
+        reader.ReadUnmanaged(out int decoded);
+        value = new HandwrittenFactoryModel { Value = decoded };
+    }
+}
+
+public abstract class AbstractConditionalNode
+    : ISharpPackConditionalFormatterAware
+{
+    public int Value { get; set; }
+
+    bool ISharpPackConditionalFormatterAware
+        .RequiresFormatterAwareSerialization => true;
+}
+
+public sealed class ConcreteConditionalNode : AbstractConditionalNode;
+
+public sealed class AbstractConditionalNodeFormatter
+    : SharpPackFormatter<AbstractConditionalNode>
+{
+    public override void Serialize<TBufferWriter>(
+        ref SharpPackWriter<TBufferWriter> writer,
+        scoped ref AbstractConditionalNode? value)
+    {
+        if (value is null)
+        {
+            writer.WriteNullObjectHeader();
+            return;
+        }
+
+        writer.WriteObjectHeader(1);
+        writer.WriteUnmanaged(value.Value);
+    }
+
+    public override void Deserialize(
+        ref SharpPackReader reader,
+        scoped ref AbstractConditionalNode? value)
+    {
+        if (!reader.TryReadObjectHeader(out var count))
+        {
+            value = null;
+            return;
+        }
+        if (count != 1)
+        {
+            SharpPackSerializationException.ThrowInvalidPropertyCount(
+                typeof(AbstractConditionalNode),
+                1,
+                count);
+        }
+
+        reader.ReadUnmanaged(out int decoded);
+        value = new ConcreteConditionalNode { Value = decoded };
     }
 }

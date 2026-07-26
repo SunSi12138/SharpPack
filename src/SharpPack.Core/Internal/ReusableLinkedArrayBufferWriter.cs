@@ -79,9 +79,7 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
             ? AllocateUninitializedArray<byte>(firstBufferSize, pinned)
             : noUseFirstBufferSentinel;
         this.firstBufferWritten = 0;
-        this.initialBufferSize = useFirstBuffer
-            ? Math.Min(firstBufferSize, DefaultInitialBufferSize)
-            : DefaultInitialBufferSize;
+        this.initialBufferSize = DefaultInitialBufferSize;
         this.current = default;
         this.nextBufferSize = initialBufferSize;
         this.totalWritten = 0;

@@ -6,6 +6,7 @@ using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Collections.Frozen;
+using System.Runtime.CompilerServices;
 
 namespace SharpPack;
 
@@ -18,6 +19,7 @@ internal static partial class FormatterResolver
     internal static object? CreateGenericFormatter(
         Type type,
         bool typeIsReferenceOrContainsReferences,
+        bool isUnmanagedRawCopyDisabled,
         bool preferKnownGenericFormatter)
     {
         Type? formatterType = null;
@@ -26,7 +28,8 @@ internal static partial class FormatterResolver
         {
             if (type.IsSZArray)
             {
-                if (!typeIsReferenceOrContainsReferences)
+                if (!typeIsReferenceOrContainsReferences &&
+                    !isUnmanagedRawCopyDisabled)
                 {
                     formatterType = typeof(DangerousUnmanagedArrayFormatter<>).MakeGenericType(type.GetElementType()!);
                     goto CREATE;
@@ -57,6 +60,20 @@ internal static partial class FormatterResolver
             }
         }
 
+        if (type.IsGenericType &&
+            type.GetGenericTypeDefinition() == typeof(List<>) &&
+            RuntimeFeature.IsDynamicCodeSupported)
+        {
+            var elementType = type.GetGenericArguments()[0];
+            if (!TypeHelpers.IsReferenceOrContainsReferences(elementType) &&
+                !TypeHelpers.IsUnmanagedRawCopyDisabled(elementType))
+            {
+                formatterType = typeof(DangerousUnmanagedListFormatter<>)
+                    .MakeGenericType(elementType);
+                goto CREATE;
+            }
+        }
+
         if (preferKnownGenericFormatter &&
             TryCreateKnownGenericFormatterType(type) is { } knownFormatterType)
         {
@@ -64,7 +81,9 @@ internal static partial class FormatterResolver
             goto CREATE;
         }
 
-        if (type.IsEnum || !typeIsReferenceOrContainsReferences)
+        if (type.IsEnum ||
+            (!typeIsReferenceOrContainsReferences &&
+             !isUnmanagedRawCopyDisabled))
         {
             formatterType = typeof(DangerousUnmanagedFormatter<>).MakeGenericType(type);
             goto CREATE;

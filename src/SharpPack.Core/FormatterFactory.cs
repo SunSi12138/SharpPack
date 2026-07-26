@@ -183,7 +183,10 @@ internal static class FormatterResolver<T>
 
             if (FormatterResolver.CreateWellKnownFormatter(type) is { } wellKnown)
             {
-                return (SharpPackFormatter<T>)wellKnown;
+                var formatter = (SharpPackFormatter<T>)wellKnown;
+                return context is null
+                    ? formatter
+                    : formatter.BindContext(context.Graph);
             }
 
             if (typeof(ISharpPackable<>).MakeGenericType(type).IsAssignableFrom(type))
@@ -196,9 +199,13 @@ internal static class FormatterResolver<T>
             if (FormatterResolver.CreateGenericFormatter(
                     type,
                     containsReferences,
+                    TypeHelpers.IsUnmanagedRawCopyDisabled(type),
                     preferKnownGenericFormatter: context is not null) is { } generic)
             {
-                return (SharpPackFormatter<T>)generic;
+                var formatter = (SharpPackFormatter<T>)generic;
+                return context is null
+                    ? formatter
+                    : formatter.BindContext(context.Graph);
             }
 
             return new ErrorSharpPackFormatter<T>();
@@ -223,16 +230,40 @@ internal static class FormatterResolver<T>
     static MethodInfo? FindFactoryMethod(
         Type type,
         Type? parameterType)
-        => type
-            .GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
-            .FirstOrDefault(method =>
+    {
+        var factoryInterface = parameterType is null
+            ? typeof(ISharpPackFormatterFactory<T>)
+            : typeof(ISharpPackContextFormatterFactory<T>);
+        var genericDefinition = factoryInterface.GetGenericTypeDefinition();
+        var metadataName = genericDefinition.Name;
+        var aritySeparator = metadataName.IndexOf('`');
+        var interfaceName = aritySeparator < 0
+            ? metadataName
+            : metadataName[..aritySeparator];
+        var explicitNamePrefix =
+            $"{genericDefinition.Namespace}.{interfaceName}<";
+        var candidates = type.GetMethods(
+                BindingFlags.Static | BindingFlags.Public |
+                BindingFlags.NonPublic)
+            .Where(method =>
+                method.ReturnType == typeof(SharpPackFormatter<T>) &&
                 (parameterType is null
                     ? method.GetParameters().Length == 0
-                    : method.GetParameters() is [{ ParameterType: var actual }] &&
-                      actual == parameterType) &&
-                (method.Name == "CreateFormatter" ||
-                 method.Name.EndsWith(".CreateFormatter", StringComparison.Ordinal)) &&
-                method.ReturnType.IsGenericType &&
-                method.ReturnType.GetGenericTypeDefinition() ==
-                    typeof(SharpPackFormatter<>));
+                    : method.GetParameters() is
+                        [{ ParameterType: var actual }] &&
+                      actual == parameterType));
+
+        return candidates.FirstOrDefault(method =>
+                    (method.Name.StartsWith(
+                         explicitNamePrefix,
+                         StringComparison.Ordinal) ||
+                     method.Name.StartsWith(
+                         $"global::{explicitNamePrefix}",
+                         StringComparison.Ordinal)) &&
+                    method.Name.EndsWith(
+                        ".CreateFormatter",
+                        StringComparison.Ordinal))
+               ?? candidates.FirstOrDefault(static method =>
+                   method.IsPublic && method.Name == "CreateFormatter");
+    }
 }
