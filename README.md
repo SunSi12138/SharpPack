@@ -155,12 +155,14 @@ example is available in
 
 See [SharpPack versus MemoryPack benchmarks](docs/benchmarks.md) for the
 reproducible NuGet-only comparison and current latency, throughput and
-allocation results. For a generated unmanaged value, SharpPack 1.1.0 matches
-MemoryPack 1.21.4 for `byte[]` serialization and round-trip latency, while its
-pre-sized `IBufferWriter<byte>` path is about 6% faster in the published ARM64
-run. Managed allocations are identical, including zero serializer allocation
-on that writer path. The document also retains the broader SharpPack 1.0.3
-object-graph results for comparison.
+allocation results. SharpPack 1.1.0 matches MemoryPack 1.21.4 for unmanaged
+`byte[]` serialization and is about 9% faster on the pre-sized unmanaged
+`IBufferWriter<byte>` path in the published ARM64 run. On the generated object
+graph, deserialization is about 2% faster, while `byte[]` serialization ranges
+from 1% to 7% slower and the 1024-item writer path is 3% slower. Managed
+allocations are identical, including zero serializer allocation on pre-sized
+writer paths. Separate unpinned 8/80/256 KB measurements found all three buffer
+sizes equivalent within 3%, supporting the 8 KB default.
 
 Built-in supported types
 ---
