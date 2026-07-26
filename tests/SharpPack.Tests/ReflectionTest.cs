@@ -16,7 +16,9 @@ public class ReflectionTest
 
         var m = type
             .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
-            .Single(method => method.Name.EndsWith(".CreateFormatter", StringComparison.Ordinal));
+            .Single(method =>
+                method.Name.EndsWith(".CreateFormatter", StringComparison.Ordinal) &&
+                method.GetParameters().Length == 0);
         m.Should().NotBeNull();
         m.Invoke(null, null).Should().BeAssignableTo<SharpPackFormatter<ReflecCheck>>();
 

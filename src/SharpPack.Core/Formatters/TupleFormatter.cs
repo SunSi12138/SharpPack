@@ -34,7 +34,6 @@ public sealed class TupleFormatter<T1> : SharpPackFormatter<Tuple<T1?>>
         );
     }
 }
-
 [Preserve]
 public sealed class TupleFormatter<T1, T2> : SharpPackFormatter<Tuple<T1?, T2?>>
 {
@@ -334,6 +333,7 @@ public sealed class ValueTupleFormatter<T1> : SharpPackFormatter<ValueTuple<T1?>
     public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ValueTuple<T1?> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<ValueTuple<T1?>>() &&
             !writer.OptionalState.HasFormatterOverride<T1>())
         {
             writer.DangerousWriteUnmanaged(value);
@@ -347,6 +347,7 @@ public sealed class ValueTupleFormatter<T1> : SharpPackFormatter<ValueTuple<T1?>
     public override void Deserialize(ref SharpPackReader reader, scoped ref ValueTuple<T1?> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<ValueTuple<T1?>>() &&
             !reader.OptionalState.HasFormatterOverride<T1>())
         {
             reader.DangerousReadUnmanaged(out value);
@@ -370,6 +371,7 @@ public sealed class ValueTupleFormatter<T1, T2> : SharpPackFormatter<ValueTuple<
     public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ValueTuple<T1?, T2?> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<ValueTuple<T1?, T2?>>() &&
             !(writer.OptionalState.HasFormatterOverride<T1>() ||
               writer.OptionalState.HasFormatterOverride<T2>()))
         {
@@ -385,6 +387,7 @@ public sealed class ValueTupleFormatter<T1, T2> : SharpPackFormatter<ValueTuple<
     public override void Deserialize(ref SharpPackReader reader, scoped ref ValueTuple<T1?, T2?> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<ValueTuple<T1?, T2?>>() &&
             !(reader.OptionalState.HasFormatterOverride<T1>() ||
               reader.OptionalState.HasFormatterOverride<T2>()))
         {
@@ -411,6 +414,7 @@ public sealed class ValueTupleFormatter<T1, T2, T3> : SharpPackFormatter<ValueTu
     public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ValueTuple<T1?, T2?, T3?> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<ValueTuple<T1?, T2?, T3?>>() &&
             !(writer.OptionalState.HasFormatterOverride<T1>() ||
               writer.OptionalState.HasFormatterOverride<T2>() ||
               writer.OptionalState.HasFormatterOverride<T3>()))
@@ -428,6 +432,7 @@ public sealed class ValueTupleFormatter<T1, T2, T3> : SharpPackFormatter<ValueTu
     public override void Deserialize(ref SharpPackReader reader, scoped ref ValueTuple<T1?, T2?, T3?> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<ValueTuple<T1?, T2?, T3?>>() &&
             !(reader.OptionalState.HasFormatterOverride<T1>() ||
               reader.OptionalState.HasFormatterOverride<T2>() ||
               reader.OptionalState.HasFormatterOverride<T3>()))
@@ -457,6 +462,7 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4> : SharpPackFormatter<Val
     public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ValueTuple<T1?, T2?, T3?, T4?> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?, T4?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<ValueTuple<T1?, T2?, T3?, T4?>>() &&
             !(writer.OptionalState.HasFormatterOverride<T1>() ||
               writer.OptionalState.HasFormatterOverride<T2>() ||
               writer.OptionalState.HasFormatterOverride<T3>() ||
@@ -476,6 +482,7 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4> : SharpPackFormatter<Val
     public override void Deserialize(ref SharpPackReader reader, scoped ref ValueTuple<T1?, T2?, T3?, T4?> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?, T4?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<ValueTuple<T1?, T2?, T3?, T4?>>() &&
             !(reader.OptionalState.HasFormatterOverride<T1>() ||
               reader.OptionalState.HasFormatterOverride<T2>() ||
               reader.OptionalState.HasFormatterOverride<T3>() ||
@@ -508,6 +515,7 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5> : SharpPackFormatter
     public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ValueTuple<T1?, T2?, T3?, T4?, T5?> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?, T4?, T5?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<ValueTuple<T1?, T2?, T3?, T4?, T5?>>() &&
             !(writer.OptionalState.HasFormatterOverride<T1>() ||
               writer.OptionalState.HasFormatterOverride<T2>() ||
               writer.OptionalState.HasFormatterOverride<T3>() ||
@@ -529,6 +537,7 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5> : SharpPackFormatter
     public override void Deserialize(ref SharpPackReader reader, scoped ref ValueTuple<T1?, T2?, T3?, T4?, T5?> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?, T4?, T5?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<ValueTuple<T1?, T2?, T3?, T4?, T5?>>() &&
             !(reader.OptionalState.HasFormatterOverride<T1>() ||
               reader.OptionalState.HasFormatterOverride<T2>() ||
               reader.OptionalState.HasFormatterOverride<T3>() ||
@@ -564,6 +573,7 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5, T6> : SharpPackForma
     public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?>>() &&
             !(writer.OptionalState.HasFormatterOverride<T1>() ||
               writer.OptionalState.HasFormatterOverride<T2>() ||
               writer.OptionalState.HasFormatterOverride<T3>() ||
@@ -587,6 +597,7 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5, T6> : SharpPackForma
     public override void Deserialize(ref SharpPackReader reader, scoped ref ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?>>() &&
             !(reader.OptionalState.HasFormatterOverride<T1>() ||
               reader.OptionalState.HasFormatterOverride<T2>() ||
               reader.OptionalState.HasFormatterOverride<T3>() ||
@@ -625,6 +636,7 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5, T6, T7> : SharpPackF
     public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?>>() &&
             !(writer.OptionalState.HasFormatterOverride<T1>() ||
               writer.OptionalState.HasFormatterOverride<T2>() ||
               writer.OptionalState.HasFormatterOverride<T3>() ||
@@ -650,6 +662,7 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5, T6, T7> : SharpPackF
     public override void Deserialize(ref SharpPackReader reader, scoped ref ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?>>() &&
             !(reader.OptionalState.HasFormatterOverride<T1>() ||
               reader.OptionalState.HasFormatterOverride<T2>() ||
               reader.OptionalState.HasFormatterOverride<T3>() ||
@@ -692,6 +705,7 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5, T6, T7, TRest> : Sha
     public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?, TRest> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?, TRest>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?, TRest>>() &&
             !(writer.OptionalState.HasFormatterOverride<T1>() ||
               writer.OptionalState.HasFormatterOverride<T2>() ||
               writer.OptionalState.HasFormatterOverride<T3>() ||
@@ -719,6 +733,7 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5, T6, T7, TRest> : Sha
     public override void Deserialize(ref SharpPackReader reader, scoped ref ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?, TRest> value)
     {
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?, TRest>>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?, TRest>>() &&
             !(reader.OptionalState.HasFormatterOverride<T1>() ||
               reader.OptionalState.HasFormatterOverride<T2>() ||
               reader.OptionalState.HasFormatterOverride<T3>() ||

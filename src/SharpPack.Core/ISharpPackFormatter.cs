@@ -16,6 +16,9 @@ public interface ISharpPackFormatter<T>
 [Preserve]
 public abstract class SharpPackFormatter<T> : ISharpPackFormatter<T>
 {
+    internal virtual SharpPackFormatter<T> BindContext(FormatterGraph graph)
+        => this;
+
     internal virtual bool HasFormatterOverrideDependency(FormatterGraph graph)
         => false;
 

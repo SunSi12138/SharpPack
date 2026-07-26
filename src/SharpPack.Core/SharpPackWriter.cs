@@ -1,8 +1,10 @@
 using System.Buffers;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Unicode;
+using SharpPack.Internal;
 
 namespace SharpPack;
 
@@ -357,6 +359,52 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         AdvanceWithinSpan(CheckedAdd(bytesWritten, 8)); // + header
     }
 
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void WriteUtf8Exact(string? value, int utf8ByteCount)
+    {
+        if (utf8ByteCount < 0)
+        {
+            SharpPackSerializationException.ThrowInvalidLength(
+                utf8ByteCount);
+        }
+        if (value == null)
+        {
+            WriteNullCollectionHeader();
+            return;
+        }
+        if (value.Length == 0)
+        {
+            WriteCollectionHeader(0);
+            return;
+        }
+
+        var requiredLength = CheckedAdd(utf8ByteCount, 8);
+        ref var destPointer = ref GetSpanReference(requiredLength);
+        Unsafe.WriteUnaligned(
+            ref Unsafe.Add(ref destPointer, 4),
+            value.Length);
+        var dest = MemoryMarshal.CreateSpan(
+            ref Unsafe.Add(ref destPointer, 8),
+            utf8ByteCount);
+        var status = Utf8.FromUtf16(
+            value,
+            dest,
+            out var charsRead,
+            out var bytesWritten,
+            replaceInvalidSequences: false);
+        if (status != OperationStatus.Done)
+        {
+            SharpPackSerializationException.ThrowFailedEncoding(status);
+        }
+        if (charsRead != value.Length || bytesWritten != utf8ByteCount)
+        {
+            SharpPackSerializationException.ThrowInvalidEncodingLength();
+        }
+        Unsafe.WriteUnaligned(ref destPointer, ~bytesWritten);
+        AdvanceWithinSpan(requiredLength);
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteUtf8(ReadOnlySpan<byte> utf8Value, int utf16Length = -1)
     {
@@ -439,6 +487,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
     public void WriteArray<T>(T?[]? value)
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !HasFormatterOverride<T>())
         {
             DangerousWriteUnmanagedArray(value);
@@ -463,6 +512,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
     public void WriteSpan<T>(scoped Span<T?> value)
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !HasFormatterOverride<T>())
         {
             DangerousWriteUnmanagedSpan(value);
@@ -481,6 +531,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
     public void WriteSpan<T>(scoped ReadOnlySpan<T?> value)
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !HasFormatterOverride<T>())
         {
             DangerousWriteUnmanagedSpan(value);
@@ -506,7 +557,8 @@ public ref partial struct SharpPackWriter<TBufferWriter>
             return;
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
         {
             DangerousWriteUnmanagedArray(value);
             return;
@@ -535,7 +587,8 @@ public ref partial struct SharpPackWriter<TBufferWriter>
             return;
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
         {
             DangerousWriteUnmanagedSpan(value);
             return;
@@ -558,7 +611,8 @@ public ref partial struct SharpPackWriter<TBufferWriter>
             return;
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
         {
             DangerousWriteUnmanagedSpan(value);
             return;
@@ -673,6 +727,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         if (value.Length == 0) return;
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !HasFormatterOverride<T>())
         {
             var srcLength = GetUnmanagedByteCount<T>(value.Length);

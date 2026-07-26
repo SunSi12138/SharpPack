@@ -10,6 +10,8 @@ internal sealed class FormatterGraph
 {
     bool registrationsFrozen;
     bool hasRegistrations;
+    readonly Lock formatterCreationLock = new();
+    readonly HashSet<Type> creatingFormatterTypes = [];
 
     internal FormatterGraph(SharpPackSerializerContext owner)
     {
@@ -32,14 +34,67 @@ internal sealed class FormatterGraph
     }
 
     internal SharpPackFormatter<T> GetFormatter<T>()
-        => ContextFormatterSlot<T>.Get(this);
+    {
+        if (ContextFormatterSlot<T>.TryGet(this, out var formatter))
+        {
+            return formatter;
+        }
+
+        lock (formatterCreationLock)
+        {
+            return GetFormatterLocked<T>();
+        }
+    }
+
+    SharpPackFormatter<T> GetFormatterLocked<T>()
+    {
+        if (ContextFormatterSlot<T>.TryGet(this, out var formatter))
+        {
+            return formatter;
+        }
+
+        var type = typeof(T);
+        if (!creatingFormatterTypes.Add(type))
+        {
+            throw new SharpPackSerializationException(
+                $"Recursive formatter construction was detected for {type.FullName}.");
+        }
+
+        try
+        {
+            return ContextFormatterSlot<T>.Get(this);
+        }
+        finally
+        {
+            creatingFormatterTypes.Remove(type);
+        }
+    }
 
     internal bool HasExplicitRegistration<T>()
         => ContextFormatterSlot<T>.HasExplicitRegistration(this);
 
     internal bool HasFormatterOverride<T>()
-        => HasExplicitRegistration<T>() ||
-           GetFormatter<T>().HasFormatterOverrideDependency(this);
+    {
+        if (HasExplicitRegistration<T>())
+        {
+            return true;
+        }
+
+        lock (formatterCreationLock)
+        {
+            // A recursive formatter dependency is selected conservatively.
+            // The context-only formatter pays the override-aware path while
+            // the default formatter remains branch-free.
+            if (creatingFormatterTypes.Contains(typeof(T)))
+            {
+                return true;
+            }
+
+            var formatter = GetFormatterLocked<T>();
+            return formatter is ISharpPackContextOverrideFormatter ||
+                   formatter.HasFormatterOverrideDependency(this);
+        }
+    }
 
     internal void FreezeRegistrations()
         => registrationsFrozen = true;

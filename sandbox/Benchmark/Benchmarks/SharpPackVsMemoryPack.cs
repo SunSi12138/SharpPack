@@ -61,6 +61,17 @@ public class SharpPackVsMemoryPackBufferWriterBenchmark
 
 public abstract class SharpPackVsMemoryPackBenchmarkBase
 {
+    static SharpPackVsMemoryPackBenchmarkBase()
+    {
+        if (Environment.GetEnvironmentVariable(
+                "SHARPPACK_BENCHMARK_HIGH_THROUGHPUT") == "1")
+        {
+            global::SharpPack.SharpPackSerializer.ConfigureRuntime(
+                global::SharpPack.SharpPackSerializerRuntimeOptions
+                    .HighThroughput);
+        }
+    }
+
     [Params(0, 16, 1024)]
     public int ItemCount { get; set; }
 

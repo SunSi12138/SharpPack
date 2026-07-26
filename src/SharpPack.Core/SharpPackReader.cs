@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Unicode;
+using SharpPack.Internal;
 
 namespace SharpPack;
 
@@ -645,6 +646,7 @@ public ref partial struct SharpPackReader
     public void ReadArray<T>(scoped ref T?[]? value)
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !HasFormatterOverride<T>())
         {
             DangerousReadUnmanagedArray(ref value);
@@ -680,6 +682,7 @@ public ref partial struct SharpPackReader
     public void ReadSpan<T>(scoped ref Span<T?> value)
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !HasFormatterOverride<T>())
         {
             DangerousReadUnmanagedSpan(ref value);
@@ -729,7 +732,8 @@ public ref partial struct SharpPackReader
             return;
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
         {
             DangerousReadUnmanagedArray(ref value);
             return;
@@ -769,7 +773,8 @@ public ref partial struct SharpPackReader
             return;
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
         {
             DangerousReadUnmanagedSpan(ref value);
             return;
@@ -914,6 +919,7 @@ public ref partial struct SharpPackReader
         }
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !HasFormatterOverride<T>())
         {
             if (value.Length != length)
@@ -944,6 +950,45 @@ public ref partial struct SharpPackReader
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal int GetValidatedUnmanagedByteCount<T>(int length)
+    {
+        var byteCount = GetUnmanagedByteCount<T>(length);
+        if (Remaining < byteCount)
+        {
+            SharpPackSerializationException.ThrowInvalidRange(
+                byteCount,
+                Remaining > int.MaxValue
+                    ? int.MaxValue
+                    : (int)Remaining);
+        }
+        return byteCount;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void DangerousReadUnmanagedSpanWithoutReadLengthHeader<T>(
+        int length,
+        int byteCount,
+        scoped ref Span<T> value)
+    {
+        if (length == 0)
+        {
+            value = Array.Empty<T>();
+            return;
+        }
+
+        if (value.Length != length)
+        {
+            value = AllocateUninitializedArray<T>(length);
+        }
+
+        ref var src = ref GetSpanReference(byteCount);
+        ref var dest = ref Unsafe.As<T, byte>(
+            ref MemoryMarshal.GetReference(value));
+        Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);
+        AdvanceWithinSpan(byteCount);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ReadPackableSpanWithoutReadLengthHeader<T>(int length, scoped ref Span<T?> value)
         where T : ISharpPackable<T>
     {
@@ -960,7 +1005,8 @@ public ref partial struct SharpPackReader
             return;
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
         {
             if (value.Length != length)
             {

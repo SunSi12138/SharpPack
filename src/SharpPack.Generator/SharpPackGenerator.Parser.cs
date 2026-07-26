@@ -26,6 +26,7 @@ public enum MemberKind
     UnmanagedArray,
     SharpPackableArray, // T[] where T: ISharpPackable<T>
     SharpPackableList, // List<T> where T: ISharpPackable<T>
+    SharpPackableUnmanagedList, // closed raw-safe unmanaged ISharpPackable<T>
     SharpPackableCollection, // GenerateType.Collection
     SharpPackableNoGenerate, // GenerateType.NoGenerate
     SharpPackableUnion,
@@ -613,6 +614,7 @@ partial class MemberMeta
     public bool IsProperty { get; }
     public bool IsSettable { get; }
     public bool IsAssignable { get; }
+    public bool HasExactSizeSafeAccessor { get; }
     public bool IsConstructorParameter { get; }
     public string? ConstructorParameterName { get; }
     public int Order { get; }
@@ -659,6 +661,7 @@ partial class MemberMeta
 
         if (symbol is IFieldSymbol f)
         {
+            HasExactSizeSafeAccessor = true;
             IsProperty = false;
             IsField = true;
             IsSettable = !f.IsReadOnly; // readonly field can not set.
@@ -671,6 +674,20 @@ partial class MemberMeta
         }
         else if (symbol is IPropertySymbol p)
         {
+            HasExactSizeSafeAccessor =
+                !p.IsVirtual &&
+                !p.IsOverride &&
+                !p.IsAbstract &&
+                p.DeclaringSyntaxReferences.Length != 0 &&
+                p.DeclaringSyntaxReferences
+                .Select(static reference => reference.GetSyntax())
+                .All(static syntax =>
+                    syntax is ParameterSyntax ||
+                    syntax is PropertyDeclarationSyntax
+                    { AccessorList: { } accessors } &&
+                    accessors.Accessors.All(static accessor =>
+                        accessor.Body is null &&
+                        accessor.ExpressionBody is null));
             IsProperty = true;
             IsField = false;
             IsSettable = !p.IsReadOnly;
@@ -743,6 +760,21 @@ partial class MemberMeta
         }
         else if (memberType.IsUnmanagedType)
         {
+            if (memberType.IsUnmanagedRawCopyDisabled(references))
+            {
+                if (memberType.TryGetSharpPackableType(
+                        references,
+                        out var nestedGenerateType,
+                        out _) &&
+                    nestedGenerateType is GenerateType.Object)
+                {
+                    return MemberKind.SharpPackable;
+                }
+
+                return references.KnownTypes.Contains(memberType)
+                    ? MemberKind.KnownType
+                    : MemberKind.Object;
+            }
             if (memberType is INamedTypeSymbol unmanagedNts)
             {
                 if (unmanagedNts.IsRefLikeType)
@@ -803,6 +835,22 @@ partial class MemberMeta
                     var elemType = array.ElementType;
                     if (elemType.IsUnmanagedType)
                     {
+                        if (elemType.IsUnmanagedRawCopyDisabled(
+                                references))
+                        {
+                            if (elemType.TryGetSharpPackableType(
+                                    references,
+                                    out var customElementGenerateType,
+                                    out _) &&
+                                customElementGenerateType is
+                                    GenerateType.Object)
+                            {
+                                return MemberKind.SharpPackableArray;
+                            }
+
+                            return MemberKind.Array;
+                        }
+
                         if (elemType is INamedTypeSymbol unmanagedNts && unmanagedNts.EqualsUnconstructedGenericType(references.KnownTypes.System_Nullable_T))
                         {
                             // T?[] can not use Write/ReadUnmanagedArray
@@ -857,6 +905,15 @@ partial class MemberMeta
                 {
                     if (nts.TypeArguments[0].TryGetSharpPackableType(references, out var elemGenerateType, out _) && elemGenerateType is GenerateType.Object or GenerateType.VersionTolerant or GenerateType.CircularReference)
                     {
+                        var elementType = nts.TypeArguments[0];
+                        if (elemGenerateType is GenerateType.Object &&
+                            elementType.IsUnmanagedType &&
+                            !elementType.ContainsTypeParameter() &&
+                            !elementType.IsUnmanagedRawCopyDisabled(references))
+                        {
+                            return MemberKind.SharpPackableUnmanagedList;
+                        }
+
                         return MemberKind.SharpPackableList;
                     }
                     return MemberKind.KnownType;
