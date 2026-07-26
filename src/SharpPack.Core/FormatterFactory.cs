@@ -199,7 +199,6 @@ internal static class FormatterResolver<T>
             if (FormatterResolver.CreateGenericFormatter(
                     type,
                     containsReferences,
-                    TypeHelpers.IsUnmanagedRawCopyDisabled(type),
                     preferKnownGenericFormatter: context is not null) is { } generic)
             {
                 var formatter = (SharpPackFormatter<T>)generic;

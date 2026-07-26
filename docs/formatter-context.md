@@ -16,6 +16,9 @@ generic slots live for the process lifetime.
 An explicit context is the lifetime boundary for plugin/RPC graphs. Nested
 arrays, collections, tuples, generated objects, unions and custom formatters
 receive the same context through `SharpPackWriter` and `SharpPackReader`.
+MemoryPack-compatible unmanaged structs remain raw-copy boundaries: an
+override for one of their member types does not enter the struct. Register a
+formatter for the whole unmanaged type when its representation must change.
 Collectible closed types and registered overrides remain context-owned. Empty
 or configuration-only contexts use the same type-only static slots for
 non-collectible types, avoiding an unnecessary graph lookup.

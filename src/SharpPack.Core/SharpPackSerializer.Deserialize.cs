@@ -56,20 +56,15 @@ public static partial class SharpPackSerializer
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(ReadOnlySpan<byte> buffer, ref T? value)
     {
-        if (!TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
+        if (buffer.Length < Unsafe.SizeOf<T>())
         {
-            if (buffer.Length < Unsafe.SizeOf<T>())
-            {
-                SharpPackSerializationException.ThrowInvalidRange(
-                    Unsafe.SizeOf<T>(),
-                    buffer.Length);
-            }
-            value = Unsafe.ReadUnaligned<T>(
-                ref MemoryMarshal.GetReference(buffer));
-            return Unsafe.SizeOf<T>();
+            SharpPackSerializationException.ThrowInvalidRange(
+                Unsafe.SizeOf<T>(),
+                buffer.Length);
         }
-
-        return DeserializeCustomFormatterUnmanaged(buffer, ref value);
+        value = Unsafe.ReadUnaligned<T>(
+            ref MemoryMarshal.GetReference(buffer));
+        return Unsafe.SizeOf<T>();
     }
 
     public static T? Deserialize<
@@ -113,11 +108,6 @@ public static partial class SharpPackSerializer
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(in ReadOnlySequence<byte> buffer, ref T? value)
     {
-        if (TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
-        {
-            return DeserializeCustomFormatterUnmanaged(buffer, ref value);
-        }
-
         int sizeOfT = Unsafe.SizeOf<T>();
         if (buffer.Length < sizeOfT)
         {
@@ -157,44 +147,6 @@ public static partial class SharpPackSerializer
             {
                 ArrayPool<byte>.Shared.Return(tempArray);
             }
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    static int DeserializeCustomFormatterUnmanaged<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
-        T>(ReadOnlySpan<byte> buffer, ref T? value)
-    {
-        var state = AcquireReaderOptionalState();
-        var reader = new SharpPackReader(buffer, state);
-        try
-        {
-            reader.ReadValue(ref value);
-            return reader.Consumed;
-        }
-        finally
-        {
-            reader.Dispose();
-            state.ResetAndExit();
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    static int DeserializeCustomFormatterUnmanaged<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
-        T>(in ReadOnlySequence<byte> buffer, ref T? value)
-    {
-        var state = AcquireReaderOptionalState();
-        var reader = new SharpPackReader(buffer, state);
-        try
-        {
-            reader.ReadValue(ref value);
-            return reader.Consumed;
-        }
-        finally
-        {
-            reader.Dispose();
-            state.ResetAndExit();
         }
     }
 

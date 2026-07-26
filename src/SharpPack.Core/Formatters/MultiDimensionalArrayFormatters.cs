@@ -29,7 +29,6 @@ public sealed class TwoDimensionalArrayFormatter<T> : SharpPackFormatter<T?[,]>
         writer.WriteUnmanaged(i, j);
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !writer.HasFormatterOverride<T>())
         {
             var byteCount = FormatterValidation.ByteCount<T>(value.Length);
@@ -89,7 +88,6 @@ public sealed class TwoDimensionalArrayFormatter<T> : SharpPackFormatter<T?[,]>
         }
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !reader.HasFormatterOverride<T>())
         {
             var byteCount = FormatterValidation.ByteCount<T>(elementCount);
@@ -149,7 +147,6 @@ public sealed class ThreeDimensionalArrayFormatter<T> : SharpPackFormatter<T?[,,
         writer.WriteUnmanaged(i, j, k);
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !writer.HasFormatterOverride<T>())
         {
             var byteCount = FormatterValidation.ByteCount<T>(value.Length);
@@ -209,7 +206,6 @@ public sealed class ThreeDimensionalArrayFormatter<T> : SharpPackFormatter<T?[,,
         }
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !reader.HasFormatterOverride<T>())
         {
             var byteCount = FormatterValidation.ByteCount<T>(elementCount);
@@ -277,7 +273,6 @@ public sealed class FourDimensionalArrayFormatter<T> : SharpPackFormatter<T?[,,,
         writer.WriteUnmanaged(i, j, k, l);
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !writer.HasFormatterOverride<T>())
         {
             var byteCount = FormatterValidation.ByteCount<T>(value.Length);
@@ -338,7 +333,6 @@ public sealed class FourDimensionalArrayFormatter<T> : SharpPackFormatter<T?[,,,
         }
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !reader.HasFormatterOverride<T>())
         {
             var byteCount = FormatterValidation.ByteCount<T>(elementCount);

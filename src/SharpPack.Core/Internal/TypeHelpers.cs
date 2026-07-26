@@ -17,14 +17,6 @@ internal static class TypeHelpers
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool RequiresFormatterAwareSerialization<T>()
-        => FormatterAwareCache<T>.Value;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsUnmanagedRawCopyDisabled<T>()
-        => RequiresFormatterAwareSerialization<T>();
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static TypeKind TryGetUnmanagedSZArrayElementSizeOrSharpPackableFixedSize<T>(
         out int size)
     {
@@ -55,74 +47,6 @@ internal static class TypeHelpers
         return (bool)isReferenceOrContainsReferences.MakeGenericMethod(type).Invoke(null, null)!;
     }
 
-    internal static bool RequiresFormatterAwareSerialization(Type type)
-    {
-        if (typeof(ISharpPackUnmanagedRawCopyDisabled)
-            .IsAssignableFrom(type))
-        {
-            return true;
-        }
-
-        if (typeof(ISharpPackConditionalFormatterAware)
-            .IsAssignableFrom(type))
-        {
-            if (!RuntimeFeature.IsDynamicCodeSupported ||
-                type.IsAbstract ||
-                type.IsInterface)
-            {
-                return true;
-            }
-
-            try
-            {
-                return RuntimeHelpers.GetUninitializedObject(type) is
-                        ISharpPackConditionalFormatterAware conditional
-                    ? conditional.RequiresFormatterAwareSerialization
-                    : true;
-            }
-            catch (MemberAccessException)
-            {
-                return true;
-            }
-        }
-
-        if (type.IsArray && type.GetElementType() is { } element)
-        {
-            return RequiresFormatterAwareSerialization(element);
-        }
-
-        if (type.IsGenericType)
-        {
-            var definition = type.GetGenericTypeDefinition();
-            if (definition != typeof(Nullable<>) &&
-                definition != typeof(KeyValuePair<,>) &&
-                definition != typeof(ValueTuple<>) &&
-                definition != typeof(ValueTuple<,>) &&
-                definition != typeof(ValueTuple<,,>) &&
-                definition != typeof(ValueTuple<,,,>) &&
-                definition != typeof(ValueTuple<,,,,>) &&
-                definition != typeof(ValueTuple<,,,,,>) &&
-                definition != typeof(ValueTuple<,,,,,,>) &&
-                definition != typeof(ValueTuple<,,,,,,,>))
-            {
-                return false;
-            }
-
-            foreach (var argument in type.GetGenericArguments())
-            {
-                if (RequiresFormatterAwareSerialization(argument))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    internal static bool IsUnmanagedRawCopyDisabled(Type type)
-        => RequiresFormatterAwareSerialization(type);
-
     static class Cache<T>
     {
         public static bool IsReferenceOrNullable;
@@ -151,8 +75,7 @@ internal static class TypeHelpers
                 {
                     var elementType = type.GetElementType();
                     bool containsReference = (bool)(isReferenceOrContainsReferences.MakeGenericMethod(elementType!).Invoke(null, null)!);
-                    if (!containsReference &&
-                        !RequiresFormatterAwareSerialization(elementType!))
+                    if (!containsReference)
                     {
                         Kind = TypeKind.UnmanagedSZArray;
                         ElementSize = (int)unsafeSizeOf
@@ -189,58 +112,6 @@ internal static class TypeHelpers
             {
                 Kind = TypeKind.None;
                 ElementSize = 0;
-            }
-        }
-    }
-
-    static class FormatterAwareCache<T>
-    {
-        public static readonly bool Value = Initialize();
-
-        static bool Initialize()
-        {
-            try
-            {
-                var type = typeof(T);
-                if (typeof(ISharpPackUnmanagedRawCopyDisabled)
-                    .IsAssignableFrom(type))
-                {
-                    return true;
-                }
-
-                if (typeof(ISharpPackConditionalFormatterAware)
-                    .IsAssignableFrom(type))
-                {
-                    if (type.IsValueType &&
-                        default(T) is
-                            ISharpPackConditionalFormatterAware valueTypePolicy)
-                    {
-                        return valueTypePolicy
-                            .RequiresFormatterAwareSerialization;
-                    }
-
-                    if (RuntimeFeature.IsDynamicCodeSupported &&
-                        RuntimeHelpers.GetUninitializedObject(type) is
-                            ISharpPackConditionalFormatterAware conditional)
-                    {
-                        return conditional.RequiresFormatterAwareSerialization;
-                    }
-
-                    return true;
-                }
-
-                if (!type.IsArray && !type.IsGenericType)
-                {
-                    return false;
-                }
-
-                return TypeHelpers.RequiresFormatterAwareSerialization(type);
-            }
-            catch
-            {
-                // Never allow a failed cold-path classification to enable
-                // raw-copy and bypass a formatter contract.
-                return true;
             }
         }
     }

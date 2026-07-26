@@ -7,7 +7,7 @@ namespace SharpPack.Tests.SourceGeneratorTests;
 public class FormatterGenerationTest
 {
     [Fact]
-    public void UnmanagedCustomFormatter_EmitsSemanticMarkerAndFieldPath()
+    public void UnmanagedAnnotations_RemainOnRawCopyPath()
     {
         var source = """
 namespace Generated;
@@ -75,21 +75,18 @@ public partial struct Plain
             text.Contains("partial struct Plain",
                 StringComparison.Ordinal));
 
-        formatted.Should().Contain(
+        formatted.Should().NotContain(
             "ISharpPackUnmanagedRawCopyDisabled");
-        formatted.Should().Contain(
-            "WriteValueWithFormatter(__ValueFormatter");
-        formatted.Should().NotContain("writer.WriteUnmanaged(value);");
-        nested.Should().Contain(
+        formatted.Should().NotContain("__ValueFormatter");
+        formatted.Should().Contain("writer.WriteUnmanaged(value);");
+        nested.Should().NotContain(
             "ISharpPackUnmanagedRawCopyDisabled");
-        nested.Should().Contain("writer.WritePackable(value.@Value);");
-        plain.Should().NotContain(
-            "ISharpPackUnmanagedRawCopyDisabled");
+        nested.Should().Contain("writer.WriteUnmanaged(value);");
         plain.Should().Contain("writer.WriteUnmanaged(value);");
     }
 
     [Fact]
-    public void PackableLists_UseBulkHelperOnlyForClosedRawSafeElements()
+    public void PackableLists_UseBulkHelperForUnmanagedElements()
     {
         var source = """
 namespace Generated;
@@ -164,11 +161,9 @@ public partial class FormattedListHolder
         plainHolder.Should().Contain(
             "DeserializePackableUnmanaged");
         formattedHolder.Should().Contain(
-            "ListFormatter.SerializePackable(");
+            "SerializePackableUnmanaged");
         formattedHolder.Should().Contain(
-            "ListFormatter.DeserializePackable<");
-        formattedHolder.Should().NotContain(
-            "PackableUnmanaged");
+            "DeserializePackableUnmanaged");
     }
 
     [Fact]

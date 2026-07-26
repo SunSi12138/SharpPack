@@ -646,7 +646,6 @@ public ref partial struct SharpPackReader
     public void ReadArray<T>(scoped ref T?[]? value)
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !HasFormatterOverride<T>())
         {
             DangerousReadUnmanagedArray(ref value);
@@ -682,7 +681,6 @@ public ref partial struct SharpPackReader
     public void ReadSpan<T>(scoped ref Span<T?> value)
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !HasFormatterOverride<T>())
         {
             DangerousReadUnmanagedSpan(ref value);
@@ -732,8 +730,7 @@ public ref partial struct SharpPackReader
             return;
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
             DangerousReadUnmanagedArray(ref value);
             return;
@@ -773,8 +770,7 @@ public ref partial struct SharpPackReader
             return;
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
             DangerousReadUnmanagedSpan(ref value);
             return;
@@ -919,7 +915,6 @@ public ref partial struct SharpPackReader
         }
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !HasFormatterOverride<T>())
         {
             if (value.Length != length)
@@ -1005,8 +1000,7 @@ public ref partial struct SharpPackReader
             return;
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
             if (value.Length != length)
             {

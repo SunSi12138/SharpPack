@@ -25,7 +25,6 @@ public class ReferenceSymbols
     public INamedTypeSymbol SkipOverwriteDefaultAttribute { get; }
     public INamedTypeSymbol GenerateTypeScriptAttribute { get; }
     public INamedTypeSymbol ISharpPackable { get; }
-    public INamedTypeSymbol ISharpPackUnmanagedRawCopyDisabled { get; }
 
     public WellKnownTypes KnownTypes { get; }
 
@@ -51,8 +50,6 @@ public class ReferenceSymbols
         SkipOverwriteDefaultAttribute = GetTypeByMetadataName("SharpPack.SuppressDefaultInitializationAttribute");
         GenerateTypeScriptAttribute = GetTypeByMetadataName(SharpPackGenerator.GenerateTypeScriptAttributeFullName);
         ISharpPackable = GetTypeByMetadataName("SharpPack.ISharpPackable`1").ConstructUnboundGenericType();
-        ISharpPackUnmanagedRawCopyDisabled = GetTypeByMetadataName(
-            "SharpPack.ISharpPackUnmanagedRawCopyDisabled");
         KnownTypes = new WellKnownTypes(this);
     }
 
