@@ -120,7 +120,7 @@ public class SharpPackSerializerContextTest
     }
 
     [Fact]
-    public void PrimitiveRegistration_PropagatesThroughGeneratedUnmanagedStruct()
+    public void PrimitiveRegistration_DoesNotPenetrateGeneratedUnmanagedStruct()
     {
         var value = new ContextUnmanagedStruct
         {
@@ -134,7 +134,7 @@ public class SharpPackSerializerContextTest
         var defaultPayload = SharpPackSerializer.Serialize(value);
         var contextPayload = SharpPackSerializer.Serialize(value, context);
 
-        contextPayload.Should().NotEqual(defaultPayload);
+        contextPayload.Should().Equal(defaultPayload);
         SharpPackSerializer.Deserialize<ContextUnmanagedStruct>(
             contextPayload,
             context).Should().Be(value);
@@ -153,7 +153,7 @@ public class SharpPackSerializerContextTest
             values,
             context);
 
-        contextArrayPayload.Should().NotEqual(defaultArrayPayload);
+        contextArrayPayload.Should().Equal(defaultArrayPayload);
         SharpPackSerializer.Deserialize<ContextUnmanagedStruct[]>(
             contextArrayPayload,
             context).Should().Equal(values);
@@ -166,7 +166,7 @@ public class SharpPackSerializerContextTest
         var containerPayload = SharpPackSerializer.Serialize(
             container,
             context);
-        containerPayload.Should().NotEqual(
+        containerPayload.Should().Equal(
             SharpPackSerializer.Serialize(container));
         SharpPackSerializer.Deserialize<ContextUnmanagedStructContainer>(
             containerPayload,
@@ -471,7 +471,7 @@ public class SharpPackSerializerContextTest
     }
 
     [Fact]
-    public void AbstractConditionalElement_UsesRegisteredFormatterInArray()
+    public void AbstractRegisteredElement_UsesFormatterInArray()
     {
         var context = new SharpPackSerializerContextBuilder()
             .Register(new AbstractConditionalNodeFormatter())
@@ -1456,12 +1456,8 @@ public sealed class HandwrittenFactoryFormatter
 }
 
 public abstract class AbstractConditionalNode
-    : ISharpPackConditionalFormatterAware
 {
     public int Value { get; set; }
-
-    bool ISharpPackConditionalFormatterAware
-        .RequiresFormatterAwareSerialization => true;
 }
 
 public sealed class ConcreteConditionalNode : AbstractConditionalNode;

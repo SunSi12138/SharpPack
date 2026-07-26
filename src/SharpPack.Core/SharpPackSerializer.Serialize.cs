@@ -129,14 +129,9 @@ public static partial class SharpPackSerializer
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static byte[] SerializeUnmanaged<T>(in T? value)
     {
-        if (!TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
-        {
-            var array = AllocateUninitializedArray<byte>(Unsafe.SizeOf<T>());
-            Unsafe.WriteUnaligned(ref GetArrayDataReference(array), value);
-            return array;
-        }
-
-        return SerializeCustomFormatterUnmanaged(value);
+        var array = AllocateUninitializedArray<byte>(Unsafe.SizeOf<T>());
+        Unsafe.WriteUnaligned(ref GetArrayDataReference(array), value);
+        return array;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -203,57 +198,12 @@ public static partial class SharpPackSerializer
         scoped in T? value)
         where TBufferWriter : IBufferWriter<byte>
     {
-        if (!TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
-        {
-            var buffer = bufferWriter.GetSpan(Unsafe.SizeOf<T>());
-            Unsafe.WriteUnaligned(
-                ref MemoryMarshal.GetReference(buffer),
-                value);
-            bufferWriter.Advance(Unsafe.SizeOf<T>());
-            return Unsafe.SizeOf<T>();
-        }
-
-        return SerializeCustomFormatterUnmanaged(ref bufferWriter, value);
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    static byte[] SerializeCustomFormatterUnmanaged<T>(in T? value)
-    {
-        var state = AcquireWriterState();
-        try
-        {
-            var writer = new SharpPackWriter<ReusableLinkedArrayBufferWriter>(
-                ref state.BufferWriter,
-                state.BufferWriter.DangerousGetFirstBuffer(),
-                state.OptionalState);
-            Serialize(ref writer, value);
-            return state.BufferWriter.ToArrayAndReset();
-        }
-        finally
-        {
-            state.Reset();
-            state.Exit();
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    static int SerializeCustomFormatterUnmanaged<T, TBufferWriter>(
-        ref TBufferWriter bufferWriter,
-        scoped in T? value)
-        where TBufferWriter : IBufferWriter<byte>
-    {
-        var state = AcquireWriterOptionalState();
-        try
-        {
-            var writer = new SharpPackWriter<TBufferWriter>(
-                ref bufferWriter,
-                state);
-            return Serialize(ref writer, value);
-        }
-        finally
-        {
-            state.ResetAndExit();
-        }
+        var buffer = bufferWriter.GetSpan(Unsafe.SizeOf<T>());
+        Unsafe.WriteUnaligned(
+            ref MemoryMarshal.GetReference(buffer),
+            value);
+        bufferWriter.Advance(Unsafe.SizeOf<T>());
+        return Unsafe.SizeOf<T>();
     }
 
     public static int Serialize<T, TBufferWriter>(

@@ -19,7 +19,6 @@ internal static partial class FormatterResolver
     internal static object? CreateGenericFormatter(
         Type type,
         bool typeIsReferenceOrContainsReferences,
-        bool isUnmanagedRawCopyDisabled,
         bool preferKnownGenericFormatter)
     {
         Type? formatterType = null;
@@ -28,8 +27,7 @@ internal static partial class FormatterResolver
         {
             if (type.IsSZArray)
             {
-                if (!typeIsReferenceOrContainsReferences &&
-                    !isUnmanagedRawCopyDisabled)
+                if (!typeIsReferenceOrContainsReferences)
                 {
                     formatterType = typeof(DangerousUnmanagedArrayFormatter<>).MakeGenericType(type.GetElementType()!);
                     goto CREATE;
@@ -65,8 +63,7 @@ internal static partial class FormatterResolver
             RuntimeFeature.IsDynamicCodeSupported)
         {
             var elementType = type.GetGenericArguments()[0];
-            if (!TypeHelpers.IsReferenceOrContainsReferences(elementType) &&
-                !TypeHelpers.IsUnmanagedRawCopyDisabled(elementType))
+            if (!TypeHelpers.IsReferenceOrContainsReferences(elementType))
             {
                 formatterType = typeof(DangerousUnmanagedListFormatter<>)
                     .MakeGenericType(elementType);
@@ -81,9 +78,7 @@ internal static partial class FormatterResolver
             goto CREATE;
         }
 
-        if (type.IsEnum ||
-            (!typeIsReferenceOrContainsReferences &&
-             !isUnmanagedRawCopyDisabled))
+        if (type.IsEnum || !typeIsReferenceOrContainsReferences)
         {
             formatterType = typeof(DangerousUnmanagedFormatter<>).MakeGenericType(type);
             goto CREATE;

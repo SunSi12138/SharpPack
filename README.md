@@ -37,7 +37,7 @@ SharpPack 1.x targets .NET 10 and uses C# 14.
 Install the aggregate runtime and source-generator package from NuGet:
 
 ```shell
-dotnet add package SharpPack --version 1.0.3
+dotnet add package SharpPack --version 1.1.0
 ```
 
 Versioned packages and symbols are also attached to
@@ -129,7 +129,8 @@ var value = SharpPackSerializer.Deserialize<PluginDto>(bin, context);
 ```
 
 The same context is propagated through the complete object graph, including
-arrays, lists, dictionaries, generated types, unions and custom formatters.
+arrays, lists, dictionaries, generated types, unions and custom formatters,
+except across raw-copy unmanaged struct interiors as described below.
 Collectible types and registered overrides always use the context-owned graph;
 an empty/configuration-only context may share type-only static slots for
 non-collectible types.
@@ -154,11 +155,12 @@ example is available in
 
 See [SharpPack versus MemoryPack benchmarks](docs/benchmarks.md) for the
 reproducible NuGet-only comparison and current latency, throughput and
-allocation results. On the published comparison workload, SharpPack 1.0.3
-deserialization is 1%–2% faster than MemoryPack 1.21.4, small serialization is
-within 0%–3%, and the 1024-item serialization cases are 4%–6% slower. Managed
-allocations are identical, including zero serializer allocation on the
-pre-sized `IBufferWriter<byte>` path.
+allocation results. For a generated unmanaged value, SharpPack 1.1.0 matches
+MemoryPack 1.21.4 for `byte[]` serialization and round-trip latency, while its
+pre-sized `IBufferWriter<byte>` path is about 6% faster in the published ARM64
+run. Managed allocations are identical, including zero serializer allocation
+on that writer path. The document also retains the broader SharpPack 1.0.3
+object-graph results for comparison.
 
 Built-in supported types
 ---
@@ -183,13 +185,11 @@ These types can be serialized by default:
 Define `[SharpPackable]` `class` / `struct` / `record` / `record struct`
 ---
 `[SharpPackable]` can annotate any `class`, `struct`, `record`, `record struct`
-or `interface`. An unmanaged `struct` or `record struct` with no formatter-aware
-members is serialized directly from its memory layout. If a serialized member
-uses `[SharpPackCustomFormatter]`, SharpPack deliberately leaves the raw-copy
-path and invokes the generated member formatter; this rule is propagated
-through supported generated and collection shapes. Other object-style
-annotations such as ignore/include, constructors and callbacks are not applied
-to an otherwise raw-copied unmanaged type.
+or `interface`. As in MemoryPack, an unmanaged `struct` or `record struct` is
+serialized directly from its memory layout. Member annotations, including
+`[SharpPackCustomFormatter]`, ignore/include, constructors and callbacks, are
+not applied. To customize its representation, register a formatter for the
+whole unmanaged type in a `SharpPackSerializerContext`.
 
 Otherwise, by default, `[SharpPackable]` serializes public instance properties or fields. You can use `[SharpPackIgnore]` to remove serialization target, `[SharpPackInclude]` promotes a private member to serialization target.
 

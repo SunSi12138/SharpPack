@@ -151,3 +151,129 @@ public partial class MemoryPackChild
     public int Id { get; set; }
     public string? Name { get; set; }
 }
+
+[MemoryDiagnoser]
+[GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
+public class UnmanagedSharpPackVsMemoryPack
+{
+    MemoryPackUnmanagedPayload memoryPackValue;
+    SharpPackUnmanagedPayload sharpPackValue;
+    byte[] memoryPackPayload = null!;
+    byte[] sharpPackPayload = null!;
+    ArrayBufferWriter<byte> memoryPackWriter = null!;
+    ArrayBufferWriter<byte> sharpPackWriter = null!;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        memoryPackValue = new MemoryPackUnmanagedPayload
+        {
+            Id = 30_000,
+            Timestamp = 123_456_789,
+        };
+        sharpPackValue = new SharpPackUnmanagedPayload
+        {
+            Id = memoryPackValue.Id,
+            Timestamp = memoryPackValue.Timestamp,
+        };
+        memoryPackPayload =
+            MemoryPack.MemoryPackSerializer.Serialize(memoryPackValue);
+        sharpPackPayload =
+            SharpPack.SharpPackSerializer.Serialize(sharpPackValue);
+        if (!memoryPackPayload.AsSpan().SequenceEqual(sharpPackPayload))
+        {
+            throw new InvalidOperationException(
+                "SharpPack and MemoryPack unmanaged payloads differ.");
+        }
+
+        memoryPackWriter = new ArrayBufferWriter<byte>(
+            memoryPackPayload.Length);
+        sharpPackWriter = new ArrayBufferWriter<byte>(
+            sharpPackPayload.Length);
+    }
+
+    [Benchmark(Baseline = true), BenchmarkCategory("UnmanagedSerialize")]
+    public byte[] MemoryPackSerialize()
+        => MemoryPack.MemoryPackSerializer.Serialize(memoryPackValue);
+
+    [Benchmark, BenchmarkCategory("UnmanagedSerialize")]
+    public byte[] SharpPackSerialize()
+        => SharpPack.SharpPackSerializer.Serialize(sharpPackValue);
+
+    [Benchmark(Baseline = true), BenchmarkCategory("UnmanagedRoundTrip")]
+    public long MemoryPackRoundTrip()
+    {
+        var payload = MemoryPackSerializeNoInline(memoryPackValue);
+        var value = MemoryPackDeserializeNoInline(payload);
+        return value.Id + value.Timestamp;
+    }
+
+    [Benchmark, BenchmarkCategory("UnmanagedRoundTrip")]
+    public long SharpPackRoundTrip()
+    {
+        var payload = SharpPackSerializeNoInline(sharpPackValue);
+        var value = SharpPackDeserializeNoInline(payload);
+        return value.Id + value.Timestamp;
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(
+        System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    static byte[] MemoryPackSerializeNoInline(
+        MemoryPackUnmanagedPayload value)
+        => MemoryPack.MemoryPackSerializer.Serialize(value);
+
+    [System.Runtime.CompilerServices.MethodImpl(
+        System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    static MemoryPackUnmanagedPayload MemoryPackDeserializeNoInline(
+        byte[] payload)
+        => MemoryPack.MemoryPackSerializer
+            .Deserialize<MemoryPackUnmanagedPayload>(payload);
+
+    [System.Runtime.CompilerServices.MethodImpl(
+        System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    static byte[] SharpPackSerializeNoInline(
+        SharpPackUnmanagedPayload value)
+        => SharpPack.SharpPackSerializer.Serialize(value);
+
+    [System.Runtime.CompilerServices.MethodImpl(
+        System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    static SharpPackUnmanagedPayload SharpPackDeserializeNoInline(
+        byte[] payload)
+        => SharpPack.SharpPackSerializer
+            .Deserialize<SharpPackUnmanagedPayload>(payload);
+
+    [Benchmark(Baseline = true), BenchmarkCategory("UnmanagedBufferWriter")]
+    public int MemoryPackBufferWriter()
+    {
+        MemoryPack.MemoryPackSerializer.Serialize(
+            memoryPackWriter,
+            memoryPackValue);
+        var count = memoryPackWriter.WrittenCount;
+        memoryPackWriter.Clear();
+        return count;
+    }
+
+    [Benchmark, BenchmarkCategory("UnmanagedBufferWriter")]
+    public int SharpPackBufferWriter()
+    {
+        var count = SharpPack.SharpPackSerializer.Serialize(
+            ref sharpPackWriter,
+            sharpPackValue);
+        sharpPackWriter.Clear();
+        return count;
+    }
+}
+
+[SharpPack.SharpPackable]
+public partial struct SharpPackUnmanagedPayload
+{
+    public int Id { get; set; }
+    public long Timestamp { get; set; }
+}
+
+[MemoryPack.MemoryPackable]
+public partial struct MemoryPackUnmanagedPayload
+{
+    public int Id { get; set; }
+    public long Timestamp { get; set; }
+}

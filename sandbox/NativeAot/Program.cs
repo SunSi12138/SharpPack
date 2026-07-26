@@ -50,15 +50,21 @@ var unmanagedFormatted = new AotUnmanagedFormatted
     Value = 30_000,
     Tail = 123_456_789,
 };
+AotVarIntFormatter.Reset();
 var unmanagedPayload = SharpPackSerializer.Serialize(unmanagedFormatted);
 var unmanagedRoundTrip =
     SharpPackSerializer.Deserialize<AotUnmanagedFormatted>(
         unmanagedPayload);
-if (unmanagedRoundTrip.Value != unmanagedFormatted.Value ||
-    unmanagedRoundTrip.Tail != unmanagedFormatted.Tail)
+if (unmanagedPayload.Length !=
+        System.Runtime.CompilerServices.Unsafe.SizeOf<
+            AotUnmanagedFormatted>() ||
+    unmanagedRoundTrip.Value != unmanagedFormatted.Value ||
+    unmanagedRoundTrip.Tail != unmanagedFormatted.Tail ||
+    AotVarIntFormatter.SerializeCalls != 0 ||
+    AotVarIntFormatter.DeserializeCalls != 0)
 {
     throw new InvalidOperationException(
-        "The unmanaged custom formatter failed under NativeAOT.");
+        "The unmanaged raw-copy contract failed under NativeAOT.");
 }
 
 var closedFormatted =
@@ -69,13 +75,16 @@ var closedFormatted =
 var closedFormattedPayload = SharpPackSerializer.Serialize(closedFormatted);
 var closedFormattedRoundTrip = SharpPackSerializer.Deserialize<
     AotUnmanagedWrapper<AotUnmanagedFormatted>>(closedFormattedPayload);
-if (closedFormattedRoundTrip.Value.Value !=
+if (closedFormattedPayload.Length !=
+        System.Runtime.CompilerServices.Unsafe.SizeOf<
+            AotUnmanagedWrapper<AotUnmanagedFormatted>>() ||
+    closedFormattedRoundTrip.Value.Value !=
         closedFormatted.Value.Value ||
     closedFormattedRoundTrip.Value.Tail !=
         closedFormatted.Value.Tail)
 {
     throw new InvalidOperationException(
-        "The closed unmanaged formatter policy failed under NativeAOT.");
+        "The closed unmanaged raw-copy policy failed under NativeAOT.");
 }
 
 var closedPlain = new AotUnmanagedWrapper<int> { Value = 42 };
@@ -105,11 +114,11 @@ if (genericFormattedClassRoundTrip?.Value.Value !=
         unmanagedFormatted.Value ||
     genericFormattedClassRoundTrip.Value.Tail !=
         unmanagedFormatted.Tail ||
-    AotVarIntFormatter.SerializeCalls != 1 ||
-    AotVarIntFormatter.DeserializeCalls != 1)
+    AotVarIntFormatter.SerializeCalls != 0 ||
+    AotVarIntFormatter.DeserializeCalls != 0)
 {
     throw new InvalidOperationException(
-        "The formatter-aware generic class failed under NativeAOT.");
+        "The generic class did not preserve unmanaged raw-copy under NativeAOT.");
 }
 
 AotVarIntFormatter.Reset();
@@ -143,35 +152,39 @@ if (genericExactFormattedRoundTrip?.Value.Value !=
     genericExactFormattedRoundTrip.Value.Tail !=
         unmanagedFormatted.Tail ||
     genericExactFormattedRoundTrip.Text != "formatted exact aot" ||
-    AotVarIntFormatter.SerializeCalls != 1 ||
-    AotVarIntFormatter.DeserializeCalls != 1)
+    AotVarIntFormatter.SerializeCalls != 0 ||
+    AotVarIntFormatter.DeserializeCalls != 0)
 {
     throw new InvalidOperationException(
-        "The formatter-aware generic exact path failed under NativeAOT.");
+        "The generic exact path did not preserve unmanaged raw-copy under NativeAOT.");
 }
 
 AotVarIntFormatter.Reset();
 var closedFormattedArray = new[] { closedFormatted, closedFormatted };
 var closedFormattedArrayPayload =
     SharpPackSerializer.Serialize(closedFormattedArray);
-if (AotVarIntFormatter.SerializeCalls != closedFormattedArray.Length)
+if (AotVarIntFormatter.SerializeCalls != 0 ||
+    closedFormattedArrayPayload.Length !=
+        sizeof(int) +
+        (System.Runtime.CompilerServices.Unsafe.SizeOf<
+            AotUnmanagedWrapper<AotUnmanagedFormatted>>() *
+         closedFormattedArray.Length))
 {
     throw new InvalidOperationException(
-        "The formatted unmanaged array bypassed its member formatter under NativeAOT.");
+        "The annotated unmanaged array lost its raw path under NativeAOT.");
 }
 AotVarIntFormatter.Reset();
 var closedFormattedArrayRoundTrip = SharpPackSerializer.Deserialize<
     AotUnmanagedWrapper<AotUnmanagedFormatted>[]>(
         closedFormattedArrayPayload);
 if (closedFormattedArrayRoundTrip is not { Length: 2 } ||
-    AotVarIntFormatter.DeserializeCalls !=
-        closedFormattedArrayRoundTrip.Length ||
+    AotVarIntFormatter.DeserializeCalls != 0 ||
     closedFormattedArrayRoundTrip.Any(item =>
         item.Value.Value != unmanagedFormatted.Value ||
         item.Value.Tail != unmanagedFormatted.Tail))
 {
     throw new InvalidOperationException(
-        "The formatted unmanaged array policy failed under NativeAOT.");
+        "The annotated unmanaged array policy failed under NativeAOT.");
 }
 
 AotVarIntFormatter.Reset();
@@ -212,14 +225,14 @@ var formattedListPayload = SharpPackSerializer.Serialize(formattedList);
 var formattedListRoundTrip = SharpPackSerializer.Deserialize<List<
     AotUnmanagedWrapper<AotUnmanagedFormatted>>>(formattedListPayload);
 if (formattedListRoundTrip is not { Count: 2 } ||
-    AotVarIntFormatter.SerializeCalls != 2 ||
-    AotVarIntFormatter.DeserializeCalls != 2 ||
+    AotVarIntFormatter.SerializeCalls != 0 ||
+    AotVarIntFormatter.DeserializeCalls != 0 ||
     formattedListRoundTrip.Any(item =>
         item.Value.Value != unmanagedFormatted.Value ||
         item.Value.Tail != unmanagedFormatted.Tail))
 {
     throw new InvalidOperationException(
-        "The formatter-aware unmanaged List failed under NativeAOT.");
+        "The unmanaged List raw-copy path failed under NativeAOT.");
 }
 
 var context = new SharpPackSerializerContext();
@@ -244,11 +257,13 @@ var contextFormattedArray = SharpPackSerializer.Deserialize<
         contextFormattedArrayPayload,
         context);
 if (contextFormattedArray is not { Length: 2 } ||
-    AotVarIntFormatter.SerializeCalls != 2 ||
-    AotVarIntFormatter.DeserializeCalls != 2)
+    !contextFormattedArrayPayload.AsSpan().SequenceEqual(
+        closedFormattedArrayPayload) ||
+    AotVarIntFormatter.SerializeCalls != 0 ||
+    AotVarIntFormatter.DeserializeCalls != 0)
 {
     throw new InvalidOperationException(
-        "The Context formatted unmanaged array failed under NativeAOT.");
+        "The empty Context changed unmanaged raw-copy under NativeAOT.");
 }
 
 var contextPlainArrayPayload = SharpPackSerializer.Serialize(

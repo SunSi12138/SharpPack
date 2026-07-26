@@ -270,28 +270,7 @@ public partial class TypeMeta
 
         var serializeBody = "";
         var deserializeBody = "";
-        var conditionalSerializeDispatch = "";
-        var conditionalDeserializeDispatch = "";
         var formatterOverrideMethods = "";
-        var isUnmanagedRawCopyDisabled =
-            IsUnmanagedType &&
-            Symbol.IsUnmanagedRawCopyDisabled(reference);
-        var hasConditionalFormatterAwarePolicy =
-            !isUnmanagedRawCopyDisabled &&
-            Members.Any(static member =>
-                member.MemberType.ContainsTypeParameter() &&
-                member.Kind is MemberKind.Unmanaged or
-                    MemberKind.UnmanagedNullable or
-                    MemberKind.UnmanagedArray);
-        var formatterAwarePolicyName =
-            "__SharpPackRequiresFormatterAwareSerialization";
-        while (Symbol.GetAllMembers().Any(member =>
-                   member.Name == formatterAwarePolicyName) ||
-               Symbol.TypeParameters.Any(parameter =>
-                   parameter.Name == formatterAwarePolicyName))
-        {
-            formatterAwarePolicyName += "_";
-        }
         var contextFormatterTypeName = "__SharpPackContextFormatter";
         while (Symbol.GetAllMembers().Any(
                    member => member.Name == contextFormatterTypeName) ||
@@ -300,9 +279,7 @@ public partial class TypeMeta
         {
             contextFormatterTypeName += "_";
         }
-        if (IsUnmanagedType &&
-            !isUnmanagedRawCopyDisabled &&
-            !hasConditionalFormatterAwarePolicy)
+        if (IsUnmanagedType)
         {
             serializeBody = $$"""
         writer.WriteUnmanaged(value);
@@ -310,8 +287,6 @@ public partial class TypeMeta
             deserializeBody = $$"""
         reader.ReadUnmanaged(out value);
 """;
-            formatterOverrideMethods = EmitFormatterOverrideMethods(
-                contextFormatterTypeName);
         }
         else
         {
@@ -333,33 +308,6 @@ public partial class TypeMeta
 
             serializeBody = EmitSerializeBody();
             deserializeBody = EmitDeserializeBody();
-            if (hasConditionalFormatterAwarePolicy)
-            {
-                if (IsUnmanagedType)
-                {
-                    serializeBody = "        writer.WriteUnmanaged(value);";
-                    deserializeBody = "        reader.ReadUnmanaged(out value);";
-                }
-
-                var conditionalSerializeHelper =
-                    GetFormatterOverrideHelperName(serialize: true);
-                var conditionalDeserializeHelper =
-                    GetFormatterOverrideHelperName(serialize: false);
-                conditionalSerializeDispatch = $$"""
-        if ({{formatterAwarePolicyName}})
-        {
-            {{conditionalSerializeHelper}}(ref writer, ref value);
-            return;
-        }
-""";
-                conditionalDeserializeDispatch = $$"""
-        if ({{formatterAwarePolicyName}})
-        {
-            {{conditionalDeserializeHelper}}(ref reader, ref value);
-            return;
-        }
-""";
-            }
             formatterOverrideMethods = EmitFormatterOverrideMethods(
                 contextFormatterTypeName);
 
@@ -393,26 +341,6 @@ public partial class TypeMeta
         var fixedSizeMethod = "";
         var exactSizeInterface = "";
         var exactSizeMethod = "";
-        var unmanagedRawCopyDisabledInterface =
-            isUnmanagedRawCopyDisabled
-                ? ", global::SharpPack.ISharpPackUnmanagedRawCopyDisabled"
-                : "";
-        var conditionalFormatterAwarePolicyInterface =
-            hasConditionalFormatterAwarePolicy
-                ? ", global::SharpPack.ISharpPackConditionalFormatterAware"
-                : "";
-        var formatterAwarePolicy =
-            hasConditionalFormatterAwarePolicy
-                ? $$"""
-
-    static readonly bool {{formatterAwarePolicyName}} =
-        {{EmitConditionalFormatterAwarePolicy()}};
-
-    bool global::SharpPack.ISharpPackConditionalFormatterAware.RequiresFormatterAwareSerialization
-        => {{formatterAwarePolicyName}};
-"""
-                : "";
-
         var fixedSize = Members.All(x =>
             x.Kind is MemberKind.Unmanaged
                 or MemberKind.Enum
@@ -435,14 +363,11 @@ public partial class TypeMeta
                 Members.Select(x =>
                     $"System.Runtime.CompilerServices.Unsafe.SizeOf<{x.MemberType.FullyQualifiedToString()}>()"));
             var headerPlus = Members.Length == 0 ? "1" : "1 + ";
-            var fixedSizeExpression = hasConditionalFormatterAwarePolicy
-                ? $"{formatterAwarePolicyName} ? 0 : {headerPlus}{sizeOf}"
-                : $"{headerPlus}{sizeOf}";
             fixedSizeInterface = ", global::SharpPack.IFixedSizeSharpPackable";
             fixedSizeMethod = $$"""
 
     [global::SharpPack.Internal.Preserve]
-    static int global::SharpPack.IFixedSizeSharpPackable.Size => {{fixedSizeExpression}};
+    static int global::SharpPack.IFixedSizeSharpPackable.Size => {{headerPlus}}{{sizeOf}};
 
 """;
         }
@@ -463,10 +388,7 @@ public partial class TypeMeta
         {
             exactSizeInterface =
                 $", global::SharpPack.ISharpPackExactSizeSerializable<{TypeName}>";
-            exactSizeMethod = EmitExactSizeSerializeMethod(
-                hasConditionalFormatterAwarePolicy
-                    ? formatterAwarePolicyName
-                    : null);
+            exactSizeMethod = EmitExactSizeSerializeMethod();
         }
         const string serializeMethodSignarture =
             "Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter>";
@@ -482,8 +404,9 @@ public partial class TypeMeta
         var contextFactoryInterface =
             $", global::SharpPack.ISharpPackFormatterFactory<{TypeName}>" +
             $", global::SharpPack.ISharpPackContextFormatterFactory<{TypeName}>";
-        var contextDependencyCondition =
-            EmitFormatterOverrideDependencyCondition(
+        var contextDependencyCondition = IsUnmanagedType
+            ? ""
+            : EmitFormatterOverrideDependencyCondition(
                 "context",
                 useOptionalState: false);
         var contextFormatterSelection =
@@ -538,10 +461,9 @@ public partial class TypeMeta
 """;
 
         writer.AppendLine($$"""
-partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{fixedSizeInterface}}{{exactSizeInterface}}{{unmanagedRawCopyDisabledInterface}}{{conditionalFormatterAwarePolicyInterface}}{{contextFactoryInterface}}
+partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{fixedSizeInterface}}{{exactSizeInterface}}{{contextFactoryInterface}}
 {
-{{EmitCustomFormatters()}}
-{{formatterAwarePolicy}}
+{{(IsUnmanagedType ? "" : EmitCustomFormatters())}}
     static partial void StaticConstructor();
 
     static {{Symbol.Name}}()
@@ -556,22 +478,20 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
     [global::SharpPack.Internal.Preserve]
     {{staticSharpPackableMethod}}{{serializeMethodSignarture}} writer, {{scopedRef}} {{TypeName}}{{nullable}} value) {{constraint}}
     {
-{{conditionalSerializeDispatch}}
-{{OnSerializing.Select(x => "        " + x.Emit()).NewLine()}}
+{{(IsUnmanagedType ? "" : OnSerializing.Select(x => "        " + x.Emit()).NewLine())}}
 {{serializeBody}}
     END:
-{{OnSerialized.Select(x => "        " + x.Emit()).NewLine()}}
+{{(IsUnmanagedType ? "" : OnSerialized.Select(x => "        " + x.Emit()).NewLine())}}
         return;
     }
 
     [global::SharpPack.Internal.Preserve]
     {{staticSharpPackableMethod}}Deserialize(ref SharpPackReader reader, {{scopedRef}} {{TypeName}}{{nullable}} value)
     {
-{{conditionalDeserializeDispatch}}
-{{OnDeserializing.Select(x => "        " + x.Emit()).NewLine()}}
+{{(IsUnmanagedType ? "" : OnDeserializing.Select(x => "        " + x.Emit()).NewLine())}}
 {{deserializeBody}}
     END:
-{{OnDeserialized.Select(x => "        " + x.Emit()).NewLine()}}
+{{(IsUnmanagedType ? "" : OnDeserialized.Select(x => "        " + x.Emit()).NewLine())}}
         return;
     }
 
@@ -582,22 +502,6 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         {
             writer.AppendLine("}");
         }
-    }
-
-    string EmitConditionalFormatterAwarePolicy()
-    {
-        var conditions = Members
-            .Where(static member =>
-                member.MemberType.ContainsTypeParameter())
-            .Select(static member =>
-                $"global::SharpPack.SharpPackFormatterPolicy.RequiresFormatterAwareSerialization<{member.MemberType.FullyQualifiedToString()}>()")
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-        return conditions.Length == 0
-            ? "false"
-            : string.Join(
-                " || " + Environment.NewLine + "        ",
-                conditions);
     }
 
     private string EmitDeserializeBody()
@@ -907,34 +811,8 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         return EmitObjectSerializeBody(honorFormatterOverrides: false);
     }
 
-    string EmitExactSizeSerializeMethod(
-        string? formatterAwareCondition)
+    string EmitExactSizeSerializeMethod()
     {
-        var formatterAwareFallback = formatterAwareCondition is null
-            ? ""
-            : $$"""
-        if ({{formatterAwareCondition}})
-        {
-            var fallbackWriter = global::SharpPack.Internal
-                .ReusableLinkedArrayBufferWriterPool.Rent(
-                    out var fallbackWriterLeaseId);
-            try
-            {
-                _ = global::SharpPack.SharpPackSerializer.Serialize(
-                    ref fallbackWriter,
-                    this);
-                return fallbackWriter.ToArrayAndReset();
-            }
-            finally
-            {
-                global::SharpPack.Internal
-                    .ReusableLinkedArrayBufferWriterPool.Return(
-                        fallbackWriter,
-                        fallbackWriterLeaseId);
-            }
-        }
-
-""";
         var captureMembers = Members
             .Select((member, index) => member.Kind == MemberKind.String
                 ? $"""
@@ -981,7 +859,6 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
     [global::SharpPack.Internal.Preserve]
     byte[] global::SharpPack.ISharpPackExactSizeSerializable<{{TypeName}}>.SerializeExact()
     {
-{{formatterAwareFallback}}
 {{captureMembers}}
         var size = 1L +
             {{sizeExpression}};

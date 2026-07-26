@@ -487,7 +487,6 @@ public ref partial struct SharpPackWriter<TBufferWriter>
     public void WriteArray<T>(T?[]? value)
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !HasFormatterOverride<T>())
         {
             DangerousWriteUnmanagedArray(value);
@@ -512,7 +511,6 @@ public ref partial struct SharpPackWriter<TBufferWriter>
     public void WriteSpan<T>(scoped Span<T?> value)
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !HasFormatterOverride<T>())
         {
             DangerousWriteUnmanagedSpan(value);
@@ -531,7 +529,6 @@ public ref partial struct SharpPackWriter<TBufferWriter>
     public void WriteSpan<T>(scoped ReadOnlySpan<T?> value)
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !HasFormatterOverride<T>())
         {
             DangerousWriteUnmanagedSpan(value);
@@ -557,8 +554,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
             return;
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
             DangerousWriteUnmanagedArray(value);
             return;
@@ -587,8 +583,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
             return;
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
             DangerousWriteUnmanagedSpan(value);
             return;
@@ -611,8 +606,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
             return;
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>())
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
             DangerousWriteUnmanagedSpan(value);
             return;
@@ -727,7 +721,6 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         if (value.Length == 0) return;
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
-            !TypeHelpers.IsUnmanagedRawCopyDisabled<T>() &&
             !HasFormatterOverride<T>())
         {
             var srcLength = GetUnmanagedByteCount<T>(value.Length);

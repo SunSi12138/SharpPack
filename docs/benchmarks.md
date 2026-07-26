@@ -1,15 +1,17 @@
 # SharpPack versus MemoryPack benchmarks
 
-This comparison uses BenchmarkDotNet 0.15.8, SharpPack 1.0.3 and the public
-MemoryPack 1.21.4 package. The benchmark is a standalone NuGet consumer: it
-does not reference SharpPack source projects. Both serializers run side by side
-against generated models with identical fields, values and member order. Every
-setup verifies that they produce byte-for-byte identical payloads before any
+This comparison uses BenchmarkDotNet 0.15.8 and the public MemoryPack 1.21.4
+package. The current unmanaged results use SharpPack 1.1.0; the broader object
+graph results below are retained from SharpPack 1.0.3 and are labeled
+accordingly. The benchmark is a standalone NuGet consumer and does not
+reference SharpPack source projects. Both serializers run side by side against
+generated models with identical fields, values and member order. Every setup
+verifies that they produce byte-for-byte identical payloads before any
 measurement starts.
 
 ## Reproduce
 
-From the repository root after SharpPack 1.0.3 is available on NuGet.org:
+From the repository root after SharpPack 1.1.0 is available on NuGet.org:
 
 ```shell
 dotnet run --project benchmarks/SharpPackVsMemoryPack -c Release -- \
@@ -36,8 +38,33 @@ Environment: Apple M4 (10 physical cores), macOS 26.4.1, .NET SDK 10.0.102,
 3 independent process launches, 4 warmup iterations, 12 measurement iterations
 and `MemoryDiagnoser`.
 
-SharpPack uses its default unpinned 8 KB retained buffer in the main table.
-MemoryPack 1.21.4 retains a pinned 256 KB first buffer per serializer thread.
+### SharpPack 1.1.0 unmanaged results
+
+The unmanaged payload is a 16-byte generated struct containing an `int` and a
+`long`. Both serializers use their direct raw-memory path and produce identical
+payloads. The round-trip benchmark uses non-inlined serialize and deserialize
+helpers so BenchmarkDotNet measures the complete operation rather than a value
+that the JIT can fold into harness overhead.
+
+| Operation | MemoryPack | SharpPack | MP Ops/s | SP Ops/s | Ratio | Allocated MP / SP |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Serialize to `byte[]` | 2.362 ns | 2.359 ns | 423.37 M | 423.91 M | 1.00 | 40 B / 40 B |
+| Serialize and deserialize round-trip | 2.897 ns | 2.905 ns | 345.18 M | 344.23 M | 1.00 | 40 B / 40 B |
+| Serialize to pre-sized `IBufferWriter<byte>` | 2.377 ns | 2.229 ns | 420.70 M | 448.63 M | 0.94 | 0 B / 0 B |
+
+SharpPack 1.1.0 is effectively tied with MemoryPack for unmanaged `byte[]`
+serialization and round-trip latency. Its pre-sized `IBufferWriter<byte>` path
+is about 6% faster in this run, with no serializer allocation in either
+implementation.
+
+### SharpPack 1.0.3 object graph results
+
+The following table is the published SharpPack 1.0.3 measurement. It remains
+useful for the broader generated object and collection workload, but it should
+not be interpreted as a fresh 1.1.0 measurement.
+
+SharpPack used its default unpinned 8 KB retained buffer in this table.
+MemoryPack 1.21.4 retained a pinned 256 KB first buffer per serializer thread.
 
 | Operation | Items | MemoryPack | SharpPack | MP Ops/s | SP Ops/s | Ratio | Allocated MP / SP |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
