@@ -31,6 +31,10 @@ jobs:
       - run: dotnet publish sandbox/NativeAot/NativeAot.csproj -c Release -o "$RUNNER_TEMP/sharppack-aot"
       - run: '"$RUNNER_TEMP/sharppack-aot/NativeAot"'
       - run: dotnet list SharpPack.sln package --vulnerable --include-transitive
+      - name: Restore release-versioned outputs
+        run: dotnet build -c Release -p:Version="$VERSION"
+        env:
+          VERSION: ${{ inputs.version }}
       - name: Pack
         run: |
           dotnet pack src/SharpPack.Core/SharpPack.Core.csproj -c Release --no-build -p:Version="$VERSION" -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg -o ./publish
