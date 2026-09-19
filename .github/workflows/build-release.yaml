@@ -32,7 +32,7 @@ jobs:
       - run: '"$RUNNER_TEMP/sharppack-aot/NativeAot"'
       - run: dotnet list SharpPack.sln package --vulnerable --include-transitive
       - name: Restore release-versioned outputs
-        run: dotnet build -c Release -p:Version="$VERSION"
+        run: dotnet build -c Release --no-incremental -p:Version="$VERSION"
         env:
           VERSION: ${{ inputs.version }}
       - name: Pack
