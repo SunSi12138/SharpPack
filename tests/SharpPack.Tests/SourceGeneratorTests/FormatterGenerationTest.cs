@@ -711,7 +711,6 @@ public sealed class FrozenModel :
     static void global::SharpPack.ISharpPackable<FrozenModel>.Serialize<TBufferWriter>(
         ref global::SharpPack.SharpPackWriter<TBufferWriter> writer,
         scoped ref FrozenModel? value)
-        where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
     {
     }
 
