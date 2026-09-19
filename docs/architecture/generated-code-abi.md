@@ -39,9 +39,12 @@ removals cannot be hidden by updating Generator in the same change.
 The broader CLR-public surface of `SharpPack.Core` and `SharpPack.Streaming`
 is captured in `eng/baselines/public-api/`. The baseline includes public,
 protected, and protected-internal members, including CLR-public members hidden
-from IntelliSense. CI regenerates the surface in memory and fails when it differs
-from the checked-in text; additions therefore require an explicit reviewed
-baseline update, while removals and signature changes cannot pass silently.
+from IntelliSense. Signature-affecting required/optional custom modifiers are
+preserved as `modreq`/`modopt`; for example, an `init` accessor records its
+`IsExternalInit` requirement. CI regenerates the surface in memory and fails
+when it differs from the checked-in text; additions therefore require an
+explicit reviewed baseline update, while removals and signature changes cannot
+pass silently.
 
 `eng/baselines/generated/representative.g.cs.txt` captures complete generated
 source for a fixed fixture covering a simple object, unmanaged/fixed exact-size
