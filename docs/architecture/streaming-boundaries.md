@@ -23,17 +23,23 @@ prove that the payload inside a frame remains the canonical representation.
 **Owner / boundary:** the transport owns its buffers and backpressure signal;
 Streaming owns only state needed to finish the current logical operation.
 
-**Allowed:** advance a pipe precisely through examined/consumed positions, await
-flush/read operations, and impose documented size limits before allocation.
+**Allowed today:** advance a pipe precisely through examined/consumed
+positions, await asynchronous flush/read operations, propagate transport
+exceptions, and keep caller-owned transports open.
 
-**Forbidden:** retain transport memory after advancing it, busy-loop while no
-progress is possible, allocate from an untrusted length before validating it, or
-hide cancellation and transport exceptions.
+**Forbidden today:** retain transport memory after advancing it, busy-loop while
+no progress is possible, synchronously block an asynchronous transport, or read
+past the current logical frame.
 
-**Verification:** tests must force one-byte fragmentation, coalesced frames,
-oversized/truncated input, cancellation, and a transport that applies
-backpressure. `StreamingSerializer.SerializeAwaitsPipeBackpressure` configures
-low `PipeOptions` pause/resume thresholds and proves serialization remains
+**Planned hardening (not a Stage 1 invariant):** treat a collection
+`PipeWriter.FlushAsync` result with `IsCanceled` as cancellation (#13), and add
+configurable read/payload size limits before allocating from untrusted lengths
+(#15).
+
+**Verification:** tests force one-byte fragmentation, coalesced frames,
+truncated input, cancellation on covered paths, and transport backpressure.
+`StreamingSerializer.SerializeAwaitsPipeBackpressure` configures low
+`PipeOptions` pause/resume thresholds and proves serialization remains
 incomplete until the reader drains the pipe. Resource-ownership tests verify
 that success and failure release temporary state without closing the transport.
 
