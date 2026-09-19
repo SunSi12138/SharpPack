@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Linq;
 
@@ -658,4 +659,96 @@ public partial class Model
             "new int[] { 2, 3 }) " +
             "{ @Enabled = true }.GetFormatter()");
     }
+
+    [Fact]
+    public void FrozenGeneratedCodeAbi_CompilesAgainstCurrentRuntime()
+    {
+        // This is intentionally a frozen copy of generated-code shapes rather
+        // than output from the current generator. It proves that runtime ABI
+        // changes cannot be hidden by updating the generator in the same PR.
+        var source = """
+#nullable enable
+namespace GeneratedCodeAbiFixture;
+
+public sealed class FrozenModel :
+    global::SharpPack.ISharpPackable<FrozenModel>,
+    global::SharpPack.ISharpPackFormatterFactory<FrozenModel>,
+    global::SharpPack.ISharpPackContextFormatterFactory<FrozenModel>,
+    global::SharpPack.ISharpPackExactSizeSerializable<FrozenModel>
+{
+    [global::SharpPack.Internal.Preserve]
+    static global::SharpPack.SharpPackFormatter<FrozenModel>
+        global::SharpPack.ISharpPackFormatterFactory<FrozenModel>.CreateFormatter()
+        => new global::SharpPack.Formatters.SharpPackableFormatter<FrozenModel>();
+
+    [global::SharpPack.Internal.Preserve]
+    static global::SharpPack.SharpPackFormatter<FrozenModel>
+        global::SharpPack.ISharpPackContextFormatterFactory<FrozenModel>.CreateFormatter(
+            global::SharpPack.SharpPackSerializerContext context)
+    {
+        _ = context.HasFormatterOverrideDependency<int>();
+        return new global::SharpPack.Formatters.SharpPackableFormatter<FrozenModel>();
+    }
+
+    [global::SharpPack.Internal.Preserve]
+    byte[] global::SharpPack.ISharpPackExactSizeSerializable<FrozenModel>.SerializeExact()
+    {
+        var buffer = new byte[1];
+        var bufferWriter =
+            new global::SharpPack.Internal.SharpPackExactArrayBufferWriter(buffer);
+        var writer = global::SharpPack.SharpPackSerializer.CreateExactWriter(
+            ref bufferWriter);
+
+        if (global::System.Array.MaxLength < 0)
+        {
+            global::SharpPack.SharpPackSerializationException.ThrowSizeOverflow();
+        }
+
+        return buffer;
+    }
+
+    [global::SharpPack.Internal.Preserve]
+    static void global::SharpPack.ISharpPackable<FrozenModel>.Serialize<TBufferWriter>(
+        ref global::SharpPack.SharpPackWriter<TBufferWriter> writer,
+        scoped ref FrozenModel? value)
+        where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+    {
+    }
+
+    [global::SharpPack.Internal.Preserve]
+    static void global::SharpPack.ISharpPackable<FrozenModel>.Deserialize(
+        ref global::SharpPack.SharpPackReader reader,
+        scoped ref FrozenModel? value)
+    {
+    }
+}
+""";
+
+        var references = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(static assembly =>
+                !assembly.IsDynamic &&
+                !string.IsNullOrWhiteSpace(assembly.Location))
+            .Distinct()
+            .Select(static assembly =>
+                MetadataReference.CreateFromFile(assembly.Location))
+            .ToArray();
+        var parseOptions = new CSharpParseOptions(LanguageVersion.CSharp14);
+        var compilation = CSharpCompilation.Create(
+            "generated-code-abi",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(source, parseOptions),
+            ],
+            references: references,
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                allowUnsafe: true));
+
+        compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error)
+            .Should()
+            .BeEmpty();
+    }
+
 }
