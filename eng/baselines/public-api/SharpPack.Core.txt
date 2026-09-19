@@ -618,7 +618,7 @@ type public sealed class SharpPack.GenerateTypeScriptAttribute : System.Attribut
   ctor public GenerateTypeScriptAttribute()
 
 type public interface SharpPack.IFixedSizeSharpPackable
-  property static System.Int32 Size { get:public; }
+  property static System.Int32 Size { get:public:abstract; }
 
 type public interface SharpPack.ISharpPackContextFormatterFactory<T>
   method public static abstract SharpPack.SharpPackFormatter<T> CreateFormatter(SharpPack.SharpPackSerializerContext context)
@@ -664,7 +664,7 @@ type public struct SharpPack.Internal.ReusableLinkedArrayBufferWriter.Enumerator
   method public sealed override System.Boolean MoveNext()
   method public sealed override System.Void Dispose()
   method public sealed override System.Void Reset()
-  property System.Memory<System.Byte> Current { get:public; }
+  property System.Memory<System.Byte> Current { get:public:sealed override; }
 
 type public static class SharpPack.Internal.ReusableLinkedArrayBufferWriterPool
   method public static SharpPack.Internal.ReusableLinkedArrayBufferWriter Rent(out System.Int64 leaseId)
