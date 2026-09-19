@@ -878,10 +878,10 @@ type public static class SharpPack.SharpPackSerializer
   method public static System.Boolean TrySerialize<T>(System.Span<System.Byte> destination, in T value, out System.Int32 written)
   method public static System.Byte[] Serialize<T>(in T value)
   method public static System.Byte[] Serialize<T>(in T value, SharpPack.SharpPackSerializerContext context)
-  method public static System.Int32 Deserialize<T>(System.ReadOnlySpan<System.Byte> buffer, ref T value)
-  method public static System.Int32 Deserialize<T>(System.ReadOnlySpan<System.Byte> buffer, ref T value, SharpPack.SharpPackSerializerContext context)
-  method public static System.Int32 Deserialize<T>(in System.Buffers.ReadOnlySequence<System.Byte> buffer, ref T value)
-  method public static System.Int32 Deserialize<T>(in System.Buffers.ReadOnlySequence<System.Byte> buffer, ref T value, SharpPack.SharpPackSerializerContext context)
+  method public static System.Int32 Deserialize<[DynamicallyAccessedMembers(NonPublicMethods)] T>(System.ReadOnlySpan<System.Byte> buffer, ref T value)
+  method public static System.Int32 Deserialize<[DynamicallyAccessedMembers(NonPublicMethods)] T>(System.ReadOnlySpan<System.Byte> buffer, ref T value, SharpPack.SharpPackSerializerContext context)
+  method public static System.Int32 Deserialize<[DynamicallyAccessedMembers(NonPublicMethods)] T>(in System.Buffers.ReadOnlySequence<System.Byte> buffer, ref T value)
+  method public static System.Int32 Deserialize<[DynamicallyAccessedMembers(NonPublicMethods)] T>(in System.Buffers.ReadOnlySequence<System.Byte> buffer, ref T value, SharpPack.SharpPackSerializerContext context)
   method public static System.Int32 Serialize<T, TBufferWriter>(TBufferWriter bufferWriter, in T value) where TBufferWriter : class, System.Buffers.IBufferWriter<System.Byte>
   method public static System.Int32 Serialize<T, TBufferWriter>(TBufferWriter bufferWriter, in T value, SharpPack.SharpPackSerializerContext context) where TBufferWriter : class, System.Buffers.IBufferWriter<System.Byte>
   method public static System.Int32 Serialize<T, TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, in T value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
@@ -889,15 +889,15 @@ type public static class SharpPack.SharpPackSerializer
   method public static System.Int32 Serialize<T, TBufferWriter>(ref TBufferWriter bufferWriter, in T value, SharpPack.SharpPackSerializerContext context) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
   method public static System.Threading.Tasks.ValueTask SerializeAsync<T>(System.IO.Stream stream, T value, SharpPack.SharpPackSerializerContext context, System.Threading.CancellationToken cancellationToken = null)
   method public static System.Threading.Tasks.ValueTask SerializeAsync<T>(System.IO.Stream stream, T value, System.Threading.CancellationToken cancellationToken = null)
-  method public static System.Threading.Tasks.ValueTask<T> DeserializeAsync<T>(System.IO.Stream stream, SharpPack.SharpPackSerializerContext context, System.Threading.CancellationToken cancellationToken = null)
-  method public static System.Threading.Tasks.ValueTask<T> DeserializeAsync<T>(System.IO.Stream stream, System.Int32 payloadLength, SharpPack.SharpPackSerializerContext context, System.Threading.CancellationToken cancellationToken = null)
-  method public static System.Threading.Tasks.ValueTask<T> DeserializeAsync<T>(System.IO.Stream stream, System.Int32 payloadLength, System.Threading.CancellationToken cancellationToken = null)
-  method public static System.Threading.Tasks.ValueTask<T> DeserializeAsync<T>(System.IO.Stream stream, System.Threading.CancellationToken cancellationToken = null)
+  method public static System.Threading.Tasks.ValueTask<T> DeserializeAsync<[DynamicallyAccessedMembers(NonPublicMethods)] T>(System.IO.Stream stream, SharpPack.SharpPackSerializerContext context, System.Threading.CancellationToken cancellationToken = null)
+  method public static System.Threading.Tasks.ValueTask<T> DeserializeAsync<[DynamicallyAccessedMembers(NonPublicMethods)] T>(System.IO.Stream stream, System.Int32 payloadLength, SharpPack.SharpPackSerializerContext context, System.Threading.CancellationToken cancellationToken = null)
+  method public static System.Threading.Tasks.ValueTask<T> DeserializeAsync<[DynamicallyAccessedMembers(NonPublicMethods)] T>(System.IO.Stream stream, System.Int32 payloadLength, System.Threading.CancellationToken cancellationToken = null)
+  method public static System.Threading.Tasks.ValueTask<T> DeserializeAsync<[DynamicallyAccessedMembers(NonPublicMethods)] T>(System.IO.Stream stream, System.Threading.CancellationToken cancellationToken = null)
   method public static System.Void ConfigureRuntime(SharpPack.SharpPackSerializerRuntimeOptions options)
-  method public static T Deserialize<T>(System.ReadOnlySpan<System.Byte> buffer)
-  method public static T Deserialize<T>(System.ReadOnlySpan<System.Byte> buffer, SharpPack.SharpPackSerializerContext context)
-  method public static T Deserialize<T>(in System.Buffers.ReadOnlySequence<System.Byte> buffer)
-  method public static T Deserialize<T>(in System.Buffers.ReadOnlySequence<System.Byte> buffer, SharpPack.SharpPackSerializerContext context)
+  method public static T Deserialize<[DynamicallyAccessedMembers(NonPublicMethods)] T>(System.ReadOnlySpan<System.Byte> buffer)
+  method public static T Deserialize<[DynamicallyAccessedMembers(NonPublicMethods)] T>(System.ReadOnlySpan<System.Byte> buffer, SharpPack.SharpPackSerializerContext context)
+  method public static T Deserialize<[DynamicallyAccessedMembers(NonPublicMethods)] T>(in System.Buffers.ReadOnlySequence<System.Byte> buffer)
+  method public static T Deserialize<[DynamicallyAccessedMembers(NonPublicMethods)] T>(in System.Buffers.ReadOnlySequence<System.Byte> buffer, SharpPack.SharpPackSerializerContext context)
 
 type public readonly struct SharpPack.SharpPackSerializerConfiguration : System.IEquatable<SharpPack.SharpPackSerializerConfiguration>
   method public override System.Boolean Equals(System.Object obj)
