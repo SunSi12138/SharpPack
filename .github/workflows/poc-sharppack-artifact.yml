@@ -1,0 +1,32 @@
+name: POC SharpPack artifact
+
+on:
+  push:
+    branches:
+      - poc-sharppack-artifact-20260920
+
+permissions:
+  contents: read
+
+jobs:
+  pack:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: Pack exact v1.1.0 source
+        run: |
+          mkdir -p publish
+          dotnet pack src/SharpPack.Core/SharpPack.Core.csproj -c Release -p:Version=1.1.0 -p:IncludeSymbols=false -o publish
+          dotnet pack src/SharpPack.Generator/SharpPack.Generator.csproj -c Release -p:Version=1.1.0 -o publish
+          dotnet pack src/SharpPack/SharpPack.csproj -c Release -p:Version=1.1.0 -o publish
+      - name: Upload packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: sharppack-1.1.0-poc
+          path: publish/*.nupkg
+          if-no-files-found: error
+          retention-days: 1
