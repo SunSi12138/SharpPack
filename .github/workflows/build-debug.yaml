@@ -28,7 +28,7 @@ jobs:
         with:
           global-json-file: global.json
       - run: dotnet build -c Release
-      - name: Verify architecture baselines
+      - name: Verify public API and generated-source baselines
         run: dotnet run --project tools/SharpPack.Baselines/SharpPack.Baselines.csproj -c Release -- verify
       - run: dotnet test -c Release --no-build
       - run: dotnet run --project sandbox/CollectibleAlcSample -c Release
