@@ -37,17 +37,22 @@ shape directly against the current `SharpPack.Core` runtime, so covered ABI
 removals cannot be hidden by updating Generator in the same change.
 
 The broader CLR-public surface of `SharpPack.Core` and `SharpPack.Streaming`
-is captured in `eng/baselines/public-api/`. The baseline includes public,
+is captured in `eng/baselines/public-api/`. The published Generator package is
+also covered for its host-facing entry point, `SharpPack.Generator.SharpPackGenerator`,
+including its public `Initialize` contract. The baselines include public,
 protected, and protected-internal members, including CLR-public members hidden
 from IntelliSense. Signature-affecting required/optional custom modifiers are
 preserved as `modreq`/`modopt`; for example, an `init` accessor records its
 `IsExternalInit` requirement. Property accessors also retain dispatch
 semantics such as `abstract`, `virtual`, `override`, and `sealed override`.
 Generic constraints preserve nullable constraint metadata where it changes the
-contract, including `notnull` and the `class` / `class?` distinction. CI
-regenerates the surface in memory and fails when it differs from the checked-in
-text; additions therefore require an explicit reviewed baseline update, while
-removals and signature changes cannot pass silently.
+contract, including `notnull` and the `class` / `class?` distinction.
+Trimming/NativeAOT contracts expressed with
+`DynamicallyAccessedMembersAttribute` are preserved on public generic
+parameters, parameters, return values, fields, and properties. CI regenerates
+the surface in memory and fails when it differs from the checked-in text;
+additions therefore require an explicit reviewed baseline update, while removals
+and signature or trimming-contract changes cannot pass silently.
 
 `eng/baselines/generated/representative.g.cs.txt` captures complete generated
 source for a fixed fixture covering a simple object, unmanaged/fixed exact-size
@@ -58,6 +63,15 @@ representative emitter change detector rather than an exhaustive ABI catalog.
 Both baselines are maintained by `tools/SharpPack.Baselines`. CI runs:
 
 `dotnet run --project tools/SharpPack.Baselines/SharpPack.Baselines.csproj -c Release -- verify`
+
+On the x64 CI leg it also runs
+`bash tools/SharpPack.Baselines/characterize-failures.sh`. That characterization
+temporarily changes the shipped `SharpPackSerializerRuntimeOptions.ThreadBufferSize`
+accessor from `init` to `set` and requires the Core API gate to fail, restores
+the source, then temporarily changes the actual Generator emitter header and
+requires the generated-source snapshot gate to fail. The script restores both
+files and finishes with a clean successful verification; the workflow's final
+`git diff --exit-code` is an additional restoration check.
 
 For an intentional API or generated-source change, run the same command with
 `update` instead of `verify` and review the resulting text diff before
