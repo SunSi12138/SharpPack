@@ -187,7 +187,7 @@ static class PublicApiBaseline
             var suffix = field.IsLiteral
                 ? $" = {FormatConstant(field.GetRawConstantValue(), field.FieldType)}"
                 : string.Empty;
-            yield return $"field {visibility} {JoinModifiers(modifiers)}{TypeName(field.FieldType)} {field.Name}{suffix}";
+            yield return $"field {visibility} {JoinModifiers(modifiers)}{TypeName(field.FieldType)}{CustomModifiers(field.GetRequiredCustomModifiers(), field.GetOptionalCustomModifiers())} {field.Name}{suffix}";
         }
 
         foreach (var constructor in type.GetConstructors(DeclaredMembers))
@@ -209,7 +209,7 @@ static class PublicApiBaseline
                 (Name: "set", Method: property.SetMethod),
             }
             .Where(static x => x.Method is not null && Visibility(x.Method) is not null)
-            .Select(static x => $"{x.Name}:{Visibility(x.Method!)}")
+            .Select(static x => Accessor(x.Name, x.Method!))
             .ToArray();
 
             if (accessors.Length == 0)
@@ -223,7 +223,7 @@ static class PublicApiBaseline
                 ? property.Name
                 : $"{property.Name}[{Parameters(indexParameters)}]";
             yield return
-                $"property {(accessor.IsStatic ? "static " : string.Empty)}{TypeName(property.PropertyType)} {name} {{ {string.Join("; ", accessors)}; }}";
+                $"property {(accessor.IsStatic ? "static " : string.Empty)}{TypeName(property.PropertyType)}{CustomModifiers(property.GetRequiredCustomModifiers(), property.GetOptionalCustomModifiers())} {name} {{ {string.Join("; ", accessors)}; }}";
         }
 
         foreach (var @event in type.GetEvents(DeclaredMembers))
@@ -382,15 +382,34 @@ static class PublicApiBaseline
 
     static string ReturnType(MethodInfo method)
     {
+        var requiredModifiers = method.ReturnParameter.GetRequiredCustomModifiers();
+        var optionalModifiers = method.ReturnParameter.GetOptionalCustomModifiers();
         if (!method.ReturnType.IsByRef)
         {
-            return TypeName(method.ReturnType);
+            return TypeName(method.ReturnType) +
+                   CustomModifiers(requiredModifiers, optionalModifiers);
         }
 
         var elementType = method.ReturnType.GetElementType()!;
-        var isReadOnly = method.ReturnParameter.GetRequiredCustomModifiers()
+        var isReadOnly = requiredModifiers
             .Any(static x => x.FullName == "System.Runtime.InteropServices.InAttribute");
-        return $"{(isReadOnly ? "ref readonly" : "ref")} {TypeName(elementType)}";
+        return $"{(isReadOnly ? "ref readonly" : "ref")} {TypeName(elementType)}" +
+               CustomModifiers(requiredModifiers, optionalModifiers);
+    }
+
+    static string Accessor(string name, MethodInfo method)
+    {
+        var requiredModifiers = method.ReturnParameter.GetRequiredCustomModifiers();
+        var optionalModifiers = method.ReturnParameter.GetOptionalCustomModifiers();
+        var accessorName =
+            name == "set" &&
+            requiredModifiers.Any(static x =>
+                x.FullName == "System.Runtime.CompilerServices.IsExternalInit")
+                ? "init"
+                : name;
+
+        return $"{accessorName}:{Visibility(method)}" +
+               CustomModifiers(requiredModifiers, optionalModifiers);
     }
 
     static string Parameters(IEnumerable<ParameterInfo> parameters)
@@ -416,7 +435,7 @@ static class PublicApiBaseline
                     : "ref ";
         }
 
-        var result = $"{prefix}{TypeName(type)} {parameter.Name}";
+        var result = $"{prefix}{TypeName(type)}{CustomModifiers(parameter.GetRequiredCustomModifiers(), parameter.GetOptionalCustomModifiers())} {parameter.Name}";
         if (parameter.IsOptional)
         {
             result += $" = {FormatConstant(parameter.DefaultValue, type)}";
@@ -544,6 +563,24 @@ static class PublicApiBaseline
             decimal number => number.ToString(CultureInfo.InvariantCulture),
             _ => Convert.ToString(value, CultureInfo.InvariantCulture) ?? value.ToString() ?? string.Empty,
         };
+    }
+
+    static string CustomModifiers(
+        IReadOnlyList<Type> requiredModifiers,
+        IReadOnlyList<Type> optionalModifiers)
+    {
+        var builder = new StringBuilder();
+        foreach (var modifier in requiredModifiers)
+        {
+            builder.Append(" modreq(").Append(TypeName(modifier)).Append(')');
+        }
+
+        foreach (var modifier in optionalModifiers)
+        {
+            builder.Append(" modopt(").Append(TypeName(modifier)).Append(')');
+        }
+
+        return builder.ToString();
     }
 
     static string JoinModifiers(IEnumerable<string> modifiers)
