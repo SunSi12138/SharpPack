@@ -452,10 +452,17 @@ static class PublicApiBaseline
             var constraints = new List<string>();
             var attributes = parameter.GenericParameterAttributes &
                              GenericParameterAttributes.SpecialConstraintMask;
-            var hasStruct = (attributes & GenericParameterAttributes.NotNullableValueTypeConstraint) != 0;
-            if ((attributes & GenericParameterAttributes.ReferenceTypeConstraint) != 0)
+            var hasReferenceTypeConstraint =
+                (attributes & GenericParameterAttributes.ReferenceTypeConstraint) != 0;
+            var hasStruct =
+                (attributes & GenericParameterAttributes.NotNullableValueTypeConstraint) != 0;
+            var hasUnmanaged = parameter.GetCustomAttributesData().Any(static x =>
+                x.AttributeType.FullName == "System.Runtime.CompilerServices.IsUnmanagedAttribute");
+            var nullableFlag = GenericParameterNullableFlag(parameter);
+
+            if (hasReferenceTypeConstraint)
             {
-                constraints.Add("class");
+                constraints.Add(nullableFlag == 2 ? "class?" : "class");
             }
 
             if (hasStruct)
@@ -463,16 +470,26 @@ static class PublicApiBaseline
                 constraints.Add("struct");
             }
 
-            if (parameter.GetCustomAttributesData().Any(static x =>
-                    x.AttributeType.FullName == "System.Runtime.CompilerServices.IsUnmanagedAttribute"))
+            if (hasUnmanaged)
             {
                 constraints.Add("unmanaged");
             }
 
-            constraints.AddRange(parameter.GetGenericParameterConstraints()
+            var typeConstraints = parameter.GetGenericParameterConstraints()
                 .Select(TypeName)
                 .Where(static x => x != "System.ValueType")
-                .OrderBy(static x => x, StringComparer.Ordinal));
+                .OrderBy(static x => x, StringComparer.Ordinal)
+                .ToArray();
+
+            if (!hasReferenceTypeConstraint &&
+                !hasStruct &&
+                !hasUnmanaged &&
+                nullableFlag == 1)
+            {
+                constraints.Add("notnull");
+            }
+
+            constraints.AddRange(typeConstraints);
 
             if (!hasStruct &&
                 (attributes & GenericParameterAttributes.DefaultConstructorConstraint) != 0)
@@ -487,6 +504,77 @@ static class PublicApiBaseline
         }
 
         return string.Concat(parts);
+    }
+
+    static byte GenericParameterNullableFlag(Type parameter)
+    {
+        var direct = NullableAttributeFlag(parameter.GetCustomAttributesData());
+        if (direct is not null)
+        {
+            return direct.Value;
+        }
+
+        if (parameter.DeclaringMethod is MethodBase method)
+        {
+            var methodContext = NullableContextFlag(method.GetCustomAttributesData());
+            if (methodContext is not null)
+            {
+                return methodContext.Value;
+            }
+        }
+
+        for (var type = parameter.DeclaringType; type is not null; type = type.DeclaringType)
+        {
+            var typeContext = NullableContextFlag(type.GetCustomAttributesData());
+            if (typeContext is not null)
+            {
+                return typeContext.Value;
+            }
+        }
+
+        return 0;
+    }
+
+    static byte? NullableAttributeFlag(IEnumerable<CustomAttributeData> attributes)
+    {
+        var attribute = attributes.FirstOrDefault(static x =>
+            x.AttributeType.FullName == "System.Runtime.CompilerServices.NullableAttribute");
+        if (attribute is null || attribute.ConstructorArguments.Count != 1)
+        {
+            return null;
+        }
+
+        var argument = attribute.ConstructorArguments[0];
+        if (argument.ArgumentType == typeof(byte) && argument.Value is byte flag)
+        {
+            return flag;
+        }
+
+        if (argument.Value is IReadOnlyCollection<CustomAttributeTypedArgument> values &&
+            values.Count != 0)
+        {
+            var first = values.First();
+            if (first.Value is byte firstFlag)
+            {
+                return firstFlag;
+            }
+        }
+
+        return null;
+    }
+
+    static byte? NullableContextFlag(IEnumerable<CustomAttributeData> attributes)
+    {
+        var attribute = attributes.FirstOrDefault(static x =>
+            x.AttributeType.FullName == "System.Runtime.CompilerServices.NullableContextAttribute");
+        if (attribute is null ||
+            attribute.ConstructorArguments.Count != 1 ||
+            attribute.ConstructorArguments[0].Value is not byte flag)
+        {
+            return null;
+        }
+
+        return flag;
     }
 
     static string TypeName(Type type)
