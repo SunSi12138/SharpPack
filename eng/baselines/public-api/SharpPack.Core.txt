@@ -117,7 +117,7 @@ type public sealed class SharpPack.Formatters.ConcurrentBagFormatter<T> : SharpP
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Concurrent.ConcurrentBag<T> value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref System.Collections.Concurrent.ConcurrentBag<T> value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
 
-type public sealed class SharpPack.Formatters.ConcurrentDictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>>
+type public sealed class SharpPack.Formatters.ConcurrentDictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue>> where TKey : notnull
   ctor public ConcurrentDictionaryFormatter()
   ctor public ConcurrentDictionaryFormatter(System.Collections.Generic.IEqualityComparer<TKey> equalityComparer)
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Concurrent.ConcurrentDictionary<TKey, TValue> value)
@@ -148,7 +148,7 @@ type public sealed class SharpPack.Formatters.DangerousUnmanagedFormatter<T> : S
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref T value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref T value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
 
-type public sealed class SharpPack.Formatters.DictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Generic.Dictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Generic.Dictionary<TKey, TValue>>
+type public sealed class SharpPack.Formatters.DictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Generic.Dictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Generic.Dictionary<TKey, TValue>> where TKey : notnull
   ctor public DictionaryFormatter()
   ctor public DictionaryFormatter(System.Collections.Generic.IEqualityComparer<TKey> equalityComparer)
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Generic.Dictionary<TKey, TValue> value)
@@ -168,7 +168,7 @@ type public sealed class SharpPack.Formatters.FourDimensionalArrayFormatter<T> :
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref T[,,,] value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref T[,,,] value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
 
-type public sealed class SharpPack.Formatters.FrozenDictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Frozen.FrozenDictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Frozen.FrozenDictionary<TKey, TValue>>
+type public sealed class SharpPack.Formatters.FrozenDictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Frozen.FrozenDictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Frozen.FrozenDictionary<TKey, TValue>> where TKey : notnull
   ctor public FrozenDictionaryFormatter()
   ctor public FrozenDictionaryFormatter(System.Collections.Generic.IEqualityComparer<TKey> equalityComparer)
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Frozen.FrozenDictionary<TKey, TValue> value)
@@ -185,11 +185,11 @@ type public sealed class SharpPack.Formatters.GenericCollectionFormatter<TCollec
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref TCollection value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref TCollection value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
 
-type public sealed class SharpPack.Formatters.GenericDictionaryFormatter<TDictionary, TKey, TValue> : SharpPack.Formatters.GenericDictionaryFormatterBase<TDictionary, TKey, TValue>, SharpPack.ISharpPackFormatter<TDictionary> where TDictionary : System.Collections.Generic.IDictionary<TKey, TValue>, new()
+type public sealed class SharpPack.Formatters.GenericDictionaryFormatter<TDictionary, TKey, TValue> : SharpPack.Formatters.GenericDictionaryFormatterBase<TDictionary, TKey, TValue>, SharpPack.ISharpPackFormatter<TDictionary> where TDictionary : System.Collections.Generic.IDictionary<TKey, TValue>, new() where TKey : notnull
   ctor public GenericDictionaryFormatter()
   method protected override TDictionary CreateDictionary()
 
-type public abstract class SharpPack.Formatters.GenericDictionaryFormatterBase<TDictionary, TKey, TValue> : SharpPack.SharpPackFormatter<TDictionary>, SharpPack.ISharpPackFormatter<TDictionary> where TDictionary : System.Collections.Generic.IDictionary<TKey, TValue>
+type public abstract class SharpPack.Formatters.GenericDictionaryFormatterBase<TDictionary, TKey, TValue> : SharpPack.SharpPackFormatter<TDictionary>, SharpPack.ISharpPackFormatter<TDictionary> where TDictionary : System.Collections.Generic.IDictionary<TKey, TValue> where TKey : notnull
   ctor protected GenericDictionaryFormatterBase()
   method protected abstract TDictionary CreateDictionary()
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref TDictionary value)
@@ -216,7 +216,7 @@ type public sealed class SharpPack.Formatters.ImmutableArrayFormatter<T> : Sharp
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Immutable.ImmutableArray<T> value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref System.Collections.Immutable.ImmutableArray<T> value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
 
-type public sealed class SharpPack.Formatters.ImmutableDictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Immutable.ImmutableDictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Immutable.ImmutableDictionary<TKey, TValue>>
+type public sealed class SharpPack.Formatters.ImmutableDictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Immutable.ImmutableDictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Immutable.ImmutableDictionary<TKey, TValue>> where TKey : notnull
   ctor public ImmutableDictionaryFormatter()
   ctor public ImmutableDictionaryFormatter(System.Collections.Generic.IEqualityComparer<TKey> keyEqualityComparer, System.Collections.Generic.IEqualityComparer<TValue> valueEqualityComparer)
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Immutable.ImmutableDictionary<TKey, TValue> value)
@@ -238,7 +238,7 @@ type public sealed class SharpPack.Formatters.ImmutableQueueFormatter<T> : Sharp
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Immutable.ImmutableQueue<T> value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref System.Collections.Immutable.ImmutableQueue<T> value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
 
-type public sealed class SharpPack.Formatters.ImmutableSortedDictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Immutable.ImmutableSortedDictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Immutable.ImmutableSortedDictionary<TKey, TValue>>
+type public sealed class SharpPack.Formatters.ImmutableSortedDictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Immutable.ImmutableSortedDictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Immutable.ImmutableSortedDictionary<TKey, TValue>> where TKey : notnull
   ctor public ImmutableSortedDictionaryFormatter()
   ctor public ImmutableSortedDictionaryFormatter(System.Collections.Generic.IComparer<TKey> keyComparer, System.Collections.Generic.IEqualityComparer<TValue> valueEqualityComparer)
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Immutable.ImmutableSortedDictionary<TKey, TValue> value)
@@ -260,7 +260,7 @@ type public sealed class SharpPack.Formatters.InterfaceCollectionFormatter<T> : 
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Generic.ICollection<T> value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref System.Collections.Generic.ICollection<T> value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
 
-type public sealed class SharpPack.Formatters.InterfaceDictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Generic.IDictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Generic.IDictionary<TKey, TValue>>
+type public sealed class SharpPack.Formatters.InterfaceDictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Generic.IDictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Generic.IDictionary<TKey, TValue>> where TKey : notnull
   ctor public InterfaceDictionaryFormatter()
   ctor public InterfaceDictionaryFormatter(System.Collections.Generic.IEqualityComparer<TKey> equalityComparer)
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Generic.IDictionary<TKey, TValue> value)
@@ -271,12 +271,12 @@ type public sealed class SharpPack.Formatters.InterfaceEnumerableFormatter<T> : 
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Generic.IEnumerable<T> value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref System.Collections.Generic.IEnumerable<T> value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
 
-type public sealed class SharpPack.Formatters.InterfaceGroupingFormatter<TKey, TElement> : SharpPack.SharpPackFormatter<System.Linq.IGrouping<TKey, TElement>>, SharpPack.ISharpPackFormatter<System.Linq.IGrouping<TKey, TElement>>
+type public sealed class SharpPack.Formatters.InterfaceGroupingFormatter<TKey, TElement> : SharpPack.SharpPackFormatter<System.Linq.IGrouping<TKey, TElement>>, SharpPack.ISharpPackFormatter<System.Linq.IGrouping<TKey, TElement>> where TKey : notnull
   ctor public InterfaceGroupingFormatter()
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Linq.IGrouping<TKey, TElement> value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref System.Linq.IGrouping<TKey, TElement> value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
 
-type public sealed class SharpPack.Formatters.InterfaceImmutableDictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Immutable.IImmutableDictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Immutable.IImmutableDictionary<TKey, TValue>>
+type public sealed class SharpPack.Formatters.InterfaceImmutableDictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Immutable.IImmutableDictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Immutable.IImmutableDictionary<TKey, TValue>> where TKey : notnull
   ctor public InterfaceImmutableDictionaryFormatter()
   ctor public InterfaceImmutableDictionaryFormatter(System.Collections.Generic.IEqualityComparer<TKey> keyEqualityComparer, System.Collections.Generic.IEqualityComparer<TValue> valueEqualityComparer)
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Immutable.IImmutableDictionary<TKey, TValue> value)
@@ -308,7 +308,7 @@ type public sealed class SharpPack.Formatters.InterfaceListFormatter<T> : SharpP
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Generic.IList<T> value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref System.Collections.Generic.IList<T> value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
 
-type public sealed class SharpPack.Formatters.InterfaceLookupFormatter<TKey, TElement> : SharpPack.SharpPackFormatter<System.Linq.ILookup<TKey, TElement>>, SharpPack.ISharpPackFormatter<System.Linq.ILookup<TKey, TElement>>
+type public sealed class SharpPack.Formatters.InterfaceLookupFormatter<TKey, TElement> : SharpPack.SharpPackFormatter<System.Linq.ILookup<TKey, TElement>>, SharpPack.ISharpPackFormatter<System.Linq.ILookup<TKey, TElement>> where TKey : notnull
   ctor public InterfaceLookupFormatter()
   ctor public InterfaceLookupFormatter(System.Collections.Generic.IEqualityComparer<TKey> equalityComparer)
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Linq.ILookup<TKey, TElement> value)
@@ -319,7 +319,7 @@ type public sealed class SharpPack.Formatters.InterfaceReadOnlyCollectionFormatt
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Generic.IReadOnlyCollection<T> value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref System.Collections.Generic.IReadOnlyCollection<T> value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
 
-type public sealed class SharpPack.Formatters.InterfaceReadOnlyDictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>>
+type public sealed class SharpPack.Formatters.InterfaceReadOnlyDictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>> where TKey : notnull
   ctor public InterfaceReadOnlyDictionaryFormatter()
   ctor public InterfaceReadOnlyDictionaryFormatter(System.Collections.Generic.IEqualityComparer<TKey> equalityComparer)
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Generic.IReadOnlyDictionary<TKey, TValue> value)
@@ -440,13 +440,13 @@ type public sealed class SharpPack.Formatters.SharpPackableFormatter<T> : SharpP
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref T value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref T value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
 
-type public sealed class SharpPack.Formatters.SortedDictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Generic.SortedDictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Generic.SortedDictionary<TKey, TValue>>
+type public sealed class SharpPack.Formatters.SortedDictionaryFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Generic.SortedDictionary<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Generic.SortedDictionary<TKey, TValue>> where TKey : notnull
   ctor public SortedDictionaryFormatter()
   ctor public SortedDictionaryFormatter(System.Collections.Generic.IComparer<TKey> comparer)
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Generic.SortedDictionary<TKey, TValue> value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref System.Collections.Generic.SortedDictionary<TKey, TValue> value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
 
-type public sealed class SharpPack.Formatters.SortedListFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Generic.SortedList<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Generic.SortedList<TKey, TValue>>
+type public sealed class SharpPack.Formatters.SortedListFormatter<TKey, TValue> : SharpPack.SharpPackFormatter<System.Collections.Generic.SortedList<TKey, TValue>>, SharpPack.ISharpPackFormatter<System.Collections.Generic.SortedList<TKey, TValue>> where TKey : notnull
   ctor public SortedListFormatter()
   ctor public SortedListFormatter(System.Collections.Generic.IComparer<TKey> comparer)
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Generic.SortedList<TKey, TValue> value)
@@ -484,7 +484,7 @@ type public sealed class SharpPack.Formatters.TimeZoneInfoFormatter : SharpPack.
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.TimeZoneInfo value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref System.TimeZoneInfo value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
 
-type public sealed class SharpPack.Formatters.TupleFormatter<T1, T2, T3, T4, T5, T6, T7, TRest> : SharpPack.SharpPackFormatter<System.Tuple<T1, T2, T3, T4, T5, T6, T7, TRest>>, SharpPack.ISharpPackFormatter<System.Tuple<T1, T2, T3, T4, T5, T6, T7, TRest>>
+type public sealed class SharpPack.Formatters.TupleFormatter<T1, T2, T3, T4, T5, T6, T7, TRest> : SharpPack.SharpPackFormatter<System.Tuple<T1, T2, T3, T4, T5, T6, T7, TRest>>, SharpPack.ISharpPackFormatter<System.Tuple<T1, T2, T3, T4, T5, T6, T7, TRest>> where TRest : notnull
   ctor public TupleFormatter()
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Tuple<T1, T2, T3, T4, T5, T6, T7, TRest> value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref System.Tuple<T1, T2, T3, T4, T5, T6, T7, TRest> value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
@@ -924,7 +924,7 @@ type public sealed class SharpPack.SharpPackSerializerContextBuilder
   method public SharpPack.SharpPackSerializerContextBuilder Configure(SharpPack.SharpPackSerializerConfiguration value)
   method public SharpPack.SharpPackSerializerContextBuilder Register<T>(SharpPack.SharpPackFormatter<T> formatter)
   method public SharpPack.SharpPackSerializerContextBuilder RegisterCollection<TCollection, TElement>() where TCollection : System.Collections.Generic.ICollection<TElement>, new()
-  method public SharpPack.SharpPackSerializerContextBuilder RegisterDictionary<TDictionary, TKey, TValue>() where TDictionary : System.Collections.Generic.IDictionary<TKey, TValue>, new()
+  method public SharpPack.SharpPackSerializerContextBuilder RegisterDictionary<TDictionary, TKey, TValue>() where TDictionary : System.Collections.Generic.IDictionary<TKey, TValue>, new() where TKey : notnull
   method public SharpPack.SharpPackSerializerContextBuilder RegisterFactory<T, TFactory>() where TFactory : SharpPack.ISharpPackFormatterFactory<T>
   method public SharpPack.SharpPackSerializerContextBuilder RegisterSet<TSet, TElement>() where TSet : System.Collections.Generic.ISet<TElement>, new()
 
