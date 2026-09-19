@@ -23,6 +23,8 @@ jobs:
       - run: dotnet build -c Release -p:Version="$VERSION"
         env:
           VERSION: ${{ inputs.version }}
+      - name: Verify architecture baselines
+        run: dotnet run --project tools/SharpPack.Baselines/SharpPack.Baselines.csproj -c Release -- verify
       - run: dotnet test -c Release --no-build
       - run: dotnet run --project sandbox/CollectibleAlcSample -c Release
       - run: tools/CompatibilityBaseline/generate-original-head-corpus.sh
