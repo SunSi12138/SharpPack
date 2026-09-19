@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using SharpPack;
 using SharpPack.Generator;
 using SharpPack.Streaming;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Reflection;
 using System.Text;
@@ -29,6 +30,10 @@ static class BaselineProgram
                 PublicApiBaseline.Create(typeof(SharpPackSerializer).Assembly),
             ["eng/baselines/public-api/SharpPack.Streaming.txt"] =
                 PublicApiBaseline.Create(typeof(SharpPackStreamingSerializer).Assembly),
+            ["eng/baselines/public-api/SharpPack.Generator.txt"] =
+                PublicApiBaseline.Create(
+                    typeof(SharpPackGenerator).Assembly,
+                    static type => type == typeof(SharpPackGenerator)),
             ["eng/baselines/generated/representative.g.cs.txt"] =
                 GeneratedSourceBaseline.Create(),
         };
@@ -140,7 +145,9 @@ static class PublicApiBaseline
         BindingFlags.Static |
         BindingFlags.DeclaredOnly;
 
-    public static string Create(Assembly assembly)
+    public static string Create(
+        Assembly assembly,
+        Func<Type, bool>? includeType = null)
     {
         var builder = new StringBuilder();
         builder.AppendLine("# SharpPack public API baseline");
@@ -149,6 +156,7 @@ static class PublicApiBaseline
 
         foreach (var type in assembly.GetTypes()
                      .Where(IsExternallyVisible)
+                     .Where(type => includeType is null || includeType(type))
                      .OrderBy(TypeName, StringComparer.Ordinal))
         {
             builder.AppendLine();
@@ -187,7 +195,7 @@ static class PublicApiBaseline
             var suffix = field.IsLiteral
                 ? $" = {FormatConstant(field.GetRawConstantValue(), field.FieldType)}"
                 : string.Empty;
-            yield return $"field {visibility} {JoinModifiers(modifiers)}{TypeName(field.FieldType)}{CustomModifiers(field.GetRequiredCustomModifiers(), field.GetOptionalCustomModifiers())} {field.Name}{suffix}";
+            yield return $"field {visibility} {JoinModifiers(modifiers)}{TrimmingContractAttributes(field.GetCustomAttributesData())}{TypeName(field.FieldType)}{CustomModifiers(field.GetRequiredCustomModifiers(), field.GetOptionalCustomModifiers())} {field.Name}{suffix}";
         }
 
         foreach (var constructor in type.GetConstructors(DeclaredMembers))
@@ -222,8 +230,11 @@ static class PublicApiBaseline
             var name = indexParameters.Length == 0
                 ? property.Name
                 : $"{property.Name}[{Parameters(indexParameters)}]";
+            var trimmingAttributes = TrimmingContractAttributes(
+                property.GetMethod?.ReturnParameter.GetCustomAttributesData() ??
+                property.GetCustomAttributesData());
             yield return
-                $"property {(accessor.IsStatic ? "static " : string.Empty)}{TypeName(property.PropertyType)}{CustomModifiers(property.GetRequiredCustomModifiers(), property.GetOptionalCustomModifiers())} {name} {{ {string.Join("; ", accessors)}; }}";
+                $"property {(accessor.IsStatic ? "static " : string.Empty)}{trimmingAttributes}{TypeName(property.PropertyType)}{CustomModifiers(property.GetRequiredCustomModifiers(), property.GetOptionalCustomModifiers())} {name} {{ {string.Join("; ", accessors)}; }}";
         }
 
         foreach (var @event in type.GetEvents(DeclaredMembers))
@@ -256,7 +267,7 @@ static class PublicApiBaseline
             var modifiers = MethodModifiers(method, includeStatic: true);
 
             var genericArguments = method.IsGenericMethodDefinition
-                ? $"<{string.Join(", ", method.GetGenericArguments().Select(static x => x.Name))}>"
+                ? $"<{string.Join(", ", method.GetGenericArguments().Select(GenericParameterDeclaration))}>"
                 : string.Empty;
             var constraints = GenericConstraints(method.GetGenericArguments());
             yield return
@@ -291,7 +302,7 @@ static class PublicApiBaseline
         }
 
         parts.Add(TypeKind(type));
-        parts.Add(TypeName(type));
+        parts.Add(DeclaredTypeName(type));
 
         var bases = new List<string>();
         if (type.IsEnum)
@@ -376,16 +387,20 @@ static class PublicApiBaseline
     {
         var requiredModifiers = method.ReturnParameter.GetRequiredCustomModifiers();
         var optionalModifiers = method.ReturnParameter.GetOptionalCustomModifiers();
+        var trimmingAttributes =
+            TrimmingContractAttributes(method.ReturnParameter.GetCustomAttributesData());
         if (!method.ReturnType.IsByRef)
         {
-            return TypeName(method.ReturnType) +
+            return trimmingAttributes +
+                   TypeName(method.ReturnType) +
                    CustomModifiers(requiredModifiers, optionalModifiers);
         }
 
         var elementType = method.ReturnType.GetElementType()!;
         var isReadOnly = requiredModifiers
             .Any(static x => x.FullName == "System.Runtime.InteropServices.InAttribute");
-        return $"{(isReadOnly ? "ref readonly" : "ref")} {TypeName(elementType)}" +
+        return trimmingAttributes +
+               $"{(isReadOnly ? "ref readonly" : "ref")} {TypeName(elementType)}" +
                CustomModifiers(requiredModifiers, optionalModifiers);
     }
 
@@ -460,7 +475,8 @@ static class PublicApiBaseline
                     : "ref ";
         }
 
-        var result = $"{prefix}{TypeName(type)}{CustomModifiers(parameter.GetRequiredCustomModifiers(), parameter.GetOptionalCustomModifiers())} {parameter.Name}";
+        var result =
+            $"{TrimmingContractAttributes(parameter.GetCustomAttributesData())}{prefix}{TypeName(type)}{CustomModifiers(parameter.GetRequiredCustomModifiers(), parameter.GetOptionalCustomModifiers())} {parameter.Name}";
         if (parameter.IsOptional)
         {
             result += $" = {FormatConstant(parameter.DefaultValue, type)}";
@@ -601,6 +617,58 @@ static class PublicApiBaseline
         }
 
         return flag;
+    }
+
+    static string GenericParameterDeclaration(Type parameter)
+        => TrimmingContractAttributes(parameter.GetCustomAttributesData()) + parameter.Name;
+
+    static string DeclaredTypeName(Type type)
+    {
+        var name = TypeName(type);
+        if (!type.IsGenericType)
+        {
+            return name;
+        }
+
+        var allArguments = type.GetGenericArguments();
+        var declaringArgumentCount = type.DeclaringType?.GetGenericArguments().Length ?? 0;
+        var ownArguments = allArguments.Skip(declaringArgumentCount).ToArray();
+        if (ownArguments.Length == 0)
+        {
+            return name;
+        }
+
+        var genericStart = name.LastIndexOf('<');
+        return genericStart < 0
+            ? name
+            : name[..genericStart] +
+              "<" +
+              string.Join(", ", ownArguments.Select(GenericParameterDeclaration)) +
+              ">";
+    }
+
+    static string TrimmingContractAttributes(IEnumerable<CustomAttributeData> attributes)
+    {
+        var builder = new StringBuilder();
+        foreach (var attribute in attributes.Where(static x =>
+                     x.AttributeType.FullName ==
+                     "System.Diagnostics.CodeAnalysis.DynamicallyAccessedMembersAttribute"))
+        {
+            if (attribute.ConstructorArguments.Count != 1 ||
+                attribute.ConstructorArguments[0].Value is null)
+            {
+                continue;
+            }
+
+            var value = (DynamicallyAccessedMemberTypes)Convert.ToInt32(
+                attribute.ConstructorArguments[0].Value,
+                CultureInfo.InvariantCulture);
+            builder.Append("[DynamicallyAccessedMembers(")
+                .Append(value)
+                .Append(")] ");
+        }
+
+        return builder.ToString();
     }
 
     static string TypeName(Type type)
