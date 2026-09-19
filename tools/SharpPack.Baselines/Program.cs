@@ -253,15 +253,7 @@ static class PublicApiBaseline
                 continue;
             }
 
-            var modifiers = new List<string>();
-            if (method.IsStatic) modifiers.Add("static");
-            if (method.IsAbstract) modifiers.Add("abstract");
-            else if (method.IsVirtual)
-            {
-                if (method.IsFinal) modifiers.Add("sealed override");
-                else if (method.GetBaseDefinition() != method) modifiers.Add("override");
-                else modifiers.Add("virtual");
-            }
+            var modifiers = MethodModifiers(method, includeStatic: true);
 
             var genericArguments = method.IsGenericMethodDefinition
                 ? $"<{string.Join(", ", method.GetGenericArguments().Select(static x => x.Name))}>"
@@ -407,9 +399,42 @@ static class PublicApiBaseline
                 x.FullName == "System.Runtime.CompilerServices.IsExternalInit")
                 ? "init"
                 : name;
+        var modifiers = MethodModifiers(method, includeStatic: false);
 
         return $"{accessorName}:{Visibility(method)}" +
+               (modifiers.Count == 0 ? string.Empty : ":" + string.Join("+", modifiers)) +
                CustomModifiers(requiredModifiers, optionalModifiers);
+    }
+
+    static List<string> MethodModifiers(MethodInfo method, bool includeStatic)
+    {
+        var modifiers = new List<string>();
+        if (includeStatic && method.IsStatic)
+        {
+            modifiers.Add("static");
+        }
+
+        if (method.IsAbstract)
+        {
+            modifiers.Add("abstract");
+        }
+        else if (method.IsVirtual)
+        {
+            if (method.IsFinal)
+            {
+                modifiers.Add("sealed override");
+            }
+            else if (method.GetBaseDefinition() != method)
+            {
+                modifiers.Add("override");
+            }
+            else
+            {
+                modifiers.Add("virtual");
+            }
+        }
+
+        return modifiers;
     }
 
     static string Parameters(IEnumerable<ParameterInfo> parameters)
