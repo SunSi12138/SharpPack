@@ -41,8 +41,10 @@ is captured in `eng/baselines/public-api/`. The baseline includes public,
 protected, and protected-internal members, including CLR-public members hidden
 from IntelliSense. Signature-affecting required/optional custom modifiers are
 preserved as `modreq`/`modopt`; for example, an `init` accessor records its
-`IsExternalInit` requirement. CI regenerates the surface in memory and fails
-when it differs from the checked-in text; additions therefore require an
+`IsExternalInit` requirement. Generic constraints also preserve nullable
+constraint metadata where it changes the contract, including `notnull` and the
+`class` / `class?` distinction. CI regenerates the surface in memory and
+fails when it differs from the checked-in text; additions therefore require an
 explicit reviewed baseline update, while removals and signature changes cannot
 pass silently.
 
