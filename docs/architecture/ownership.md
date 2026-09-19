@@ -21,7 +21,7 @@ state after an exception.
 
 **Owner / boundary:** a `SharpPackSerializerContext` owns its registrations and
 context-local resolution results. Process-wide caches may contain only types and
-formatters that cannot shorten collectible `AssemblyLoadContext` lifetimes.
+formatters that cannot lengthen collectible `AssemblyLoadContext` lifetimes.
 
 **Allowed:** immutable registration tables, context-local closed-generic
 factories, weak associations for collectible types, and release of context state
