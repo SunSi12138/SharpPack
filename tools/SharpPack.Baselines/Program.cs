@@ -536,7 +536,8 @@ static class PublicApiBaseline
 
         return value switch
         {
-            string text => "\\\"" + text.Replace("\\\\", "\\\\\\\\", StringComparison.Ordinal)\n                .Replace("\\\"", "\\\\\\\"", StringComparison.Ordinal) + "\\\"",\n            char ch => "'" + ch.ToString().Replace("'", "\\'", StringComparison.Ordinal) + "'",
+            string text => System.Text.Json.JsonSerializer.Serialize(text),
+            char ch => "'" + ch.ToString().Replace("'", "\\'", StringComparison.Ordinal) + "'",
             bool boolean => boolean ? "true" : "false",
             float single => single.ToString("R", CultureInfo.InvariantCulture),
             double number => number.ToString("R", CultureInfo.InvariantCulture),
