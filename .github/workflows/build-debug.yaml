@@ -29,20 +29,8 @@ jobs:
         with:
           global-json-file: global.json
       - run: dotnet build -c Release
-      - name: Bootstrap architecture baselines
-        run: |
-          dotnet run --project tools/SharpPack.Baselines/SharpPack.Baselines.csproj -c Release -- update
-          for file in \
-            eng/baselines/public-api/SharpPack.Core.txt \
-            eng/baselines/public-api/SharpPack.Streaming.txt \
-            eng/baselines/generated/representative.g.cs.txt
-          do
-            echo "BASELINE_BEGIN:$file"
-            base64 -w0 "$file"
-            echo
-            echo "BASELINE_END:$file"
-          done
-          exit 1
+      - name: Verify architecture baselines
+        run: dotnet run --project tools/SharpPack.Baselines/SharpPack.Baselines.csproj -c Release -- verify
       - run: dotnet test -c Release --no-build
       - run: dotnet run --project sandbox/CollectibleAlcSample -c Release
       - run: dotnet pack -c Release --no-build -o "$GITHUB_WORKSPACE/artifacts"
