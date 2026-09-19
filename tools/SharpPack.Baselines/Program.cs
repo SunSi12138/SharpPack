@@ -484,6 +484,7 @@ static class PublicApiBaseline
             if (!hasReferenceTypeConstraint &&
                 !hasStruct &&
                 !hasUnmanaged &&
+                typeConstraints.Length == 0 &&
                 nullableFlag == 1)
             {
                 constraints.Add("notnull");
