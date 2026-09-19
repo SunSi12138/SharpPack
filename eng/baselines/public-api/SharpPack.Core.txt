@@ -906,7 +906,7 @@ type public readonly struct SharpPack.SharpPackSerializerConfiguration : System.
   method public sealed override System.Boolean Equals(SharpPack.SharpPackSerializerConfiguration other)
   method public static System.Boolean op_Equality(SharpPack.SharpPackSerializerConfiguration left, SharpPack.SharpPackSerializerConfiguration right)
   method public static System.Boolean op_Inequality(SharpPack.SharpPackSerializerConfiguration left, SharpPack.SharpPackSerializerConfiguration right)
-  property SharpPack.SharpPackStringEncoding StringEncoding { get:public; set:public; }
+  property SharpPack.SharpPackStringEncoding StringEncoding { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
   property static SharpPack.SharpPackSerializerConfiguration Default { get:public; }
   property static SharpPack.SharpPackSerializerConfiguration Utf16 { get:public; }
   property static SharpPack.SharpPackSerializerConfiguration Utf8 { get:public; }
@@ -939,8 +939,8 @@ type public sealed class SharpPack.SharpPackSerializerRuntimeOptions : System.IE
   method public sealed override System.Boolean Equals(SharpPack.SharpPackSerializerRuntimeOptions other)
   method public static System.Boolean op_Equality(SharpPack.SharpPackSerializerRuntimeOptions left, SharpPack.SharpPackSerializerRuntimeOptions right)
   method public static System.Boolean op_Inequality(SharpPack.SharpPackSerializerRuntimeOptions left, SharpPack.SharpPackSerializerRuntimeOptions right)
-  property System.Boolean PinThreadBuffer { get:public; set:public; }
-  property System.Int32 ThreadBufferSize { get:public; set:public; }
+  property System.Boolean PinThreadBuffer { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
+  property System.Int32 ThreadBufferSize { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
   property static SharpPack.SharpPackSerializerRuntimeOptions Default { get:public; }
   property static SharpPack.SharpPackSerializerRuntimeOptions HighThroughput { get:public; }
 
