@@ -32,8 +32,10 @@ hide cancellation and transport exceptions.
 
 **Verification:** tests must force one-byte fragmentation, coalesced frames,
 oversized/truncated input, cancellation, and a transport that applies
-backpressure. Resource-ownership tests verify that success and failure release
-temporary state without closing the transport.
+backpressure. `StreamingSerializer.SerializeAwaitsPipeBackpressure` configures
+low `PipeOptions` pause/resume thresholds and proves serialization remains
+incomplete until the reader drains the pipe. Resource-ownership tests verify
+that success and failure release temporary state without closing the transport.
 
 ## Evolution rule
 
