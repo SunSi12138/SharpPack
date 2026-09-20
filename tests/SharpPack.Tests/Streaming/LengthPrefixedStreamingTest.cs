@@ -305,12 +305,19 @@ public class LengthPrefixedStreamingTest
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             async () => await read);
 
+        pipe.Writer.Write(CreateFrame(123));
+        await pipe.Writer.FlushAsync();
+
+        var retry = await SharpPackStreamingSerializer
+            .DeserializeLengthPrefixedAsync<int>(pipe.Reader);
+        retry.Should().Be(123);
+
         await pipe.Reader.CompleteAsync();
         await pipe.Writer.CompleteAsync();
     }
 
     [Fact]
-    public async Task LengthPrefixed_CancellationWhileWaitingForPayload_BalancesPipeRead()
+    public async Task LengthPrefixed_CancellationWhileWaitingForPayload_TerminatesFramedReader()
     {
         var expected = new StreamingLargeVariableItem
         {
@@ -336,11 +343,26 @@ public class LengthPrefixedStreamingTest
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             async () => await read);
 
-        pipe.Writer.Write(new byte[] { 0x7A });
+        var remainingPayload = frame.AsSpan(initialLength).ToArray();
+        var nextFrame = CreateFrame(
+            new StreamingLargeVariableItem { Payload = "next" });
+        pipe.Writer.Write(remainingPayload);
+        pipe.Writer.Write(nextFrame);
         await pipe.Writer.FlushAsync();
 
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await SharpPackStreamingSerializer
+                .DeserializeLengthPrefixedAsync<StreamingLargeVariableItem>(
+                    pipe.Reader));
+
         var postCancellation = await pipe.Reader.ReadAsync();
-        postCancellation.Buffer.ToArray().Should().Equal(0x7A);
+        postCancellation.Buffer.Length.Should()
+            .Be(remainingPayload.Length + nextFrame.Length);
+        postCancellation.Buffer
+            .Slice(0, remainingPayload.Length)
+            .ToArray()
+            .Should()
+            .Equal(remainingPayload);
         pipe.Reader.AdvanceTo(postCancellation.Buffer.End);
 
         await pipe.Reader.CompleteAsync();
