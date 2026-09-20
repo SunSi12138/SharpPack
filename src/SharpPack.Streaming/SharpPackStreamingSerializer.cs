@@ -484,7 +484,7 @@ public static class SharpPackStreamingSerializer
 
         if (enumerator.MoveNext())
         {
-            throw CreateCollectionCountMismatch(count, count + 1);
+            throw CreateCollectionCountMismatch(count, (long)count + 1);
         }
 
         var finalFlush = await pipeWriter
@@ -574,7 +574,7 @@ public static class SharpPackStreamingSerializer
 
             if (enumerator.MoveNext())
             {
-                throw CreateCollectionCountMismatch(count, count + 1);
+                throw CreateCollectionCountMismatch(count, (long)count + 1);
             }
 
             await tempWriter
@@ -607,7 +607,7 @@ public static class SharpPackStreamingSerializer
 
     static SharpPackSerializationException CreateCollectionCountMismatch(
         int declaredCount,
-        int actualCount)
+        long actualCount)
         => new(
             $"The declared collection count is {declaredCount}, but the source " +
             $"contains {actualCount} item(s).");
