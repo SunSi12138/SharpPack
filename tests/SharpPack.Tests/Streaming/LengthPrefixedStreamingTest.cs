@@ -1,7 +1,12 @@
 using FluentAssertions;
 using SharpPack.Streaming;
+using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
+using System.IO;
 using System.IO.Pipelines;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace SharpPack.Tests.Streaming;
 
