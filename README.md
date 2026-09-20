@@ -597,17 +597,45 @@ Also the member name is automatically converted to camelCase. If you want to use
 
 Streaming Serialization
 ---
-`SharpPack.Streaming` provides `SharpPackStreamingSerializer`, which adds additional support for serializing and deserializing collections with streams.
+`SharpPack.Streaming` provides `SharpPackStreamingSerializer` for collection streaming and framed item transports.
+
+The legacy `DeserializeAsync<T>` collection API is unframed. It can safely make progress when an item is known to be complete from the payload shape, but buffer occupancy alone cannot prove completeness for arbitrary variable-size items such as large strings, nested collections, custom formatters, or reference-aware objects. Do not use `bufferAtLeast` or `readMinimumSize` as message-boundary controls.
+
+For arbitrary variable-size items, use the additive length-prefixed transport APIs. Each frame is:
+
+```text
+uint32 payloadLength (little endian)
+SharpPack payload bytes
+```
+
+The 4-byte prefix belongs to `SharpPack.Streaming`; it is not part of the standard SharpPack/MemoryPack-compatible payload. The sender buffers one item to determine its payload length, and the receiver waits for the complete declared payload before invoking Core deserialization. Multiple frames can be read with `DeserializeLengthPrefixedItemsAsync<T>`.
+
+Cancellation before a frame header is consumed leaves the reader aligned and the length-prefixed APIs can be called again. If cancellation interrupts payload collection after the frame header has been consumed, the remaining frame boundary cannot be recovered without resumable per-frame state. SharpPack therefore treats that `PipeReader` as terminal for the length-prefixed APIs: the canceled call throws `OperationCanceledException`, and subsequent length-prefixed reads throw `InvalidOperationException`. The caller still owns and completes the `PipeReader`; start a new framed transport before resuming framed deserialization.
 
 ```csharp
-public static class SharpPackStreamingSerializer
+await SharpPackStreamingSerializer.SerializeLengthPrefixedAsync(
+    pipe.Writer,
+    message,
+    context,
+    cancellationToken);
+
+MyMessage? single = await SharpPackStreamingSerializer
+    .DeserializeLengthPrefixedAsync<MyMessage>(
+        pipe.Reader,
+        context: context,
+        cancellationToken: cancellationToken);
+
+await foreach (var item in SharpPackStreamingSerializer
+                   .DeserializeLengthPrefixedItemsAsync<MyMessage>(
+                       pipe.Reader,
+                       context: context,
+                       cancellationToken: cancellationToken))
 {
-    public static async ValueTask SerializeAsync<T>(PipeWriter pipeWriter, int count, IEnumerable<T> source, int flushRate = 4096, CancellationToken cancellationToken = default)
-    public static async ValueTask SerializeAsync<T>(Stream stream, int count, IEnumerable<T> source, int flushRate = 4096, CancellationToken cancellationToken = default)
-    public static async IAsyncEnumerable<T?> DeserializeAsync<T>(PipeReader pipeReader, int bufferAtLeast = 4096, int readMinimumSize = 8192, [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    public static IAsyncEnumerable<T?> DeserializeAsync<T>(Stream stream, int bufferAtLeast = 4096, int readMinimumSize = 8192, CancellationToken cancellationToken = default)
+    // one complete frame per item
 }
 ```
+
+The existing `SerializeFrameAsync` / `DeserializeFrameAsync` pair remains available when an outer protocol already owns and supplies the payload length. Those methods do not write or read the 4-byte SharpPack.Streaming length prefix.
 
 Custom formatter API
 ---
@@ -623,7 +651,7 @@ var context = new SharpPackSerializerContextBuilder()
 
 RPC
 ---
-For length-prefixed transports, `SharpPack.Streaming` exposes `SerializeFrameAsync` and `DeserializeFrameAsync`. The frame boundary is transport metadata and does not alter the SharpPack payload.
+For transports that already know the payload length, `SerializeFrameAsync` and `DeserializeFrameAsync` operate on exactly that caller-owned payload boundary. For a self-contained SharpPack.Streaming frame with its own 4-byte little-endian length prefix, use `SerializeLengthPrefixedAsync`, `DeserializeLengthPrefixedAsync`, or `DeserializeLengthPrefixedItemsAsync`. In both cases, transport framing is outside the SharpPack payload and does not alter Core wire bytes.
 
 Native AOT
 ---
