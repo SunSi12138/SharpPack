@@ -270,67 +270,99 @@ public static class SharpPackStreamingSerializer
                 $"{maxFrameLength}.");
         }
 
-        if (payloadLength > int.MaxValue - sizeof(uint))
+        if (payloadLength > Array.MaxLength)
         {
             pipeReader.AdvanceTo(buffer.Start, headerReader.Position);
             throw new SharpPackSerializationException(
-                $"The frame payload length {payloadLength} exceeds the supported framed-read range.");
+                $"The frame payload length {payloadLength} exceeds the supported array length " +
+                $"{Array.MaxLength}.");
         }
 
-        var frameLength = payloadLength + sizeof(uint);
-        if (buffer.Length < frameLength)
-        {
-            pipeReader.AdvanceTo(buffer.Start, buffer.End);
-            if (readResult.IsCompleted)
-            {
-                throw new EndOfStreamException(
-                    $"The pipe completed with {buffer.Length - sizeof(uint)} payload bytes available; " +
-                    $"{payloadLength} bytes were required.");
-            }
-
-            readResult = await pipeReader
-                .ReadAtLeastAsync(frameLength, cancellationToken)
-                .ConfigureAwait(false);
-            buffer = readResult.Buffer;
-
-            if (readResult.IsCanceled)
-            {
-                pipeReader.AdvanceTo(buffer.Start, buffer.Start);
-                throw new OperationCanceledException(cancellationToken);
-            }
-
-            if (buffer.Length < frameLength)
-            {
-                pipeReader.AdvanceTo(buffer.Start, buffer.End);
-                throw new EndOfStreamException(
-                    $"The pipe completed with {Math.Max(0, buffer.Length - sizeof(uint))} " +
-                    $"payload bytes available; {payloadLength} bytes were required.");
-            }
-        }
-
-        var payload = buffer.Slice(sizeof(uint), payloadLength);
+        byte[]? rentedPayload = null;
         try
         {
+            Span<byte> payload = payloadLength == 0
+                ? Span<byte>.Empty
+                : (rentedPayload = ArrayPool<byte>.Shared.Rent(payloadLength))
+                    .AsSpan(0, payloadLength);
+
+            var payloadStart = headerReader.Position;
+            var availablePayload = buffer.Slice(payloadStart);
+            var copied = (int)Math.Min(
+                availablePayload.Length,
+                payloadLength);
+
+            if (copied != 0)
+            {
+                availablePayload.Slice(0, copied).CopyTo(payload);
+            }
+
+            var consumed = buffer.GetPosition(copied, payloadStart);
+            pipeReader.AdvanceTo(consumed, consumed);
+
+            while (copied < payloadLength)
+            {
+                readResult = await pipeReader
+                    .ReadAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                buffer = readResult.Buffer;
+
+                if (readResult.IsCanceled)
+                {
+                    pipeReader.AdvanceTo(buffer.Start, buffer.Start);
+                    throw new OperationCanceledException(cancellationToken);
+                }
+
+                if (buffer.IsEmpty)
+                {
+                    pipeReader.AdvanceTo(buffer.End, buffer.End);
+                    if (readResult.IsCompleted)
+                    {
+                        throw new EndOfStreamException(
+                            $"The pipe completed with {copied} payload bytes available; " +
+                            $"{payloadLength} bytes were required.");
+                    }
+
+                    continue;
+                }
+
+                var remaining = payloadLength - copied;
+                var toCopy = (int)Math.Min(buffer.Length, remaining);
+                buffer.Slice(0, toCopy)
+                    .CopyTo(payload.Slice(copied, toCopy));
+                copied += toCopy;
+
+                var payloadEnd = buffer.GetPosition(toCopy);
+                pipeReader.AdvanceTo(payloadEnd, payloadEnd);
+
+                if (copied < payloadLength && readResult.IsCompleted)
+                {
+                    throw new EndOfStreamException(
+                        $"The pipe completed with {copied} payload bytes available; " +
+                        $"{payloadLength} bytes were required.");
+                }
+            }
+
             T? value = default;
-            var consumed = context is null
+            var consumedPayload = context is null
                 ? SharpPackSerializer.Deserialize(payload, ref value)
                 : SharpPackSerializer.Deserialize(payload, ref value, context);
 
-            if (consumed != payloadLength)
+            if (consumedPayload != payloadLength)
             {
                 throw new SharpPackSerializationException(
-                    $"The formatter consumed {consumed} of the " +
+                    $"The formatter consumed {consumedPayload} of the " +
                     $"{payloadLength}-byte framed payload.");
             }
 
-            var frameEnd = buffer.GetPosition(frameLength);
-            pipeReader.AdvanceTo(frameEnd, frameEnd);
             return (true, value);
         }
-        catch
+        finally
         {
-            pipeReader.AdvanceTo(buffer.Start, buffer.End);
-            throw;
+            if (rentedPayload is not null)
+            {
+                ArrayPool<byte>.Shared.Return(rentedPayload);
+            }
         }
     }
 
