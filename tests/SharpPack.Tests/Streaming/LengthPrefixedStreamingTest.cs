@@ -78,14 +78,17 @@ public class LengthPrefixedStreamingTest
         };
         var pipe = new Pipe();
 
-        await SharpPackStreamingSerializer.SerializeLengthPrefixedAsync(
-            pipe.Writer,
-            expected,
-            context);
+        var serialization = SharpPackStreamingSerializer
+            .SerializeLengthPrefixedAsync(
+                pipe.Writer,
+                expected,
+                context)
+            .AsTask();
         var actual = await SharpPackStreamingSerializer
             .DeserializeLengthPrefixedAsync<StreamingCustomVariableItem>(
                 pipe.Reader,
                 context: context);
+        await serialization;
 
         actual!.Payload.Should().Be(expected.Payload);
 
@@ -103,12 +106,15 @@ public class LengthPrefixedStreamingTest
         expected.Next = expected;
         var pipe = new Pipe();
 
-        await SharpPackStreamingSerializer.SerializeLengthPrefixedAsync(
-            pipe.Writer,
-            expected);
+        var serialization = SharpPackStreamingSerializer
+            .SerializeLengthPrefixedAsync(
+                pipe.Writer,
+                expected)
+            .AsTask();
         var actual = await SharpPackStreamingSerializer
             .DeserializeLengthPrefixedAsync<StreamingReferenceVariableItem>(
                 pipe.Reader);
+        await serialization;
 
         actual!.Payload.Should().Be(expected.Payload);
         actual.Next.Should().BeSameAs(actual);
