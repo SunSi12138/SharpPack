@@ -291,6 +291,29 @@ public class CollectionSerializationContractTest
         attempt.Bytes.Should().Equal(SharpPackSerializer.Serialize(values));
     }
 
+    [Theory]
+    [InlineData(CollectionDestination.Pipe)]
+    [InlineData(CollectionDestination.Stream)]
+    public async Task Serialize_LazyValidCount_IsSinglePassAndPreservesCoreWireBytes(
+        CollectionDestination destination)
+    {
+        var values = new[] { 21, 22, 23, 24 };
+        var source = new TrackingEnumerable<int>(values);
+
+        var attempt = await CaptureAsync(
+            destination,
+            values.Length,
+            source,
+            flushRate: 5);
+
+        attempt.Exception.Should().BeNull();
+        source.GetEnumeratorCalls.Should().Be(1);
+        source.MoveNextCalls.Should().Be(values.Length + 1,
+            "the only look-ahead should be the single overflow probe");
+        source.CurrentReads.Should().Be(values.Length);
+        attempt.Bytes.Should().Equal(SharpPackSerializer.Serialize(values));
+    }
+
     static async Task<SerializationAttempt> CaptureAsync<T>(
         CollectionDestination destination,
         int count,
