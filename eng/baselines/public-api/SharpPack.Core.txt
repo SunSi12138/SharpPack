@@ -907,6 +907,7 @@ type public readonly struct SharpPack.SharpPackSerializerConfiguration : System.
   method public static System.Boolean op_Equality(SharpPack.SharpPackSerializerConfiguration left, SharpPack.SharpPackSerializerConfiguration right)
   method public static System.Boolean op_Inequality(SharpPack.SharpPackSerializerConfiguration left, SharpPack.SharpPackSerializerConfiguration right)
   property SharpPack.SharpPackStringEncoding StringEncoding { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
+  property SharpPack.TypeResolutionMode TypeResolutionMode { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
   property static SharpPack.SharpPackSerializerConfiguration Default { get:public; }
   property static SharpPack.SharpPackSerializerConfiguration Utf16 { get:public; }
   property static SharpPack.SharpPackSerializerConfiguration Utf8 { get:public; }
@@ -1096,6 +1097,12 @@ type public sealed class SharpPack.SharpPackableAttribute : System.Attribute
 
 type public sealed class SharpPack.SuppressDefaultInitializationAttribute : System.Attribute
   ctor public SuppressDefaultInitializationAttribute()
+
+type public enum SharpPack.TypeResolutionMode : System.Byte, System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  field public System.Byte value__
+  field public const SharpPack.TypeResolutionMode ContextCatalogOnly = 1
+  field public const SharpPack.TypeResolutionMode Disabled = 2
+  field public const SharpPack.TypeResolutionMode GlobalCompatibility = 0
 
 type public sealed class SharpPack.Utf16StringFormatterAttribute : SharpPack.SharpPackCustomFormatterAttribute<SharpPack.Formatters.Utf16StringFormatter, System.String>
   ctor public Utf16StringFormatterAttribute()

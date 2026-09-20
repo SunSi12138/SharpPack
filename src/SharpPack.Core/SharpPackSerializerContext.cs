@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using SharpPack.Formatters;
@@ -11,9 +10,7 @@ namespace SharpPack;
 public sealed class SharpPackSerializerContext
 {
     readonly FormatterGraph graph;
-    readonly Dictionary<string, List<Assembly>> assemblies =
-        new(StringComparer.OrdinalIgnoreCase);
-    readonly Lock assemblyLock = new();
+    readonly TypeResolutionPolicy typeResolution;
 
     public SharpPackSerializerConfiguration Configuration { get; }
 
@@ -32,10 +29,8 @@ public sealed class SharpPackSerializerContext
         bool freezeRegistrations)
     {
         Configuration = configuration;
+        typeResolution = new TypeResolutionPolicy(configuration.TypeResolutionMode);
         graph = new FormatterGraph(this);
-
-        AddAssembly(typeof(object).Assembly);
-        AddAssembly(typeof(SharpPackSerializerContext).Assembly);
         if (freezeRegistrations)
         {
             graph.FreezeRegistrations();
@@ -70,84 +65,17 @@ public sealed class SharpPackSerializerContext
     internal void FreezeRegistrations()
         => graph.FreezeRegistrations();
 
-    internal Assembly? ResolveAssembly(AssemblyName name)
-    {
-        if (name.Name is null)
-        {
-            return null;
-        }
-
-        lock (assemblyLock)
-        {
-            if (!assemblies.TryGetValue(name.Name, out var candidates))
-            {
-                return null;
-            }
-
-            if (candidates.Count == 1)
-            {
-                return candidates[0];
-            }
-
-            Assembly? match = null;
-            foreach (var candidate in candidates)
-            {
-                if (!AssemblyName.ReferenceMatchesDefinition(
-                        candidate.GetName(),
-                        name))
-                {
-                    continue;
-                }
-                if (match is not null)
-                {
-                    return null;
-                }
-                match = candidate;
-            }
-            return match;
-        }
-    }
-
     internal void AddType(Type type)
-    {
-        lock (assemblyLock)
-        {
-            AddTypeCore(type);
-        }
-    }
+        => typeResolution.AddType(type);
 
-    void AddTypeCore(Type type)
-    {
-        AddAssembly(type.Assembly);
-        if (type.HasElementType && type.GetElementType() is { } element)
-        {
-            AddTypeCore(element);
-        }
+    internal void ObserveSerializedType(Type type)
+        => typeResolution.ObserveSerializedType(type);
 
-        if (type.IsGenericType)
-        {
-            foreach (var argument in type.GetGenericArguments())
-            {
-                AddTypeCore(argument);
-            }
-        }
-    }
+    internal Type? ResolveType(string typeName)
+        => typeResolution.ResolveType(typeName);
 
-    void AddAssembly(Assembly assembly)
-    {
-        var name = assembly.GetName().Name;
-        if (name is not null)
-        {
-            if (!assemblies.TryGetValue(name, out var candidates))
-            {
-                assemblies.Add(name, [assembly]);
-            }
-            else if (!candidates.Contains(assembly))
-            {
-                candidates.Add(assembly);
-            }
-        }
-    }
+    internal void ThrowIfTypePayloadDisabled()
+        => typeResolution.ThrowIfTypePayloadDisabled();
 }
 
 /// <summary>
