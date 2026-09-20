@@ -8,6 +8,7 @@ on:
   pull_request:
     branches:
       - "main"
+      - "dev"
 
 jobs:
   build-dotnet:
@@ -27,6 +28,11 @@ jobs:
         with:
           global-json-file: global.json
       - run: dotnet build -c Release
+      - name: Verify public API and generated-source baselines
+        run: dotnet run --project tools/SharpPack.Baselines/SharpPack.Baselines.csproj -c Release -- verify
+      - name: Characterize baseline failure modes
+        if: matrix.runner == 'ubuntu-24.04'
+        run: bash tools/SharpPack.Baselines/characterize-failures.sh
       - run: dotnet test -c Release --no-build
       - run: dotnet run --project sandbox/CollectibleAlcSample -c Release
       - run: dotnet pack -c Release --no-build -o "$GITHUB_WORKSPACE/artifacts"
