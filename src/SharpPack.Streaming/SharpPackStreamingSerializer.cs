@@ -70,8 +70,8 @@ public static class SharpPackStreamingSerializer
         {
             T? value = default;
             var consumed = context is null
-                ? SharpPackSerializer.Deserialize(payload.Span, ref value)
-                : SharpPackSerializer.Deserialize(payload.Span, ref value, context);
+                ? SharpPackSerializer.Deserialize(payload, ref value)
+                : SharpPackSerializer.Deserialize(payload, ref value, context);
 
             if (consumed != payloadLength)
             {
@@ -345,8 +345,8 @@ public static class SharpPackStreamingSerializer
 
             T? value = default;
             var consumedPayload = context is null
-                ? SharpPackSerializer.Deserialize(payload, ref value)
-                : SharpPackSerializer.Deserialize(payload, ref value, context);
+                ? SharpPackSerializer.Deserialize(payload.Span, ref value)
+                : SharpPackSerializer.Deserialize(payload.Span, ref value, context);
 
             if (consumedPayload != payloadLength)
             {
