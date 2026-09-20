@@ -1,6 +1,8 @@
 using FluentAssertions;
 using SharpPack.Streaming;
+using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.IO.Pipelines;
 using System.Threading.Tasks;
 
