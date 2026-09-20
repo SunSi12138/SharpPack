@@ -317,8 +317,58 @@ public static class PluginEntry
             return exception.Message == "expected formatter failure";
         }
     }
+
+    public static bool RunRegisteredFormatterContext(SharpPackSerializerContext context)
+    {
+        var value = new UnsupportedPluginType { Value = 6 };
+        var bytes = SharpPackSerializer.Serialize(value, context);
+        if (bytes.Length != 5 ||
+            bytes[0] != 1 ||
+            bytes[1] != 6 ||
+            bytes[2] != 0 ||
+            bytes[3] != 0 ||
+            bytes[4] != 0)
+        {
+            return false;
+        }
+
+        return SharpPackSerializer.Deserialize<UnsupportedPluginType>(bytes, context)
+            is { Value: 6 };
+    }
 }
 """;
+
+    [Fact]
+    public void ContextBuilder_RetainedAfterBuild_DoesNotRootPlugin()
+    {
+        var retained = BuildPluginContextAndUnload(
+            CompilePlugin(),
+            "retained-builder-success");
+
+        ForceUnload(retained.References);
+
+        retained.References.LoadContext.IsAlive.Should().BeFalse(
+            "a successful Build should transfer formatter ownership to the context and release builder captures");
+        retained.References.Assembly.IsAlive.Should().BeFalse();
+        retained.References.PluginType.IsAlive.Should().BeFalse();
+        GC.KeepAlive(retained.Builder);
+    }
+
+    [Fact]
+    public void ContextBuilder_FailedBuild_ClearsRegistrationCaptures()
+    {
+        var retained = FailPluginContextBuildAndUnload(
+            CompilePlugin(),
+            "retained-builder-failure");
+
+        ForceUnload(retained.References);
+
+        retained.References.LoadContext.IsAlive.Should().BeFalse(
+            "a failed Build should still release registration captures from the retained builder");
+        retained.References.Assembly.IsAlive.Should().BeFalse();
+        retained.References.PluginType.IsAlive.Should().BeFalse();
+        GC.KeepAlive(retained.Builder);
+    }
 
     [Fact]
     public void ExplicitContextGraph_UnloadsCollectibleAssembly()
@@ -393,6 +443,80 @@ public static class PluginEntry
         references.LoadContext.IsAlive.Should().BeFalse();
         references.Assembly.IsAlive.Should().BeFalse();
         references.PluginType.IsAlive.Should().BeFalse();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static RetainedBuilderUnloadReferences BuildPluginContextAndUnload(
+        byte[] image,
+        string name)
+    {
+        var loaded = LoadedPlugin.Load(image, name);
+        var builder = new SharpPackSerializerContextBuilder();
+
+        RegisterPluginFormatter(builder, loaded);
+        var context = builder.Build();
+
+        loaded.InvokeBoolean("RunRegisteredFormatterContext", context)
+            .Should().BeTrue(
+                "the built context must own and use the plugin formatter after builder ownership transfer");
+
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
+        Assert.Throws<InvalidOperationException>(
+            () => builder.Configure(SharpPackSerializerConfiguration.Utf16));
+
+        var references = loaded.Unload();
+        context = null!;
+        loaded = null!;
+        return new RetainedBuilderUnloadReferences(builder, references);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static RetainedBuilderUnloadReferences FailPluginContextBuildAndUnload(
+        byte[] image,
+        string name)
+    {
+        var loaded = LoadedPlugin.Load(image, name);
+        var builder = new SharpPackSerializerContextBuilder();
+
+        RegisterPluginFormatter(builder, loaded);
+        RegisterPluginFormatter(builder, loaded);
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => builder.Build());
+        exception.Message.Should().Contain("already registered or resolved",
+            "the original registration failure must not be masked by cleanup");
+
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
+        Assert.Throws<InvalidOperationException>(
+            () => builder.Configure(SharpPackSerializerConfiguration.Utf16));
+
+        var references = loaded.Unload();
+        loaded = null!;
+        exception = null!;
+        return new RetainedBuilderUnloadReferences(builder, references);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static void RegisterPluginFormatter(
+        SharpPackSerializerContextBuilder builder,
+        LoadedPlugin loaded)
+    {
+        var pluginType = loaded.Assembly.GetType(
+            "CollectiblePlugin.UnsupportedPluginType",
+            throwOnError: true)!;
+        var formatterType = loaded.Assembly.GetType(
+            "CollectiblePlugin.UnsupportedPluginFormatter",
+            throwOnError: true)!;
+        var formatter = Activator.CreateInstance(formatterType)!;
+
+        var register = typeof(SharpPackSerializerContextBuilder)
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .Single(static method =>
+                method.Name == nameof(SharpPackSerializerContextBuilder.Register) &&
+                method.IsGenericMethodDefinition);
+
+        register.MakeGenericMethod(pluginType)
+            .Invoke(builder, [formatter]);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -545,10 +669,14 @@ public static class PluginEntry
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public bool InvokeBoolean(string methodName)
+        public bool InvokeBoolean(
+            string methodName,
+            params object?[] arguments)
         {
-            var method = entryType!.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static)!;
-            var result = (bool)method.Invoke(null, null)!;
+            var method = entryType!.GetMethod(
+                methodName,
+                BindingFlags.Public | BindingFlags.Static)!;
+            var result = (bool)method.Invoke(null, arguments)!;
             method = null!;
             return result;
         }
@@ -571,7 +699,14 @@ public static class PluginEntry
         }
     }
 
-    sealed record UnloadReferences(WeakReference LoadContext, WeakReference Assembly, WeakReference PluginType);
+    sealed record UnloadReferences(
+        WeakReference LoadContext,
+        WeakReference Assembly,
+        WeakReference PluginType);
+
+    sealed record RetainedBuilderUnloadReferences(
+        SharpPackSerializerContextBuilder Builder,
+        UnloadReferences References);
 }
 
 [SharpPackable]
