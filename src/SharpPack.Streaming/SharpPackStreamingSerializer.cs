@@ -70,8 +70,8 @@ public static class SharpPackStreamingSerializer
         {
             T? value = default;
             var consumed = context is null
-                ? SharpPackSerializer.Deserialize(payload, ref value)
-                : SharpPackSerializer.Deserialize(payload, ref value, context);
+                ? SharpPackSerializer.Deserialize(payload.Span, ref value)
+                : SharpPackSerializer.Deserialize(payload.Span, ref value, context);
 
             if (consumed != payloadLength)
             {
@@ -281,10 +281,10 @@ public static class SharpPackStreamingSerializer
         byte[]? rentedPayload = null;
         try
         {
-            Span<byte> payload = payloadLength == 0
-                ? Span<byte>.Empty
+            Memory<byte> payload = payloadLength == 0
+                ? Memory<byte>.Empty
                 : (rentedPayload = ArrayPool<byte>.Shared.Rent(payloadLength))
-                    .AsSpan(0, payloadLength);
+                    .AsMemory(0, payloadLength);
 
             var payloadStart = headerReader.Position;
             var availablePayload = buffer.Slice(payloadStart);
@@ -294,7 +294,7 @@ public static class SharpPackStreamingSerializer
 
             if (copied != 0)
             {
-                availablePayload.Slice(0, copied).CopyTo(payload);
+                availablePayload.Slice(0, copied).CopyTo(payload.Span);
             }
 
             var consumed = buffer.GetPosition(copied, payloadStart);
@@ -329,7 +329,7 @@ public static class SharpPackStreamingSerializer
                 var remaining = payloadLength - copied;
                 var toCopy = (int)Math.Min(buffer.Length, remaining);
                 buffer.Slice(0, toCopy)
-                    .CopyTo(payload.Slice(copied, toCopy));
+                    .CopyTo(payload.Span.Slice(copied, toCopy));
                 copied += toCopy;
 
                 var payloadEnd = buffer.GetPosition(toCopy);
