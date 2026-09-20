@@ -1,5 +1,6 @@
 ﻿using SharpPack.Internal;
 using System.Buffers;
+using System.Buffers.Binary;
 using System.IO.Pipelines;
 using System.Runtime.CompilerServices;
 
@@ -82,6 +83,249 @@ public static class SharpPackStreamingSerializer
             var payloadEnd = buffer.GetPosition(payloadLength);
             pipeReader.AdvanceTo(payloadEnd, payloadEnd);
             return value;
+        }
+        catch
+        {
+            pipeReader.AdvanceTo(buffer.Start, buffer.End);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Serializes one SharpPack payload as a self-contained transport frame:
+    /// a 4-byte little-endian payload length followed by the unchanged
+    /// SharpPack payload bytes.
+    /// </summary>
+    /// <remarks>
+    /// The payload is buffered at item granularity so its length is known
+    /// before the frame is emitted. The caller owns <paramref name="pipeWriter"/>
+    /// and the library does not complete it.
+    /// </remarks>
+    public static async ValueTask SerializeLengthPrefixedAsync<T>(
+        PipeWriter pipeWriter,
+        T? value,
+        SharpPackSerializerContext? context = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(pipeWriter);
+
+        var payloadWriter = ReusableLinkedArrayBufferWriterPool.Rent(
+            out var payloadWriterLeaseId);
+        try
+        {
+            var payloadLength = context is null
+                ? SharpPackSerializer.Serialize(ref payloadWriter, value)
+                : SharpPackSerializer.Serialize(ref payloadWriter, value, context);
+
+            if (payloadLength < 0)
+            {
+                throw new SharpPackSerializationException(
+                    "The serialized payload length exceeded the supported Int32 range.");
+            }
+
+            var header = pipeWriter.GetSpan(sizeof(uint));
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                header,
+                checked((uint)payloadLength));
+            pipeWriter.Advance(sizeof(uint));
+
+            foreach (var segment in payloadWriter)
+            {
+                if (!segment.IsEmpty)
+                {
+                    pipeWriter.Write(segment.Span);
+                }
+            }
+
+            var result = await pipeWriter
+                .FlushAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (result.IsCanceled)
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+        }
+        finally
+        {
+            ReusableLinkedArrayBufferWriterPool.Return(
+                payloadWriter,
+                payloadWriterLeaseId);
+        }
+    }
+
+    /// <summary>
+    /// Deserializes one self-contained length-prefixed transport frame.
+    /// </summary>
+    /// <remarks>
+    /// The 4-byte little-endian length prefix is transport metadata and is
+    /// not part of the SharpPack payload. Core deserialization starts only
+    /// after the complete payload is available, and it must consume exactly
+    /// the declared payload length. The caller owns <paramref name="pipeReader"/>.
+    /// </remarks>
+    public static async ValueTask<T?> DeserializeLengthPrefixedAsync<T>(
+        PipeReader pipeReader,
+        int maxFrameLength = int.MaxValue,
+        SharpPackSerializerContext? context = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await DeserializeLengthPrefixedCoreAsync<T>(
+                pipeReader,
+                allowCleanEndOfStream: false,
+                maxFrameLength,
+                context,
+                cancellationToken)
+            .ConfigureAwait(false);
+        return result.Value;
+    }
+
+    /// <summary>
+    /// Deserializes consecutive self-contained length-prefixed transport
+    /// frames until the pipe completes cleanly at a frame boundary.
+    /// </summary>
+    public static async IAsyncEnumerable<T?> DeserializeLengthPrefixedItemsAsync<T>(
+        PipeReader pipeReader,
+        int maxFrameLength = int.MaxValue,
+        SharpPackSerializerContext? context = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        while (true)
+        {
+            var result = await DeserializeLengthPrefixedCoreAsync<T>(
+                    pipeReader,
+                    allowCleanEndOfStream: true,
+                    maxFrameLength,
+                    context,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (!result.HasValue)
+            {
+                yield break;
+            }
+
+            yield return result.Value;
+        }
+    }
+
+    static async ValueTask<(bool HasValue, T? Value)>
+        DeserializeLengthPrefixedCoreAsync<T>(
+            PipeReader pipeReader,
+            bool allowCleanEndOfStream,
+            int maxFrameLength,
+            SharpPackSerializerContext? context,
+            CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(pipeReader);
+        ArgumentOutOfRangeException.ThrowIfNegative(maxFrameLength);
+
+        var readResult = await pipeReader
+            .ReadAtLeastAsync(sizeof(uint), cancellationToken)
+            .ConfigureAwait(false);
+        var buffer = readResult.Buffer;
+
+        if (readResult.IsCanceled)
+        {
+            pipeReader.AdvanceTo(buffer.Start, buffer.Start);
+            throw new OperationCanceledException(cancellationToken);
+        }
+
+        if (buffer.Length < sizeof(uint))
+        {
+            if (allowCleanEndOfStream &&
+                readResult.IsCompleted &&
+                buffer.IsEmpty)
+            {
+                pipeReader.AdvanceTo(buffer.End, buffer.End);
+                return (false, default);
+            }
+
+            pipeReader.AdvanceTo(buffer.Start, buffer.End);
+            throw new EndOfStreamException(
+                $"The pipe completed with {buffer.Length} frame-header bytes available; " +
+                $"{sizeof(uint)} bytes were required.");
+        }
+
+        var headerReader = new SequenceReader<byte>(buffer);
+        if (!headerReader.TryReadLittleEndian(out int rawPayloadLength))
+        {
+            pipeReader.AdvanceTo(buffer.Start, buffer.End);
+            throw new EndOfStreamException(
+                "The pipe did not contain a complete length-prefixed frame header.");
+        }
+
+        var payloadLengthValue = unchecked((uint)rawPayloadLength);
+        if (payloadLengthValue > int.MaxValue)
+        {
+            pipeReader.AdvanceTo(buffer.Start, headerReader.Position);
+            throw new SharpPackSerializationException(
+                $"The frame payload length {payloadLengthValue} exceeds the supported Int32 range.");
+        }
+
+        var payloadLength = (int)payloadLengthValue;
+        if (payloadLength > maxFrameLength)
+        {
+            pipeReader.AdvanceTo(buffer.Start, headerReader.Position);
+            throw new SharpPackSerializationException(
+                $"The frame payload length {payloadLength} exceeds the configured maximum " +
+                $"{maxFrameLength}.");
+        }
+
+        if (payloadLength > int.MaxValue - sizeof(uint))
+        {
+            pipeReader.AdvanceTo(buffer.Start, headerReader.Position);
+            throw new SharpPackSerializationException(
+                $"The frame payload length {payloadLength} exceeds the supported framed-read range.");
+        }
+
+        var frameLength = payloadLength + sizeof(uint);
+        if (buffer.Length < frameLength)
+        {
+            pipeReader.AdvanceTo(buffer.Start, buffer.End);
+            if (readResult.IsCompleted)
+            {
+                throw new EndOfStreamException(
+                    $"The pipe completed with {buffer.Length - sizeof(uint)} payload bytes available; " +
+                    $"{payloadLength} bytes were required.");
+            }
+
+            readResult = await pipeReader
+                .ReadAtLeastAsync(frameLength, cancellationToken)
+                .ConfigureAwait(false);
+            buffer = readResult.Buffer;
+
+            if (readResult.IsCanceled)
+            {
+                pipeReader.AdvanceTo(buffer.Start, buffer.Start);
+                throw new OperationCanceledException(cancellationToken);
+            }
+
+            if (buffer.Length < frameLength)
+            {
+                pipeReader.AdvanceTo(buffer.Start, buffer.End);
+                throw new EndOfStreamException(
+                    $"The pipe completed with {Math.Max(0, buffer.Length - sizeof(uint))} " +
+                    $"payload bytes available; {payloadLength} bytes were required.");
+            }
+        }
+
+        var payload = buffer.Slice(sizeof(uint), payloadLength);
+        try
+        {
+            T? value = default;
+            var consumed = context is null
+                ? SharpPackSerializer.Deserialize(payload, ref value)
+                : SharpPackSerializer.Deserialize(payload, ref value, context);
+
+            if (consumed != payloadLength)
+            {
+                throw new SharpPackSerializationException(
+                    $"The formatter consumed {consumed} of the " +
+                    $"{payloadLength}-byte framed payload.");
+            }
+
+            var frameEnd = buffer.GetPosition(frameLength);
+            pipeReader.AdvanceTo(frameEnd, frameEnd);
+            return (true, value);
         }
         catch
         {
