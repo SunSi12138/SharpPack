@@ -233,11 +233,24 @@ public static partial class SharpPackSerializer
         return written;
     }
 
+    /// <summary>
+    /// Serializes one value to a caller-owned stream.
+    /// </summary>
+    /// <remarks>
+    /// SharpPack writes the payload, performs a final
+    /// <see cref="Stream.FlushAsync(CancellationToken)"/>, and leaves the stream
+    /// open. If serialization fails after writing has started, the destination
+    /// may contain a partial payload. SharpPack does not roll back caller-owned
+    /// writers, pipes, or streams.
+    /// </remarks>
     public static async ValueTask SerializeAsync<T>(
         Stream stream,
         T? value,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(stream);
+        cancellationToken.ThrowIfCancellationRequested();
+
         var tempWriter = ReusableLinkedArrayBufferWriterPool.Rent(
             out var tempWriterLeaseId);
         try

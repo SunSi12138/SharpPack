@@ -71,6 +71,17 @@ public static partial class SharpPackSerializer
         where TBufferWriter : class, IBufferWriter<byte>
         => Serialize(ref bufferWriter, value, context);
 
+    /// <summary>
+    /// Serializes one value to a caller-owned stream using the supplied
+    /// serializer context.
+    /// </summary>
+    /// <remarks>
+    /// SharpPack writes the payload, performs a final
+    /// <see cref="Stream.FlushAsync(CancellationToken)"/>, and leaves the stream
+    /// open. If serialization fails after writing has started, the destination
+    /// may contain a partial payload. SharpPack does not roll back caller-owned
+    /// writers, pipes, or streams.
+    /// </remarks>
     public static async ValueTask SerializeAsync<T>(
         Stream stream,
         T? value,
@@ -78,6 +89,9 @@ public static partial class SharpPackSerializer
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(stream);
+        cancellationToken.ThrowIfCancellationRequested();
+
         var tempWriter = ReusableLinkedArrayBufferWriterPool.Rent(
             out var tempWriterLeaseId);
         try
@@ -169,10 +183,14 @@ public static partial class SharpPackSerializer
     /// serializer context.
     /// </summary>
     /// <remarks>
+    /// The caller owns <paramref name="stream"/> and SharpPack leaves it open.
     /// A buffer-backed <see cref="MemoryStream"/> advances by the bytes consumed
     /// by one value. Other streams are read through end-of-stream because a
     /// general <see cref="Stream"/> cannot return bytes read past that value.
-    /// Use the payload-length overload for framed or concatenated messages.
+    /// This read-to-end overload has no declared payload boundary, so it does
+    /// not require the formatter to consume every byte read from the stream.
+    /// Use the payload-length overload for framed or concatenated messages and
+    /// deterministic exact-consumption enforcement.
     /// </remarks>
     public static async ValueTask<T?> DeserializeAsync<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
@@ -182,7 +200,10 @@ public static partial class SharpPackSerializer
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(stream);
+        cancellationToken.ThrowIfCancellationRequested();
         context.EnsureRootType<T>();
+
         if (stream is MemoryStream memoryStream && memoryStream.TryGetBuffer(out var segment))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -254,6 +275,12 @@ public static partial class SharpPackSerializer
     /// Deserializes exactly one length-delimited payload using the supplied
     /// serializer context.
     /// </summary>
+    /// <remarks>
+    /// The caller owns <paramref name="stream"/> and SharpPack leaves it open.
+    /// Exactly <paramref name="payloadLength"/> bytes are read for this payload.
+    /// Deserialization fails if the formatter does not consume exactly that
+    /// payload length.
+    /// </remarks>
     public static ValueTask<T?> DeserializeAsync<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(

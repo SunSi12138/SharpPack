@@ -31,13 +31,29 @@ exceptions, and keep caller-owned transports open.
 no progress is possible, synchronously block an asynchronous transport, or read
 past the current logical frame.
 
-**Planned hardening (not a Stage 1 invariant):** treat a collection
-`PipeWriter.FlushAsync` result with `IsCanceled` as cancellation (#13), and add
-configurable read/payload size limits before allocating from untrusted lengths
-(#15).
+**Pipe flush contract:** every public Pipe write path interprets
+`FlushResult.IsCanceled` as `OperationCanceledException` and
+`FlushResult.IsCompleted` as `InvalidOperationException`. SharpPack does not
+complete caller-owned readers or writers. A completed writer flush means the
+reader side has ended and the serialization operation cannot report success.
+
+**Stream flush contract (1.x):** Core single-value `SerializeAsync(Stream, ...)`
+writes the payload and performs one final `FlushAsync`, leaving the stream open.
+The Streaming collection `SerializeAsync(Stream, ...)` path preserves its 1.x
+behavior: it writes buffered chunks but does not issue an additional final flush;
+the caller owns the final flush and stream lifetime.
+
+**Payload boundaries:** Core general-stream deserialization reads to EOF (except
+for the buffer-backed `MemoryStream` fast path, which advances only by the decoded
+value). Payload-length and framed APIs read/consume exactly their declared
+payload and fail if Core consumes a different byte count.
+
+**Planned hardening (not a Stage 1 invariant):** add configurable read/payload
+size limits before allocating from untrusted lengths (#15).
 
 **Verification:** tests force one-byte fragmentation, coalesced frames,
-truncated input, cancellation on covered paths, and transport backpressure.
+truncated input, canceled/completed pipe flushes, stream final-flush ownership,
+exact payload consumption, cancellation on covered paths, and transport backpressure.
 `StreamingSerializer.SerializeAwaitsPipeBackpressure` configures low
 `PipeOptions` pause/resume thresholds and proves serialization remains
 incomplete until the reader drains the pipe. Resource-ownership tests verify
