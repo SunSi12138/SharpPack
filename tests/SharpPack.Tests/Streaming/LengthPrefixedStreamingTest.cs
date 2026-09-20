@@ -310,7 +310,7 @@ public class LengthPrefixedStreamingTest
     }
 
     [Fact]
-    public async Task LengthPrefixed_CancellationWhileWaitingForPayload_AllowsRetry()
+    public async Task LengthPrefixed_CancellationWhileWaitingForPayload_BalancesPipeRead()
     {
         var expected = new StreamingLargeVariableItem
         {
@@ -336,13 +336,12 @@ public class LengthPrefixedStreamingTest
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             async () => await read);
 
-        pipe.Writer.Write(frame.AsSpan(initialLength));
+        pipe.Writer.Write(new byte[] { 0x7A });
         await pipe.Writer.FlushAsync();
 
-        var actual = await SharpPackStreamingSerializer
-            .DeserializeLengthPrefixedAsync<StreamingLargeVariableItem>(
-                pipe.Reader);
-        actual!.Payload.Should().Be(expected.Payload);
+        var postCancellation = await pipe.Reader.ReadAsync();
+        postCancellation.Buffer.ToArray().Should().Equal(0x7A);
+        pipe.Reader.AdvanceTo(postCancellation.Buffer.End);
 
         await pipe.Reader.CompleteAsync();
         await pipe.Writer.CompleteAsync();
@@ -358,18 +357,20 @@ public class LengthPrefixedStreamingTest
             (uint)(payload.Length + 1));
         payload.CopyTo(frame.AsSpan(sizeof(uint)));
         frame[^1] = 0xCA;
+        var nextFrame = CreateFrame(456);
 
         var pipe = new Pipe();
         pipe.Writer.Write(frame);
+        pipe.Writer.Write(nextFrame);
         await pipe.Writer.FlushAsync();
 
         await Assert.ThrowsAsync<SharpPackSerializationException>(
             async () => await SharpPackStreamingSerializer
                 .DeserializeLengthPrefixedAsync<int>(pipe.Reader));
 
-        var read = await pipe.Reader.ReadAsync();
-        read.Buffer.ToArray().Should().Equal(frame);
-        pipe.Reader.AdvanceTo(read.Buffer.End);
+        var next = await SharpPackStreamingSerializer
+            .DeserializeLengthPrefixedAsync<int>(pipe.Reader);
+        next.Should().Be(456);
 
         await pipe.Reader.CompleteAsync();
         await pipe.Writer.CompleteAsync();
