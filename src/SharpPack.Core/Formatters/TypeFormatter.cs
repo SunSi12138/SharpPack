@@ -19,6 +19,9 @@ public sealed partial class TypeFormatter : SharpPackFormatter<Type>
     [Preserve]
     public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Type? value)
     {
+        var context = writer.OptionalState.SerializerContext;
+        context?.ThrowIfTypePayloadDisabled();
+
         var full = value?.AssemblyQualifiedName;
         if (full == null)
         {
@@ -26,7 +29,7 @@ public sealed partial class TypeFormatter : SharpPackFormatter<Type>
             return;
         }
 
-        writer.OptionalState.SerializerContext?.AddType(value!);
+        context?.ObserveSerializedType(value!);
         var shortName = ShortTypeNameRegex().Replace(full, "");
         writer.WriteString(shortName);
     }
@@ -42,6 +45,9 @@ public sealed partial class TypeFormatter : SharpPackFormatter<Type>
         Justification = "Serialized Type values are inherently data-driven; applications must preserve the types they exchange.")]
     public override void Deserialize(ref SharpPackReader reader, scoped ref Type? value)
     {
+        var context = reader.OptionalState.SerializerContext;
+        context?.ThrowIfTypePayloadDisabled();
+
         var typeName = reader.ReadString();
         if (typeName == null)
         {
@@ -49,7 +55,6 @@ public sealed partial class TypeFormatter : SharpPackFormatter<Type>
             return;
         }
 
-        var context = reader.OptionalState.SerializerContext;
         value = ResolveType(typeName, context);
         if (value is null &&
             typeName.Contains("MemoryPack", StringComparison.Ordinal))
@@ -66,11 +71,6 @@ public sealed partial class TypeFormatter : SharpPackFormatter<Type>
             SharpPackSerializationException.ThrowMessage(
                 $"Type '{typeName}' could not be resolved.");
         }
-
-        if (context is not null)
-        {
-            context.AddType(value);
-        }
     }
 
     [UnconditionalSuppressMessage(
@@ -85,20 +85,8 @@ public sealed partial class TypeFormatter : SharpPackFormatter<Type>
         string typeName,
         SharpPackSerializerContext? context)
     {
-        if (context is null)
-        {
-            return Type.GetType(typeName, throwOnError: false);
-        }
-
-        return Type.GetType(
-                   typeName,
-                   context.ResolveAssembly,
-                   static (assembly, name, ignoreCase) =>
-                       assembly?.GetType(
-                           name,
-                           throwOnError: false,
-                           ignoreCase),
-                   throwOnError: false)
-               ?? Type.GetType(typeName, throwOnError: false);
+        return context is null
+            ? Type.GetType(typeName, throwOnError: false)
+            : context.ResolveType(typeName);
     }
 }

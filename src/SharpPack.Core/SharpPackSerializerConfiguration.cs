@@ -1,7 +1,7 @@
 namespace SharpPack;
 
 /// <summary>
-/// Immutable protocol settings owned by a serializer context.
+/// Immutable settings owned by a serializer context.
 /// </summary>
 public readonly record struct SharpPackSerializerConfiguration
 {
@@ -18,6 +18,15 @@ public readonly record struct SharpPackSerializerConfiguration
     };
 
     public SharpPackStringEncoding StringEncoding { get; init; }
+
+    public TypeResolutionMode TypeResolutionMode { get; init; }
+}
+
+public enum TypeResolutionMode : byte
+{
+    GlobalCompatibility = 0,
+    ContextCatalogOnly = 1,
+    Disabled = 2,
 }
 
 public enum SharpPackStringEncoding : byte

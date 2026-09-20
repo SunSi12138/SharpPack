@@ -48,6 +48,35 @@ independently of the builder. A built context is safe to share between
 concurrent RPC calls. Different contexts may register different formatters for
 the same closed `T` without affecting each other.
 
+## Runtime Type resolution
+
+Runtime `Type` names are resolved by a context-owned capability separate from
+the formatter graph. The default `GlobalCompatibility` mode preserves 1.x
+behavior: SharpPack first prefers assemblies already known to the context and
+then permits the normal CLR-wide `Type.GetType` fallback.
+
+Hosts that treat incoming payloads as untrusted can opt into catalog-only
+resolution:
+
+```csharp
+var context = new SharpPackSerializerContext(
+    SharpPackSerializerConfiguration.Default with
+    {
+        TypeResolutionMode = TypeResolutionMode.ContextCatalogOnly,
+    });
+```
+
+`ContextCatalogOnly` resolves only through assemblies learned from explicit
+context capabilities such as root types and registered formatter types. It does
+not perform a global fallback, and serializing or deserializing a `Type` value
+does not expand the strict catalog. If multiple context-local assemblies are
+equally valid for one serialized assembly identity, resolution fails instead
+of selecting one arbitrarily.
+
+`Disabled` rejects serialized `Type` payload reads and writes. The catalog is
+owned by the serializer context; releasing the context releases its assembly
+references. No process-global mutable type registry is used.
+
 ## Resolution model
 
 The default path resolves a type once:

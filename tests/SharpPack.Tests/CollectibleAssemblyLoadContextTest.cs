@@ -288,6 +288,24 @@ public static class PluginEntry
         return SharpPackSerializer.DeserializeAsync<PluginDto>(stream, context).AsTask().GetAwaiter().GetResult()?.Id == 42;
     }
 
+    public static bool RunStrictTypeResolution()
+    {
+        var context = new SharpPackSerializerContext(
+            SharpPackSerializerConfiguration.Default with
+            {
+                TypeResolutionMode = TypeResolutionMode.ContextCatalogOnly,
+            });
+        var value = new PluginDto
+        {
+            RuntimeType = typeof(PluginItem),
+        };
+
+        var bytes = SharpPackSerializer.Serialize(value, context);
+        return SharpPackSerializer.Deserialize<PluginDto>(bytes, context)
+            is { RuntimeType: var runtimeType } &&
+            runtimeType == typeof(PluginItem);
+    }
+
     public static bool RunFailedLookup()
     {
         var context = new SharpPackSerializerContext();
@@ -391,6 +409,8 @@ public static class PluginEntry
 
         first.InvokeBoolean("RunAll").Should().BeTrue();
         second.InvokeBoolean("RunAll").Should().BeTrue();
+        first.InvokeBoolean("RunStrictTypeResolution").Should().BeTrue();
+        second.InvokeBoolean("RunStrictTypeResolution").Should().BeTrue();
         GlobalFormatterCachesExist().Should().BeFalse();
 
         var firstReferences = first.Unload();
@@ -407,6 +427,22 @@ public static class PluginEntry
         secondReferences.LoadContext.IsAlive.Should().BeFalse();
         secondReferences.Assembly.IsAlive.Should().BeFalse();
         secondReferences.PluginType.IsAlive.Should().BeFalse();
+    }
+
+    [Fact]
+    public void AmbiguousAssemblyCandidates_FailDeterministically()
+    {
+        var references = RejectAmbiguousTypeAndUnload(CompilePlugin());
+
+        ForceUnload(references.First);
+        references.First.LoadContext.IsAlive.Should().BeFalse();
+        references.First.Assembly.IsAlive.Should().BeFalse();
+        references.First.PluginType.IsAlive.Should().BeFalse();
+
+        ForceUnload(references.Second);
+        references.Second.LoadContext.IsAlive.Should().BeFalse();
+        references.Second.Assembly.IsAlive.Should().BeFalse();
+        references.Second.PluginType.IsAlive.Should().BeFalse();
     }
 
     [Fact]
@@ -443,6 +479,40 @@ public static class PluginEntry
         references.LoadContext.IsAlive.Should().BeFalse();
         references.Assembly.IsAlive.Should().BeFalse();
         references.PluginType.IsAlive.Should().BeFalse();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static PairUnloadReferences RejectAmbiguousTypeAndUnload(byte[] image)
+    {
+        var first = LoadedPlugin.Load(image, "ambiguous-one");
+        var second = LoadedPlugin.Load(image, "ambiguous-two");
+        var builder = new SharpPackSerializerContextBuilder()
+            .Configure(
+                SharpPackSerializerConfiguration.Default with
+                {
+                    TypeResolutionMode = TypeResolutionMode.ContextCatalogOnly,
+                });
+
+        RegisterPluginFormatter(builder, first);
+        RegisterPluginFormatter(builder, second);
+        var context = builder.Build();
+        var runtimeType = first.Assembly.GetType(
+            "CollectiblePlugin.UnsupportedPluginType",
+            throwOnError: true)!;
+        var payload = SharpPackSerializer.Serialize<Type>(runtimeType);
+
+        var deserialize = () =>
+            SharpPackSerializer.Deserialize<Type>(payload, context);
+        deserialize.Should().Throw<SharpPackSerializationException>();
+
+        var firstReferences = first.Unload();
+        var secondReferences = second.Unload();
+        runtimeType = null!;
+        context = null!;
+        builder = null!;
+        first = null!;
+        second = null!;
+        return new PairUnloadReferences(firstReferences, secondReferences);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -707,6 +777,10 @@ public static class PluginEntry
     sealed record RetainedBuilderUnloadReferences(
         SharpPackSerializerContextBuilder Builder,
         UnloadReferences References);
+
+    sealed record PairUnloadReferences(
+        UnloadReferences First,
+        UnloadReferences Second);
 }
 
 [SharpPackable]
