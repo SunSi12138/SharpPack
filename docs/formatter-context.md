@@ -40,9 +40,13 @@ var context = new SharpPackSerializerContextBuilder()
     .Build();
 ```
 
-`Build` freezes registration and can only be called once. A built context is
-safe to share between concurrent RPC calls. Different contexts may register
-different formatters for the same closed `T` without affecting each other.
+`Build` freezes registration and can only be called once. The builder is an
+ownership-transfer object: once a build attempt starts, its registration
+captures are released whether registration/freeze succeeds or throws. A
+successfully built context continues to own its registered formatters
+independently of the builder. A built context is safe to share between
+concurrent RPC calls. Different contexts may register different formatters for
+the same closed `T` without affecting each other.
 
 ## Resolution model
 
