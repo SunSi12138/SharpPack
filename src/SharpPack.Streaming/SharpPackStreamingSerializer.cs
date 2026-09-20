@@ -8,6 +8,14 @@ namespace SharpPack.Streaming;
 
 public static class SharpPackStreamingSerializer
 {
+    static readonly ConditionalWeakTable<PipeReader, LengthPrefixedReaderState>
+        s_lengthPrefixedReaderStates = new();
+
+    sealed class LengthPrefixedReaderState
+    {
+        public bool IsTerminal { get; set; }
+    }
+
     /// <summary>
     /// Serializes one framed RPC payload directly into a pipe without an
     /// intermediate byte array. The caller owns the frame header.
@@ -161,6 +169,10 @@ public static class SharpPackStreamingSerializer
     /// not part of the SharpPack payload. Core deserialization starts only
     /// after the complete payload is available, and it must consume exactly
     /// the declared payload length. The caller owns <paramref name="pipeReader"/>.
+    /// If cancellation interrupts an in-progress payload after its frame header
+    /// has been consumed, that reader is terminal for the length-prefixed APIs:
+    /// subsequent framed reads throw <see cref="InvalidOperationException"/>
+    /// rather than interpreting the remaining payload as a new frame.
     /// </remarks>
     public static async ValueTask<T?> DeserializeLengthPrefixedAsync<T>(
         PipeReader pipeReader,
@@ -217,6 +229,7 @@ public static class SharpPackStreamingSerializer
     {
         ArgumentNullException.ThrowIfNull(pipeReader);
         ArgumentOutOfRangeException.ThrowIfNegative(maxFrameLength);
+        ThrowIfLengthPrefixedReaderIsTerminal(pipeReader);
 
         var readResult = await pipeReader
             .ReadAtLeastAsync(sizeof(uint), cancellationToken)
@@ -302,14 +315,25 @@ public static class SharpPackStreamingSerializer
 
             while (copied < payloadLength)
             {
-                readResult = await pipeReader
-                    .ReadAsync(cancellationToken)
-                    .ConfigureAwait(false);
+                try
+                {
+                    readResult = await pipeReader
+                        .ReadAsync(cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                    when (cancellationToken.IsCancellationRequested)
+                {
+                    MarkLengthPrefixedReaderTerminal(pipeReader);
+                    throw;
+                }
+
                 buffer = readResult.Buffer;
 
                 if (readResult.IsCanceled)
                 {
                     pipeReader.AdvanceTo(buffer.Start, buffer.Start);
+                    MarkLengthPrefixedReaderTerminal(pipeReader);
                     throw new OperationCanceledException(cancellationToken);
                 }
 
@@ -364,6 +388,25 @@ public static class SharpPackStreamingSerializer
                 ArrayPool<byte>.Shared.Return(rentedPayload);
             }
         }
+    }
+
+    static void ThrowIfLengthPrefixedReaderIsTerminal(PipeReader pipeReader)
+    {
+        if (s_lengthPrefixedReaderStates.TryGetValue(pipeReader, out var state) &&
+            state.IsTerminal)
+        {
+            throw new InvalidOperationException(
+                "This PipeReader cannot continue length-prefixed deserialization because " +
+                "cancellation interrupted an in-progress frame after its header was consumed. " +
+                "The frame boundary is no longer recoverable; start a new framed transport.");
+        }
+    }
+
+    static void MarkLengthPrefixedReaderTerminal(PipeReader pipeReader)
+    {
+        s_lengthPrefixedReaderStates.GetValue(
+            pipeReader,
+            static _ => new LengthPrefixedReaderState()).IsTerminal = true;
     }
 
     public static async ValueTask SerializeAsync<T>(
