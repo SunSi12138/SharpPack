@@ -16,10 +16,35 @@ public static class SharpPackStreamingSerializer
         public bool IsTerminal { get; set; }
     }
 
+    const string PipeReaderCompletedMessage =
+        "The pipe reader completed before serialization finished.";
+
+    static void EnsurePipeFlushSucceeded(
+        FlushResult result,
+        CancellationToken cancellationToken)
+    {
+        if (result.IsCanceled)
+        {
+            throw new OperationCanceledException(cancellationToken);
+        }
+        if (result.IsCompleted)
+        {
+            throw new InvalidOperationException(PipeReaderCompletedMessage);
+        }
+    }
+
     /// <summary>
     /// Serializes one framed RPC payload directly into a pipe without an
     /// intermediate byte array. The caller owns the frame header.
     /// </summary>
+    /// <remarks>
+    /// The caller owns <paramref name="pipeWriter"/> and SharpPack never
+    /// completes it. A canceled flush throws <see cref="OperationCanceledException"/>;
+    /// a completed flush throws <see cref="InvalidOperationException"/>.
+    /// If serialization fails after writing has started, the destination may
+    /// contain a partial payload. SharpPack does not roll back caller-owned
+    /// writers, pipes, or streams.
+    /// </remarks>
     public static async ValueTask<int> SerializeFrameAsync<T>(
         PipeWriter pipeWriter,
         T? value,
@@ -27,16 +52,14 @@ public static class SharpPackStreamingSerializer
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(pipeWriter);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var written = context is null
             ? SharpPackSerializer.Serialize(ref pipeWriter, value)
             : SharpPackSerializer.Serialize(ref pipeWriter, value, context);
 
         var result = await pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
-        if (result.IsCanceled)
-        {
-            throw new OperationCanceledException(cancellationToken);
-        }
+        EnsurePipeFlushSucceeded(result, cancellationToken);
 
         return written;
     }
@@ -81,12 +104,9 @@ public static class SharpPackStreamingSerializer
                 ? SharpPackSerializer.Deserialize(payload, ref value)
                 : SharpPackSerializer.Deserialize(payload, ref value, context);
 
-            if (consumed != payloadLength)
-            {
-                throw new SharpPackSerializationException(
-                    $"The formatter consumed {consumed} of the " +
-                    $"{payloadLength}-byte RPC payload.");
-            }
+            SharpPackSerializer.EnsurePayloadConsumed(
+                payloadLength,
+                consumed);
 
             var payloadEnd = buffer.GetPosition(payloadLength);
             pipeReader.AdvanceTo(payloadEnd, payloadEnd);
@@ -107,7 +127,12 @@ public static class SharpPackStreamingSerializer
     /// <remarks>
     /// The payload is buffered at item granularity so its length is known
     /// before the frame is emitted. The caller owns <paramref name="pipeWriter"/>
-    /// and the library does not complete it.
+    /// and SharpPack never completes it. A canceled flush throws
+    /// <see cref="OperationCanceledException"/>; a completed flush throws
+    /// <see cref="InvalidOperationException"/>.
+    /// If serialization fails after writing has started, the destination may
+    /// contain a partial payload. SharpPack does not roll back caller-owned
+    /// writers, pipes, or streams.
     /// </remarks>
     public static async ValueTask SerializeLengthPrefixedAsync<T>(
         PipeWriter pipeWriter,
@@ -116,6 +141,7 @@ public static class SharpPackStreamingSerializer
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(pipeWriter);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var payloadWriter = ReusableLinkedArrayBufferWriterPool.Rent(
             out var payloadWriterLeaseId);
@@ -148,10 +174,7 @@ public static class SharpPackStreamingSerializer
             var result = await pipeWriter
                 .FlushAsync(cancellationToken)
                 .ConfigureAwait(false);
-            if (result.IsCanceled)
-            {
-                throw new OperationCanceledException(cancellationToken);
-            }
+            EnsurePipeFlushSucceeded(result, cancellationToken);
         }
         finally
         {
@@ -372,12 +395,9 @@ public static class SharpPackStreamingSerializer
                 ? SharpPackSerializer.Deserialize(payload.Span, ref value)
                 : SharpPackSerializer.Deserialize(payload.Span, ref value, context);
 
-            if (consumedPayload != payloadLength)
-            {
-                throw new SharpPackSerializationException(
-                    $"The formatter consumed {consumedPayload} of the " +
-                    $"{payloadLength}-byte framed payload.");
-            }
+            SharpPackSerializer.EnsurePayloadConsumed(
+                payloadLength,
+                consumedPayload);
 
             return (true, value);
         }
@@ -417,8 +437,12 @@ public static class SharpPackStreamingSerializer
     /// the collection header is written. Lazy sources are enumerated once:
     /// fewer than <paramref name="count"/> items fail after any already-written
     /// partial payload, while an extra item is detected but never serialized.
-    /// The caller owns <paramref name="pipeWriter"/> and output is not
-    /// transactional.
+    /// The caller owns <paramref name="pipeWriter"/> and SharpPack never
+    /// completes it. A canceled flush throws <see cref="OperationCanceledException"/>;
+    /// a completed flush throws <see cref="InvalidOperationException"/>.
+    /// If serialization fails after writing has started, the destination may
+    /// contain a partial payload. SharpPack does not roll back caller-owned
+    /// writers, pipes, or streams.
     /// </remarks>
     public static async ValueTask SerializeAsync<T>(
         PipeWriter pipeWriter,
@@ -430,6 +454,7 @@ public static class SharpPackStreamingSerializer
     {
         ArgumentNullException.ThrowIfNull(pipeWriter);
         ValidateCollectionSerializationArguments(count, source, flushRate);
+        cancellationToken.ThrowIfCancellationRequested();
 
         using var state = SharpPackWriterOptionalStatePool.Rent(context);
 
@@ -475,10 +500,7 @@ public static class SharpPackStreamingSerializer
                 var flush = await pipeWriter
                     .FlushAsync(cancellationToken)
                     .ConfigureAwait(false);
-                if (flush.IsCanceled)
-                {
-                    throw new OperationCanceledException(cancellationToken);
-                }
+                EnsurePipeFlushSucceeded(flush, cancellationToken);
             }
         }
 
@@ -490,10 +512,7 @@ public static class SharpPackStreamingSerializer
         var finalFlush = await pipeWriter
             .FlushAsync(cancellationToken)
             .ConfigureAwait(false);
-        if (finalFlush.IsCanceled)
-        {
-            throw new OperationCanceledException(cancellationToken);
-        }
+        EnsurePipeFlushSucceeded(finalFlush, cancellationToken);
     }
 
     /// <summary>
@@ -504,7 +523,13 @@ public static class SharpPackStreamingSerializer
     /// the collection header is buffered. Lazy sources are enumerated once:
     /// fewer than <paramref name="count"/> items fail after any already-written
     /// partial payload, while an extra item is detected but never serialized.
-    /// The caller owns <paramref name="stream"/> and output is not transactional.
+    /// The caller owns <paramref name="stream"/>. For 1.x compatibility this
+    /// collection API writes its buffered chunks but does not perform a final
+    /// <see cref="Stream.FlushAsync(CancellationToken)"/>; the caller controls
+    /// the final stream flush and lifetime.
+    /// If serialization fails after writing has started, the destination may
+    /// contain a partial payload. SharpPack does not roll back caller-owned
+    /// writers, pipes, or streams.
     /// </remarks>
     public static async ValueTask SerializeAsync<T>(
         Stream stream,
@@ -516,6 +541,7 @@ public static class SharpPackStreamingSerializer
     {
         ArgumentNullException.ThrowIfNull(stream);
         ValidateCollectionSerializationArguments(count, source, flushRate);
+        cancellationToken.ThrowIfCancellationRequested();
 
         using var state = SharpPackWriterOptionalStatePool.Rent(context);
 
@@ -612,6 +638,14 @@ public static class SharpPackStreamingSerializer
             $"The declared collection count is {declaredCount}, but the source " +
             $"contains {actualCount} item(s).");
 
+    /// <summary>
+    /// Deserializes one legacy unframed SharpPack collection from a caller-owned
+    /// pipe.
+    /// </summary>
+    /// <remarks>
+    /// SharpPack advances <paramref name="pipeReader"/> through the collection
+    /// payload but never completes the caller-provided reader.
+    /// </remarks>
     public static async IAsyncEnumerable<T?> DeserializeAsync<T>(
         PipeReader pipeReader,
         int bufferAtLeast = 4096,
@@ -751,6 +785,17 @@ public static class SharpPackStreamingSerializer
         }
     }
 
+    /// <summary>
+    /// Deserializes one legacy unframed SharpPack collection from a caller-owned
+    /// stream.
+    /// </summary>
+    /// <remarks>
+    /// SharpPack creates and completes only its internal PipeReader adapter and
+    /// leaves <paramref name="stream"/> open. The collection header bounds the
+    /// logical payload, but the adapter may read ahead from the underlying
+    /// stream; callers that must preserve following transport bytes should use
+    /// an explicit framed or payload-length boundary.
+    /// </remarks>
     public static async IAsyncEnumerable<T?> DeserializeAsync<T>(
         Stream stream,
         int bufferAtLeast = 4096,

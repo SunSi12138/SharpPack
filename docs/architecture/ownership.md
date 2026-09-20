@@ -7,8 +7,14 @@
 temporary state it creates for the duration of the operation.
 
 **Allowed:** borrow caller storage synchronously, retain reusable buffers inside
-an explicitly long-lived serializer/context object, and return newly allocated
-payloads from allocation-returning APIs.
+an explicitly long-lived serializer/context object, return newly allocated
+payloads from allocation-returning APIs, and leave already-written bytes in a
+caller-owned destination when an operation fails after output has started.
+
+**Non-transactional output:** caller-owned `IBufferWriter<byte>`, `PipeWriter`,
+and `Stream` destinations are not rolled back. If serialization fails after the
+first write, a partial payload may remain; SharpPack is responsible for resetting
+only its own pooled/operation state.
 
 **Forbidden:** dispose caller resources, retain spans or borrowed buffers after
 the call, return pooled memory to a pool while it is observable, or expose stale

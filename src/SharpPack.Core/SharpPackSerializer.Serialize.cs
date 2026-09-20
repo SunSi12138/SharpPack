@@ -134,6 +134,15 @@ public static partial class SharpPackSerializer
         return array;
     }
 
+    /// <summary>
+    /// Serializes one value into a caller-owned <c>IBufferWriter&lt;byte&gt;</c>.
+    /// </summary>
+    /// <remarks>
+    /// The caller retains ownership of <paramref name="bufferWriter"/>. Output
+    /// is non-transactional: if serialization fails after writing has started,
+    /// the destination may contain a partial payload. SharpPack does not roll
+    /// back caller-owned writers, pipes, or streams.
+    /// </remarks>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Serialize<T, TBufferWriter>(
         ref TBufferWriter bufferWriter,
@@ -206,6 +215,15 @@ public static partial class SharpPackSerializer
         return Unsafe.SizeOf<T>();
     }
 
+    /// <summary>
+    /// Serializes one value into a caller-owned <c>IBufferWriter&lt;byte&gt;</c>.
+    /// </summary>
+    /// <remarks>
+    /// The caller retains ownership of <paramref name="bufferWriter"/>. Output
+    /// is non-transactional: if serialization fails after writing has started,
+    /// the destination may contain a partial payload. SharpPack does not roll
+    /// back caller-owned writers, pipes, or streams.
+    /// </remarks>
     public static int Serialize<T, TBufferWriter>(
         TBufferWriter bufferWriter,
         scoped in T? value)
@@ -233,11 +251,24 @@ public static partial class SharpPackSerializer
         return written;
     }
 
+    /// <summary>
+    /// Serializes one value to a caller-owned stream.
+    /// </summary>
+    /// <remarks>
+    /// SharpPack writes the payload, performs a final
+    /// <see cref="Stream.FlushAsync(CancellationToken)"/>, and leaves the stream
+    /// open. If serialization fails after writing has started, the destination
+    /// may contain a partial payload. SharpPack does not roll back caller-owned
+    /// writers, pipes, or streams.
+    /// </remarks>
     public static async ValueTask SerializeAsync<T>(
         Stream stream,
         T? value,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(stream);
+        cancellationToken.ThrowIfCancellationRequested();
+
         var tempWriter = ReusableLinkedArrayBufferWriterPool.Rent(
             out var tempWriterLeaseId);
         try

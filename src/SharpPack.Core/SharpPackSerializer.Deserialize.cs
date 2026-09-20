@@ -154,15 +154,22 @@ public static partial class SharpPackSerializer
     /// Deserializes from the stream's remaining contents.
     /// </summary>
     /// <remarks>
+    /// The caller owns <paramref name="stream"/> and SharpPack leaves it open.
     /// A buffer-backed <see cref="MemoryStream"/> advances by the bytes consumed
     /// by one value. Other streams are read through end-of-stream because a
     /// general <see cref="Stream"/> cannot return bytes read past that value.
-    /// Use the payload-length overload for framed or concatenated messages.
+    /// This read-to-end overload has no declared payload boundary, so it does
+    /// not require the formatter to consume every byte read from the stream.
+    /// Use the payload-length overload for framed or concatenated messages and
+    /// deterministic exact-consumption enforcement.
     /// </remarks>
     public static async ValueTask<T?> DeserializeAsync<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(Stream stream, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(stream);
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (stream is MemoryStream ms && ms.TryGetBuffer(out ArraySegment<byte> streamBuffer))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -241,6 +248,12 @@ public static partial class SharpPackSerializer
     /// Deserializes exactly one length-delimited payload without consuming
     /// bytes from a following message.
     /// </summary>
+    /// <remarks>
+    /// The caller owns <paramref name="stream"/> and SharpPack leaves it open.
+    /// Exactly <paramref name="payloadLength"/> bytes are read for this payload.
+    /// Deserialization fails if the formatter does not consume exactly that
+    /// payload length.
+    /// </remarks>
     public static ValueTask<T?> DeserializeAsync<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
         T>(
@@ -263,6 +276,7 @@ public static partial class SharpPackSerializer
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentOutOfRangeException.ThrowIfNegative(payloadLength);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (stream is MemoryStream memoryStream &&
             memoryStream.TryGetBuffer(out var segment))
@@ -280,7 +294,7 @@ public static partial class SharpPackSerializer
             var consumed = context is null
                 ? Deserialize(payload, ref value)
                 : Deserialize(payload, ref value, context);
-            EnsureFrameConsumed(payloadLength, consumed);
+            EnsurePayloadConsumed(payloadLength, consumed);
             memoryStream.Seek(payloadLength, SeekOrigin.Current);
             return value;
         }
@@ -331,7 +345,7 @@ public static partial class SharpPackSerializer
             var consumed = context is null
                 ? Deserialize(sequence, ref value)
                 : Deserialize(sequence, ref value, context);
-            EnsureFrameConsumed(payloadLength, consumed);
+            EnsurePayloadConsumed(payloadLength, consumed);
             return value;
         }
         finally
@@ -342,7 +356,7 @@ public static partial class SharpPackSerializer
         }
     }
 
-    static void EnsureFrameConsumed(int payloadLength, int consumed)
+    internal static void EnsurePayloadConsumed(int payloadLength, int consumed)
     {
         if (payloadLength != consumed)
         {
