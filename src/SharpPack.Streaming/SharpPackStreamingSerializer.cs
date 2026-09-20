@@ -409,6 +409,17 @@ public static class SharpPackStreamingSerializer
             static _ => new LengthPrefixedReaderState()).IsTerminal = true;
     }
 
+    /// <summary>
+    /// Serializes exactly <paramref name="count"/> collection items to a pipe.
+    /// </summary>
+    /// <remarks>
+    /// Arguments and any cheaply available source count are validated before
+    /// the collection header is written. Lazy sources are enumerated once:
+    /// fewer than <paramref name="count"/> items fail after any already-written
+    /// partial payload, while an extra item is detected but never serialized.
+    /// The caller owns <paramref name="pipeWriter"/> and output is not
+    /// transactional.
+    /// </remarks>
     public static async ValueTask SerializeAsync<T>(
         PipeWriter pipeWriter,
         int count,
@@ -417,44 +428,84 @@ public static class SharpPackStreamingSerializer
         SharpPackSerializerContext? context = null,
         CancellationToken cancellationToken = default)
     {
-        static void WriteCollectionHeader(PipeWriter pipeWriter, int count, SharpPackWriterOptionalState state)
+        ArgumentNullException.ThrowIfNull(pipeWriter);
+        ValidateCollectionSerializationArguments(count, source, flushRate);
+
+        using var state = SharpPackWriterOptionalStatePool.Rent(context);
+
         {
             var writer = new SharpPackWriter<PipeWriter>(ref pipeWriter, state);
             writer.WriteCollectionHeader(count);
             writer.Flush();
         }
 
-        static bool WriteWhileReachFlushRate(PipeWriter pipeWriter, IEnumerator<T> enumerator, int flushRate, SharpPackWriterOptionalState state)
+        using var enumerator = source.GetEnumerator();
+        var actual = 0;
+
+        while (actual < count)
         {
             var writer = new SharpPackWriter<PipeWriter>(ref pipeWriter, state);
-            while (enumerator.MoveNext())
+            var reachedFlushRate = false;
+            try
             {
-                writer.WriteValue(enumerator.Current);
-                if (flushRate < writer.WrittenCount)
+                while (actual < count)
                 {
-                    writer.Flush();
-                    return true;
+                    if (!enumerator.MoveNext())
+                    {
+                        throw CreateCollectionCountMismatch(count, actual);
+                    }
+
+                    writer.WriteValue(enumerator.Current);
+                    actual++;
+
+                    if (flushRate < writer.WrittenCount)
+                    {
+                        reachedFlushRate = true;
+                        break;
+                    }
                 }
             }
+            finally
+            {
+                writer.Flush();
+            }
 
-            writer.Flush();
-            return false; // false when completed.
+            if (reachedFlushRate)
+            {
+                var flush = await pipeWriter
+                    .FlushAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                if (flush.IsCanceled)
+                {
+                    throw new OperationCanceledException(cancellationToken);
+                }
+            }
         }
 
-        using var state = SharpPackWriterOptionalStatePool.Rent(context);
-
-        WriteCollectionHeader(pipeWriter, count, state);
-
-        using var enumerator = source.GetEnumerator();
-
-        while (WriteWhileReachFlushRate(pipeWriter, enumerator, flushRate, state))
+        if (enumerator.MoveNext())
         {
-            await pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
+            throw CreateCollectionCountMismatch(count, (long)count + 1);
         }
 
-        await pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
+        var finalFlush = await pipeWriter
+            .FlushAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (finalFlush.IsCanceled)
+        {
+            throw new OperationCanceledException(cancellationToken);
+        }
     }
 
+    /// <summary>
+    /// Serializes exactly <paramref name="count"/> collection items to a stream.
+    /// </summary>
+    /// <remarks>
+    /// Arguments and any cheaply available source count are validated before
+    /// the collection header is buffered. Lazy sources are enumerated once:
+    /// fewer than <paramref name="count"/> items fail after any already-written
+    /// partial payload, while an extra item is detected but never serialized.
+    /// The caller owns <paramref name="stream"/> and output is not transactional.
+    /// </remarks>
     public static async ValueTask SerializeAsync<T>(
         Stream stream,
         int count,
@@ -463,29 +514,8 @@ public static class SharpPackStreamingSerializer
         SharpPackSerializerContext? context = null,
         CancellationToken cancellationToken = default)
     {
-        static void WriteCollectionHeader(ReusableLinkedArrayBufferWriter bufferWriter, int count, SharpPackWriterOptionalState state)
-        {
-            var writer = new SharpPackWriter<ReusableLinkedArrayBufferWriter>(ref bufferWriter, state);
-            writer.WriteCollectionHeader(count);
-            writer.Flush();
-        }
-
-        static bool WriteWhileReachFlushRate(ReusableLinkedArrayBufferWriter bufferWriter, IEnumerator<T> enumerator, int flushRate, SharpPackWriterOptionalState state)
-        {
-            var writer = new SharpPackWriter<ReusableLinkedArrayBufferWriter>(ref bufferWriter, state);
-            while (enumerator.MoveNext())
-            {
-                writer.WriteValue(enumerator.Current);
-                if (flushRate < writer.WrittenCount)
-                {
-                    writer.Flush();
-                    return true;
-                }
-            }
-
-            writer.Flush();
-            return false; // false when completed.
-        }
+        ArgumentNullException.ThrowIfNull(stream);
+        ValidateCollectionSerializationArguments(count, source, flushRate);
 
         using var state = SharpPackWriterOptionalStatePool.Rent(context);
 
@@ -493,15 +523,63 @@ public static class SharpPackStreamingSerializer
             out var tempWriterLeaseId);
         try
         {
-            WriteCollectionHeader(tempWriter, count, state);
+            {
+                var writer = new SharpPackWriter<ReusableLinkedArrayBufferWriter>(
+                    ref tempWriter,
+                    state);
+                writer.WriteCollectionHeader(count);
+                writer.Flush();
+            }
 
             using var enumerator = source.GetEnumerator();
+            var actual = 0;
 
-            while (WriteWhileReachFlushRate(tempWriter, enumerator, flushRate, state))
+            while (actual < count)
             {
-                await tempWriter.WriteToAndResetAsync(stream, cancellationToken).ConfigureAwait(false);
+                var writer = new SharpPackWriter<ReusableLinkedArrayBufferWriter>(
+                    ref tempWriter,
+                    state);
+                var reachedFlushRate = false;
+                try
+                {
+                    while (actual < count)
+                    {
+                        if (!enumerator.MoveNext())
+                        {
+                            throw CreateCollectionCountMismatch(count, actual);
+                        }
+
+                        writer.WriteValue(enumerator.Current);
+                        actual++;
+
+                        if (flushRate < writer.WrittenCount)
+                        {
+                            reachedFlushRate = true;
+                            break;
+                        }
+                    }
+                }
+                finally
+                {
+                    writer.Flush();
+                }
+
+                if (reachedFlushRate)
+                {
+                    await tempWriter
+                        .WriteToAndResetAsync(stream, cancellationToken)
+                        .ConfigureAwait(false);
+                }
             }
-            await tempWriter.WriteToAndResetAsync(stream, cancellationToken).ConfigureAwait(false);
+
+            if (enumerator.MoveNext())
+            {
+                throw CreateCollectionCountMismatch(count, (long)count + 1);
+            }
+
+            await tempWriter
+                .WriteToAndResetAsync(stream, cancellationToken)
+                .ConfigureAwait(false);
         }
         finally
         {
@@ -510,6 +588,29 @@ public static class SharpPackStreamingSerializer
                 tempWriterLeaseId);
         }
     }
+
+    static void ValidateCollectionSerializationArguments<T>(
+        int count,
+        IEnumerable<T> source,
+        int flushRate)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(flushRate, 0);
+
+        if (Enumerable.TryGetNonEnumeratedCount(source, out var actualCount) &&
+            actualCount != count)
+        {
+            throw CreateCollectionCountMismatch(count, actualCount);
+        }
+    }
+
+    static SharpPackSerializationException CreateCollectionCountMismatch(
+        int declaredCount,
+        long actualCount)
+        => new(
+            $"The declared collection count is {declaredCount}, but the source " +
+            $"contains {actualCount} item(s).");
 
     public static async IAsyncEnumerable<T?> DeserializeAsync<T>(
         PipeReader pipeReader,

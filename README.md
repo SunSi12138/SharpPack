@@ -599,6 +599,10 @@ Streaming Serialization
 ---
 `SharpPack.Streaming` provides `SharpPackStreamingSerializer` for collection streaming and framed item transports.
 
+The collection `SerializeAsync<T>(..., int count, IEnumerable<T> source, ...)` overloads require `count` to match the source exactly. The destination, source, non-negative `count`, and positive `flushRate` are validated before the collection header is written. When the source exposes a count without enumeration, a mismatch also fails before the first output byte. Arbitrary lazy `IEnumerable<T>` sources are not pre-enumerated or buffered: SharpPack writes at most the declared number of items, probes once for a `(count + 1)`th item without serializing it, and fails if the source ends early or contains an extra item.
+
+Collection output is caller-owned and non-transactional. For a lazy source, an underflow, enumeration exception, cancellation, or other failure may leave a partial collection payload already written to the destination; SharpPack does not roll it back. For truly lazy item streams whose count is not a protocol fact known in advance, prefer the framed item streaming APIs rather than declaring a normal collection count.
+
 The legacy `DeserializeAsync<T>` collection API is unframed. It can safely make progress when an item is known to be complete from the payload shape, but buffer occupancy alone cannot prove completeness for arbitrary variable-size items such as large strings, nested collections, custom formatters, or reference-aware objects. Do not use `bufferAtLeast` or `readMinimumSize` as message-boundary controls.
 
 For arbitrary variable-size items, use the additive length-prefixed transport APIs. Each frame is:
