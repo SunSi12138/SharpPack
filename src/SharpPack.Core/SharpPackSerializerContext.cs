@@ -197,15 +197,22 @@ public sealed class SharpPackSerializerContextBuilder
         ThrowIfBuilt();
         built = true;
 
-        var context = new SharpPackSerializerContext(
-            configuration,
-            freezeRegistrations: false);
-        foreach (var registration in registrations)
+        try
         {
-            registration(context);
+            var context = new SharpPackSerializerContext(
+                configuration,
+                freezeRegistrations: false);
+            foreach (var registration in registrations)
+            {
+                registration(context);
+            }
+            context.FreezeRegistrations();
+            return context;
         }
-        context.FreezeRegistrations();
-        return context;
+        finally
+        {
+            registrations.Clear();
+        }
     }
 
     void ThrowIfBuilt()
