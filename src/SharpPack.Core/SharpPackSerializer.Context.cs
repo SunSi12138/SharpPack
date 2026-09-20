@@ -39,6 +39,15 @@ public static partial class SharpPackSerializer
         }
     }
 
+    /// <summary>
+    /// Serializes one value into a caller-owned <c>IBufferWriter&lt;byte&gt;</c>.
+    /// </summary>
+    /// <remarks>
+    /// The caller retains ownership of <paramref name="bufferWriter"/>. Output
+    /// is non-transactional: if serialization fails after writing has started,
+    /// the destination may contain a partial payload. SharpPack does not roll
+    /// back caller-owned writers, pipes, or streams.
+    /// </remarks>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Serialize<T, TBufferWriter>(
         ref TBufferWriter bufferWriter,
@@ -64,6 +73,15 @@ public static partial class SharpPackSerializer
         }
     }
 
+    /// <summary>
+    /// Serializes one value into a caller-owned <c>IBufferWriter&lt;byte&gt;</c>.
+    /// </summary>
+    /// <remarks>
+    /// The caller retains ownership of <paramref name="bufferWriter"/>. Output
+    /// is non-transactional: if serialization fails after writing has started,
+    /// the destination may contain a partial payload. SharpPack does not roll
+    /// back caller-owned writers, pipes, or streams.
+    /// </remarks>
     public static int Serialize<T, TBufferWriter>(
         TBufferWriter bufferWriter,
         scoped in T? value,
