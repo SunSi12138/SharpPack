@@ -610,6 +610,8 @@ SharpPack payload bytes
 
 The 4-byte prefix belongs to `SharpPack.Streaming`; it is not part of the standard SharpPack/MemoryPack-compatible payload. The sender buffers one item to determine its payload length, and the receiver waits for the complete declared payload before invoking Core deserialization. Multiple frames can be read with `DeserializeLengthPrefixedItemsAsync<T>`.
 
+Cancellation before a frame header is consumed leaves the reader aligned and the length-prefixed APIs can be called again. If cancellation interrupts payload collection after the frame header has been consumed, the remaining frame boundary cannot be recovered without resumable per-frame state. SharpPack therefore treats that `PipeReader` as terminal for the length-prefixed APIs: the canceled call throws `OperationCanceledException`, and subsequent length-prefixed reads throw `InvalidOperationException`. The caller still owns and completes the `PipeReader`; start a new framed transport before resuming framed deserialization.
+
 ```csharp
 await SharpPackStreamingSerializer.SerializeLengthPrefixedAsync(
     pipe.Writer,
