@@ -244,6 +244,37 @@ public class StreamingSerializer
     }
 
     [Fact]
+    public async Task DeserializeLegacyCollection_HonorsContextCollectionLimit()
+    {
+        var pipe = new Pipe();
+        pipe.Writer.Write(
+            SharpPackSerializer.Serialize(new[] { 1, 2, 3 }));
+        await pipe.Writer.CompleteAsync();
+        var context = new SharpPackSerializerContext(
+            SharpPackSerializerConfiguration.Default with
+            {
+                ReadLimits = SharpPackReadLimits.Default with
+                {
+                    MaxCollectionLength = 2,
+                },
+            });
+
+        await Assert.ThrowsAsync<SharpPackSerializationException>(async () =>
+        {
+            await foreach (var _ in SharpPackStreamingSerializer
+                               .DeserializeAsync<int>(
+                                   pipe.Reader,
+                                   bufferAtLeast: 4,
+                                   readMinimumSize: 4,
+                                   context))
+            {
+            }
+        });
+
+        await pipe.Reader.CompleteAsync();
+    }
+
+    [Fact]
     public async Task DeserializeRegistersFreshContextRootType()
     {
         var expected = new[]

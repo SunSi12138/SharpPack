@@ -22,6 +22,20 @@ public class SharpPackSerializationException : Exception
     }
 
     [DoesNotReturn]
+    internal static void ThrowReadLimitExceeded(
+        string boundary,
+        int limit,
+        int actual,
+        Type? type = null)
+    {
+        var typeSuffix = type is null
+            ? string.Empty
+            : $" while reading {type.FullName}";
+        throw new SharpPackSerializationException(
+            $"The {boundary} read limit {limit} was exceeded by value {actual}{typeSuffix}.");
+    }
+
+    [DoesNotReturn]
     public static void ThrowInvalidPropertyCount(byte expected, byte actual)
     {
         throw new SharpPackSerializationException($"Current object's property count is {expected} but binary's header maked as {actual}, can't deserialize about versioning.");

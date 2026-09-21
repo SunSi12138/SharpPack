@@ -13,7 +13,6 @@ using static MemoryMarshal;
 [StructLayout(LayoutKind.Auto)]
 public ref partial struct SharpPackReader
 {
-    const int DepthLimit = 1000;
     static readonly UTF8Encoding StrictUtf8Encoding = new(false, true);
 
     ReadOnlySequence<byte> bufferSource;
@@ -25,6 +24,8 @@ public ref partial struct SharpPackReader
     int advancedCount;
     int consumed;   // total length of consumed
     int depth;
+    readonly int maxDepth;
+    readonly int maxCollectionLength;
     readonly SharpPackReaderOptionalState optionalState;
 
     public int Consumed => consumed;
@@ -43,6 +44,8 @@ public ref partial struct SharpPackReader
         this.rentBuffer = null;
         this.smallBuffer = default;
         this.totalLength = sequence.Length;
+        this.maxDepth = optionalState.MaxDepth;
+        this.maxCollectionLength = optionalState.MaxCollectionLength;
         this.optionalState = optionalState;
     }
 
@@ -57,6 +60,8 @@ public ref partial struct SharpPackReader
         this.rentBuffer = null;
         this.smallBuffer = default;
         this.totalLength = buffer.Length;
+        this.maxDepth = optionalState.MaxDepth;
+        this.maxCollectionLength = optionalState.MaxCollectionLength;
         this.optionalState = optionalState;
     }
 
@@ -332,6 +337,7 @@ public ref partial struct SharpPackReader
             SharpPackSerializationException.ThrowInsufficientBufferUnless(length);
         }
 
+        ThrowIfCollectionLimitExceeded(length);
         return true;
     }
 
@@ -391,6 +397,7 @@ public ref partial struct SharpPackReader
             SharpPackSerializationException.ThrowInsufficientBufferUnless(length);
         }
 
+        ThrowIfCollectionLimitExceeded(length);
         return true;
     }
 
@@ -1088,13 +1095,29 @@ public ref partial struct SharpPackReader
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void ThrowIfCollectionLimitExceeded(int length)
+    {
+        if (length > maxCollectionLength)
+        {
+            SharpPackSerializationException.ThrowReadLimitExceeded(
+                "collection length",
+                maxCollectionLength,
+                length);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     void EnterDepth<T>()
     {
         depth++;
-        if (depth >= DepthLimit)
+        if (depth > maxDepth)
         {
             depth--;
-            SharpPackSerializationException.ThrowReachedDepthLimit(typeof(T));
+            SharpPackSerializationException.ThrowReadLimitExceeded(
+                "depth",
+                maxDepth,
+                maxDepth + 1,
+                typeof(T));
         }
     }
 }
