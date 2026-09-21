@@ -167,3 +167,9 @@ The executable
 the complete host/plugin lifecycle: load a plugin into a collectible context,
 pass an explicit serializer context into plugin-owned generic code, release all
 strong references, call `Unload`, and verify collection.
+
+
+## Deserialization limits
+
+Aggregate read limits and payload-size boundaries are documented in
+[Deserialization read limits](read-limits.md).

@@ -145,6 +145,18 @@ public static partial class SharpPackSerializer
         SharpPackSerializerContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        EnsurePayloadWithinLimit(buffer.Length, context);
+        return DeserializeWithContext(buffer, ref value, context);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static int DeserializeWithContext<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        T>(
+        ReadOnlySpan<byte> buffer,
+        ref T? value,
+        SharpPackSerializerContext context)
+    {
         context.EnsureRootType<T>();
         var state = AcquireReaderOptionalState();
         state.Init(context);
@@ -180,6 +192,17 @@ public static partial class SharpPackSerializer
         SharpPackSerializerContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        EnsurePayloadWithinLimit(buffer.Length, context);
+        return DeserializeWithContext(buffer, ref value, context);
+    }
+
+    internal static int DeserializeWithContext<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        T>(
+        in ReadOnlySequence<byte> buffer,
+        ref T? value,
+        SharpPackSerializerContext context)
+    {
         context.EnsureRootType<T>();
         var state = AcquireReaderOptionalState();
         state.Init(context);
@@ -220,16 +243,16 @@ public static partial class SharpPackSerializer
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(stream);
         cancellationToken.ThrowIfCancellationRequested();
-        context.EnsureRootType<T>();
 
         if (stream is MemoryStream memoryStream && memoryStream.TryGetBuffer(out var segment))
         {
             cancellationToken.ThrowIfCancellationRequested();
             T? value = default;
-            var consumed = Deserialize(
+            var consumed = DeserializeWithContext(
                 segment.AsSpan(checked((int)memoryStream.Position)),
                 ref value,
                 context);
+            EnsurePayloadWithinLimit(consumed, context);
             memoryStream.Seek(consumed, SeekOrigin.Current);
             return value;
         }
@@ -240,6 +263,7 @@ public static partial class SharpPackSerializer
         {
             var buffer = ArrayPool<byte>.Shared.Rent(65536);
             var offset = 0;
+            long totalRead = 0;
             while (true)
             {
                 if (offset == buffer.Length)
@@ -266,6 +290,8 @@ public static partial class SharpPackSerializer
                 }
 
                 offset += read;
+                totalRead += read;
+                EnsurePayloadWithinLimit(totalRead, context);
                 if (read == 0)
                 {
                     builder.Add(buffer.AsMemory(0, offset), returnToPool: true);
@@ -275,11 +301,21 @@ public static partial class SharpPackSerializer
 
             if (builder.TryGetSingleMemory(out var memory))
             {
-                return Deserialize<T>(memory.Span, context);
+                T? singleValue = default;
+                _ = DeserializeWithContext(
+                    memory.Span,
+                    ref singleValue,
+                    context);
+                return singleValue;
             }
 
             var sequence = builder.Build();
-            return Deserialize<T>(sequence, context);
+            T? sequenceValue = default;
+            _ = DeserializeWithContext(
+                sequence,
+                ref sequenceValue,
+                context);
+            return sequenceValue;
         }
         finally
         {

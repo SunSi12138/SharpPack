@@ -746,6 +746,18 @@ type public sealed class SharpPack.SharpPackOrderAttribute : System.Attribute
   ctor public SharpPackOrderAttribute(System.Int32 order)
   property System.Int32 Order { get:public; }
 
+type public readonly struct SharpPack.SharpPackReadLimits : System.IEquatable<SharpPack.SharpPackReadLimits>
+  method public override System.Boolean Equals(System.Object obj)
+  method public override System.Int32 GetHashCode()
+  method public override System.String ToString()
+  method public sealed override System.Boolean Equals(SharpPack.SharpPackReadLimits other)
+  method public static System.Boolean op_Equality(SharpPack.SharpPackReadLimits left, SharpPack.SharpPackReadLimits right)
+  method public static System.Boolean op_Inequality(SharpPack.SharpPackReadLimits left, SharpPack.SharpPackReadLimits right)
+  property System.Int32 MaxCollectionLength { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
+  property System.Int32 MaxDepth { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
+  property System.Int32 MaxReferenceCount { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
+  property static SharpPack.SharpPackReadLimits Default { get:public; }
+
 type public ref struct SharpPack.SharpPackReader
   ctor public SharpPackReader(System.ReadOnlySpan<System.Byte> buffer, SharpPack.SharpPackReaderOptionalState optionalState)
   ctor public SharpPackReader(in System.Buffers.ReadOnlySequence<System.Byte> sequence, SharpPack.SharpPackReaderOptionalState optionalState)
@@ -906,6 +918,8 @@ type public readonly struct SharpPack.SharpPackSerializerConfiguration : System.
   method public sealed override System.Boolean Equals(SharpPack.SharpPackSerializerConfiguration other)
   method public static System.Boolean op_Equality(SharpPack.SharpPackSerializerConfiguration left, SharpPack.SharpPackSerializerConfiguration right)
   method public static System.Boolean op_Inequality(SharpPack.SharpPackSerializerConfiguration left, SharpPack.SharpPackSerializerConfiguration right)
+  property System.Int32 MaxPayloadBytes { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
+  property SharpPack.SharpPackReadLimits ReadLimits { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
   property SharpPack.SharpPackStringEncoding StringEncoding { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
   property SharpPack.TypeResolutionMode TypeResolutionMode { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
   property static SharpPack.SharpPackSerializerConfiguration Default { get:public; }

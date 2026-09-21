@@ -116,6 +116,8 @@ public sealed class BitPackFormatter : SharpPackFormatter<bool[]>
             SharpPackSerializationException.ThrowInsufficientBufferUnless(length);
         }
 
+        reader.ThrowIfCollectionLimitExceeded(length);
+
         if (value == null || value.Length != length)
         {
             value = new bool[length];

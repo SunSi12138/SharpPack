@@ -20,6 +20,14 @@ public readonly record struct SharpPackSerializerConfiguration
     public SharpPackStringEncoding StringEncoding { get; init; }
 
     public TypeResolutionMode TypeResolutionMode { get; init; }
+
+    public SharpPackReadLimits ReadLimits { get; init; }
+
+    /// <summary>
+    /// Maximum accepted top-level payload size for known-length reads.
+    /// Zero preserves the current unlimited behavior.
+    /// </summary>
+    public int MaxPayloadBytes { get; init; }
 }
 
 public enum TypeResolutionMode : byte
