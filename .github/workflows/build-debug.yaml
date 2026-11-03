@@ -5,10 +5,10 @@ on:
   push:
     branches:
       - "main"
-  pull_request:
-    branches:
-      - "main"
       - "dev"
+  # Validate stacked PRs against their actual base, including feature branches.
+  # Keep the unprivileged pull_request event; never use pull_request_target here.
+  pull_request:
 
 jobs:
   build-dotnet:
@@ -24,6 +24,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
