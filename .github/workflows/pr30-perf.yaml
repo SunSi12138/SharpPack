@@ -23,9 +23,14 @@ jobs:
           path: baseline
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: cd8359d9777898eb7334985001eef0d2d0287c9e
+          ref: 56113519bb9771fe33ec39daed59181024918228
           persist-credentials: false
           path: candidate
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 974e7186daf34f9a92a79065caf2a20ca64799c1
+          persist-credentials: false
+          path: experiment
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73
         with:
           dotnet-version: 10.0.102
@@ -35,7 +40,7 @@ jobs:
           set -euo pipefail
           dotnet --info
           lscpu
-          for side in baseline candidate; do
+          for side in baseline candidate experiment; do
             test "$(git -C "$side" status --porcelain)" = ""
             git -C "$side" rev-parse HEAD
             mkdir -p "$RUNNER_TEMP/perf-$side"
@@ -44,15 +49,15 @@ jobs:
             (cd "$RUNNER_TEMP/perf-$side"; test "$(dotnet --version)" = 10.0.102; dotnet --version; dotnet build -c Release -p:RepoRoot="$GITHUB_WORKSPACE/$side")
           done
           sha256sum "$RUNNER_TEMP"/perf-*/Program.cs
-      - name: Run warmed BABA paired samples
+      - name: Run warmed three-way ABCCBA samples
         shell: bash
         run: |
           set -euo pipefail
-          for pair in candidate:B1 baseline:A1 candidate:B2 baseline:A2; do
+          for pair in baseline:A1 candidate:B1 experiment:C1 experiment:C2 candidate:B2 baseline:A2; do
             side=${pair%:*}; label=${pair#*:}
             echo "PAIR $label $side"
             extra=()
-            if [ "$side" = candidate ]; then extra+=(--safe-bitarray); fi
+            if [ "$side" != baseline ]; then extra+=(--safe-bitarray); fi
             dotnet "$RUNNER_TEMP/perf-$side/bin/Release/net10.0/Perf.dll" "${extra[@]}" | tee "$RUNNER_TEMP/perf-$label.txt"
           done
           python3 harness/tools/PairedPerf/summarize.py "$RUNNER_TEMP" >> "$GITHUB_STEP_SUMMARY"
