@@ -188,6 +188,8 @@ public static class PluginEntry
     public static bool RunAll()
     {
         var context = new SharpPackSerializerContextBuilder()
+            .EnableTypeSerialization()
+            .RegisterType<PluginItem>("plugin-item")
             .Register<IHostPluginUnion>(new HostPluginUnionFormatter())
             .Register(new UnsupportedPluginFormatter())
             .Build();
@@ -434,7 +436,7 @@ public static class PluginEntry
     }
 
     [Fact]
-    public void EmptyContextTracksRuntimeTypeInsideNonCollectibleHost()
+    public void ExplicitRegistryRoundTripsRuntimeTypeInsideNonCollectibleHost()
     {
         var references = RoundTripHostRuntimeTypeAndUnload(CompilePlugin());
 
@@ -451,7 +453,8 @@ public static class PluginEntry
         string name)
     {
         var loaded = LoadedPlugin.Load(image, name);
-        var builder = new SharpPackSerializerContextBuilder();
+        var builder = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+            .RegisterType(loaded.PluginType, "plugin-dto");
 
         RegisterPluginFormatter(builder, loaded);
         var context = builder.Build();
@@ -476,7 +479,8 @@ public static class PluginEntry
         string name)
     {
         var loaded = LoadedPlugin.Load(image, name);
-        var builder = new SharpPackSerializerContextBuilder();
+        var builder = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+            .RegisterType(loaded.PluginType, "plugin-dto");
 
         RegisterPluginFormatter(builder, loaded);
         RegisterPluginFormatter(builder, loaded);
@@ -519,11 +523,50 @@ public static class PluginEntry
             .Invoke(builder, [formatter]);
     }
 
+    [Fact]
+    public void SameTypeIdResolvesOnlyWithinItsCollectibleContext()
+    {
+        var references = RoundTripIndependentRegistries(CompilePlugin());
+        foreach (var item in references)
+        {
+            ForceUnload(item);
+            item.LoadContext.IsAlive.Should().BeFalse();
+            item.Assembly.IsAlive.Should().BeFalse();
+            item.PluginType.IsAlive.Should().BeFalse();
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static UnloadReferences[] RoundTripIndependentRegistries(byte[] image)
+    {
+        var first = LoadedPlugin.Load(image, "registry-first");
+        var second = LoadedPlugin.Load(image, "registry-second");
+        var firstContext = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+            .RegisterType(first.PluginType, "plugin").Build();
+        var secondContext = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+            .RegisterType(second.PluginType, "plugin").Build();
+        var payload = SharpPackSerializer.Serialize<Type>(first.PluginType, firstContext);
+        payload.Should().Equal(SharpPackSerializer.Serialize<Type>(second.PluginType, secondContext));
+        SharpPackSerializer.Deserialize<Type>(payload, firstContext).Should().BeSameAs(first.PluginType);
+        SharpPackSerializer.Deserialize<Type>(payload, secondContext).Should().BeSameAs(second.PluginType);
+        Assert.Throws<SharpPackSerializationException>(() => SharpPackSerializer.Serialize<Type>(second.PluginType, firstContext));
+        var conflict = new SharpPackSerializerContextBuilder().RegisterType(first.PluginType, "plugin");
+        Assert.Throws<ArgumentException>(() => conflict.RegisterType(second.PluginType, "plugin"));
+        var references = new[] { first.Unload(), second.Unload() };
+        firstContext = null!;
+        secondContext = null!;
+        conflict = null!;
+        first = null!;
+        second = null!;
+        return references;
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     static UnloadReferences RoundTripHostRuntimeTypeAndUnload(byte[] image)
     {
         var loaded = LoadedPlugin.Load(image, "host-runtime-type");
-        var context = new SharpPackSerializerContext();
+        var context = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+            .RegisterType(loaded.PluginType, "plugin-dto").Build();
         var value = new HostRuntimeTypeEnvelope
         {
             RuntimeType = loaded.PluginType

@@ -63,7 +63,11 @@ public class WellknownFormattersTest
         ConvertEqual(TimeZoneInfo.Utc);
         var sb = new StringBuilder(new string('a', 99999));
         Convert(sb).ToString().Should().Be(sb.ToString());
-        ConvertEqual(typeof(WellknownFormattersTest));
+        var typeContext = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+            .RegisterType<WellknownFormattersTest>("well-known-test").Build();
+        var typePayload = SharpPackSerializer.Serialize<Type>(typeof(WellknownFormattersTest), typeContext);
+        SharpPackSerializer.Deserialize<Type>(typePayload, typeContext).Should().Be(typeof(WellknownFormattersTest));
+        Assert.Throws<SharpPackSerializationException>(() => Convert(typeof(WellknownFormattersTest)));
         var bitArray = new BitArray(Enumerable.Range(1, 1000).Select(x => x % 3 == 0).ToArray());
         Convert(bitArray).OfType<bool>().ToArray().Should().Equal(bitArray.OfType<bool>().ToArray());
         ConvertEqual(CultureInfo.InvariantCulture);

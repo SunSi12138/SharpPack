@@ -24,9 +24,27 @@ var value = new AotSharpPackModel
     Item = new AotUnionItem { Value = 123 },
 };
 
-var defaultPayload = SharpPackSerializer.Serialize(value);
+var typeContext = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+    .RegisterType<AotSharpPackModel>("aot-model").Build();
+try
+{
+    _ = SharpPackSerializer.Serialize<Type>(typeof(AotSharpPackModel));
+    throw new InvalidOperationException("Default Type serialization must be disabled under NativeAOT.");
+}
+catch (SharpPackSerializationException)
+{
+}
+try
+{
+    _ = SharpPackSerializer.Deserialize<Type>(SharpPackSerializer.Serialize("unknown-id"), typeContext);
+    throw new InvalidOperationException("Unknown Type IDs must be rejected under NativeAOT.");
+}
+catch (SharpPackSerializationException)
+{
+}
+var registeredPayload = SharpPackSerializer.Serialize(value, typeContext);
 AssertModel(
-    SharpPackSerializer.Deserialize<AotSharpPackModel>(defaultPayload),
+    SharpPackSerializer.Deserialize<AotSharpPackModel>(registeredPayload, typeContext),
     value);
 
 var exactValue = new AotExactSizeModel
@@ -235,12 +253,13 @@ if (formattedListRoundTrip is not { Count: 2 } ||
         "The unmanaged List raw-copy path failed under NativeAOT.");
 }
 
-var context = new SharpPackSerializerContext();
+var context = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+    .RegisterType<AotSharpPackModel>("aot-model").Build();
 var contextPayload = SharpPackSerializer.Serialize(value, context);
-if (!defaultPayload.AsSpan().SequenceEqual(contextPayload))
+if (!registeredPayload.AsSpan().SequenceEqual(contextPayload))
 {
     throw new InvalidOperationException(
-        "The empty Context changed the SharpPack wire format.");
+        "Equivalent explicit Type registries changed the SharpPack wire format.");
 }
 AssertModel(
     SharpPackSerializer.Deserialize<AotSharpPackModel>(
@@ -311,8 +330,9 @@ if (SharpPackSerializer.Deserialize<AotFactoryValue>(
         "The explicitly registered public factory failed under NativeAOT.");
 }
 
-var utf8Context = new SharpPackSerializerContext(
-    SharpPackSerializerConfiguration.Utf8);
+var utf8Context = new SharpPackSerializerContextBuilder()
+    .Configure(SharpPackSerializerConfiguration.Utf8).EnableTypeSerialization()
+    .RegisterType<AotSharpPackModel>("aot-model").Build();
 var utf8Payload = SharpPackSerializer.Serialize(value, utf8Context);
 AssertModel(
     SharpPackSerializer.Deserialize<AotSharpPackModel>(

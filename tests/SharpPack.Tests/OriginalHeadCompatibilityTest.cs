@@ -28,6 +28,14 @@ public class OriginalHeadCompatibilityTest
         Corpus.WellKnownFormatterCount.Should().Be(117);
         Corpus.GenericShapeCount.Should().Be(68);
         Corpus.Entries.Should().HaveCount(203);
+        var typePayloadEntries = Corpus.Entries
+            .Select(static entry => Type.GetType(entry.Type, throwOnError: false))
+            .Where(static type => type is not null && ContainsTypePayload(type))
+            .ToArray();
+        typePayloadEntries.Should().Equal(new[] { typeof(Type), typeof(Type[]) },
+            "only the legacy Type leaf and Type array entries change wire contract");
+        Corpus.Entries.Count(static entry => entry.Type.Contains(", GoldenCorpus,", StringComparison.Ordinal))
+            .Should().Be(11, "fixture-local cases remain covered by explicit generated-model tests");
     }
 
     [Theory]
@@ -41,6 +49,17 @@ public class OriginalHeadCompatibilityTest
         var context = entry.Configuration == nameof(SharpPackStringEncoding.Utf16)
             ? new SharpPackSerializerContext(SharpPackSerializerConfiguration.Utf16)
             : new SharpPackSerializerContext();
+
+        if (ContainsTypePayload(type))
+        {
+            // Keep the immutable original fixture; Type is an intentional breaking exception.
+            Assert.Throws<SharpPackSerializationException>(() => invoker.Deserialize(payload, context: null));
+            Assert.Throws<SharpPackSerializationException>(() => invoker.Deserialize(payload, context));
+            var registered = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+                .RegisterType<Dictionary<string, int>>("dictionary").Build();
+            Assert.Throws<SharpPackSerializationException>(() => invoker.Deserialize(payload, registered));
+            return;
+        }
 
         var defaultValue = entry.Configuration == nameof(SharpPackStringEncoding.Utf8)
             ? invoker.Deserialize(payload, context: null)
@@ -247,11 +266,12 @@ public class OriginalHeadCompatibilityTest
     }
 
     [Fact]
-    public void TypePayload_ResolvesApplicationAssemblyInFreshContext()
+    public void TypePayload_RequiresExplicitRegistration()
     {
         var value = new GoldenTypeContainer { Value = typeof(GoldenObject) };
-        var payload = SharpPackSerializer.Serialize(value);
-        var context = new SharpPackSerializerContext();
+        var context = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+            .RegisterType<GoldenObject>("golden-object").Build();
+        var payload = SharpPackSerializer.Serialize(value, context);
 
         var decoded = SharpPackSerializer.Deserialize<GoldenTypeContainer>(
             payload,
@@ -270,6 +290,12 @@ public class OriginalHeadCompatibilityTest
         _ = SharpPackSerializer.Deserialize<T>(expected);
         _ = SharpPackSerializer.Deserialize<T>(expected, context);
     }
+
+    // Inspect actual runtime type structure rather than a root-name prefix.
+    static bool ContainsTypePayload(Type type)
+        => type == typeof(Type)
+           || (type.HasElementType && ContainsTypePayload(type.GetElementType()!))
+           || (type.IsGenericType && type.GetGenericArguments().Any(ContainsTypePayload));
 
     static bool IsByteDeterministic(GoldenEntry entry)
         => entry.Deterministic

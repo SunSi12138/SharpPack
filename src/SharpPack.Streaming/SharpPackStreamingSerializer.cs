@@ -688,7 +688,6 @@ public static class SharpPackStreamingSerializer
         ArgumentOutOfRangeException.ThrowIfNegative(bufferAtLeast);
         ArgumentOutOfRangeException.ThrowIfLessThan(readMinimumSize, bufferAtLeast);
 
-        context?.EnsureRootType<T>();
         using var state = SharpPackReaderOptionalStatePool.Rent(context);
         var itemBuffer = new List<T?>();
         var remain = -1;

@@ -107,26 +107,6 @@ internal static class FormatterTypeTraits<T>
     }
 }
 
-internal static class ContextRootTypeRegistration<T>
-{
-    static readonly ConditionalWeakTable<SharpPackSerializerContext, object> registrations = new();
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static void Ensure(SharpPackSerializerContext context)
-    {
-        if (!registrations.TryGetValue(context, out _))
-        {
-            _ = registrations.GetValue(
-                context,
-                static context =>
-                {
-                    context.AddType(typeof(T));
-                    return new object();
-                });
-        }
-    }
-}
-
 internal static class FormatterResolver<T>
 {
     internal static SharpPackFormatter<T> CreateDefault()
@@ -151,8 +131,6 @@ internal static class FormatterResolver<T>
 
         try
         {
-            context?.AddType(type);
-
             if (type == typeof(Type))
             {
                 return (SharpPackFormatter<T>)(object)new TypeFormatter();

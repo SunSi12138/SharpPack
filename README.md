@@ -9,9 +9,15 @@ modern .NET.
 
 SharpPack is an independently maintained fork of
 [Cysharp/MemoryPack](https://github.com/Cysharp/MemoryPack). It retains the
-original MemoryPack binary wire format while using a fully renamed API,
+original MemoryPack binary wire format for non-`System.Type` payloads while using a fully renamed API,
 context-owned formatter graphs, modern .NET 10 runtime targets, and aggressive
 performance optimizations. See [NOTICE](NOTICE) for attribution.
+
+The development branch intentionally changes `System.Type` payloads: they are
+disabled by default and use explicitly registered, context-owned stable IDs.
+This is a breaking change from the published 1.1.0 Type-name wire contract.
+See [Type payload migration](docs/formatter-context.md#systemtype-payload-capability)
+before upgrading applications that exchange Type values.
 
 Its speed comes from a C#-specific binary format, modern .NET APIs, generic
 static formatter dispatch, and an incremental source generator. The format
