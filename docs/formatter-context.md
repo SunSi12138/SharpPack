@@ -94,10 +94,14 @@ separate trusted migration application using the old version; do not enable
 runtime fallback in the new reader. Keep endpoints on compatible contracts
 until migration is complete. Non-Type wire payloads remain unchanged.
 
-The pinned original 203-entry compatibility corpus remains unchanged. Its one
-`System.Type` entry is now explicitly tested for rejection instead of wire
-roundtrip and omitted from the reverse-compatible current-writer corpus (191
-rather than 192 entries). The other entries retain their existing checks.
+The pinned original 203-entry compatibility corpus remains unchanged. Its two Type-containing entries
+(`System.Type` and `System.Type[]`) are explicitly tested for rejection instead
+of legacy wire roundtrip. The reverse-compatible current-writer corpus retains
+all 190 non-Type runtime entries (previously 192 including those two Type
+entries). The 11 original fixture-local entries retain their separate explicit
+checks. Classification traverses runtime element types and generic arguments;
+no other unresolved runtime types or extra Type exclusions may be skipped.
+Actual counts are asserted by the compatibility tool, not inferred from CI badges.
 
 For collectible plugins, load and discover the permitted Types, build that
 plugin's immutable registry, then publish its context. Independent contexts may

@@ -28,8 +28,12 @@ public class OriginalHeadCompatibilityTest
         Corpus.WellKnownFormatterCount.Should().Be(117);
         Corpus.GenericShapeCount.Should().Be(68);
         Corpus.Entries.Should().HaveCount(203);
-        Corpus.Entries.Count(static entry => entry.Type.StartsWith("System.Type,", StringComparison.Ordinal))
-            .Should().Be(1, "only the legacy System.Type entry is exempt from positive wire compatibility");
+        var typePayloadEntries = Corpus.Entries
+            .Select(static entry => Type.GetType(entry.Type, throwOnError: false))
+            .Where(static type => type is not null && ContainsTypePayload(type))
+            .ToArray();
+        typePayloadEntries.Should().Equal(new[] { typeof(Type), typeof(Type[]) },
+            "only the legacy Type leaf and Type array entries change wire contract");
         Corpus.Entries.Count(static entry => entry.Type.Contains(", GoldenCorpus,", StringComparison.Ordinal))
             .Should().Be(11, "fixture-local cases remain covered by explicit generated-model tests");
     }
@@ -46,7 +50,7 @@ public class OriginalHeadCompatibilityTest
             ? new SharpPackSerializerContext(SharpPackSerializerConfiguration.Utf16)
             : new SharpPackSerializerContext();
 
-        if (type == typeof(Type))
+        if (ContainsTypePayload(type))
         {
             // Keep the immutable original fixture; Type is an intentional breaking exception.
             Assert.Throws<SharpPackSerializationException>(() => invoker.Deserialize(payload, context: null));
@@ -286,6 +290,12 @@ public class OriginalHeadCompatibilityTest
         _ = SharpPackSerializer.Deserialize<T>(expected);
         _ = SharpPackSerializer.Deserialize<T>(expected, context);
     }
+
+    // Inspect actual runtime type structure rather than a root-name prefix.
+    static bool ContainsTypePayload(Type type)
+        => type == typeof(Type)
+           || (type.HasElementType && ContainsTypePayload(type.GetElementType()!))
+           || (type.IsGenericType && type.GetGenericArguments().Any(ContainsTypePayload));
 
     static bool IsByteDeterministic(GoldenEntry entry)
         => entry.Deterministic

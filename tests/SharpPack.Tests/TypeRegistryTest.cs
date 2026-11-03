@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using SharpPack.Formatters;
 
@@ -89,6 +90,26 @@ public class TypeRegistryTest
         var emptyRegistry = new SharpPackSerializerContextBuilder().EnableTypeSerialization().Build();
         Assert.Throws<SharpPackSerializationException>(() => SharpPackSerializer.Deserialize<TypeRegistryEnvelope>(payload, emptyRegistry));
         Assert.Throws<SharpPackSerializationException>(() => SharpPackSerializer.Serialize<Type>(typeof(TypeRegistryEnvelope), context));
+    }
+
+    [Fact]
+    public void TypeArrayAndGenericContainerUseRegisteredLeafCapability()
+    {
+        var context = RegisteredContext();
+        Type?[] values = [typeof(TypeRegistryTest), null];
+        var payload = SharpPackSerializer.Serialize(values, context);
+        SharpPackSerializer.Deserialize<Type?[]>(payload, context).Should().Equal(values);
+        Assert.Throws<SharpPackSerializationException>(() => SharpPackSerializer.Serialize(values));
+        Assert.Throws<SharpPackSerializationException>(() => SharpPackSerializer.Deserialize<Type?[]>(payload));
+        var empty = new SharpPackSerializerContextBuilder().EnableTypeSerialization().Build();
+        Assert.Throws<SharpPackSerializationException>(() => SharpPackSerializer.Deserialize<Type?[]>(payload, empty));
+
+        var nested = new List<Type?[]> { values };
+        var nestedPayload = SharpPackSerializer.Serialize(nested, context);
+        SharpPackSerializer.Deserialize<List<Type?[]>>(nestedPayload, context)![0].Should().Equal(values);
+        Assert.Throws<SharpPackSerializationException>(() => SharpPackSerializer.Serialize(nested));
+        Assert.Throws<SharpPackSerializationException>(() => SharpPackSerializer.Deserialize<List<Type?[]>>(nestedPayload));
+        Assert.Throws<SharpPackSerializationException>(() => SharpPackSerializer.Deserialize<List<Type?[]>>(nestedPayload, empty));
     }
 
     [Fact]

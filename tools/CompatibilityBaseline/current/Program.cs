@@ -36,9 +36,9 @@ foreach (var entry in original.Entries)
             SharpPackSerializerConfiguration.Utf16)
         : null;
     var originalPayload = Convert.FromHexString(entry.PayloadHex);
-    if (type == typeof(Type))
+    if (ContainsTypePayload(type))
     {
-        // The original corpus stays immutable. This one wire contract deliberately changed.
+        // The original corpus stays immutable. Type leaves, including inside arrays, changed.
         try
         {
             _ = invoker.Deserialize(originalPayload, context);
@@ -46,7 +46,7 @@ foreach (var entry in original.Entries)
         catch (SharpPackSerializationException)
         {
             rejectedLegacyTypeCount++;
-            Console.Error.WriteLine("Verified intentional legacy System.Type payload rejection; excluded from reverse wire compatibility.");
+            Console.Error.WriteLine("Verified intentional legacy Type-containing payload rejection; excluded from reverse wire compatibility.");
             continue;
         }
         throw new InvalidOperationException("Legacy System.Type payload unexpectedly resolved.");
@@ -63,10 +63,10 @@ foreach (var entry in original.Entries)
 }
 
 // Pinned corpus ledger: 203 total = 11 original fixture-local entries +
-// 191 non-Type reverse-compatible runtime entries + 1 rejected legacy Type.
+// 190 non-Type reverse-compatible runtime entries + 2 rejected legacy Type entries.
 // No additional Type exemptions or unresolved runtime types may disappear silently.
 if (original.Entries.Count != 203 || fixtureEntryCount != 11 ||
-    rejectedLegacyTypeCount != 1 || currentEntries.Count != 191)
+    rejectedLegacyTypeCount != 2 || currentEntries.Count != 190)
 {
     throw new InvalidOperationException(
         $"Unexpected compatibility coverage: total={original.Entries.Count}, " +
@@ -74,7 +74,7 @@ if (original.Entries.Count != 203 || fixtureEntryCount != 11 ||
 }
 Console.Error.WriteLine(
     $"Compatibility coverage: {currentEntries.Count} reverse-compatible, " +
-    $"{rejectedLegacyTypeCount} legacy Type rejected, {fixtureEntryCount} fixture-local entries tested separately.");
+    $"{rejectedLegacyTypeCount} legacy Type-containing entries rejected, {fixtureEntryCount} fixture-local entries tested separately.");
 
 var current = new CurrentPayloadDocument(
     original.SourceCommit,
@@ -83,6 +83,12 @@ Console.Write(
     JsonSerializer.Serialize(
         current,
         new JsonSerializerOptions { WriteIndented = true }));
+
+// Traverse closed generic arguments and element shapes, not just the root's name.
+static bool ContainsTypePayload(Type type)
+    => type == typeof(Type)
+       || (type.HasElementType && ContainsTypePayload(type.GetElementType()!))
+       || (type.IsGenericType && type.GetGenericArguments().Any(ContainsTypePayload));
 
 abstract class PayloadInvoker
 {
