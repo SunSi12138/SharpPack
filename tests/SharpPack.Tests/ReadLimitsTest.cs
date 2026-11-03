@@ -93,7 +93,8 @@ public class ReadLimitsTest
                 payload,
                 tooShallow);
 
-        deserialize.Should().Throw<SharpPackSerializationException>();
+        deserialize.Should().Throw<SharpPackSerializationException>()
+            .Which.ReadLimitKind.Should().Be(SharpPackReadLimitKind.Depth);
     }
 
     [Fact]
@@ -255,7 +256,8 @@ public class ReadLimitsTest
             SharpPackSerializer.Deserialize<ReadLimitReferenceNode>(
                 twoPayload,
                 context);
-        overflow.Should().Throw<SharpPackSerializationException>();
+        overflow.Should().Throw<SharpPackSerializationException>()
+            .Which.ReadLimitKind.Should().Be(SharpPackReadLimitKind.ReferenceCount);
 
         var afterFailure =
             SharpPackSerializer.Deserialize<ReadLimitReferenceNode>(

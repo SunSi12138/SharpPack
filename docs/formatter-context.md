@@ -48,34 +48,66 @@ independently of the builder. A built context is safe to share between
 concurrent RPC calls. Different contexts may register different formatters for
 the same closed `T` without affecting each other.
 
-## Runtime Type resolution
+## System.Type payload capability
 
-Runtime `Type` names are resolved by a context-owned capability separate from
-the formatter graph. The default `GlobalCompatibility` mode preserves 1.x
-behavior: SharpPack first prefers assemblies already known to the context and
-then permits the normal CLR-wide `Type.GetType` fallback.
-
-Hosts that treat incoming payloads as untrusted can opt into catalog-only
-resolution:
+`System.Type` values are disabled by default, including null Type values. The
+built-in Type formatter requires an explicit context with `RegisteredOnly`
+enabled. Formatter registration and root-type use never grant Type-payload
+permission, and reading or writing a payload never changes the registry.
 
 ```csharp
-var context = new SharpPackSerializerContext(
-    SharpPackSerializerConfiguration.Default with
-    {
-        TypeResolutionMode = TypeResolutionMode.ContextCatalogOnly,
-    });
+var context = new SharpPackSerializerContextBuilder()
+    .EnableTypeSerialization()
+    .RegisterType<MyRequest>("request-v1")
+    .RegisterType(typeof(MyResponse), "response-v1")
+    .Build();
+
+byte[] payload = SharpPackSerializer.Serialize<Type>(typeof(MyRequest), context);
+Type? type = SharpPackSerializer.Deserialize<Type>(payload, context);
 ```
 
-`ContextCatalogOnly` resolves only through assemblies learned from explicit
-context capabilities such as root types and registered formatter types. It does
-not perform a global fallback, and serializing or deserializing a `Type` value
-does not expand the strict catalog. If multiple context-local assemblies are
-equally valid for one serialized assembly identity, resolution fails instead
-of selecting one arbitrarily.
+The Type wire value is the registered ID encoded as an ordinary SharpPack string
+using the context's string encoding. Null is supported only in an enabled
+context. IDs use ordinal, case-sensitive equality and must be nonempty and not
+whitespace. Duplicate IDs or duplicate Types (including repeated identical
+registrations) fail during registration; aliases are not supported.
+`RegisterType` does not enable serialization. `Configure` replaces all settings,
+so call `EnableTypeSerialization` after it or explicitly set
+`TypeSerializationMode.RegisteredOnly` in the configuration.
 
-`Disabled` rejects serialized `Type` payload reads and writes. The catalog is
-owned by the serializer context; releasing the context releases its assembly
-references. No process-global mutable type registry is used.
+`Build` copies registrations into a private immutable bidirectional registry.
+Both successful and failed build attempts clear the builder's Type references
+along with its formatter captures. There is no global Type registry, CLR-name
+lookup, assembly probing, or compatibility fallback. An unknown Type or ID
+fails with `SharpPackSerializationException`; a failed lookup cannot authorize
+later operations. Custom formatters remain trusted application code, not a
+sandbox controlled by the built-in Type formatter.
+
+### Migration from the 1.x Type-name contract
+
+This development change intentionally breaks previous `System.Type` payloads.
+Choose stable protocol IDs on both endpoints and register each allowed Type
+explicitly. Do not use assembly-qualified names as protocol IDs. Legacy CLR-name
+payloads are not automatically resolved or converted, including the old
+MemoryPack-to-SharpPack name substitution. Convert stored legacy data with a
+separate trusted migration application using the old version; do not enable
+runtime fallback in the new reader. Keep endpoints on compatible contracts
+until migration is complete. Non-Type wire payloads remain unchanged.
+
+The pinned original 203-entry compatibility corpus remains unchanged. Its two Type-containing entries
+(`System.Type` and `System.Type[]`) are explicitly tested for rejection instead
+of legacy wire roundtrip. The reverse-compatible current-writer corpus retains
+all 190 non-Type runtime entries (previously 192 including those two Type
+entries). The 11 original fixture-local entries retain their separate explicit
+checks. Classification traverses runtime element types and generic arguments;
+no other unresolved runtime types or extra Type exclusions may be skipped.
+Actual counts are asserted by the compatibility tool, not inferred from CI badges.
+
+For collectible plugins, load and discover the permitted Types, build that
+plugin's immutable registry, then publish its context. Independent contexts may
+map the same ID to different Types, even with identical CLR names in different
+ALCs. Stop plugin requests and release its context and other plugin references
+before unloading. To change an active registry, publish a new context snapshot.
 
 ## Resolution model
 

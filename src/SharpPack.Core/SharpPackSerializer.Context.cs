@@ -157,7 +157,6 @@ public static partial class SharpPackSerializer
         ref T? value,
         SharpPackSerializerContext context)
     {
-        context.EnsureRootType<T>();
         var state = AcquireReaderOptionalState();
         state.Init(context);
         var reader = new SharpPackReader(buffer, state);
@@ -203,7 +202,6 @@ public static partial class SharpPackSerializer
         ref T? value,
         SharpPackSerializerContext context)
     {
-        context.EnsureRootType<T>();
         var state = AcquireReaderOptionalState();
         state.Init(context);
         var reader = new SharpPackReader(buffer, state);
@@ -259,42 +257,41 @@ public static partial class SharpPackSerializer
 
         var builder = ReusableReadOnlySequenceBuilderPool.Rent(
             out var builderLeaseId);
+        byte[]? pendingBuffer = null;
         try
         {
-            var buffer = ArrayPool<byte>.Shared.Rent(65536);
+            var maxPayloadBytes = context.MaxPayloadBytes;
+            pendingBuffer = ArrayPool<byte>.Shared.Rent(
+                (int)Math.Min(65536L, (long)maxPayloadBytes + 1));
             var offset = 0;
             long totalRead = 0;
             while (true)
             {
-                if (offset == buffer.Length)
+                if (offset == pendingBuffer.Length)
                 {
-                    builder.Add(buffer, returnToPool: true);
-                    buffer = ArrayPool<byte>.Shared.Rent(
-                        Math.Min(
-                            MathEx.NewArrayCapacity(buffer.Length),
-                            MaximumStreamSegmentSize));
+                    var nextRequest = (int)Math.Min(
+                        Math.Min(MathEx.NewArrayCapacity(pendingBuffer.Length), MaximumStreamSegmentSize),
+                        (long)maxPayloadBytes - totalRead + 1);
+                    builder.Add(pendingBuffer, returnToPool: true);
+                    pendingBuffer = null; // Ownership transferred only after Add succeeds.
+                    pendingBuffer = ArrayPool<byte>.Shared.Rent(nextRequest);
                     offset = 0;
                 }
 
-                int read;
-                try
-                {
-                    read = await stream.ReadAsync(
-                        buffer.AsMemory(offset, buffer.Length - offset),
-                        cancellationToken).ConfigureAwait(false);
-                }
-                catch
-                {
-                    ArrayPool<byte>.Shared.Return(buffer);
-                    throw;
-                }
-
+                // A pool bucket can exceed the requested size. Bound the slice,
+                // including one probe byte to distinguish exact-limit EOF.
+                var read = await stream.ReadAsync(
+                    pendingBuffer.AsMemory(offset, (int)Math.Min(
+                        pendingBuffer.Length - offset,
+                        (long)maxPayloadBytes - totalRead + 1)),
+                    cancellationToken).ConfigureAwait(false);
                 offset += read;
                 totalRead += read;
                 EnsurePayloadWithinLimit(totalRead, context);
                 if (read == 0)
                 {
-                    builder.Add(buffer.AsMemory(0, offset), returnToPool: true);
+                    builder.Add(pendingBuffer.AsMemory(0, offset), returnToPool: true);
+                    pendingBuffer = null;
                     break;
                 }
             }
@@ -319,6 +316,10 @@ public static partial class SharpPackSerializer
         }
         finally
         {
+            if (pendingBuffer is not null)
+            {
+                ArrayPool<byte>.Shared.Return(pendingBuffer);
+            }
             ReusableReadOnlySequenceBuilderPool.Return(
                 builder,
                 builderLeaseId);

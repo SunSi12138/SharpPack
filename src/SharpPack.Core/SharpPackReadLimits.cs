@@ -44,3 +44,12 @@ public readonly record struct SharpPackReadLimits
         };
     }
 }
+
+/// <summary>Identifies the aggregate boundary that rejected a read.</summary>
+public enum SharpPackReadLimitKind : byte
+{
+    PayloadBytes,
+    Depth,
+    CollectionLength,
+    ReferenceCount,
+}

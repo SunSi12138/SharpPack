@@ -28,7 +28,7 @@ public class ContextFormatterMatrixTest
         AssertEquivalent("显式 context");
         AssertEquivalent(new Version(1, 2, 3, 4));
         AssertEquivalent(new Uri("https://example.com/rpc"));
-        AssertEquivalent(typeof(Dictionary<string, int>));
+        AssertExplicitTypeCapability(typeof(Dictionary<string, int>));
         AssertEquivalent(new[] { 1, 2, 3 });
         AssertEquivalent(new[] { "a", "b", "c" });
         AssertEquivalent(new int[,] { { 1, 2 }, { 3, 4 } });
@@ -122,6 +122,17 @@ public class ContextFormatterMatrixTest
             MyProperty = 30,
         };
         AssertEquivalent(externalUnion);
+    }
+
+    void AssertExplicitTypeCapability(Type value)
+    {
+        Assert.Throws<SharpPackSerializationException>(() => SharpPackSerializer.Serialize<Type>(value));
+        Assert.Throws<SharpPackSerializationException>(() => SharpPackSerializer.Serialize<Type>(value, context));
+        var registered = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+            .RegisterType(value, "matrix-type").Build();
+        var bytes = SharpPackSerializer.Serialize<Type>(value, registered);
+        bytes.Should().Equal(SharpPackSerializer.Serialize("matrix-type"));
+        SharpPackSerializer.Deserialize<Type>(bytes, registered).Should().Be(value);
     }
 
     void AssertEquivalent<T>(T value)

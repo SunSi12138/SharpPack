@@ -203,15 +203,28 @@ public sealed class SharpPackReaderOptionalState : IDisposable
             return;
         }
 
-        if (id < (uint)sequentialReferences.Count ||
-            sparseReferences?.ContainsKey(id) == true)
+        if (id < (uint)sequentialReferences.Count)
         {
             SharpPackSerializationException.ThrowMessage(
                 "Object is already added, id:" + id);
         }
 
-        ThrowIfReferenceLimitExceeded();
-        (sparseReferences ??= []).Add(id, value);
+        if (referenceCount >= maxReferenceCount)
+        {
+            // Only the rejection path needs an extra lookup to preserve
+            // duplicate-ID classification. Successful inserts retain TryAdd.
+            if (sparseReferences?.ContainsKey(id) == true)
+            {
+                SharpPackSerializationException.ThrowMessage(
+                    "Object is already added, id:" + id);
+            }
+            ThrowIfReferenceLimitExceeded();
+        }
+        if (!(sparseReferences ??= []).TryAdd(id, value))
+        {
+            SharpPackSerializationException.ThrowMessage(
+                "Object is already added, id:" + id);
+        }
         referenceCount++;
     }
 
@@ -221,7 +234,7 @@ public sealed class SharpPackReaderOptionalState : IDisposable
         if (referenceCount >= maxReferenceCount)
         {
             SharpPackSerializationException.ThrowReadLimitExceeded(
-                "reference count",
+                SharpPackReadLimitKind.ReferenceCount,
                 maxReferenceCount,
                 referenceCount == int.MaxValue
                     ? int.MaxValue

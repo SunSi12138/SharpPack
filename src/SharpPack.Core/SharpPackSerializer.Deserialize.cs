@@ -366,7 +366,7 @@ public static partial class SharpPackSerializer
         if (payloadLength > maxPayloadBytes)
         {
             SharpPackSerializationException.ThrowReadLimitExceeded(
-                "payload byte length",
+                SharpPackReadLimitKind.PayloadBytes,
                 maxPayloadBytes,
                 payloadLength > int.MaxValue
                     ? int.MaxValue

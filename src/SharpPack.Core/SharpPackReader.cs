@@ -402,10 +402,21 @@ public ref partial struct SharpPackReader
     }
 
     /// <summary>
-    /// no validate collection size, be careful to use.
+    /// Reads a collection count without checking remaining payload bytes.
+    /// Configured collection cardinality limits still apply.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool DangerousTryReadCollectionHeader(out int length)
+    {
+        if (!TryReadLengthHeader(out length)) return false;
+        ThrowIfCollectionLimitExceeded(length);
+        return true;
+    }
+
+    // String lengths are not collection cardinalities. Keep the raw structural
+    // header primitive internal so public Dangerous reads cannot bypass limits.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool TryReadLengthHeader(out int length)
     {
         length = Unsafe.ReadUnaligned<int>(ref GetSpanReference(4));
         AdvanceWithinSpan(4);
@@ -1100,7 +1111,7 @@ public ref partial struct SharpPackReader
         if (length > maxCollectionLength)
         {
             SharpPackSerializationException.ThrowReadLimitExceeded(
-                "collection length",
+                SharpPackReadLimitKind.CollectionLength,
                 maxCollectionLength,
                 length);
         }
@@ -1114,7 +1125,7 @@ public ref partial struct SharpPackReader
         {
             depth--;
             SharpPackSerializationException.ThrowReadLimitExceeded(
-                "depth",
+                SharpPackReadLimitKind.Depth,
                 maxDepth,
                 maxDepth + 1,
                 typeof(T));

@@ -1,4 +1,4 @@
-﻿using SharpPack.Internal;
+using SharpPack.Internal;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.IO.Pipelines;
@@ -312,7 +312,7 @@ public static class SharpPackStreamingSerializer
             if (payloadLength > maxPayloadBytes)
             {
                 SharpPackSerializationException.ThrowReadLimitExceeded(
-                    "payload byte length",
+                    SharpPackReadLimitKind.PayloadBytes,
                     maxPayloadBytes,
                     payloadLength);
             }
@@ -432,9 +432,6 @@ public static class SharpPackStreamingSerializer
     static int GetMaxPayloadBytes(SharpPackSerializerContext? context)
         => context?.MaxPayloadBytes ?? int.MaxValue;
 
-    static int GetMaxCollectionLength(SharpPackSerializerContext? context)
-        => context?.ReadLimits.MaxCollectionLength ?? int.MaxValue;
-
     static void ThrowIfPayloadLimitExceeded(
         int payloadLength,
         SharpPackSerializerContext? context)
@@ -443,7 +440,7 @@ public static class SharpPackStreamingSerializer
         if (payloadLength > maxPayloadBytes)
         {
             SharpPackSerializationException.ThrowReadLimitExceeded(
-                "payload byte length",
+                SharpPackReadLimitKind.PayloadBytes,
                 maxPayloadBytes,
                 payloadLength);
         }
@@ -695,7 +692,6 @@ public static class SharpPackStreamingSerializer
         static void ReadCollectionHeader(
             in ReadOnlySequence<byte> buffer,
             SharpPackReaderOptionalState state,
-            int maxCollectionLength,
             out int length)
         {
             using var reader = new SharpPackReader(buffer, state);
@@ -703,14 +699,6 @@ public static class SharpPackStreamingSerializer
             {
                 length = 0;
                 return;
-            }
-
-            if (length > maxCollectionLength)
-            {
-                SharpPackSerializationException.ThrowReadLimitExceeded(
-                    "collection length",
-                    maxCollectionLength,
-                    length);
             }
         }
 
@@ -737,9 +725,7 @@ public static class SharpPackStreamingSerializer
         ArgumentOutOfRangeException.ThrowIfNegative(bufferAtLeast);
         ArgumentOutOfRangeException.ThrowIfLessThan(readMinimumSize, bufferAtLeast);
 
-        context?.EnsureRootType<T>();
         using var state = SharpPackReaderOptionalStatePool.Rent(context);
-        var maxCollectionLength = GetMaxCollectionLength(context);
         var itemBuffer = new List<T?>();
         var remain = -1;
         var readResult = await pipeReader
@@ -776,7 +762,6 @@ public static class SharpPackStreamingSerializer
                 ReadCollectionHeader(
                     buffer,
                     state,
-                    maxCollectionLength,
                     out remain);
                 parseStart = buffer.GetPosition(4);
                 if (remain > 0)

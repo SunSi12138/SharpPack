@@ -746,6 +746,13 @@ type public sealed class SharpPack.SharpPackOrderAttribute : System.Attribute
   ctor public SharpPackOrderAttribute(System.Int32 order)
   property System.Int32 Order { get:public; }
 
+type public enum SharpPack.SharpPackReadLimitKind : System.Byte, System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  field public System.Byte value__
+  field public const SharpPack.SharpPackReadLimitKind CollectionLength = 2
+  field public const SharpPack.SharpPackReadLimitKind Depth = 1
+  field public const SharpPack.SharpPackReadLimitKind PayloadBytes = 0
+  field public const SharpPack.SharpPackReadLimitKind ReferenceCount = 3
+
 type public readonly struct SharpPack.SharpPackReadLimits : System.IEquatable<SharpPack.SharpPackReadLimits>
   method public override System.Boolean Equals(System.Object obj)
   method public override System.Int32 GetHashCode()
@@ -883,6 +890,7 @@ type public class SharpPack.SharpPackSerializationException : System.Exception, 
   method public static System.Void ThrowSequenceReachedEnd()
   method public static System.Void ThrowSizeOverflow()
   method public static System.Void ThrowWriteInvalidMemberCount(System.Byte memberCount)
+  property System.Nullable<SharpPack.SharpPackReadLimitKind> ReadLimitKind { get:public; }
 
 type public static class SharpPack.SharpPackSerializer
   method public static SharpPack.SharpPackWriter<SharpPack.Internal.SharpPackExactArrayBufferWriter> CreateExactWriter(ref SharpPack.Internal.SharpPackExactArrayBufferWriter bufferWriter)
@@ -918,10 +926,10 @@ type public readonly struct SharpPack.SharpPackSerializerConfiguration : System.
   method public sealed override System.Boolean Equals(SharpPack.SharpPackSerializerConfiguration other)
   method public static System.Boolean op_Equality(SharpPack.SharpPackSerializerConfiguration left, SharpPack.SharpPackSerializerConfiguration right)
   method public static System.Boolean op_Inequality(SharpPack.SharpPackSerializerConfiguration left, SharpPack.SharpPackSerializerConfiguration right)
-  property System.Int32 MaxPayloadBytes { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
   property SharpPack.SharpPackReadLimits ReadLimits { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
   property SharpPack.SharpPackStringEncoding StringEncoding { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
-  property SharpPack.TypeResolutionMode TypeResolutionMode { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
+  property SharpPack.TypeSerializationMode TypeSerializationMode { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
+  property System.Int32 MaxPayloadBytes { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
   property static SharpPack.SharpPackSerializerConfiguration Default { get:public; }
   property static SharpPack.SharpPackSerializerConfiguration Utf16 { get:public; }
   property static SharpPack.SharpPackSerializerConfiguration Utf8 { get:public; }
@@ -937,11 +945,14 @@ type public sealed class SharpPack.SharpPackSerializerContextBuilder
   ctor public SharpPackSerializerContextBuilder()
   method public SharpPack.SharpPackSerializerContext Build()
   method public SharpPack.SharpPackSerializerContextBuilder Configure(SharpPack.SharpPackSerializerConfiguration value)
+  method public SharpPack.SharpPackSerializerContextBuilder EnableTypeSerialization()
   method public SharpPack.SharpPackSerializerContextBuilder Register<T>(SharpPack.SharpPackFormatter<T> formatter)
   method public SharpPack.SharpPackSerializerContextBuilder RegisterCollection<TCollection, TElement>() where TCollection : System.Collections.Generic.ICollection<TElement>, new()
   method public SharpPack.SharpPackSerializerContextBuilder RegisterDictionary<TDictionary, TKey, TValue>() where TDictionary : System.Collections.Generic.IDictionary<TKey, TValue>, new() where TKey : notnull
   method public SharpPack.SharpPackSerializerContextBuilder RegisterFactory<T, TFactory>() where TFactory : SharpPack.ISharpPackFormatterFactory<T>
   method public SharpPack.SharpPackSerializerContextBuilder RegisterSet<TSet, TElement>() where TSet : System.Collections.Generic.ISet<TElement>, new()
+  method public SharpPack.SharpPackSerializerContextBuilder RegisterType(System.Type type, System.String typeId)
+  method public SharpPack.SharpPackSerializerContextBuilder RegisterType<T>(System.String typeId)
 
 type public sealed class SharpPack.SharpPackSerializerRuntimeOptions : System.IEquatable<SharpPack.SharpPackSerializerRuntimeOptions>
   ctor public SharpPackSerializerRuntimeOptions()
@@ -1112,11 +1123,10 @@ type public sealed class SharpPack.SharpPackableAttribute : System.Attribute
 type public sealed class SharpPack.SuppressDefaultInitializationAttribute : System.Attribute
   ctor public SuppressDefaultInitializationAttribute()
 
-type public enum SharpPack.TypeResolutionMode : System.Byte, System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+type public enum SharpPack.TypeSerializationMode : System.Byte, System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
   field public System.Byte value__
-  field public const SharpPack.TypeResolutionMode ContextCatalogOnly = 1
-  field public const SharpPack.TypeResolutionMode Disabled = 2
-  field public const SharpPack.TypeResolutionMode GlobalCompatibility = 0
+  field public const SharpPack.TypeSerializationMode Disabled = 0
+  field public const SharpPack.TypeSerializationMode RegisteredOnly = 1
 
 type public sealed class SharpPack.Utf16StringFormatterAttribute : SharpPack.SharpPackCustomFormatterAttribute<SharpPack.Formatters.Utf16StringFormatter, System.String>
   ctor public Utf16StringFormatterAttribute()

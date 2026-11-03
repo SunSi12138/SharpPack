@@ -42,6 +42,7 @@ public sealed class BitArrayFormatter : SharpPackFormatter<BitArray>
             SharpPackSerializationException.ThrowInvalidLength(length);
         }
 
+        reader.ThrowIfCollectionLimitExceeded(length);
         var words = reader.ReadUnmanagedArray<int>();
         var requiredWordCount = (int)(((long)length + 31) / 32);
         if (words is null || words.Length < requiredWordCount)
