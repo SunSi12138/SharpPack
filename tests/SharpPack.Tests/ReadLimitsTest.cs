@@ -58,7 +58,8 @@ public class ReadLimitsTest
         var bytes = new byte[first.Length + second.Length];
         first.CopyTo(bytes, 0);
         second.CopyTo(bytes, first.Length);
-        using var stream = new MemoryStream(bytes);
+        using var stream = new MemoryStream(
+            bytes, 0, bytes.Length, writable: false, publiclyVisible: true);
         var context = CreateContext(maxPayloadBytes: first.Length);
 
         var value = await SharpPackSerializer.DeserializeAsync<int>(
@@ -67,6 +68,23 @@ public class ReadLimitsTest
 
         value.Should().Be(123);
         stream.Position.Should().Be(first.Length);
+    }
+
+    [Fact]
+    public async Task PayloadLimit_NonExposedMemoryStreamRetainsReadToEndContract()
+    {
+        var first = SharpPackSerializer.Serialize(123);
+        var second = SharpPackSerializer.Serialize(456);
+        var bytes = new byte[first.Length + second.Length];
+        first.CopyTo(bytes, 0);
+        second.CopyTo(bytes, first.Length);
+        using var stream = new MemoryStream(bytes);
+        Assert.False(stream.TryGetBuffer(out _));
+        var failure = await Assert.ThrowsAsync<SharpPackSerializationException>(
+            async () => await SharpPackSerializer.DeserializeAsync<int>(
+                stream, CreateContext(maxPayloadBytes: first.Length)));
+        Assert.Equal(SharpPackReadLimitKind.PayloadBytes, failure.ReadLimitKind);
+        Assert.Equal(first.Length + 1, stream.Position);
     }
 
     [Fact]

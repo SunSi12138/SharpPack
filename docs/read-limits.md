@@ -64,3 +64,16 @@ not the complete error-code taxonomy planned in #16. Tests and callers need not
 parse exception text. Structural header checks still precede cardinality checks
 where the reader has enough information; a failure is classified at the first
 boundary reached, not by a second whole-payload verification pass.
+
+## BitArray wire and runtime layout
+
+BitArray retains the logical wire shape `[bitLength, int32 words]`. Its formatter
+uses public `Length`, `CopyTo(int[])`, and .NET 10 `CollectionsMarshal.AsBytes`
+APIs instead of reinterpreting private fields: .NET 10 stores backing bytes,
+not an `int[]`. Writers emit the minimum word count and clear unused high bits.
+Readers accept legacy extra words while enforcing both logical bit count and
+encoded word-table limits, then ignore words outside the logical value. The
+original corpus remains unchanged. Old private-layout-dependent extra bytes
+were already marked nondeterministic; exact unsafe backing-buffer output is
+not preserved. The safe writer currently allocates a temporary word array;
+BitArray-specific allocation/performance must be measured separately.

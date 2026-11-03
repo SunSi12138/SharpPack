@@ -1,13 +1,14 @@
 using SharpPack.Internal;
 using System.Collections;
-using System.Runtime.CompilerServices;
+using System;
+using System.Runtime.InteropServices;
 
 namespace SharpPack.Formatters;
 
 [Preserve]
 public sealed class BitArrayFormatter : SharpPackFormatter<BitArray>
 {
-    // serialize [m_length, m_array]
+    // Wire: [logical bit length, int32 words]. Do not depend on BCL field layout.
 
     [Preserve]
     public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref BitArray? value)
@@ -18,10 +19,11 @@ public sealed class BitArrayFormatter : SharpPackFormatter<BitArray>
             return;
         }
 
-        ref var view = ref Unsafe.As<BitArray, BitArrayView>(ref value);
-
-        writer.WriteUnmanagedWithObjectHeader(2, view.m_length);
-        writer.WriteUnmanagedArray(view.m_array);
+        var length = value.Length;
+        var words = new int[(int)(((long)length + 31) / 32)];
+        value.CopyTo(words, 0);
+        writer.WriteUnmanagedWithObjectHeader(2, length);
+        writer.WriteUnmanagedArray(words);
     }
 
     [Preserve]
@@ -52,18 +54,24 @@ public sealed class BitArrayFormatter : SharpPackFormatter<BitArray>
         }
 
         var bitArray = new BitArray(length, false);
-        ref var view = ref Unsafe.As<BitArray, BitArrayView>(ref bitArray);
-        words.AsSpan(0, requiredWordCount).CopyTo(view.m_array);
+        var bytes = CollectionsMarshal.AsBytes(bitArray);
+        if (BitConverter.IsLittleEndian)
+        {
+            MemoryMarshal.AsBytes(words.AsSpan(0, requiredWordCount))
+                .Slice(0, bytes.Length).CopyTo(bytes);
+        }
+        else
+        {
+            for (var i = 0; i < bytes.Length; i++)
+            {
+                bytes[i] = (byte)((uint)words[i / 4] >> ((i % 4) * 8));
+            }
+        }
+        if (length % 8 != 0)
+        {
+            bytes[^1] &= (byte)((1 << (length % 8)) - 1);
+        }
 
         value = bitArray;
     }
-}
-
-#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
-[Preserve]
-internal class BitArrayView
-{
-    public int[] m_array;
-    public int m_length;
-    public int _version;
 }
