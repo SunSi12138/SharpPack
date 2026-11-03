@@ -20,10 +20,31 @@ public sealed class BitArrayFormatter : SharpPackFormatter<BitArray>
         }
 
         var length = value.Length;
-        var words = new int[(int)(((long)length + 31) / 32)];
-        value.CopyTo(words, 0);
+        var wordCount = (int)(((long)length + 31) / 32);
         writer.WriteUnmanagedWithObjectHeader(2, length);
-        writer.WriteUnmanagedArray(words);
+        writer.WriteCollectionHeader(wordCount);
+        if (wordCount == 0) return;
+
+        var byteCount = checked(wordCount * sizeof(int));
+        var destination = MemoryMarshal.CreateSpan(
+            ref writer.GetSpanReference(byteCount), byteCount);
+        var source = CollectionsMarshal.AsBytes(value);
+        source.CopyTo(destination);
+        destination.Slice(source.Length).Clear();
+        if (length % 8 != 0)
+        {
+            destination[source.Length - 1] &= (byte)((1 << (length % 8)) - 1);
+        }
+        // BitArray exposes low-order bytes first. Unmanaged int words retain
+        // the existing native-endian wire convention on every architecture.
+        if (!BitConverter.IsLittleEndian)
+        {
+            for (var i = 0; i < byteCount; i += sizeof(int))
+            {
+                destination.Slice(i, sizeof(int)).Reverse();
+            }
+        }
+        writer.Advance(byteCount);
     }
 
     [Preserve]
