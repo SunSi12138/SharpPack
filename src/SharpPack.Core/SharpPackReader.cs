@@ -32,6 +32,7 @@ public ref partial struct SharpPackReader
     public long Remaining => totalLength - consumed;
     public SharpPackReaderOptionalState OptionalState => optionalState;
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public SharpPackReader(in ReadOnlySequence<byte> sequence, SharpPackReaderOptionalState optionalState)
     {
         this.bufferSource = sequence.IsSingleSegment ? ReadOnlySequence<byte>.Empty : sequence;
@@ -49,6 +50,7 @@ public ref partial struct SharpPackReader
         this.optionalState = optionalState;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public SharpPackReader(ReadOnlySpan<byte> buffer, SharpPackReaderOptionalState optionalState)
     {
         this.bufferSource = ReadOnlySequence<byte>.Empty;
