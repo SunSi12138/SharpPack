@@ -41,14 +41,14 @@ jobs:
             mkdir -p "$RUNNER_TEMP/perf-$side"
             cp harness/tools/PairedPerf/{Program.cs,Perf.csproj} "$RUNNER_TEMP/perf-$side/"
             printf '{"sdk":{"version":"10.0.102","rollForward":"disable"}}' > "$RUNNER_TEMP/perf-$side/global.json"
-            (cd "$RUNNER_TEMP/perf-$side"; dotnet build -c Release -p:RepoRoot="$GITHUB_WORKSPACE/$side")
+            (cd "$RUNNER_TEMP/perf-$side"; test "$(dotnet --version)" = 10.0.102; dotnet --version; dotnet build -c Release -p:RepoRoot="$GITHUB_WORKSPACE/$side")
           done
           sha256sum "$RUNNER_TEMP"/perf-*/Program.cs
-      - name: Run warmed ABBA paired samples
+      - name: Run warmed BABA paired samples
         shell: bash
         run: |
           set -euo pipefail
-          for pair in baseline:A1 candidate:B1 candidate:B2 baseline:A2; do
+          for pair in candidate:B1 baseline:A1 candidate:B2 baseline:A2; do
             side=${pair%:*}; label=${pair#*:}
             echo "PAIR $label $side"
             extra=()

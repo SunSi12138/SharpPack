@@ -7,7 +7,7 @@ for label in ('A1','B1','B2','A2'):
             _,name,ns,allocated,low,high,n=line.split(',')
             rows[name]=(float(ns),float(allocated),float(low),float(high))
     runs[label]=rows
-print('Same-runner SDK 10.0.102 ABBA microbenchmark; median of two run medians. Not BDN, no statistical regression claim.\n')
+print('Same-runner SDK 10.0.102 BABA microbenchmark; median of two run medians. Not BDN, no statistical regression claim.\n')
 print('Baseline 8efea5afc79eaefc5023806a2588c4ad2f09a9c6; candidate cd8359d9777898eb7334985001eef0d2d0287c9e.\n')
 print('| Case | Old ns/op | New ns/op | Ratio | Old B/op | New B/op |')
 print('|---|---:|---:|---:|---:|---:|')
