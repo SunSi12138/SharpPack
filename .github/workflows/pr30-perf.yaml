@@ -1,0 +1,58 @@
+name: PR30 paired performance validation
+on:
+  push:
+    branches: [ci/pr30-paired-perf-20261103]
+permissions:
+  contents: read
+jobs:
+  paired:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          path: harness
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 8efea5afc79eaefc5023806a2588c4ad2f09a9c6
+          persist-credentials: false
+          path: baseline
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: cd8359d9777898eb7334985001eef0d2d0287c9e
+          persist-credentials: false
+          path: candidate
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73
+        with:
+          dotnet-version: 10.0.102
+      - name: Record environment and build identical harnesses
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet --info
+          lscpu
+          for side in baseline candidate; do
+            test "$(git -C "$side" status --porcelain)" = ""
+            git -C "$side" rev-parse HEAD
+            mkdir -p "$RUNNER_TEMP/perf-$side"
+            cp harness/tools/PairedPerf/{Program.cs,Perf.csproj} "$RUNNER_TEMP/perf-$side/"
+            printf '{"sdk":{"version":"10.0.102","rollForward":"disable"}}' > "$RUNNER_TEMP/perf-$side/global.json"
+            (cd "$RUNNER_TEMP/perf-$side"; dotnet build -c Release -p:RepoRoot="$GITHUB_WORKSPACE/$side")
+          done
+          sha256sum "$RUNNER_TEMP"/perf-*/Program.cs
+      - name: Run warmed ABBA paired samples
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pair in baseline:A1 candidate:B1 candidate:B2 baseline:A2; do
+            side=${pair%:*}; label=${pair#*:}
+            echo "PAIR $label $side"
+            extra=()
+            if [ "$side" = candidate ]; then extra+=(--safe-bitarray); fi
+            dotnet "$RUNNER_TEMP/perf-$side/bin/Release/net10.0/Perf.dll" "${extra[@]}" | tee "$RUNNER_TEMP/perf-$label.txt"
+          done
+          python3 harness/tools/PairedPerf/summarize.py "$RUNNER_TEMP" >> "$GITHUB_STEP_SUMMARY"
