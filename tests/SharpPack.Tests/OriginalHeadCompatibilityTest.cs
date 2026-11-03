@@ -28,6 +28,10 @@ public class OriginalHeadCompatibilityTest
         Corpus.WellKnownFormatterCount.Should().Be(117);
         Corpus.GenericShapeCount.Should().Be(68);
         Corpus.Entries.Should().HaveCount(203);
+        Corpus.Entries.Count(static entry => entry.Type.StartsWith("System.Type,", StringComparison.Ordinal))
+            .Should().Be(1, "only the legacy System.Type entry is exempt from positive wire compatibility");
+        Corpus.Entries.Count(static entry => entry.Type.Contains(", GoldenCorpus,", StringComparison.Ordinal))
+            .Should().Be(11, "fixture-local cases remain covered by explicit generated-model tests");
     }
 
     [Theory]
@@ -41,6 +45,17 @@ public class OriginalHeadCompatibilityTest
         var context = entry.Configuration == nameof(SharpPackStringEncoding.Utf16)
             ? new SharpPackSerializerContext(SharpPackSerializerConfiguration.Utf16)
             : new SharpPackSerializerContext();
+
+        if (type == typeof(Type))
+        {
+            // Keep the immutable original fixture; Type is an intentional breaking exception.
+            Assert.Throws<SharpPackSerializationException>(() => invoker.Deserialize(payload, context: null));
+            Assert.Throws<SharpPackSerializationException>(() => invoker.Deserialize(payload, context));
+            var registered = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+                .RegisterType<Dictionary<string, int>>("dictionary").Build();
+            Assert.Throws<SharpPackSerializationException>(() => invoker.Deserialize(payload, registered));
+            return;
+        }
 
         var defaultValue = entry.Configuration == nameof(SharpPackStringEncoding.Utf8)
             ? invoker.Deserialize(payload, context: null)
@@ -247,11 +262,12 @@ public class OriginalHeadCompatibilityTest
     }
 
     [Fact]
-    public void TypePayload_ResolvesApplicationAssemblyInFreshContext()
+    public void TypePayload_RequiresExplicitRegistration()
     {
         var value = new GoldenTypeContainer { Value = typeof(GoldenObject) };
-        var payload = SharpPackSerializer.Serialize(value);
-        var context = new SharpPackSerializerContext();
+        var context = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+            .RegisterType<GoldenObject>("golden-object").Build();
+        var payload = SharpPackSerializer.Serialize(value, context);
 
         var decoded = SharpPackSerializer.Deserialize<GoldenTypeContainer>(
             payload,

@@ -145,7 +145,6 @@ public static partial class SharpPackSerializer
         SharpPackSerializerContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        context.EnsureRootType<T>();
         var state = AcquireReaderOptionalState();
         state.Init(context);
         var reader = new SharpPackReader(buffer, state);
@@ -180,7 +179,6 @@ public static partial class SharpPackSerializer
         SharpPackSerializerContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        context.EnsureRootType<T>();
         var state = AcquireReaderOptionalState();
         state.Init(context);
         var reader = new SharpPackReader(buffer, state);
@@ -220,7 +218,6 @@ public static partial class SharpPackSerializer
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(stream);
         cancellationToken.ThrowIfCancellationRequested();
-        context.EnsureRootType<T>();
 
         if (stream is MemoryStream memoryStream && memoryStream.TryGetBuffer(out var segment))
         {

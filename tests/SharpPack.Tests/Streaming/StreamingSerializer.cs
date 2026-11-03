@@ -244,7 +244,7 @@ public class StreamingSerializer
     }
 
     [Fact]
-    public async Task DeserializeRegistersFreshContextRootType()
+    public async Task DeserializeUsesExplicitTypeRegistry()
     {
         var expected = new[]
         {
@@ -253,11 +253,12 @@ public class StreamingSerializer
                 Value = typeof(StreamingSerializer),
             },
         };
+        var context = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+            .RegisterType<StreamingSerializer>("streaming-test").Build();
         var pipe = new Pipe();
-        pipe.Writer.Write(SharpPackSerializer.Serialize(expected));
+        pipe.Writer.Write(SharpPackSerializer.Serialize(expected, context));
         await pipe.Writer.CompleteAsync();
 
-        var context = new SharpPackSerializerContext();
         var actual = new List<StreamingTypeValue?>();
         await foreach (var item in SharpPackStreamingSerializer
                            .DeserializeAsync<StreamingTypeValue>(

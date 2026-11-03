@@ -10,7 +10,7 @@ namespace SharpPack;
 public sealed class SharpPackSerializerContext
 {
     readonly FormatterGraph graph;
-    readonly TypeResolutionPolicy typeResolution;
+    internal TypeRegistry TypeRegistry { get; }
 
     public SharpPackSerializerConfiguration Configuration { get; }
 
@@ -26,11 +26,17 @@ public sealed class SharpPackSerializerContext
 
     internal SharpPackSerializerContext(
         SharpPackSerializerConfiguration configuration,
-        bool freezeRegistrations)
+        bool freezeRegistrations,
+        IReadOnlyDictionary<string, Type>? typeRegistrations = null)
     {
+        if (configuration.TypeSerializationMode is not TypeSerializationMode.Disabled and not TypeSerializationMode.RegisteredOnly)
+        {
+            throw new ArgumentOutOfRangeException(nameof(configuration), "Unknown Type serialization mode.");
+        }
         Configuration = configuration;
-        typeResolution = new TypeResolutionPolicy(configuration.TypeResolutionMode);
+        TypeRegistry = new TypeRegistry(configuration.TypeSerializationMode, typeRegistrations);
         graph = new FormatterGraph(this);
+
         if (freezeRegistrations)
         {
             graph.FreezeRegistrations();
@@ -53,29 +59,11 @@ public sealed class SharpPackSerializerContext
 
     internal FormatterGraph Graph => graph;
 
-    internal void EnsureRootType<T>()
-        => ContextRootTypeRegistration<T>.Ensure(this);
-
     internal void Register<T>(SharpPackFormatter<T> formatter)
-    {
-        graph.Register(formatter);
-        AddType(typeof(T));
-    }
+        => graph.Register(formatter);
 
     internal void FreezeRegistrations()
         => graph.FreezeRegistrations();
-
-    internal void AddType(Type type)
-        => typeResolution.AddType(type);
-
-    internal void ObserveSerializedType(Type type)
-        => typeResolution.ObserveSerializedType(type);
-
-    internal Type? ResolveType(string typeName)
-        => typeResolution.ResolveType(typeName);
-
-    internal void ThrowIfTypePayloadDisabled()
-        => typeResolution.ThrowIfTypePayloadDisabled();
 }
 
 /// <summary>
@@ -85,6 +73,8 @@ public sealed class SharpPackSerializerContextBuilder
 {
     readonly List<Action<SharpPackSerializerContext>> registrations = [];
     SharpPackSerializerConfiguration configuration = SharpPackSerializerConfiguration.Default;
+    readonly Dictionary<string, Type> typesById = new(StringComparer.Ordinal);
+    readonly HashSet<Type> registeredTypes = [];
     bool built;
 
     public SharpPackSerializerContextBuilder Configure(
@@ -92,6 +82,36 @@ public sealed class SharpPackSerializerContextBuilder
     {
         ThrowIfBuilt();
         configuration = value;
+        return this;
+    }
+
+    /// <summary>Enables explicitly registered System.Type payloads for this context.</summary>
+    public SharpPackSerializerContextBuilder EnableTypeSerialization()
+    {
+        ThrowIfBuilt();
+        configuration = configuration with { TypeSerializationMode = TypeSerializationMode.RegisteredOnly };
+        return this;
+    }
+
+    public SharpPackSerializerContextBuilder RegisterType<T>(string typeId)
+        => RegisterType(typeof(T), typeId);
+
+    /// <summary>Registers a stable, ordinal Type ID without enabling Type serialization.</summary>
+    public SharpPackSerializerContextBuilder RegisterType(Type type, string typeId)
+    {
+        ThrowIfBuilt();
+        ArgumentNullException.ThrowIfNull(type);
+        ArgumentException.ThrowIfNullOrWhiteSpace(typeId);
+        if (typesById.ContainsKey(typeId))
+        {
+            throw new ArgumentException("The Type ID is already registered.", nameof(typeId));
+        }
+        if (registeredTypes.Contains(type))
+        {
+            throw new ArgumentException("The Type is already registered.", nameof(type));
+        }
+        typesById.Add(typeId, type);
+        registeredTypes.Add(type);
         return this;
     }
 
@@ -129,7 +149,8 @@ public sealed class SharpPackSerializerContextBuilder
         {
             var context = new SharpPackSerializerContext(
                 configuration,
-                freezeRegistrations: false);
+                freezeRegistrations: false,
+                typeRegistrations: typesById);
             foreach (var registration in registrations)
             {
                 registration(context);
@@ -140,6 +161,8 @@ public sealed class SharpPackSerializerContextBuilder
         finally
         {
             registrations.Clear();
+            typesById.Clear();
+            registeredTypes.Clear();
         }
     }
 
