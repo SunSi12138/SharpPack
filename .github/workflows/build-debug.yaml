@@ -6,6 +6,7 @@ on:
     branches:
       - "main"
       - "dev"
+      - "ci/restore-dev-stack-validation"
   # Validate stacked PRs against their actual base, including feature branches.
   # Keep the unprivileged pull_request event; never use pull_request_target here.
   pull_request:
