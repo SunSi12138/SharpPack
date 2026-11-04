@@ -1,0 +1,44 @@
+name: AOT deserialize-only characterization
+on:
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - '.github/workflows/aot-deserialize-only.yaml'
+      - 'sandbox/DeserializeOnlyAot/**'
+      - 'src/**'
+  workflow_dispatch:
+jobs:
+  deserialize-only:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        variant: [baseline, no-annotations]
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Remove broad annotations in experimental variant only
+        if: matrix.variant == 'no-annotations'
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for name in ['SharpPackSerializer.Deserialize.cs', 'SharpPackSerializer.Context.cs']:
+              path = Path('src/SharpPack.Core') / name
+              text = path.read_text()
+              assert text.count('DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)') > 0
+              text = text.replace('        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]\n', '')
+              path.write_text(text)
+          PY
+      - name: Publish isolated consumer
+        run: dotnet publish sandbox/DeserializeOnlyAot -c Release -o "$RUNNER_TEMP/deserialize-only"
+      - name: Run isolated consumer
+        run: '"$RUNNER_TEMP/deserialize-only/DeserializeOnlyAot"'
+      - name: Report native executable size
+        if: always()
+        run: stat -c '%n %s bytes' "$RUNNER_TEMP/deserialize-only/DeserializeOnlyAot"
