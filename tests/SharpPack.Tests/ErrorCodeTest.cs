@@ -67,7 +67,7 @@ public class ErrorCodeTest
     public void FormatterDiscoveryAndRecursionHaveDistinctCodes()
     {
         Check(SharpPackErrorCode.FormatterResolutionFailed, () => SharpPackSerializer.Serialize(new UnsupportedModel()));
-        var context = new SharpPackSerializerContext();
+        var context = new SharpPackSerializerContextBuilder().Register(new IntOffsetFormatter(1)).Build();
         Check(SharpPackErrorCode.RecursiveFormatterConstruction, () => context.GetFormatter<RecursiveContextFactoryModel>());
     }
 
