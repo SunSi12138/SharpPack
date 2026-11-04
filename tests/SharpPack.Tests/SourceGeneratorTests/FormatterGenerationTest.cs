@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Linq;
 
@@ -652,7 +653,32 @@ public partial class Model
                         ".g.cs",
                         StringComparison.Ordinal))
                 .Select(static tree => tree.ToString()));
-        generated.Should().NotContain("System.Reflection");
+        // Attribute construction remains direct. The only reflection allowed
+        // elsewhere in this model is exact generated-factory preservation.
+        var generatedNodes = compilation.SyntaxTrees
+            .Where(static tree => tree.FilePath.EndsWith(".g.cs", StringComparison.Ordinal))
+            .SelectMany(static tree => tree.GetRoot().DescendantNodes())
+            .ToArray();
+        var attributeField = generatedNodes.OfType<FieldDeclarationSyntax>()
+            .Single(static field => field.Declaration.Variables
+                .Any(static variable => variable.Identifier.ValueText == "__ValueFormatter"));
+        attributeField.ToString().Should().NotContain("System.Reflection");
+        generated.Should().NotContain(".GetCustomAttribute");
+        generated.Should().NotContain(".GetProperty(");
+        generated.Should().NotContain(".GetField(");
+        generated.Should().NotContain(".GetMethods(");
+        var methodLookups = generatedNodes.OfType<InvocationExpressionSyntax>()
+            .Where(static invocation => invocation.Expression is MemberAccessExpressionSyntax member &&
+                member.Name.Identifier.ValueText == "GetMethod")
+            .ToArray();
+        methodLookups.Should().HaveCount(2);
+        foreach (var lookup in methodLookups)
+        {
+            var name = ((LiteralExpressionSyntax)lookup.ArgumentList.Arguments[0].Expression).Token.ValueText;
+            name.Should().BeOneOf(
+                "global::SharpPack.ISharpPackFormatterFactory<Generated.Model>.CreateFormatter",
+                "global::SharpPack.ISharpPackContextFormatterFactory<Generated.Model>.CreateFormatter");
+        }
         generated.Should().Contain(
             "new global::Generated.CustomIntFormatterAttribute(" +
             "7, typeof(global::Generated.Model), \"marker\", " +

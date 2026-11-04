@@ -60,6 +60,8 @@ jobs:
             "$RUNNER_TEMP/$variant/DeserializeOnlyAot" --performance
           done
           stat -c '%n %s bytes' "$RUNNER_TEMP/baseline-read-only/DeserializeOnlyAot" "$RUNNER_TEMP/deserialize-only/DeserializeOnlyAot"
+      - name: Publish explicitly rooted trimming positive control
+        run: dotnet publish sandbox/DeserializeOnlyAot -c Release -p:DefineConstants=FACTORY_ROOT_POSITIVE_CONTROL -o "$RUNNER_TEMP/positive-control"
       - name: Verify negative factory-root trimming control
         run: |
           python3 - <<'PY'
@@ -71,9 +73,8 @@ jobs:
               data = path.read_bytes()
               return any(marker.encode(encoding) in data for encoding in ['utf-8', 'utf-16le'])
           assert not contains(root / 'deserialize-only/DeserializeOnlyAot'), 'Unused private method was over-preserved'
-          baseline = root / 'baseline-read-only/DeserializeOnlyAot'
-          if baseline.exists():
-              assert contains(baseline), 'Baseline failed to retain the negative-control marker'
+          positive = root / 'positive-control/DeserializeOnlyAot'
+          assert contains(positive), 'Explicitly rooted positive control failed to retain the marker'
           print('Unused private method trimming control passed.')
           PY
       - name: Verify trimmed JIT consumer compatibility
