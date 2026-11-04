@@ -17,8 +17,24 @@ Check("nested context", () => SharpPackSerializer.Deserialize<ContextNestedModel
 // requirement. It must not incidentally root the element's generated factory.
 GC.KeepAlive(new ListFormatter<CollectionItem>());
 Check("collection root", () => SharpPackSerializer.Deserialize<List<CollectionItem>>(list) is [{ Value: 42 }]);
+Check("closed generic", () => SharpPackSerializer.Deserialize<GenericModel<int>>(model)?.Value == 42);
+Check("closed generic context", () => SharpPackSerializer.Deserialize<GenericContextModel<int>>(model, context)?.Value == 43);
+Check("external union", () => SharpPackSerializer.Deserialize<IExternalUnion>(new byte[] { 3, 1, 42, 0, 0, 0 }) is ExternalUnionItem { Value: 42 });
+Check("closed external union", () => SharpPackSerializer.Deserialize<IClosedExternalUnion<int>>(new byte[] { 4, 1, 42, 0, 0, 0 }) is ClosedExternalUnionItem<int> { Value: 42 });
+Check("member custom formatter", () => SharpPackSerializer.Deserialize<CustomMemberModel>(model)?.Value == 43);
+// Literal wire bytes avoid any Type or model Serialize call in this program.
+byte[] typeId = [250, 255, 255, 255, 5, 0, 0, 0, 107, 110, 111, 119, 110]; // "known"
+var typeContext = new SharpPackSerializerContextBuilder().EnableTypeSerialization().RegisterType<int>("known").Build();
+Check("Type registered", () => SharpPackSerializer.Deserialize<Type>(typeId, typeContext) == typeof(int));
+Check("Type disabled", () => Reject(() => SharpPackSerializer.Deserialize<Type>(typeId)));
+Check("Type unknown", () => Reject(() => SharpPackSerializer.Deserialize<Type>(typeId, new SharpPackSerializerContextBuilder().EnableTypeSerialization().Build())));
 if (failures.Count != 0) throw new InvalidOperationException(string.Join("; ", failures));
-Console.WriteLine("Deserialize-only AOT: all five cases passed.");
+Console.WriteLine("Deserialize-only AOT: all thirteen cases passed.");
+static bool Reject(Action action)
+{
+    try { action(); return false; }
+    catch (SharpPackSerializationException) { return true; }
+}
 void Check(string name, Func<bool> check)
 {
     try
@@ -49,3 +65,21 @@ public sealed class PlusOneFormatter : SharpPackFormatter<int>
         value = raw + 1;
     }
 }
+
+[SharpPackable] public partial class GenericModel<T> { public T? Value { get; set; } }
+[SharpPackable] public partial class GenericContextModel<T> { public T? Value { get; set; } }
+[SharpPackable] public partial class CustomMemberModel { [PlusOne] public int Value { get; set; } }
+public sealed class PlusOneAttribute : SharpPackCustomFormatterAttribute<PlusOneFormatter, int>
+{
+    public override PlusOneFormatter GetFormatter() => new();
+}
+[SharpPackable(GenerateType.NoGenerate)] public partial interface IExternalUnion;
+[SharpPackable] public partial class ExternalUnionItem : IExternalUnion { public int Value { get; set; } }
+[SharpPackUnionFormatter(typeof(IExternalUnion))]
+[SharpPackUnion(3, typeof(ExternalUnionItem))]
+public partial class ExternalUnionFormatter;
+[SharpPackable(GenerateType.NoGenerate)] public partial interface IClosedExternalUnion<T>;
+[SharpPackable] public partial class ClosedExternalUnionItem<T> : IClosedExternalUnion<T> { public T? Value { get; set; } }
+[SharpPackUnionFormatter(typeof(IClosedExternalUnion<int>))]
+[SharpPackUnion(4, typeof(ClosedExternalUnionItem<int>))]
+public partial class ClosedExternalUnionFormatter;

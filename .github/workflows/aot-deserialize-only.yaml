@@ -14,8 +14,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-24.04, ubuntu-24.04-arm]
-        variant: [baseline, no-annotations]
+        runner: [ubuntu-24.04]
+        variant: [baseline, no-annotations, interface-roots, constructor-roots]
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -25,18 +25,8 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-      - name: Remove broad annotations in experimental variant only
-        if: matrix.variant == 'no-annotations'
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          for name in ['SharpPackSerializer.Deserialize.cs', 'SharpPackSerializer.Context.cs']:
-              path = Path('src/SharpPack.Core') / name
-              text = path.read_text()
-              assert text.count('DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)') > 0
-              text = text.replace('        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]\n', '')
-              path.write_text(text)
-          PY
+      - name: Apply isolated root-preservation candidate
+        run: python3 tools/characterize-aot-roots.py '${{ matrix.variant }}'
       - name: Publish isolated consumer
         run: dotnet publish sandbox/DeserializeOnlyAot -c Release -o "$RUNNER_TEMP/deserialize-only"
       - name: Run isolated consumer
