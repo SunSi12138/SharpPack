@@ -15,6 +15,7 @@ from xml.sax.saxutils import escape
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
+SDK_VERSION = '10.0.114'
 VERSION = '1.1.0-issue18-validation'
 PACKAGES = ('SharpPack.Core', 'SharpPack.Generator', 'SharpPack', 'SharpPack.Streaming')
 
@@ -43,12 +44,14 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='sharppack-package-', dir=os.environ.get('RUNNER_TEMP')))
     feed = work / 'feed'; feed.mkdir()
     env = dict(os.environ, NUGET_PACKAGES=str(work / 'packages'), PACKAGE_WORK=str(work))
-    sdk = json.loads((REPO / 'global.json').read_text())['sdk']['version']
+    sdk = SDK_VERSION
     assert re.fullmatch(r'10\.0\.\d{3}', sdk), 'Expected .NET 10 SDK'
     (work / 'global.json').write_text(json.dumps({'sdk': {'version': sdk, 'rollForward': 'disable', 'allowPrerelease': False}}))
     for location, label in [(REPO, 'producer'), (work, 'consumer')]:
         actual = run(['dotnet', '--version'], location, env).decode().strip()
-        assert actual == sdk, 'Unexpected SDK selection'
+        if actual != sdk:
+            observed = actual if re.fullmatch(r'\d+\.\d+\.\d+', actual) else 'unrecognized'
+            raise RuntimeError('SDK mismatch: expected=' + sdk + '; observed=' + observed)
         print('Selected ' + label + ' SDK: ' + sdk + '; consumer C#: 14.0', flush=True)
     # Pack only production projects. Restore tooling from normal sources, never consumers.
     for name in PACKAGES:

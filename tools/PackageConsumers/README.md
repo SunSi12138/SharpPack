@@ -9,7 +9,8 @@ not an old compiler inferred from the generator's Roslyn API dependency.
 The fixture packs the four production projects at one unique prerelease version,
 then builds consumers outside the repository so Directory.Build.props and project
 references cannot supply incidental code, signing, or analyzer references.
-It verifies the producer SDK against global.json, writes an exact-version,
+It verifies the producer SDK against the validation pin 10.0.114 (within the
+repository 10.0.102/latestPatch policy), writes an exact-version,
 roll-forward-disabled global.json above all temporary consumers, and verifies and
 records the actual consumer SDK. Every consumer explicitly selects C# 14.
 
