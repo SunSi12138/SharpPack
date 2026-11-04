@@ -57,6 +57,7 @@ jobs:
             fi
           done
       - name: Repeat paired balanced processes and same-binary noise controls
+        if: always()
         run: python3 tools/issue31-perf/compare.py "$RUNNER_TEMP"
       - name: Compare nested native code shape
         if: always()

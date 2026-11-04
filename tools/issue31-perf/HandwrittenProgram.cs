@@ -3,7 +3,7 @@ using SharpPack;
 byte[] payload = [42, 0, 0, 0];
 var failures = 0;
 Check("handwritten explicit default", () => SharpPackSerializer.Deserialize<HandwrittenFactoryModel>(payload)?.Value == 42);
-Check("handwritten explicit context", () => SharpPackSerializer.Deserialize<HandwrittenFactoryModel>(payload, new SharpPackSerializerContextBuilder().Build())?.Value == 43);
+Check("handwritten explicit context", () => SharpPackSerializer.Deserialize<HandwrittenFactoryModel>(payload, new SharpPackSerializerContextBuilder().Register(new MarkerIntFormatter()).Build())?.Value == 43);
 Environment.ExitCode = failures == 0 ? 0 : 1;
 void Check(string name, Func<bool> read)
 {
@@ -25,4 +25,10 @@ public sealed class HandwrittenFormatter(int offset) : SharpPackFormatter<Handwr
         reader.ReadUnmanaged(out int raw);
         value = new HandwrittenFactoryModel { Value = raw + offset };
     }
+}
+
+public sealed class MarkerIntFormatter : SharpPackFormatter<int>
+{
+    public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref int value) => throw new NotSupportedException();
+    public override void Deserialize(ref SharpPackReader reader, scoped ref int value) => reader.ReadUnmanaged(out value);
 }
