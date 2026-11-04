@@ -469,6 +469,11 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
     static {{Symbol.Name}}()
     {
         StaticConstructor();
+        if (!global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)
+        {
+            global::System.GC.KeepAlive(typeof({{TypeName}}).GetMethod("global::SharpPack.ISharpPackFormatterFactory<{{Symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)}}>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
+            global::System.GC.KeepAlive(typeof({{TypeName}}).GetMethod("global::SharpPack.ISharpPackContextFormatterFactory<{{Symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)}}>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
+        }
     }
 {{fixedSizeMethod}}
 {{exactSizeMethod}}
@@ -718,10 +723,15 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         };
     }
 
+    // Generated static constructors are retained by the deserialization API's
+    // NonPublicConstructors contract. Their self lookups retain only the explicit
+    // factories, without retaining unrelated System.Type methods. Keep the
+    // literal global:: prefix: it is part of Roslyn's emitted method name.
+    // No global registration table or per-read dispatch is introduced.
     string EmitAotFormatterRoots(string indent)
     {
         var formatterTypes = new HashSet<string>(StringComparer.Ordinal);
-        var factoryTypes = new HashSet<string>(StringComparer.Ordinal);
+        var factoryTypes = new Dictionary<string, INamedTypeSymbol>(StringComparer.Ordinal);
 
         foreach (var member in Members)
         {
@@ -742,12 +752,21 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
             sb.AppendLine(
                 $"{indent}    global::System.GC.KeepAlive(new {formatterType}());");
         }
-        foreach (var factoryType in factoryTypes.OrderBy(static x => x))
+        foreach (var entry in factoryTypes.OrderBy(static x => x.Key, StringComparer.Ordinal))
         {
+            var factoryType = entry.Key;
+            var metadataType = entry.Value.OriginalDefinition.ToDisplayString(
+                SymbolDisplayFormat.CSharpErrorMessageFormat);
             sb.AppendLine(
                 $"{indent}    global::System.GC.KeepAlive(PreserveFactory<{factoryType}, {factoryType}>());");
-            sb.AppendLine(
-                $"{indent}    global::System.GC.KeepAlive(typeof({factoryType}).GetMethods(global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.NonPublic));");
+            foreach (var factoryInterface in new[]
+                     { "ISharpPackFormatterFactory", "ISharpPackContextFormatterFactory" })
+            {
+                // The metadata name uses the generic definition's parameter names,
+                // even when typeof(factoryType) is a closed constructed type.
+                sb.AppendLine(
+                    $"{indent}    global::System.GC.KeepAlive(typeof({factoryType}).GetMethod(\"global::SharpPack.{factoryInterface}<{metadataType}>.CreateFormatter\", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly));");
+            }
         }
         if (factoryTypes.Count != 0)
         {
@@ -775,7 +794,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
                     out _) &&
                 generateType != GenerateType.NoGenerate)
             {
-                factoryTypes.Add(type.FullyQualifiedToString());
+                factoryTypes[type.FullyQualifiedToString()] = (INamedTypeSymbol)type;
             }
 
             if (type is IArrayTypeSymbol array)
@@ -1414,6 +1433,10 @@ partial {{classOrInterfaceOrRecord}} {{TypeName}} : {{contextFactoryInterface}}
     static {{Symbol.Name}}()
     {
         StaticConstructor();
+        if (!global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)
+        {
+            global::System.GC.KeepAlive(typeof({{TypeName}}).GetMethod("global::SharpPack.ISharpPackFormatterFactory<{{Symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)}}>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
+        }
     }
 {{contextFactoryMethod}}
 
@@ -1731,6 +1754,10 @@ partial class {{TypeName}} : {{contextFactoryInterface}}
     static {{Symbol.Name}}()
     {
         StaticConstructor();
+        if (!global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)
+        {
+            global::System.GC.KeepAlive(typeof({{TypeName}}).GetMethod("global::SharpPack.ISharpPackFormatterFactory<{{Symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)}}>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
+        }
     }
 {{contextFactoryMethod}}
 }

@@ -36,6 +36,10 @@ var remoteContext = new SharpPackSerializerContextBuilder()
     .RegisterRemoteUnionFormatter()
     .Build();
 Check("cross-assembly registered union", () => SharpPackSerializer.Deserialize<IRemoteUnion>(new byte[] { 5, 1, 42, 0, 0, 0 }, remoteContext) is RemoteUnionItem { Value: 43 });
+Check("closed generic member root", () => SharpPackSerializer.Deserialize<GenericNestedHost>(nested)?.Item?.Value == 42);
+Check("closed generic member context root", () => SharpPackSerializer.Deserialize<GenericNestedContextHost>(nested, context)?.Item?.Value == 43);
+Check("external type-name collision", () => SharpPackSerializer.Deserialize<CollisionTypes.__SharpPackPreserveFactory>(new byte[] { 6, 1, 42, 0, 0, 0 }) is CollisionTypes.Item { Value: 42 });
+Check("external value-name collision", () => SharpPackSerializer.Deserialize<CollisionTypes.__SharpPackPreserveFactoryValue>(new byte[] { 7, 1, 42, 0, 0, 0 }) is CollisionTypes.ValueItem { Value: 42 });
 // Literal wire bytes avoid any Type or model Serialize call in this program.
 byte[] typeId = [250, 255, 255, 255, 5, 0, 0, 0, 107, 110, 111, 119, 110]; // "known"
 var typeContext = new SharpPackSerializerContextBuilder().EnableTypeSerialization().RegisterType<int>("known").Build();
@@ -43,7 +47,7 @@ Check("Type registered", () => SharpPackSerializer.Deserialize<Type>(typeId, typ
 Check("Type disabled", () => Reject(() => SharpPackSerializer.Deserialize<Type>(typeId)));
 Check("Type unknown", () => Reject(() => SharpPackSerializer.Deserialize<Type>(typeId, new SharpPackSerializerContextBuilder().EnableTypeSerialization().Build())));
 if (failures.Count != 0) throw new InvalidOperationException(string.Join("; ", failures));
-Console.WriteLine("Deserialize-only AOT: all fifteen cases passed.");
+Console.WriteLine("Deserialize-only AOT: all nineteen cases passed.");
 static bool Reject(Action action)
 {
     try { action(); return false; }
@@ -62,7 +66,11 @@ void Check(string name, Func<bool> check)
         failures.Add(name);
     }
 }
-[SharpPackable] public partial class OrdinaryModel { public int Value { get; set; } }
+[SharpPackable] public partial class OrdinaryModel
+{
+    public int Value { get; set; }
+    private static string UnusedPrivateMethod() => "SHARPPACK_UNUSED_PRIVATE_METHOD_SHOULD_BE_TRIMMED_31";
+}
 [SharpPackable] public partial class ContextModel { public int Value { get; set; } }
 [SharpPackable] public partial class NestedModel { public NestedItem? Item { get; set; } }
 [SharpPackable] public partial class NestedItem { public int Value { get; set; } }
@@ -116,3 +124,21 @@ namespace AotNames
 [SharpPackUnionFormatter(typeof(IRemoteUnion))]
 [SharpPackUnion(5, typeof(RemoteUnionItem))]
 public partial class RemoteUnionFormatter;
+
+[SharpPackable] public partial class GenericNestedHost { public GenericNestedItem<int>? Item { get; set; } }
+[SharpPackable] public partial class GenericNestedItem<T> { public int Value { get; set; } }
+[SharpPackable] public partial class GenericNestedContextHost { public GenericNestedContextItem<int>? Item { get; set; } }
+[SharpPackable] public partial class GenericNestedContextItem<T> { public int Value { get; set; } }
+namespace CollisionTypes
+{
+    [SharpPackable(GenerateType.NoGenerate)] public partial interface __SharpPackPreserveFactory;
+    [SharpPackable] public partial class Item : __SharpPackPreserveFactory { public int Value { get; set; } }
+    [SharpPackUnionFormatter(typeof(__SharpPackPreserveFactory))]
+    [SharpPackUnion(6, typeof(Item))]
+    public partial class Formatter;
+    [SharpPackable(GenerateType.NoGenerate)] public partial interface __SharpPackPreserveFactoryValue;
+    [SharpPackable] public partial class ValueItem : __SharpPackPreserveFactoryValue { public int Value { get; set; } }
+    [SharpPackUnionFormatter(typeof(__SharpPackPreserveFactoryValue))]
+    [SharpPackUnion(7, typeof(ValueItem))]
+    public partial class ValueFormatter;
+}

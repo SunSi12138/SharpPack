@@ -158,11 +158,28 @@ partial class SharpPackGenerator
         sb.AppendLine(TypeMeta.EmitTypeParameterConstraints(
             target.TypeParameters));
         sb.AppendLine("{");
+        var rootName = "__SharpPackPreserveFactory";
+        while (target.Name == rootName || target.Name == rootName + "Value" ||
+               target.GetAllMembers().Any(member =>
+                   member.Name == rootName || member.Name == rootName + "Value") ||
+               target.TypeParameters.Any(parameter =>
+                   parameter.Name == rootName || parameter.Name == rootName + "Value"))
+        {
+            rootName += "_";
+        }
+        sb.AppendLine($"    private static readonly bool {rootName}Value = {rootName}();");
+        sb.AppendLine($"    private static bool {rootName}()");
+        sb.AppendLine("    {");
+        sb.AppendLine("        if (!global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)");
+        sb.AppendLine($"            global::System.GC.KeepAlive(typeof({targetType}).GetMethod(\"global::SharpPack.ISharpPackFormatterFactory<{target.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)}>.CreateFormatter\", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException(\"The generated SharpPack factory root was not found.\"));");
+        sb.AppendLine("        return true;");
+        sb.AppendLine("    }");
         sb.AppendLine(
             $"    static global::SharpPack.SharpPackFormatter<{targetType}>");
         sb.AppendLine(
             $"        global::SharpPack.ISharpPackFormatterFactory<{targetType}>.CreateFormatter()");
         sb.AppendLine("    {");
+        sb.AppendLine($"        _ = {rootName}Value;");
 
         var emittedPatterns = new HashSet<string>(StringComparer.Ordinal);
         ExternalUnionFactoryEntry? openEntry = null;

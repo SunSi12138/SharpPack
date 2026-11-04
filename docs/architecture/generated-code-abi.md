@@ -81,3 +81,32 @@ for the current generator/runtime pair.
 Snapshot text is a detector rather than a promise of forever-identical source.
 An intentional update must state whether it changes ABI, wire bytes, allocation
 behavior, or only implementation text.
+
+## Deserialize-only NativeAOT roots
+
+Generic deserialization retains `NonPublicConstructors`, including generated
+static constructors. This is narrower than retaining every non-public method
+on an arbitrary caller type (notably `System.Type`), but it still retains all
+non-public constructors, not only the static constructor.
+
+Generated static initialization references only the explicit default/context
+factory methods by their exact metadata names. The names include Roslyn's
+literal `global::` prefix. Closed member types use the original generic
+definition's parameter names for method lookup. Self lookups reject missing or
+ambiguous methods. Same-assembly external union targets use a private static
+initializer that coexists with application static constructors and avoids
+member, type-name and generic-parameter collisions. No global type-registration
+table or extra per-read dispatch is introduced.
+
+Cross-assembly unions continue to require the generated context registration
+extension. Runtime-discovered public factories should still use explicit
+`RegisterFactory<T, TFactory>()` for AOT. Closed collection formatter native
+code still needs the explicit roots described in the README.
+
+The isolated `sandbox/DeserializeOnlyAot` consumer uses literal payloads and no
+model serialization or model construction before reading. It is separate from
+the round-trip sample so serialization cannot accidentally preserve factories.
+The CI characterization also checks that an unused private method is absent
+from the native executable; a merged-source baseline serves as the positive
+control. Performance output is a scoped warm-read microbenchmark, not a full
+statistical performance acceptance result.

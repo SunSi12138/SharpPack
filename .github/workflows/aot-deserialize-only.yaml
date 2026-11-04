@@ -15,21 +15,27 @@ jobs:
       fail-fast: false
       matrix:
         runner: [ubuntu-24.04, ubuntu-24.04-arm]
-        variant: [precise-constructors]
+        variant: [production]
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
+      - name: Select merged baseline sources for performance comparison
+        if: matrix.runner == 'ubuntu-24.04'
+        run: git restore --source=6666ada1d878da64b2f4d2c1107fbea30fad074f -- src
       - name: Publish baseline for scoped read-only performance comparison
         if: matrix.runner == 'ubuntu-24.04'
         run: dotnet publish sandbox/DeserializeOnlyAot -c Release -o "$RUNNER_TEMP/baseline-read-only"
-      - name: Apply isolated root-preservation candidate
-        run: python3 tools/characterize-aot-roots.py '${{ matrix.variant }}'
+      - name: Restore exact candidate sources
+        if: matrix.runner == 'ubuntu-24.04'
+        run: git restore --source=HEAD -- src
       - name: Publish isolated consumer
         run: |
           set -o pipefail
@@ -54,3 +60,26 @@ jobs:
             "$RUNNER_TEMP/$variant/DeserializeOnlyAot" --performance
           done
           stat -c '%n %s bytes' "$RUNNER_TEMP/baseline-read-only/DeserializeOnlyAot" "$RUNNER_TEMP/deserialize-only/DeserializeOnlyAot"
+      - name: Verify negative factory-root trimming control
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP'])
+          marker = 'SHARPPACK_UNUSED_PRIVATE_METHOD_SHOULD_BE_TRIMMED_31'
+          def contains(path):
+              data = path.read_bytes()
+              return any(marker.encode(encoding) in data for encoding in ['utf-8', 'utf-16le'])
+          assert not contains(root / 'deserialize-only/DeserializeOnlyAot'), 'Unused private method was over-preserved'
+          baseline = root / 'baseline-read-only/DeserializeOnlyAot'
+          if baseline.exists():
+              assert contains(baseline), 'Baseline failed to retain the negative-control marker'
+          print('Unused private method trimming control passed.')
+          PY
+      - name: Verify trimmed JIT consumer compatibility
+        if: matrix.runner == 'ubuntu-24.04'
+        run: |
+          dotnet publish sandbox/DeserializeOnlyAot -c Release -p:PublishAot=false -p:PublishTrimmed=true --self-contained true -r linux-x64 -o "$RUNNER_TEMP/trimmed-jit"
+          "$RUNNER_TEMP/trimmed-jit/DeserializeOnlyAot"
+      - name: Verify the candidate source tree stayed unchanged
+        run: git diff --exit-code

@@ -35,6 +35,6 @@ internal static class ReadOnlyPerformance
             nanoseconds[sample] = (end - start) * (1_000_000_000.0 / Stopwatch.Frequency) / iterations;
         }
         Array.Sort(nanoseconds);
-        Console.WriteLine($"PERF {name}: median_ns={nanoseconds[3]:F3}; allocated_bytes_per_op={allocations[3] / (double)iterations:F3}; samples=7; iterations={iterations}; sink={sink}");
+        Console.WriteLine($"PERF {name}: median_ns={nanoseconds[3]:F3}; allocation_min_bytes_per_op={allocations.Min() / (double)iterations:F3}; allocation_max_bytes_per_op={allocations.Max() / (double)iterations:F3}; samples=7; iterations={iterations}; sink={sink}");
     }
 }
