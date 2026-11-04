@@ -64,6 +64,7 @@ def main():
     for name in PACKAGES:
         run(['dotnet', 'pack', str(REPO / 'src' / name / (name + '.csproj')), '-c', 'Release',
              '-o', str(feed), '-p:PackageVersion=' + VERSION, '-p:Version=' + VERSION], REPO, env)
+        print('Packed artifact: ' + name, flush=True)
     for name in PACKAGES:
         file = feed / f'{name}.{VERSION}.nupkg'
         with zipfile.ZipFile(file) as package:
@@ -97,7 +98,7 @@ def main():
     verify_package_parity(symbol_feeds[0] / f'SharpPack.Streaming.{VERSION}.nupkg',
                           symbol_feeds[1] / f'SharpPack.Streaming.{VERSION}.nupkg', VERSION)
     verify_symbol_parity(symbol_feeds[0] / f'SharpPack.Streaming.{VERSION}.snupkg',
-                         symbol_feeds[1] / f'SharpPack.Streaming.{VERSION}.snupkg')
+                         symbol_feeds[1] / f'SharpPack.Streaming.{VERSION}.snupkg', VERSION)
     verify_resolution(work, feed, REPO, env, project, run, VERSION)
     # Empty package cache plus a cleared, local-only source prevents published-package leakage.
     env['NUGET_PACKAGES'] = str(work / 'consumer-cache')

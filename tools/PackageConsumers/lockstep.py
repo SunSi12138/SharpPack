@@ -13,8 +13,13 @@ def tag(element):
 
 
 def metadata(package):
+    if len(package.namelist()) != len(set(package.namelist())):
+        raise RuntimeError('Streaming package has duplicate ZIP entries')
     root = ET.fromstring(package.read('SharpPack.Streaming.nuspec'))
-    return next(e for e in root if tag(e) == 'metadata')
+    entries = [e for e in root if tag(e) == 'metadata']
+    if len(entries) != 1 or len(entries[0]) != len({tag(e) for e in entries[0]}):
+        raise RuntimeError('Streaming package has duplicate or missing metadata')
+    return entries[0]
 
 
 def normalized(element, ignore_dependency_version=False):
@@ -25,10 +30,26 @@ def normalized(element, ignore_dependency_version=False):
             tuple(normalized(c, ignore_dependency_version) for c in element))
 
 
+
+def metadata_fields(package):
+    fields = {tag(e): normalized(e, True) for e in metadata(package)}
+    # Automatic SDK packing omits false; custom nuspec packing writes it explicitly.
+    # Only this exact default is equivalent. A true value remains a parity failure.
+    if fields.get('requireLicenseAcceptance') == ('requireLicenseAcceptance', (), 'false', ()):
+        del fields['requireLicenseAcceptance']
+    return fields
+
+
+def verify_exact_core(package, version):
+    deps = [e for e in metadata(package).iter() if tag(e) == 'dependency']
+    if len(deps) != 1 or deps[0].get('id') != 'SharpPack.Core' or deps[0].get('version') != f'[{version}]':
+        raise RuntimeError('Streaming exact Core dependency contract failed')
+
+
 def verify_package_parity(original, candidate, version):
     with zipfile.ZipFile(original) as old, zipfile.ZipFile(candidate) as new:
-        left = {tag(e): normalized(e, True) for e in metadata(old)}
-        right = {tag(e): normalized(e, True) for e in metadata(new)}
+        left = metadata_fields(old)
+        right = metadata_fields(new)
         if left != right:
             # Only known XML field names, never arbitrary tool output.
             raise RuntimeError('Streaming package metadata parity failed')
@@ -45,9 +66,7 @@ def verify_package_parity(original, candidate, version):
                     'README.md', 'Icon.png', 'NOTICE'}
         if new_names != expected:
             raise RuntimeError('Streaming package payload inventory changed')
-        deps = [e for e in metadata(new).iter() if tag(e) == 'dependency']
-        if len(deps) != 1 or deps[0].get('id') != 'SharpPack.Core' or deps[0].get('version') != f'[{version}]':
-            raise RuntimeError('Streaming exact Core dependency contract failed')
+        verify_exact_core(new, version)
     print('Streaming metadata and payload parity passed; Core dependency is exact', flush=True)
 
 
@@ -91,10 +110,11 @@ def verify_resolution(work, feed, repo, env, project, run, version):
     restore_case(work, 'lockstep-direct-override-error', feed, refs, env, project, run, error_code='NU1608')
 
 
-def verify_symbol_parity(original, candidate):
+def verify_symbol_parity(original, candidate, version):
     with zipfile.ZipFile(original) as old, zipfile.ZipFile(candidate) as new:
-        if normalized(metadata(old), True) != normalized(metadata(new), True):
+        if metadata_fields(old) != metadata_fields(new):
             raise RuntimeError('Streaming symbol metadata parity failed')
+        verify_exact_core(new, version)
         def payload(archive):
             return {n: archive.read(n) for n in archive.namelist() if not n.endswith('.nuspec')
                     and n not in ('_rels/.rels', '[Content_Types].xml')

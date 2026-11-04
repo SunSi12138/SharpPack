@@ -22,8 +22,8 @@
   <files>
     <file src="$output$SharpPack.Streaming.dll" target="lib/net10.0" />
     <file src="$output$SharpPack.Streaming.xml" target="lib/net10.0" />
-    <file src="$root$README.md" target="" />
-    <file src="$root$Icon.png" target="" />
-    <file src="$root$NOTICE" target="" />
+    <file src="$root$README.md" target="README.md" />
+    <file src="$root$Icon.png" target="Icon.png" />
+    <file src="$root$NOTICE" target="NOTICE" />
   </files>
 </package>
