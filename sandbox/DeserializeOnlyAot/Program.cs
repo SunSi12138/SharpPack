@@ -33,7 +33,7 @@ Check("member custom formatter", () => SharpPackSerializer.Deserialize<CustomMem
 Check("nested namespaced generic", () => SharpPackSerializer.Deserialize<AotNames.Outer<int>.Inner<long>>(model)?.Value == 42);
 var remoteContext = new SharpPackSerializerContextBuilder()
     .Register(new PlusOneFormatter())
-    .RegisterFactory<IRemoteUnion, RemoteUnionFormatter>()
+    .RegisterRemoteUnionFormatter()
     .Build();
 Check("cross-assembly registered union", () => SharpPackSerializer.Deserialize<IRemoteUnion>(new byte[] { 5, 1, 42, 0, 0, 0 }, remoteContext) is RemoteUnionItem { Value: 43 });
 // Literal wire bytes avoid any Type or model Serialize call in this program.
