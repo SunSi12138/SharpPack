@@ -82,6 +82,7 @@ void Check(string name, Func<bool> check)
 #if FACTORY_ROOT_POSITIVE_CONTROL
     public static string RootUnusedPrivateMethodForControl() => UnusedPrivateMethod();
 #endif
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     private static string UnusedPrivateMethod() => "SHARPPACK_UNUSED_PRIVATE_METHOD_SHOULD_BE_TRIMMED_31";
 }
 [SharpPackable] public partial class ContextModel { public int Value { get; set; } }

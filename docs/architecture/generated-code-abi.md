@@ -106,8 +106,8 @@ code still needs the explicit roots described in the README.
 The isolated `sandbox/DeserializeOnlyAot` consumer uses literal payloads and no
 model serialization or model construction before reading. It is separate from
 the round-trip sample so serialization cannot accidentally preserve factories.
-The CI characterization also checks that an unused private method is absent
-from the native executable; a separately compiled, explicitly rooted method serves as the positive
+The CI characterization also checks that a non-inlined unused private method has no native code symbol;
+a separately compiled, explicitly invoked method serves as the positive
 control. This checks one unused method body, not every item of reflection metadata. Performance output is a scoped warm-read microbenchmark, not a full
 statistical performance acceptance result.
 

@@ -67,19 +67,27 @@ jobs:
           stat -c '%n %s bytes' "$RUNNER_TEMP/baseline-read-only/DeserializeOnlyAot" "$RUNNER_TEMP/candidate-read-only/DeserializeOnlyAot"
       - name: Publish explicitly rooted trimming positive control
         run: dotnet publish sandbox/DeserializeOnlyAot -c Release -p:DefineConstants=FACTORY_ROOT_POSITIVE_CONTROL -o "$RUNNER_TEMP/positive-control"
-      - name: Verify negative factory-root trimming control
+      - name: Verify native method trimming with an executed positive control
         run: |
+          "$RUNNER_TEMP/positive-control/DeserializeOnlyAot" | tee "$RUNNER_TEMP/positive-output.txt"
+          grep -q 'SHARPPACK_UNUSED_PRIVATE_METHOD_SHOULD_BE_TRIMMED_31' "$RUNNER_TEMP/positive-output.txt"
           python3 - <<'PY'
-          import os
+          import os, subprocess
           from pathlib import Path
           root = Path(os.environ['RUNNER_TEMP'])
-          marker = 'SHARPPACK_UNUSED_PRIVATE_METHOD_SHOULD_BE_TRIMMED_31'
-          def contains(path):
-              data = path.read_bytes()
-              return any(marker.encode(encoding) in data for encoding in ['utf-8', 'utf-16le'])
-          assert not contains(root / 'deserialize-only/DeserializeOnlyAot'), 'Unused private method was over-preserved'
-          positive = root / 'positive-control/DeserializeOnlyAot'
-          assert contains(positive), 'Explicitly rooted positive control failed to retain the marker'
+          def methods(variant):
+              executable = root / variant / 'DeserializeOnlyAot'
+              symbols = Path(str(executable) + '.dbg')
+              text = subprocess.check_output(['nm', '-a', str(symbols)], text=True)
+              return [line for line in text.splitlines()
+                      if 'UnusedPrivateMethod' in line and len(line.split()) >= 3
+                      and line.split()[1] in ('t', 'T')]
+          negative = methods('deserialize-only')
+          positive = methods('positive-control')
+          print('Negative private method symbols:', negative)
+          print('Positive private method symbols:', positive)
+          assert not negative, 'Unused private method native code was over-preserved'
+          assert positive, 'Executed non-inlined positive control has no native method symbol'
           print('Unused private method trimming control passed.')
           PY
       - name: Verify trimmed JIT consumer compatibility
