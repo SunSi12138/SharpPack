@@ -12,7 +12,7 @@
     <description>$description$</description>
     <copyright>$copyright$</copyright>
     <tags>serializer streaming pipelines zero-copy memorypack-compatible</tags>
-    <repository type="$repositoryType$" url="$repositoryUrl$" commit="$commit$" />
+    <repository type="$repositoryType$" url="$repositoryUrl$" commit="$commit$" branch="$branch$" />
     <dependencies>
       <group targetFramework="net10.0">
         <dependency id="SharpPack.Core" version="[$version$]" exclude="Build,Analyzers" />

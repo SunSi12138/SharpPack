@@ -25,7 +25,7 @@
          Public NuGet pack extension points, not private pack target/item overrides. -->
     <Target Name="SetStreamingNuspecProperties" BeforeTargets="GenerateNuspec">
         <PropertyGroup>
-            <NuspecProperties>id=$(PackageId);version=$(PackageVersion);authors=$(Authors);description=$(Description);copyright=$([MSBuild]::Escape('$(Copyright)'));projectUrl=$(PackageProjectUrl);repositoryUrl=$(RepositoryUrl);repositoryType=$(RepositoryType);commit=$(RepositoryCommit);output=$(TargetDir);root=$(MSBuildProjectDirectory)/../../</NuspecProperties>
+            <NuspecProperties>id=$(PackageId);version=$(PackageVersion);authors=$(Authors);description=$(Description);copyright=$([MSBuild]::Escape('$(Copyright)'));projectUrl=$(PackageProjectUrl);repositoryUrl=$(RepositoryUrl);repositoryType=$(RepositoryType);commit=$(RepositoryCommit);branch=$(RepositoryBranch);output=$(TargetDir);root=$(MSBuildProjectDirectory)/../../</NuspecProperties>
         </PropertyGroup>
     </Target>
 </Project>

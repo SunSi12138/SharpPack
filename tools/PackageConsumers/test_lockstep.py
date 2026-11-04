@@ -41,6 +41,17 @@ class ParityTests(unittest.TestCase):
         files.remove(pdb[0])
         from lockstep import normalized
         self.assertEqual(normalized(normal), normalized(symbols))
+    def test_templates_preserve_git_repository_metadata(self):
+        root = Path(__file__).resolve().parents[2] / 'src/SharpPack.Streaming'
+        for filename in ['SharpPack.Streaming.nuspec', 'SharpPack.Streaming.symbols.nuspec']:
+            template = ET.parse(root / filename).getroot()
+            repository = [e for e in template.iter() if e.tag.split('}')[-1] == 'repository']
+            self.assertEqual(len(repository), 1)
+            self.assertEqual(repository[0].attrib, {'type': '$repositoryType$', 'url': '$repositoryUrl$',
+                                                     'commit': '$commit$', 'branch': '$branch$'})
+        project = ET.parse(root / 'SharpPack.Streaming.csproj').getroot()
+        properties = next(e.text for e in project.iter() if e.tag == 'NuspecProperties')
+        self.assertIn('branch=$(RepositoryBranch)', properties.split(';'))
     def test_root_file_targets_are_explicit(self):
         root = Path(__file__).resolve().parents[2] / 'src/SharpPack.Streaming'
         for filename in ['SharpPack.Streaming.nuspec', 'SharpPack.Streaming.symbols.nuspec']:
