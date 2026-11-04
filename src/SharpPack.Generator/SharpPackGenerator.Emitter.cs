@@ -467,11 +467,18 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 {{(IsUnmanagedType ? "" : EmitCustomFormatters())}}
     static partial void StaticConstructor();
 
-    [global::System.Diagnostics.CodeAnalysis.DynamicDependency("global::SharpPack.ISharpPackFormatterFactory<{{GetFactoryMetadataTypeName(Symbol)}}>.CreateFormatter", typeof({{GetFactoryRootTypeName(Symbol)}}))]
-    [global::System.Diagnostics.CodeAnalysis.DynamicDependency("global::SharpPack.ISharpPackContextFormatterFactory<{{GetFactoryMetadataTypeName(Symbol)}}>.CreateFormatter", typeof({{GetFactoryRootTypeName(Symbol)}}))]
+    [global::System.Diagnostics.CodeAnalysis.DynamicDependency("{{GetSelfRootMethodName()}}")]
     static {{Symbol.Name}}()
     {
         StaticConstructor();
+    }
+
+    // Link-time root only. Never called, so otherwise empty model cctors
+    // remain removable and do not add initialization checks to hot reads.
+    private static void {{GetSelfRootMethodName()}}()
+    {
+        global::System.GC.KeepAlive(typeof({{TypeName}}).GetMethod("global::SharpPack.ISharpPackFormatterFactory<{{GetFactoryMetadataTypeName(Symbol)}}>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
+        global::System.GC.KeepAlive(typeof({{TypeName}}).GetMethod("global::SharpPack.ISharpPackContextFormatterFactory<{{GetFactoryMetadataTypeName(Symbol)}}>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
     }
 {{fixedSizeMethod}}
 {{exactSizeMethod}}
@@ -721,9 +728,17 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         };
     }
 
-    static string GetFactoryRootTypeName(INamedTypeSymbol symbol)
-        => (symbol.IsGenericType ? symbol.ConstructUnboundGenericType() : symbol)
-            .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+    string GetSelfRootMethodName()
+    {
+        var name = "__SharpPackPreserveSelfFactoryRoots";
+        while (Symbol.Name == name ||
+               Symbol.GetAllMembers().Any(member => member.Name == name) ||
+               Symbol.TypeParameters.Any(parameter => parameter.Name == name))
+        {
+            name += "_";
+        }
+        return name;
+    }
 
     internal static string GetFactoryMetadataTypeName(INamedTypeSymbol symbol)
         => symbol.OriginalDefinition
@@ -1443,10 +1458,17 @@ partial {{classOrInterfaceOrRecord}} {{TypeName}} : {{contextFactoryInterface}}
 {
     static partial void StaticConstructor();
 
-    [global::System.Diagnostics.CodeAnalysis.DynamicDependency("global::SharpPack.ISharpPackFormatterFactory<{{GetFactoryMetadataTypeName(Symbol)}}>.CreateFormatter", typeof({{GetFactoryRootTypeName(Symbol)}}))]
+    [global::System.Diagnostics.CodeAnalysis.DynamicDependency("{{GetSelfRootMethodName()}}")]
     static {{Symbol.Name}}()
     {
         StaticConstructor();
+    }
+
+    // Link-time root only. Never called, so otherwise empty model cctors
+    // remain removable and do not add initialization checks to hot reads.
+    private static void {{GetSelfRootMethodName()}}()
+    {
+        global::System.GC.KeepAlive(typeof({{TypeName}}).GetMethod("global::SharpPack.ISharpPackFormatterFactory<{{GetFactoryMetadataTypeName(Symbol)}}>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
     }
 {{contextFactoryMethod}}
 
@@ -1761,10 +1783,17 @@ partial class {{TypeName}} : {{contextFactoryInterface}}
 {
     static partial void StaticConstructor();
 
-    [global::System.Diagnostics.CodeAnalysis.DynamicDependency("global::SharpPack.ISharpPackFormatterFactory<{{GetFactoryMetadataTypeName(Symbol)}}>.CreateFormatter", typeof({{GetFactoryRootTypeName(Symbol)}}))]
+    [global::System.Diagnostics.CodeAnalysis.DynamicDependency("{{GetSelfRootMethodName()}}")]
     static {{Symbol.Name}}()
     {
         StaticConstructor();
+    }
+
+    // Link-time root only. Never called, so otherwise empty model cctors
+    // remain removable and do not add initialization checks to hot reads.
+    private static void {{GetSelfRootMethodName()}}()
+    {
+        global::System.GC.KeepAlive(typeof({{TypeName}}).GetMethod("global::SharpPack.ISharpPackFormatterFactory<{{GetFactoryMetadataTypeName(Symbol)}}>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
     }
 {{contextFactoryMethod}}
 }
