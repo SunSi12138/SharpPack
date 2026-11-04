@@ -1,0 +1,34 @@
+name: Handwritten factory startup root investigation
+on:
+  push:
+    branches: [validate/issue31-handwritten-roots]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  characterize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Publish isolated migration variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          for variant in NO_ROOTS STATIC_FACTORY_ROOTS DECLARATIVE_FACTORY_ROOTS REGISTER_DEFAULT_FACTORY; do
+            dotnet publish sandbox/HandwrittenFactoryAot -c Release -p:DefineConstants="$variant" -o "$RUNNER_TEMP/$variant" 2>&1 | tee "$RUNNER_TEMP/publish-$variant.txt"
+            if grep -Eq 'IL2037|IL2111' "$RUNNER_TEMP/publish-$variant.txt"; then exit 1; fi
+            code=0
+            "$RUNNER_TEMP/$variant/HandwrittenFactoryAot" || code=$?
+            echo "VARIANT_RESULT $variant exit=$code"
+            if [[ "$variant" == NO_ROOTS ]]; then
+              if [[ "$code" != 1 ]]; then echo 'Negative control unexpectedly passed'; exit 1; fi
+            else
+              if [[ "$code" != 0 ]]; then echo "Migration variant failed: $variant"; fi
+            fi
+          done
+      - name: Verify clean validation checkout
+        run: git diff --exit-code
