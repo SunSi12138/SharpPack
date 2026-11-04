@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Apply an isolated CI-only root-preservation candidate, not production edits."""
+"""Historical root experiments for dev 6666ada, not the fixed production tree.
+
+Restore that baseline in a disposable checkout before use. Preconditions reject
+a newer tree rather than overwrite production changes. Current CI tests the
+actual production source and does not run this script.
+"""
 import sys
 from pathlib import Path
 

@@ -7,6 +7,8 @@ on:
     paths:
       - '.github/workflows/aot-deserialize-only.yaml'
       - 'sandbox/DeserializeOnlyAot/**'
+      - 'sandbox/DeserializeOnlyAot.Contracts/**'
+      - 'tools/SharpPack.FactoryMetadata/**'
       - 'src/**'
   workflow_dispatch:
 jobs:
@@ -69,6 +71,7 @@ jobs:
         run: dotnet publish sandbox/DeserializeOnlyAot -c Release -p:DefineConstants=FACTORY_ROOT_POSITIVE_CONTROL -o "$RUNNER_TEMP/positive-control"
       - name: Verify native method trimming with an executed positive control
         run: |
+          set -o pipefail
           "$RUNNER_TEMP/positive-control/DeserializeOnlyAot" | tee "$RUNNER_TEMP/positive-output.txt"
           grep -q 'SHARPPACK_UNUSED_PRIVATE_METHOD_SHOULD_BE_TRIMMED_31' "$RUNNER_TEMP/positive-output.txt"
           python3 - <<'PY'
@@ -93,7 +96,8 @@ jobs:
       - name: Verify trimmed JIT consumer compatibility
         if: matrix.runner == 'ubuntu-24.04'
         run: |
-          dotnet publish sandbox/DeserializeOnlyAot -c Release -p:PublishAot=false -p:PublishTrimmed=true --self-contained true -r linux-x64 -o "$RUNNER_TEMP/trimmed-jit"
+          dotnet publish sandbox/DeserializeOnlyAot -c Release -p:SharpPackTrimmedJit=true --self-contained true -r linux-x64 -o "$RUNNER_TEMP/trimmed-jit"
           "$RUNNER_TEMP/trimmed-jit/DeserializeOnlyAot"
       - name: Verify the candidate source tree stayed unchanged
         run: git diff --exit-code
+
