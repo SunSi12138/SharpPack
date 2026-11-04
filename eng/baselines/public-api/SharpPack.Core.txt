@@ -746,6 +746,25 @@ type public sealed class SharpPack.SharpPackOrderAttribute : System.Attribute
   ctor public SharpPackOrderAttribute(System.Int32 order)
   property System.Int32 Order { get:public; }
 
+type public enum SharpPack.SharpPackReadLimitKind : System.Byte, System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  field public System.Byte value__
+  field public const SharpPack.SharpPackReadLimitKind CollectionLength = 2
+  field public const SharpPack.SharpPackReadLimitKind Depth = 1
+  field public const SharpPack.SharpPackReadLimitKind PayloadBytes = 0
+  field public const SharpPack.SharpPackReadLimitKind ReferenceCount = 3
+
+type public readonly struct SharpPack.SharpPackReadLimits : System.IEquatable<SharpPack.SharpPackReadLimits>
+  method public override System.Boolean Equals(System.Object obj)
+  method public override System.Int32 GetHashCode()
+  method public override System.String ToString()
+  method public sealed override System.Boolean Equals(SharpPack.SharpPackReadLimits other)
+  method public static System.Boolean op_Equality(SharpPack.SharpPackReadLimits left, SharpPack.SharpPackReadLimits right)
+  method public static System.Boolean op_Inequality(SharpPack.SharpPackReadLimits left, SharpPack.SharpPackReadLimits right)
+  property System.Int32 MaxCollectionLength { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
+  property System.Int32 MaxDepth { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
+  property System.Int32 MaxReferenceCount { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
+  property static SharpPack.SharpPackReadLimits Default { get:public; }
+
 type public ref struct SharpPack.SharpPackReader
   ctor public SharpPackReader(System.ReadOnlySpan<System.Byte> buffer, SharpPack.SharpPackReaderOptionalState optionalState)
   ctor public SharpPackReader(in System.Buffers.ReadOnlySequence<System.Byte> sequence, SharpPack.SharpPackReaderOptionalState optionalState)
@@ -871,6 +890,7 @@ type public class SharpPack.SharpPackSerializationException : System.Exception, 
   method public static System.Void ThrowSequenceReachedEnd()
   method public static System.Void ThrowSizeOverflow()
   method public static System.Void ThrowWriteInvalidMemberCount(System.Byte memberCount)
+  property System.Nullable<SharpPack.SharpPackReadLimitKind> ReadLimitKind { get:public; }
 
 type public static class SharpPack.SharpPackSerializer
   method public static SharpPack.SharpPackWriter<SharpPack.Internal.SharpPackExactArrayBufferWriter> CreateExactWriter(ref SharpPack.Internal.SharpPackExactArrayBufferWriter bufferWriter)
@@ -906,8 +926,10 @@ type public readonly struct SharpPack.SharpPackSerializerConfiguration : System.
   method public sealed override System.Boolean Equals(SharpPack.SharpPackSerializerConfiguration other)
   method public static System.Boolean op_Equality(SharpPack.SharpPackSerializerConfiguration left, SharpPack.SharpPackSerializerConfiguration right)
   method public static System.Boolean op_Inequality(SharpPack.SharpPackSerializerConfiguration left, SharpPack.SharpPackSerializerConfiguration right)
+  property SharpPack.SharpPackReadLimits ReadLimits { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
   property SharpPack.SharpPackStringEncoding StringEncoding { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
   property SharpPack.TypeSerializationMode TypeSerializationMode { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
+  property System.Int32 MaxPayloadBytes { get:public; init:public modreq(System.Runtime.CompilerServices.IsExternalInit); }
   property static SharpPack.SharpPackSerializerConfiguration Default { get:public; }
   property static SharpPack.SharpPackSerializerConfiguration Utf16 { get:public; }
   property static SharpPack.SharpPackSerializerConfiguration Utf8 { get:public; }

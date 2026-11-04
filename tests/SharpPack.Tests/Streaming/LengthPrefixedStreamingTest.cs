@@ -289,6 +289,75 @@ public class LengthPrefixedStreamingTest
     }
 
     [Fact]
+    public async Task LengthPrefixed_ContextPayloadLimit_IsCheckedBeforePayloadWait()
+    {
+        var pipe = new Pipe();
+        var header = new byte[sizeof(uint)];
+        BinaryPrimitives.WriteUInt32LittleEndian(header, 1024);
+        pipe.Writer.Write(header);
+        await pipe.Writer.FlushAsync();
+        var context = new SharpPackSerializerContext(
+            SharpPackSerializerConfiguration.Default with
+            {
+                MaxPayloadBytes = 16,
+            });
+
+        await Assert.ThrowsAsync<SharpPackSerializationException>(
+            async () => await SharpPackStreamingSerializer
+                .DeserializeLengthPrefixedAsync<int>(
+                    pipe.Reader,
+                    context: context));
+
+        await pipe.Reader.CompleteAsync();
+        await pipe.Writer.CompleteAsync();
+    }
+
+    [Fact]
+    public async Task Frame_ContextPayloadLimit_IsCheckedBeforePayloadWait()
+    {
+        var pipe = new Pipe();
+        var context = new SharpPackSerializerContext(
+            SharpPackSerializerConfiguration.Default with
+            {
+                MaxPayloadBytes = 16,
+            });
+
+        await Assert.ThrowsAsync<SharpPackSerializationException>(
+            async () => await SharpPackStreamingSerializer
+                .DeserializeFrameAsync<int>(
+                    pipe.Reader,
+                    payloadLength: 1024,
+                    context: context));
+
+        await pipe.Reader.CompleteAsync();
+        await pipe.Writer.CompleteAsync();
+    }
+
+    [Fact]
+    public async Task LengthPrefixed_ContextPayloadLimit_ExactBoundarySucceeds()
+    {
+        var pipe = new Pipe();
+        var frame = CreateFrame(123);
+        var payloadLength = frame.Length - sizeof(uint);
+        var context = new SharpPackSerializerContext(
+            SharpPackSerializerConfiguration.Default with
+            {
+                MaxPayloadBytes = payloadLength,
+            });
+
+        pipe.Writer.Write(frame);
+        await pipe.Writer.CompleteAsync();
+
+        var value = await SharpPackStreamingSerializer
+            .DeserializeLengthPrefixedAsync<int>(
+                pipe.Reader,
+                context: context);
+
+        value.Should().Be(123);
+        await pipe.Reader.CompleteAsync();
+    }
+
+    [Fact]
     public async Task LengthPrefixed_CancellationWhileWaitingForHeader_Throws()
     {
         var pipe = new Pipe();

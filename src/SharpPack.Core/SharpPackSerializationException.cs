@@ -5,6 +5,11 @@ namespace SharpPack;
 
 public class SharpPackSerializationException : Exception
 {
+    /// <summary>
+    /// The exceeded resource boundary, or null for other serialization failures.
+    /// </summary>
+    public SharpPackReadLimitKind? ReadLimitKind { get; private init; }
+
     public SharpPackSerializationException(string message)
         : base(message)
     {
@@ -19,6 +24,23 @@ public class SharpPackSerializationException : Exception
     public static void ThrowMessage(string message)
     {
         throw new SharpPackSerializationException(message);
+    }
+
+    [DoesNotReturn]
+    internal static void ThrowReadLimitExceeded(
+        SharpPackReadLimitKind boundary,
+        int limit,
+        int actual,
+        Type? type = null)
+    {
+        var typeSuffix = type is null
+            ? string.Empty
+            : $" while reading {type.FullName}";
+        throw new SharpPackSerializationException(
+            $"The {boundary} read limit {limit} was exceeded by value {actual}{typeSuffix}.")
+        {
+            ReadLimitKind = boundary,
+        };
     }
 
     [DoesNotReturn]

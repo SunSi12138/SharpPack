@@ -1,4 +1,4 @@
-﻿using SharpPack.Internal;
+using SharpPack.Internal;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.IO.Pipelines;
@@ -76,6 +76,7 @@ public static class SharpPackStreamingSerializer
     {
         ArgumentNullException.ThrowIfNull(pipeReader);
         ArgumentOutOfRangeException.ThrowIfNegative(payloadLength);
+        ThrowIfPayloadLimitExceeded(payloadLength, context);
 
         var result = await pipeReader
             .ReadAtLeastAsync(payloadLength, cancellationToken)
@@ -102,7 +103,10 @@ public static class SharpPackStreamingSerializer
             T? value = default;
             var consumed = context is null
                 ? SharpPackSerializer.Deserialize(payload, ref value)
-                : SharpPackSerializer.Deserialize(payload, ref value, context);
+                : SharpPackSerializer.DeserializeWithContext(
+                    payload,
+                    ref value,
+                    context);
 
             SharpPackSerializer.EnsurePayloadConsumed(
                 payloadLength,
@@ -298,12 +302,24 @@ public static class SharpPackStreamingSerializer
         }
 
         var payloadLength = (int)payloadLengthValue;
-        if (payloadLength > maxFrameLength)
+        var maxPayloadBytes = GetMaxPayloadBytes(context);
+        var effectiveMaxFrameLength = Math.Min(
+            maxFrameLength,
+            maxPayloadBytes);
+        if (payloadLength > effectiveMaxFrameLength)
         {
             pipeReader.AdvanceTo(buffer.Start, headerReader.Position);
+            if (payloadLength > maxPayloadBytes)
+            {
+                SharpPackSerializationException.ThrowReadLimitExceeded(
+                    SharpPackReadLimitKind.PayloadBytes,
+                    maxPayloadBytes,
+                    payloadLength);
+            }
+
             throw new SharpPackSerializationException(
                 $"The frame payload length {payloadLength} exceeds the configured maximum " +
-                $"{maxFrameLength}.");
+                $"{effectiveMaxFrameLength}.");
         }
 
         if (payloadLength > Array.MaxLength)
@@ -393,7 +409,10 @@ public static class SharpPackStreamingSerializer
             T? value = default;
             var consumedPayload = context is null
                 ? SharpPackSerializer.Deserialize(payload.Span, ref value)
-                : SharpPackSerializer.Deserialize(payload.Span, ref value, context);
+                : SharpPackSerializer.DeserializeWithContext(
+                    payload.Span,
+                    ref value,
+                    context);
 
             SharpPackSerializer.EnsurePayloadConsumed(
                 payloadLength,
@@ -407,6 +426,23 @@ public static class SharpPackStreamingSerializer
             {
                 ArrayPool<byte>.Shared.Return(rentedPayload);
             }
+        }
+    }
+
+    static int GetMaxPayloadBytes(SharpPackSerializerContext? context)
+        => context?.MaxPayloadBytes ?? int.MaxValue;
+
+    static void ThrowIfPayloadLimitExceeded(
+        int payloadLength,
+        SharpPackSerializerContext? context)
+    {
+        var maxPayloadBytes = GetMaxPayloadBytes(context);
+        if (payloadLength > maxPayloadBytes)
+        {
+            SharpPackSerializationException.ThrowReadLimitExceeded(
+                SharpPackReadLimitKind.PayloadBytes,
+                maxPayloadBytes,
+                payloadLength);
         }
     }
 
@@ -662,6 +698,7 @@ public static class SharpPackStreamingSerializer
             if (!reader.DangerousTryReadCollectionHeader(out length))
             {
                 length = 0;
+                return;
             }
         }
 
@@ -722,7 +759,10 @@ public static class SharpPackStreamingSerializer
                     continue;
                 }
 
-                ReadCollectionHeader(buffer, state, out remain);
+                ReadCollectionHeader(
+                    buffer,
+                    state,
+                    out remain);
                 parseStart = buffer.GetPosition(4);
                 if (remain > 0)
                 {

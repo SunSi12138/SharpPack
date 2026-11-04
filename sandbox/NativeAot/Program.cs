@@ -47,6 +47,29 @@ AssertModel(
     SharpPackSerializer.Deserialize<AotSharpPackModel>(registeredPayload, typeContext),
     value);
 
+var readLimitsContext = new SharpPackSerializerContext(
+    SharpPackSerializerConfiguration.Default with
+    {
+        ReadLimits = new SharpPackReadLimits { MaxCollectionLength = 2 },
+        MaxPayloadBytes = 32,
+    });
+var limitedArray = SharpPackSerializer.Deserialize<int[]>(
+    SharpPackSerializer.Serialize(new[] { 1, 2 }), readLimitsContext);
+if (limitedArray is not [1, 2])
+{
+    throw new InvalidOperationException("Exact collection limit failed under NativeAOT.");
+}
+try
+{
+    _ = SharpPackSerializer.Deserialize<int[]>(
+        SharpPackSerializer.Serialize(new[] { 1, 2, 3 }), readLimitsContext);
+    throw new InvalidOperationException("Collection limit must reject under NativeAOT.");
+}
+catch (SharpPackSerializationException ex) when
+    (ex.ReadLimitKind == SharpPackReadLimitKind.CollectionLength)
+{
+}
+
 var exactValue = new AotExactSizeModel
 {
     Id = 7,

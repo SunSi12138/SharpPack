@@ -171,7 +171,7 @@ public sealed class BrotliStringFormatter : SharpPackFormatter<string>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override void Deserialize(ref SharpPackReader reader, scoped ref string? value)
     {
-        if (!reader.DangerousTryReadCollectionHeader(out var length))
+        if (!reader.TryReadLengthHeader(out var length))
         {
             value = null;
             return;

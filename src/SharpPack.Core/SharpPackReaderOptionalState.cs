@@ -87,6 +87,8 @@ public sealed class SharpPackReaderOptionalState : IDisposable
 
     List<object>? sequentialReferences;
     Dictionary<uint, object>? sparseReferences;
+    int referenceCount;
+    int maxReferenceCount = int.MaxValue;
     bool isInUse;
     bool requiresReset;
     long leaseGeneration;
@@ -94,6 +96,9 @@ public sealed class SharpPackReaderOptionalState : IDisposable
 
     internal SharpPackSerializerContext? SerializerContext { get; private set; }
     internal FormatterGraph? FormatterGraph { get; private set; }
+    internal int MaxDepth { get; private set; } =
+        SharpPackReadLimits.CurrentCompatibleMaxDepth;
+    internal int MaxCollectionLength { get; private set; } = int.MaxValue;
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     public bool HasFormatterOverrides => FormatterGraph is not null;
@@ -109,6 +114,10 @@ public sealed class SharpPackReaderOptionalState : IDisposable
         requiresReset = true;
         SerializerContext = context;
         FormatterGraph = context.OverrideGraph;
+        var limits = context.ReadLimits;
+        MaxDepth = limits.MaxDepth;
+        MaxCollectionLength = limits.MaxCollectionLength;
+        maxReferenceCount = limits.MaxReferenceCount;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -188,15 +197,48 @@ public sealed class SharpPackReaderOptionalState : IDisposable
                     "Object is already added, id:" + id);
             }
 
+            ThrowIfReferenceLimitExceeded();
             sequentialReferences.Add(value);
+            referenceCount++;
             return;
         }
 
-        if (id < (uint)sequentialReferences.Count ||
-            !(sparseReferences ??= []).TryAdd(id, value))
+        if (id < (uint)sequentialReferences.Count)
         {
             SharpPackSerializationException.ThrowMessage(
                 "Object is already added, id:" + id);
+        }
+
+        if (referenceCount >= maxReferenceCount)
+        {
+            // Only the rejection path needs an extra lookup to preserve
+            // duplicate-ID classification. Successful inserts retain TryAdd.
+            if (sparseReferences?.ContainsKey(id) == true)
+            {
+                SharpPackSerializationException.ThrowMessage(
+                    "Object is already added, id:" + id);
+            }
+            ThrowIfReferenceLimitExceeded();
+        }
+        if (!(sparseReferences ??= []).TryAdd(id, value))
+        {
+            SharpPackSerializationException.ThrowMessage(
+                "Object is already added, id:" + id);
+        }
+        referenceCount++;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    void ThrowIfReferenceLimitExceeded()
+    {
+        if (referenceCount >= maxReferenceCount)
+        {
+            SharpPackSerializationException.ThrowReadLimitExceeded(
+                SharpPackReadLimitKind.ReferenceCount,
+                maxReferenceCount,
+                referenceCount == int.MaxValue
+                    ? int.MaxValue
+                    : referenceCount + 1);
         }
     }
 
@@ -222,6 +264,10 @@ public sealed class SharpPackReaderOptionalState : IDisposable
 
         SerializerContext = null;
         FormatterGraph = null;
+        referenceCount = 0;
+        maxReferenceCount = int.MaxValue;
+        MaxDepth = SharpPackReadLimits.CurrentCompatibleMaxDepth;
+        MaxCollectionLength = int.MaxValue;
         requiresReset = false;
     }
 
