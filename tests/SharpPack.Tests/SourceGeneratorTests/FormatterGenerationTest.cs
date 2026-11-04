@@ -674,6 +674,11 @@ public partial class Model
         methodLookups.Should().HaveCount(2);
         foreach (var lookup in methodLookups)
         {
+            // A dynamic-code feature guard is folded away by trimmed JIT,
+            // so it must never contain metadata-preservation lookups.
+            lookup.Ancestors().OfType<IfStatementSyntax>()
+                .Should().NotContain(statement =>
+                    statement.Condition.ToString().Contains("IsDynamicCodeSupported"));
             var name = ((LiteralExpressionSyntax)lookup.ArgumentList.Arguments[0].Expression).Token.ValueText;
             name.Should().BeOneOf(
                 "global::SharpPack.ISharpPackFormatterFactory<Generated.Model>.CreateFormatter",
@@ -777,3 +782,4 @@ public sealed class FrozenModel :
     }
 
 }
+

@@ -170,8 +170,7 @@ partial class SharpPackGenerator
         sb.AppendLine($"    private static readonly bool {rootName}Value = {rootName}();");
         sb.AppendLine($"    private static bool {rootName}()");
         sb.AppendLine("    {");
-        sb.AppendLine("        if (!global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)");
-        sb.AppendLine($"            global::System.GC.KeepAlive(typeof({targetType}).GetMethod(\"global::SharpPack.ISharpPackFormatterFactory<{TypeMeta.GetFactoryMetadataTypeName(target)}>.CreateFormatter\", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException(\"The generated SharpPack factory root was not found.\"));");
+        sb.AppendLine($"        global::System.GC.KeepAlive(typeof({targetType}).GetMethod(\"global::SharpPack.ISharpPackFormatterFactory<{TypeMeta.GetFactoryMetadataTypeName(target)}>.CreateFormatter\", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException(\"The generated SharpPack factory root was not found.\"));");
         sb.AppendLine("        return true;");
         sb.AppendLine("    }");
         sb.AppendLine(
@@ -322,3 +321,4 @@ partial class SharpPackGenerator
         }
     }
 }
+
