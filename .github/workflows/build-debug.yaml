@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - "main"
+      - "validation/issue17-runtime-handshake-20261104"
   pull_request:
     branches:
       - "main"
@@ -79,6 +80,8 @@ jobs:
       - run: dotnet test -c Release --no-build
       - run: dotnet run --project sandbox/CollectibleAlcSample -c Release
       - run: dotnet pack -c Release --no-build -o "$GITHUB_WORKSPACE/artifacts"
+      - name: Verify packaged Generator and Runtime ABI compatibility
+        run: python3 tools/AbiCompatibility/verify.py
       - run: tools/CompatibilityBaseline/generate-original-head-corpus.sh
       - run: dotnet publish sandbox/NativeAot/NativeAot.csproj -c Release -o "$RUNNER_TEMP/sharppack-aot"
       - run: '"$RUNNER_TEMP/sharppack-aot/NativeAot"'

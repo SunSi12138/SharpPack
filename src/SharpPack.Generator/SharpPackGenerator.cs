@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Text;
@@ -94,6 +94,32 @@ public partial class SharpPackGenerator : IIncrementalGenerator
                     return (TypeDeclarationSyntax)context.TargetNode;
                 })
                 .WithTrackingName("SharpPack.SharpPackable.1_ForAttributeSharpPackUnion");
+
+        // Report one actionable error for the compilation, even when several
+        // annotated types would otherwise produce missing-member cascades.
+        var runtimeCompatibility = typeDeclarations.Collect()
+            .Combine(typeDeclarations2.Collect())
+            .Combine(context.CompilationProvider);
+        context.RegisterSourceOutput(runtimeCompatibility, static (context, source) =>
+        {
+            var declarations = source.Left.Left.Concat(source.Left.Right);
+            var declaration = declarations
+                .OrderBy(static syntax => syntax.SyntaxTree.FilePath, StringComparer.Ordinal)
+                .ThenBy(static syntax => syntax.SpanStart)
+                .FirstOrDefault();
+            if (declaration is null) return;
+
+            var unsupportedAbi = RuntimeGeneratedCodeAbi.GetUnsupportedVersion(source.Right);
+            if (unsupportedAbi is not null)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.IncompatibleRuntimeAbi,
+                    declaration.Identifier.GetLocation(),
+                    unsupportedAbi,
+                    RuntimeGeneratedCodeAbi.MinimumVersion,
+                    RuntimeGeneratedCodeAbi.MaximumVersion));
+            }
+        });
 
         {
             var source = typeDeclarations
@@ -226,6 +252,7 @@ public partial class SharpPackGenerator : IIncrementalGenerator
 
                 var syntax = item.Left.Item1;
                 var compilation = item.Left.Item2;
+                if (RuntimeGeneratedCodeAbi.GetUnsupportedVersion(compilation) is not null) continue;
                 var semanticModel = compilation.GetSemanticModel(syntax.SyntaxTree);
                 var typeSymbol = semanticModel.GetDeclaredSymbol(syntax, context.CancellationToken) as ITypeSymbol;
                 if (typeSymbol == null) continue;

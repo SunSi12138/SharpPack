@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Immutable;
@@ -13,7 +13,8 @@ partial class SharpPackGenerator
         Compilation compilation,
         IGeneratorContext context)
     {
-        if (declarations.IsDefaultOrEmpty)
+        if (declarations.IsDefaultOrEmpty ||
+            RuntimeGeneratedCodeAbi.GetUnsupportedVersion(compilation) is not null)
         {
             return;
         }

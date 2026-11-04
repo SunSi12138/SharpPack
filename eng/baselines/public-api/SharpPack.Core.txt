@@ -26,6 +26,9 @@ type public sealed class SharpPack.BrotliStringFormatterAttribute : SharpPack.Sh
   property System.Int32 DecompressionSizeLimit { get:public; }
   property System.Int32 Window { get:public; }
 
+type public static class SharpPack.CompilerServices.SharpPackGeneratedCodeContract
+  field public const System.Int32 Version = 1
+
 type public sealed class SharpPack.Compression.BitPackFormatter : SharpPack.SharpPackFormatter<System.Boolean[]>, SharpPack.ISharpPackFormatter<System.Boolean[]>
   ctor public BitPackFormatter()
   field public static readonly SharpPack.Compression.BitPackFormatter Default

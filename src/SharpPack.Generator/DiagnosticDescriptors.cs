@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -337,6 +337,13 @@ internal static class DiagnosticDescriptors
         id: "SHARPPACK042",
         title: "Nested SharpPackable object's containing type(s) must be partial",
         messageFormat: "The SharpPackable object '{0}' containing type(s) must be partial",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+    public static readonly DiagnosticDescriptor IncompatibleRuntimeAbi = new(
+        id: "SHARPPACK043",
+        title: "Incompatible SharpPack Generator and Runtime",
+        messageFormat: "Detected SharpPack Runtime ABI '{0}'; this Generator requires ABI [{1}, {2}]. Align SharpPack.Core and SharpPack.Generator package versions, or update the Runtime or Generator to a compatible pair.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);

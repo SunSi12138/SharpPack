@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Immutable;
@@ -11,6 +11,11 @@ partial class SharpPackGenerator
 {
     static void Generate(TypeDeclarationSyntax syntax, Compilation compilation, string? serializationInfoLogDirectoryPath, IGeneratorContext context)
     {
+        if (RuntimeGeneratedCodeAbi.GetUnsupportedVersion(compilation) is not null)
+        {
+            return;
+        }
+
         var semanticModel = compilation.GetSemanticModel(syntax.SyntaxTree);
 
         var typeSymbol = semanticModel.GetDeclaredSymbol(syntax, context.CancellationToken);

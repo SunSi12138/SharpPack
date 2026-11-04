@@ -81,3 +81,49 @@ for the current generator/runtime pair.
 Snapshot text is a detector rather than a promise of forever-identical source.
 An intentional update must state whether it changes ABI, wire bytes, allocation
 behavior, or only implementation text.
+
+## Runtime handshake (ABI 1)
+
+`SharpPack.CompilerServices.SharpPackGeneratedCodeContract.Version` is a public,
+IntelliSense-hidden constant owned by Core. Its value describes the generated-code
+contract, not the NuGet package or wire-format version. This Generator accepts
+exactly ABI `[1, 1]`. No future ABI range is implied.
+
+Before semantic extraction or C# emission, the Generator resolves the marker
+from the assembly containing `SharpPackableAttribute`. A consumer-defined type
+with the same marker name cannot override the runtime's value. A missing,
+malformed, older, or newer marker produces one `SHARPPACK043` error per compilation
+at the first annotated model/union formatter. The diagnostic includes the detected
+ABI, supported range, and package-alignment remediation. All C# output, including
+external-union target factories, is suppressed for the incompatible compilation.
+TypeScript output is also suppressed. A project with no recognized SharpPack
+annotations does not require the runtime marker; ordinary unresolved-attribute
+compiler diagnostics still apply when Core is completely absent.
+
+This is an additive handshake stage of #17. It does not rename or remove any
+existing helper, change generated C# for a supported pair, change wire bytes, or
+add runtime dispatch/allocation. Existing generated source remains supported by
+the frozen ABI compilation gate. The complete per-member generated dependency
+inventory and eventual wrapper migration remain separate work.
+
+`RuntimeAbiDiagnosticsTest` verifies matching/missing/invalid/older/newer markers,
+one error for multiple models, external-union suppression, consumer marker
+shadowing, and re-evaluation after references change in the same generator driver.
+The unsupported-runtime fixtures intentionally omit reader/writer/formatter APIs
+so any accidental emission would create compiler cascades and fail the tests.
+
+`tools/AbiCompatibility/verify.py` verifies real local NuGet packages in isolated
+consumers, without project references:
+
+- current aggregate package and current split Core + Generator: build and run;
+- current Generator + Core from pinned pre-handshake `6666ada1`: fail with
+  `SHARPPACK043`, no Generator exception or unrelated C# compiler errors;
+- Generator from that same pinned revision + current Core: build and run.
+
+That last case establishes the tested predecessor only, not a blanket promise
+for arbitrary older generators. New Generator + pre-handshake Core is deliberately
+unsupported even if a simple generated model might happen to compile. Align the
+packages to a runtime carrying ABI 1. Full CI additionally checks public API and
+unchanged generated-source baselines, the ordinary test suite, original wire
+corpus, and NativeAOT publish/run on x64 and ARM64. Passing source checks alone is
+not evidence that any execution gate passed.
