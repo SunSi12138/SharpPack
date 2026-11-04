@@ -22,6 +22,8 @@ def run(args, cwd, env):
     (Path(env['PACKAGE_WORK']) / 'last-command.log').write_bytes(result.stdout)
     if result.returncode:
         # Intentionally never publish raw output, paths, or arbitrary diagnostics.
+        if b'Packaged generator loaded and executed' in result.stdout:
+            print('Packaged generator loaded and executed; compilation or emit failed', flush=True)
         codes = sorted(set(re.findall(r'\b(?:CS|NU|MSB|SHARPPACK)\d{3,5}\b', result.stdout.decode(errors='replace'))))
         raise RuntimeError('Package validation command failed: ' + Path(args[0]).name + ' ' + args[1] + '; codes=' + ','.join(codes))
 
@@ -86,6 +88,7 @@ def main():
     host_config = work / 'Host.NuGet.Config'
     host_config.write_text('<configuration><packageSources><clear/><add key="nuget" value="https://api.nuget.org/v3/index.json"/></packageSources></configuration>')
     outputs = []
+    host_failures = []
     for version in ['4.3.0', '5.6.0']:
         path = work / ('host-' + version)
         refs = f'<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="[{version}]" /><Reference Include="SharpPack.Generator"><HintPath>{escape(str(generator))}</HintPath></Reference>'
@@ -93,9 +96,15 @@ def main():
         shutil.copyfile(HERE / 'RoslynHost.cs', path / 'Program.cs')
         run(['dotnet', 'restore', '--configfile', str(host_config)], path, env)
         output = work / (version + '-generated.txt'); outputs.append(output)
-        run(['dotnet', 'run', '-c', 'Release', '--no-restore', '--', version + '.0', str(core), str(HERE / 'Model.cs'), str(output)], path, env)
-        print('Roslyn host passed: ' + version)
+        try:
+            run(['dotnet', 'run', '-c', 'Release', '--no-restore', '--', version + '.0', str(core), str(HERE / 'Model.cs'), str(output)], path, env)
+            print('Roslyn host passed: ' + version, flush=True)
+        except RuntimeError as error:
+            host_failures.append(version)
+            print('Roslyn host failed: ' + version + '; ' + str(error), flush=True)
+    assert all(p.is_file() for p in outputs), 'Missing generator output'
     assert outputs[0].read_text() == outputs[1].read_text(), 'Host output differs'
+    print('Minimum/current generated-source equivalence passed', flush=True)
     if args.aot:
         # Runtime/compiler packs require normal package sources; SharpPack remains source-mapped locally.
         aot_config = work / 'Aot.NuGet.Config'
@@ -104,6 +113,8 @@ def main():
         run(['dotnet', 'publish', '-c', 'Release', '-p:PublishAot=true', '-p:NuGetAudit=false', '--configfile', str(aot_config), '-o', str(work / 'aot')], path, env)
         run([str(work / 'aot/Consumer'), 'verify'], path, env)
         print('Packaged NativeAOT passed')
+    if host_failures:
+        raise RuntimeError('Roslyn compilation matrix failed: ' + ','.join(host_failures))
     print('Package matrix passed; raw logs retained only on temporary runner')
 
 if __name__ == '__main__':
