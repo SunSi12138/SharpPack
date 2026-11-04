@@ -9,8 +9,8 @@ Aggregate, split Core+Generator, and Streaming consumers restore from an empty
 package cache and a cleared local-only feed. They assert the package asset graph
 and execute generated-code roundtrips. Streaming exercises the signed friend
 assembly boundary. The packaged generator runs in separate executable processes
-with Roslyn 4.3.0 and 5.6.0; generated output must agree for the common fixture,
-compile, and emit under both. This is a smoke contract, not exhaustive language
+with Roslyn 4.3.0, 4.4.0 and 5.6.0; generated output must agree for the common fixture,
+compile, and emit under each. This is a smoke contract, not exhaustive language
 coverage. NativeAOT consumes the aggregate package; source mapping confines
 SharpPack packages to the local feed while allowing runtime/compiler tool packs.
 
@@ -26,3 +26,15 @@ behavior. The branch is based on dev 6666ada, not the unmerged #30/#31/#16 stack
 - ABI mixed-version diagnostics depend on #17 and are not implemented here.
 - Deserialize-only and warning-free AOT claims remain #31, not this roundtrip.
 - Candidate-stack replay and ARM64 coverage remain separate from this x64 baseline.
+
+## Baseline evidence
+
+At test head c39837f (dev production sources 6666ada), run 41931191710
+passed aggregate, split and Streaming consumers, Roslyn 5.6 compilation/emit,
+minimum/current generated-source equality and packaged NativeAOT execution.
+Roslyn 4.3 loaded and executed the packaged generator but compilation failed with
+CS8987 (scoped modifier mismatch). The overall gate intentionally remains red;
+loading a generator is not a claim that the old compiler accepts its output
+against modern net10 Core metadata. Roslyn 4.4 is an additional boundary probe,
+not an assumed supported minimum. A compatibility decision or production fix
+needs its own justification; this harness does not suppress compiler errors.

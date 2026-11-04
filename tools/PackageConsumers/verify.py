@@ -81,7 +81,7 @@ def main():
         assert resolved == expected, (name, resolved)
         run(['dotnet', 'run', '-c', 'Release', '--no-restore'], path, env)
         print('Package consumer passed: ' + name)
-    # Two separate executables, each referencing only one Roslyn host package version.
+    # Separate executables, each referencing only one Roslyn host package version.
     cache = Path(env['NUGET_PACKAGES'])
     core = cache / 'sharppack.core' / VERSION / 'lib/net10.0/SharpPack.Core.dll'
     generator = cache / 'sharppack.generator' / VERSION / 'analyzers/dotnet/cs/SharpPack.Generator.dll'
@@ -89,7 +89,7 @@ def main():
     host_config.write_text('<configuration><packageSources><clear/><add key="nuget" value="https://api.nuget.org/v3/index.json"/></packageSources></configuration>')
     outputs = []
     host_failures = []
-    for version in ['4.3.0', '5.6.0']:
+    for version in ['4.3.0', '4.4.0', '5.6.0']:
         path = work / ('host-' + version)
         refs = f'<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="[{version}]" /><Reference Include="SharpPack.Generator"><HintPath>{escape(str(generator))}</HintPath></Reference>'
         project(path, refs)
@@ -103,7 +103,7 @@ def main():
             host_failures.append(version)
             print('Roslyn host failed: ' + version + '; ' + str(error), flush=True)
     assert all(p.is_file() for p in outputs), 'Missing generator output'
-    assert outputs[0].read_text() == outputs[1].read_text(), 'Host output differs'
+    assert len({p.read_text() for p in outputs}) == 1, 'Host output differs'
     print('Minimum/current generated-source equivalence passed', flush=True)
     if args.aot:
         # Runtime/compiler packs require normal package sources; SharpPack remains source-mapped locally.

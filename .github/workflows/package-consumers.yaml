@@ -18,4 +18,5 @@ jobs:
       - name: Real nupkg consumers, isolated Roslyn hosts and AOT
         run: python3 tools/PackageConsumers/verify.py --aot
       - name: Verify clean tracked tree
+        if: always()
         run: git diff --exit-code
