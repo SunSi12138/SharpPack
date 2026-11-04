@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
@@ -10,6 +10,9 @@
         <!-- NuGet -->
         <IsPackable>true</IsPackable>
         <PackageId>SharpPack.Streaming</PackageId>
+        <NuspecFile>$(MSBuildProjectDirectory)/SharpPack.Streaming.nuspec</NuspecFile>
+        <NuspecFile Condition="'$(IncludeSymbols)' == 'true'">$(MSBuildProjectDirectory)/SharpPack.Streaming.symbols.nuspec</NuspecFile>
+        <NuspecBasePath>$(MSBuildProjectDirectory)</NuspecBasePath>
         <PackageTags>serializer;streaming;pipelines;zero-copy;memorypack-compatible</PackageTags>
         <Description>PipeReader, PipeWriter, and framed streaming support for SharpPack.</Description>
     </PropertyGroup>
@@ -18,4 +21,11 @@
         <ProjectReference Include="..\SharpPack.Core\SharpPack.Core.csproj" />
     </ItemGroup>
 
+    <!-- Keep project-reference development; package consumers use the exact built Core version.
+         Public NuGet pack extension points, not private pack target/item overrides. -->
+    <Target Name="SetStreamingNuspecProperties" BeforeTargets="GenerateNuspec">
+        <PropertyGroup>
+            <NuspecProperties>id=$(PackageId);version=$(PackageVersion);authors=$(Authors);description=$(Description);copyright=$([MSBuild]::Escape('$(Copyright)'));projectUrl=$(PackageProjectUrl);repositoryUrl=$(RepositoryUrl);repositoryType=$(RepositoryType);commit=$(RepositoryCommit);output=$(TargetDir);root=$(MSBuildProjectDirectory)/../../</NuspecProperties>
+        </PropertyGroup>
+    </Target>
 </Project>

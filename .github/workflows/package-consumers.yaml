@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - validation/issue18-package-matrix-20261104
+      - validation/issue18-streaming-lockstep-20261104
 jobs:
   package-consumers:
     strategy:
@@ -23,6 +23,8 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.114
+      - name: Verify lockstep parser failure modes
+        run: python3 tools/PackageConsumers/test_lockstep.py
       - name: Real nupkg consumers, isolated Roslyn hosts and AOT
         run: python3 tools/PackageConsumers/verify.py --aot --architecture ${{ matrix.architecture }}
       - name: Verify clean tracked tree

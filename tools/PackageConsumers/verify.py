@@ -13,6 +13,7 @@ import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
 from xml.sax.saxutils import escape
+from lockstep import verify_package_parity, verify_resolution, verify_symbol_parity
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
@@ -75,8 +76,29 @@ def main():
                 assert not any(p.startswith('lib/') for p in package.namelist())
             if name == 'SharpPack.Streaming':
                 deps = [e for e in metadata.iter() if e.tag.split('}')[-1] == 'dependency' and e.get('id') == 'SharpPack.Core']
-                assert len(deps) == 1 and VERSION in deps[0].get('version', '')
-                # Observe today's lower-bound range. This does NOT establish lockstep policy.
+                assert len(deps) == 1 and deps[0].get('version') == f'[{VERSION}]'
+    # Compare custom nuspec with SDK-generated packaging from identical build outputs.
+    automatic = work / 'automatic-feed'; automatic.mkdir()
+    run(['dotnet', 'pack', str(REPO / 'src/SharpPack.Streaming/SharpPack.Streaming.csproj'),
+         '-c', 'Release', '--no-build', '-o', str(automatic), '-p:NuspecFile=',
+         '-p:PackageVersion=' + VERSION, '-p:Version=' + VERSION], REPO, env)
+    verify_package_parity(automatic / f'SharpPack.Streaming.{VERSION}.nupkg',
+                          feed / f'SharpPack.Streaming.{VERSION}.nupkg', VERSION)
+    # Preserve existing build-release/publish-nuget symbol packaging, without publishing.
+    symbol_feeds = []
+    for label, custom in [('automatic-symbols', False), ('candidate-symbols', True)]:
+        target = work / label; target.mkdir(); symbol_feeds.append(target)
+        command = ['dotnet', 'pack', str(REPO / 'src/SharpPack.Streaming/SharpPack.Streaming.csproj'),
+                   '-c', 'Release', '--no-build', '-o', str(target), '-p:IncludeSymbols=true',
+                   '-p:SymbolPackageFormat=snupkg', '-p:PackageVersion=' + VERSION, '-p:Version=' + VERSION]
+        if not custom:
+            command.append('-p:NuspecFile=')
+        run(command, REPO, env)
+    verify_package_parity(symbol_feeds[0] / f'SharpPack.Streaming.{VERSION}.nupkg',
+                          symbol_feeds[1] / f'SharpPack.Streaming.{VERSION}.nupkg', VERSION)
+    verify_symbol_parity(symbol_feeds[0] / f'SharpPack.Streaming.{VERSION}.snupkg',
+                         symbol_feeds[1] / f'SharpPack.Streaming.{VERSION}.snupkg')
+    verify_resolution(work, feed, REPO, env, project, run, VERSION)
     # Empty package cache plus a cleared, local-only source prevents published-package leakage.
     env['NUGET_PACKAGES'] = str(work / 'consumer-cache')
     config = work / 'NuGet.Config'
