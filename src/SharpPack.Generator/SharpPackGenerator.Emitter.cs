@@ -63,6 +63,7 @@ partial class SharpPackGenerator
         }
 
         var fullType = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+            .Replace("@", "")
             .Replace("global::", "")
             .Replace("<", "_")
             .Replace(">", "_");
