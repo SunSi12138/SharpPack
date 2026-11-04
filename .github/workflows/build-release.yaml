@@ -20,6 +20,11 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
+      - name: Record selected SDK and installed runtimes
+        run: |
+          dotnet --version
+          dotnet --info
+          dotnet --list-runtimes
       - name: Verify architecture baselines
         run: dotnet run --project tools/SharpPack.Baselines/SharpPack.Baselines.csproj -c Release -- verify
       - run: dotnet build -c Release -p:Version="$VERSION"
@@ -29,6 +34,8 @@ jobs:
       - run: dotnet run --project sandbox/CollectibleAlcSample -c Release
       - run: tools/CompatibilityBaseline/generate-original-head-corpus.sh
       - run: dotnet publish sandbox/NativeAot/NativeAot.csproj -c Release -o "$RUNNER_TEMP/sharppack-aot"
+      - name: Verify NativeAOT compiler security baseline
+        run: python3 tools/verify-aot-security-baseline.py sandbox/NativeAot/obj/project.assets.json
       - run: '"$RUNNER_TEMP/sharppack-aot/NativeAot"'
       - run: dotnet list SharpPack.sln package --vulnerable --include-transitive
       - name: Restore release-versioned outputs

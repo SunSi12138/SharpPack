@@ -25,6 +25,9 @@ trap cleanup EXIT
 
 git -C "${repository_root}" cat-file -e "${source_commit}^{commit}"
 git -C "${repository_root}" archive "${source_commit}" | tar -x -C "${baseline_root}"
+# Compare the historical source with the current, patched toolchain. Both the
+# CLI and project SDK resolver must use the same security baseline.
+cp "${repository_root}/global.json" "${baseline_root}/global.json"
 
 mkdir -p "${baseline_root}/baseline"
 cp -R "${script_dir}/fixture" "${baseline_root}/baseline/GoldenCorpus"

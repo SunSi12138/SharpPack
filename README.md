@@ -19,6 +19,19 @@ This is a breaking change from the published 1.1.0 Type-name wire contract.
 See [Type payload migration](docs/formatter-context.md#systemtype-payload-capability)
 before upgrading applications that exchange Type values.
 
+Brotli security baseline
+---
+Build and validate this branch with the stable .NET 10.0.114 SDK or a later
+10.0.1xx patch. Applications that decode untrusted Brotli data must use .NET
+10.0.14 or a later patched runtime. See
+[Microsoft's Brotli advisory](https://github.com/dotnet/runtime/security/advisories/GHSA-p3jp-9v83-76w9).
+Update and restart framework-dependent applications. Rebuild, republish, and
+redeploy self-contained and NativeAOT applications; updating the machine's
+shared runtime does not replace a decoder linked into an existing executable.
+SharpPack's decompression size limits do not repair native decoder memory
+corruption. Updating this repository's SDK does not update consumer deployments.
+The compatibility corpus checks historical source using this patched toolchain.
+
 Its speed comes from a C#-specific binary format, modern .NET APIs, generic
 static formatter dispatch, and an incremental source generator. The format
 copies compatible C# memory directly where possible and does not require a

@@ -1,6 +1,31 @@
 using SharpPack;
 using SharpPack.Formatters;
 
+// This validates the runtime compiled into this executable, not an unrelated
+// shared runtime installed on the build machine.
+var runtimeVersion = Environment.Version;
+Console.WriteLine($"NativeAOT runtime: {runtimeVersion}; architecture: {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}");
+if (runtimeVersion.Major != 10 || runtimeVersion.Minor != 0 || runtimeVersion.Build < 14)
+{
+    throw new InvalidOperationException("NativeAOT security validation requires .NET 10.0.14 or later 10.0 patch.");
+}
+
+var brotliValue = new AotBrotliModel
+{
+    Bytes = [1, 2, 3, 4, 5],
+    Text = "Brotli NativeAOT 正常往返",
+    Number = 12345,
+};
+var brotliPayload = SharpPackSerializer.Serialize(brotliValue);
+var brotliRoundTrip = SharpPackSerializer.Deserialize<AotBrotliModel>(brotliPayload);
+if (brotliRoundTrip is null ||
+    !brotliRoundTrip.Bytes.AsSpan().SequenceEqual(brotliValue.Bytes) ||
+    brotliRoundTrip.Text != brotliValue.Text ||
+    brotliRoundTrip.Number != brotliValue.Number)
+{
+    throw new InvalidOperationException("Brotli byte[], string, and generic formatter round-trips failed under NativeAOT.");
+}
+
 if (!System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)
 {
     // Root the closed collection formatters used directly as serializer root
@@ -582,3 +607,16 @@ public partial class AotClosedExternalUnionItem<T>
 [SharpPackUnionFormatter(typeof(IAotClosedExternalUnion<string>))]
 [SharpPackUnion(4, typeof(AotClosedExternalUnionItem<string>))]
 public partial class AotClosedExternalUnionFormatter;
+
+[SharpPackable]
+public partial class AotBrotliModel
+{
+    [BrotliFormatter]
+    public byte[] Bytes { get; set; } = [];
+
+    [BrotliStringFormatter]
+    public string? Text { get; set; }
+
+    [BrotliFormatter<int>]
+    public int Number { get; set; }
+}

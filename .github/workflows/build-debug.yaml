@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - "main"
+      - "validation/security-baseline-dev-20261104"
   pull_request:
     branches:
       - "main"
@@ -27,6 +28,13 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
+      - name: Record selected SDK and installed runtimes
+        run: |
+          dotnet --version
+          dotnet --info
+          dotnet --list-runtimes
+      - name: Check AOT baseline parser failure modes
+        run: python3 tools/verify-aot-security-baseline.py --self-test
       - run: dotnet build -c Release -p:EmitCompilerGeneratedFiles=true
       - name: Verify resolved MessagePack packages and analyzer execution
         run: |
@@ -81,6 +89,8 @@ jobs:
       - run: dotnet pack -c Release --no-build -o "$GITHUB_WORKSPACE/artifacts"
       - run: tools/CompatibilityBaseline/generate-original-head-corpus.sh
       - run: dotnet publish sandbox/NativeAot/NativeAot.csproj -c Release -o "$RUNNER_TEMP/sharppack-aot"
+      - name: Verify NativeAOT compiler security baseline
+        run: python3 tools/verify-aot-security-baseline.py sandbox/NativeAot/obj/project.assets.json
       - run: '"$RUNNER_TEMP/sharppack-aot/NativeAot"'
       - run: dotnet list SharpPack.sln package --vulnerable --include-transitive
       - run: git diff --exit-code
