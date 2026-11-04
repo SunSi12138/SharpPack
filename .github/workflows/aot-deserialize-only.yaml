@@ -11,6 +11,7 @@ on:
   workflow_dispatch:
 jobs:
   deserialize-only:
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -43,3 +44,39 @@ jobs:
           dotnet publish sandbox/NativeAot/NativeAot.csproj -c Release -o "$RUNNER_TEMP/original-aot" 2>&1 | tee "$RUNNER_TEMP/original-aot-publish.txt"
           if grep -q 'IL2111' "$RUNNER_TEMP/original-aot-publish.txt"; then exit 1; fi
           "$RUNNER_TEMP/original-aot/NativeAot"
+  inspect-factory-metadata:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Compile fixture without running it
+        run: dotnet build sandbox/DeserializeOnlyAot -c Release -p:PublishAot=false
+      - name: Read factory names from PE metadata without loading application types
+        run: |
+          mkdir -p "$RUNNER_TEMP/inspect"
+          cat > "$RUNNER_TEMP/inspect/inspect.csproj" <<'XML'
+          <Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings></PropertyGroup></Project>
+          XML
+          cat > "$RUNNER_TEMP/inspect/Program.cs" <<'CS'
+          using System.Reflection.Metadata;
+          using System.Reflection.PortableExecutable;
+          using var pe = new PEReader(File.OpenRead(args[0]));
+          var metadata = pe.GetMetadataReader();
+          foreach (var handle in metadata.TypeDefinitions)
+          {
+              var type = metadata.GetTypeDefinition(handle);
+              foreach (var methodHandle in type.GetMethods())
+              {
+                  var method = metadata.GetMethodDefinition(methodHandle);
+                  var name = metadata.GetString(method.Name);
+                  if (name.Contains("CreateFormatter"))
+                      Console.WriteLine(metadata.GetString(type.Name) + ": " + name);
+              }
+          }
+          CS
+          dotnet run --project "$RUNNER_TEMP/inspect" -- "$GITHUB_WORKSPACE/sandbox/DeserializeOnlyAot/bin/Release/net10.0/DeserializeOnlyAot.dll"
