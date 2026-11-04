@@ -27,7 +27,50 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-      - run: dotnet build -c Release
+      - run: dotnet build -c Release -p:EmitCompilerGeneratedFiles=true
+      - name: Verify resolved MessagePack packages and analyzer execution
+        run: |
+          for project in SandboxConsoleApp Benchmark; do
+            dotnet msbuild "sandbox/$project/$project.csproj" -t:ResolveReferences -p:Configuration=Release -getItem:Analyzer > "$RUNNER_TEMP/$project-analyzers.json"
+          done
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          for name in ("SandboxConsoleApp", "Benchmark"):
+              assets = json.loads(Path(f"sandbox/{name}/obj/project.assets.json").read_text())
+              for package in ("MessagePack", "MessagePackAnalyzer"):
+                  resolved = [key for key in assets["libraries"] if key.split("/")[0] == package]
+                  assert resolved == [f"{package}/3.1.9"], (name, package, resolved)
+              items = json.loads((Path(os.environ["RUNNER_TEMP"]) / f"{name}-analyzers.json").read_text())
+              analyzers = [item["Identity"].replace("\\", "/") for item in items["Items"]["Analyzer"]]
+              matched = [p for p in analyzers if "/messagepackanalyzer/3.1.9/" in p.lower()]
+              assert matched, (name, "MessagePack analyzer missing from compiler inputs")
+              assert all(Path(p).is_file() for p in matched)
+              print(f"{name}: resolved MessagePack=3.1.9, MessagePackAnalyzer=3.1.9; compiler analyzer inputs verified")
+          generated = [p for p in Path("sandbox/Benchmark/obj").rglob("*.cs")
+                       if "messagepack" in str(p).lower() and "generated" in str(p).lower()]
+          assert generated, "No emitted MessagePack generator output; analyzer execution not established"
+          print(f"Benchmark: MessagePack generator executed and emitted {len(generated)} source files")
+          for assets_path in Path("src").glob("*/obj/project.assets.json"):
+              packages = json.loads(assets_path.read_text())["libraries"]
+              assert not any(k.split("/")[0].startswith("MessagePack") for k in packages), assets_path
+          print("Production project assets remain free of MessagePack dependencies")
+          PY
+      - name: Smoke-test generated MessagePack benchmark harness (not performance)
+        if: matrix.runner == 'ubuntu-24.04'
+        run: |
+          dotnet run --project sandbox/Benchmark -c Release --no-build -- --filter '*JilBenchmark<Question>.MessagePackSerialize' '*JilBenchmark<Question>.MessagePackDeserialize' --job Dry --exporters json --artifacts "$RUNNER_TEMP/messagepack-bdn" --stopOnFirstError
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          reports = list((Path(os.environ["RUNNER_TEMP"]) / "messagepack-bdn/results").glob("*-report-full-compressed.json"))
+          assert reports, "No BenchmarkDotNet JSON reports"
+          cases = [case for report in reports for case in json.loads(report.read_text())["Benchmarks"]]
+          assert len(cases) == 2, f"Expected exactly two smoke cases, found {len(cases)}"
+          assert {c["Method"] for c in cases} == {"MessagePackSerialize", "MessagePackDeserialize"}
+          assert all(c.get("Statistics") and c["Statistics"]["N"] > 0 for c in cases), "Benchmark failed or did not execute"
+          print("Both MessagePack Dry harness cases built and executed; timing is not performance evidence")
+          PY
       - name: Verify public API and generated-source baselines
         run: dotnet run --project tools/SharpPack.Baselines/SharpPack.Baselines.csproj -c Release -- verify
       - name: Characterize baseline failure modes

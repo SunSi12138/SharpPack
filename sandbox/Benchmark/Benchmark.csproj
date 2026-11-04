@@ -25,8 +25,8 @@
         <PackageReference Include="K4os.Compression.LZ4" Version="1.2.16" />
         <PackageReference Include="K4os.Compression.LZ4.Streams" Version="1.2.16" />
         <PackageReference Include="MemoryPack" Version="1.21.4" />
-        <PackageReference Include="MessagePack" Version="3.1.8" />
-        <PackageReference Include="MessagePackAnalyzer" Version="3.1.8">
+        <PackageReference Include="MessagePack" Version="3.1.9" />
+        <PackageReference Include="MessagePackAnalyzer" Version="3.1.9">
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
