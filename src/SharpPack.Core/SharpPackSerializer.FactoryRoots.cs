@@ -12,7 +12,7 @@ public static partial class SharpPackSerializer
     public static void PreserveFormatterFactory<T>()
         where T : ISharpPackFormatterFactory<T>
     {
-        Func<SharpPackFormatter<T>> factory = T.CreateFormatter;
+        var factory = new Func<SharpPackFormatter<T>>(T.CreateFormatter);
         GC.KeepAlive(factory.Method);
     }
 
@@ -24,7 +24,7 @@ public static partial class SharpPackSerializer
     public static void PreserveContextFormatterFactory<T>()
         where T : ISharpPackContextFormatterFactory<T>
     {
-        Func<SharpPackSerializerContext, SharpPackFormatter<T>> factory = T.CreateFormatter;
+        var factory = new Func<SharpPackSerializerContext, SharpPackFormatter<T>>(T.CreateFormatter);
         GC.KeepAlive(factory.Method);
     }
 }

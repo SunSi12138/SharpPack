@@ -7,7 +7,7 @@ SharpPackSerializer.PreserveFormatterFactory<HandwrittenGenericFactoryModel<long
 SharpPackSerializer.PreserveContextFormatterFactory<HandwrittenGenericFactoryModel<long>>();
 SharpPackSerializer.PreserveFormatterFactory<DefaultOnlyModel>();
 SharpPackSerializer.PreserveContextFormatterFactory<ContextOnlyModel>();
-if (FactoryCalls.Default != 0 || FactoryCalls.Context != 0)
+if (FactoryCalls.Default != 0 || FactoryCalls.Context != 0 || FactoryCalls.Initialization != 0)
     throw new InvalidOperationException("Preservation executed a factory.");
 #endif
 
@@ -43,10 +43,11 @@ void Check(string name, Func<bool> read)
     try { if (!read()) throw new InvalidOperationException("Incorrect value"); Console.WriteLine("PASS " + name); }
     catch (Exception e) { failures++; Console.WriteLine("FAIL " + name + ": " + e); }
 }
-public static class FactoryCalls { public static int Default; public static int Context; }
-// Intentionally no generator, cctor, explicit metadata names or model construction before reading.
+public static class FactoryCalls { public static int Default; public static int Context; public static int Initialization; }
+// No generator, explicit metadata names or early construction. The application cctor must not run during preservation.
 public sealed class HandwrittenFactoryModel : ISharpPackFormatterFactory<HandwrittenFactoryModel>, ISharpPackContextFormatterFactory<HandwrittenFactoryModel>
 {
+    static HandwrittenFactoryModel() => FactoryCalls.Initialization++;
     public int Value { get; set; }
     static SharpPackFormatter<HandwrittenFactoryModel> ISharpPackFormatterFactory<HandwrittenFactoryModel>.CreateFormatter() { FactoryCalls.Default++; return new HandwrittenFormatter(0); }
     static SharpPackFormatter<HandwrittenFactoryModel> ISharpPackContextFormatterFactory<HandwrittenFactoryModel>.CreateFormatter(SharpPackSerializerContext context) { FactoryCalls.Context++; return new HandwrittenFormatter(1); }

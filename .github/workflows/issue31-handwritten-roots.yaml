@@ -40,5 +40,7 @@ jobs:
           set -euo pipefail
           dotnet publish sandbox/HandwrittenFactoryAot -c Release -p:DefineConstants=STATIC_FACTORY_ROOTS -p:SharpPackTrimmedJit=true --self-contained true -r ${{ matrix.runner == 'ubuntu-24.04-arm' && 'linux-arm64' || 'linux-x64' }} -o "$RUNNER_TEMP/trimmed-jit"
           "$RUNNER_TEMP/trimmed-jit/HandwrittenFactoryAot"
+      - name: Verify startup roots do not retain a collectible model assembly
+        run: dotnet run --project sandbox/CollectibleAlcSample -c Release
       - name: Verify clean validation checkout
         run: git diff --exit-code
