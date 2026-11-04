@@ -1,0 +1,59 @@
+name: Error code aligned UTF8 performance diagnosis
+on:
+  push:
+    branches: [validation/issue16-alignment-20261104]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  paired:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: 6666ada1d878da64b2f4d2c1107fbea30fad074f
+          path: baseline
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: 02d76047708a2f6fcaf1b49e2bd5685f9273a32b
+          path: candidate
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.102
+      - name: Build identical harnesses
+        run: |
+          set -euo pipefail
+          dotnet --info
+          lscpu
+          for side in baseline candidate; do
+            test "$(git -C "$side" status --porcelain)" = ""
+            git -C "$side" rev-parse HEAD
+            mkdir -p "$RUNNER_TEMP/perf-$side"
+            cp harness/tools/ErrorCodeAlignment/{Program.cs,Perf.csproj} "$RUNNER_TEMP/perf-$side/"
+            printf '{"sdk":{"version":"10.0.102","rollForward":"disable"}}' > "$RUNNER_TEMP/perf-$side/global.json"
+            (cd "$RUNNER_TEMP/perf-$side"; test "$(dotnet --version)" = 10.0.102; dotnet build -c Release -p:RepoRoot="$GITHUB_WORKSPACE/$side")
+          done
+          cmp "$RUNNER_TEMP/perf-baseline/Program.cs" "$RUNNER_TEMP/perf-candidate/Program.cs"
+      - name: Run paired ABBA BAAB samples
+        run: |
+          set -euo pipefail
+          for pair in baseline:A1 candidate:B1 candidate:B2 baseline:A2 candidate:B3 baseline:A3 baseline:A4 candidate:B4; do
+            side=${pair%:*}; label=${pair#*:}
+            dotnet "$RUNNER_TEMP/perf-$side/bin/Release/net10.0/Perf.dll" > "$RUNNER_TEMP/perf-$label.txt"
+          done
+          python3 harness/tools/ErrorCodeAlignment/summarize.py "$RUNNER_TEMP" | tee "$RUNNER_TEMP/perf-summary.txt" >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/perf-summary.txt"
