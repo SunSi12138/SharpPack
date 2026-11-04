@@ -1,0 +1,58 @@
+name: Error code JIT hot-path diagnostics
+on:
+  push:
+    branches: [validation/issue16-jit-diagnostics-20261104]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: 6666ada1d878da64b2f4d2c1107fbea30fad074f
+          path: baseline
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: 02d76047708a2f6fcaf1b49e2bd5685f9273a32b
+          path: candidate
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.102
+      - name: Build identical diagnostic harnesses
+        run: |
+          set -euo pipefail
+          dotnet --info
+          for side in baseline candidate; do
+            mkdir -p "$RUNNER_TEMP/perf-$side"
+            cp harness/tools/ErrorCodePerf/{Program.cs,Perf.csproj} "$RUNNER_TEMP/perf-$side/"
+            printf '{"sdk":{"version":"10.0.102","rollForward":"disable"}}' > "$RUNNER_TEMP/perf-$side/global.json"
+            (cd "$RUNNER_TEMP/perf-$side"; test "$(dotnet --version)" = 10.0.102; dotnet build -c Release -p:RepoRoot="$GITHUB_WORKSPACE/$side")
+          done
+      - name: Compare warmed Tier1 and deterministic FullOpts native instructions
+        run: |
+          set -euo pipefail
+          for mode in tiered fullopts; do
+            for side in baseline candidate; do
+              tiering=1
+              if [ "$mode" = fullopts ]; then tiering=0; fi
+              COMPlus_TieredCompilation=$tiering COMPlus_JitDisasm='*Serialize* *WriteUtf8*' COMPlus_JitDisasmDiffable=1 COMPlus_JitStdOutFile="$RUNNER_TEMP/jit-$mode-$side.asm" dotnet "$RUNNER_TEMP/perf-$side/bin/Release/net10.0/Perf.dll" > "$RUNNER_TEMP/diagnostic-$mode-$side.txt"
+            done
+          done
+          python3 harness/tools/ErrorCodePerf/compare-jit.py "$RUNNER_TEMP" | tee "$RUNNER_TEMP/jit-summary.txt" >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/jit-summary.txt"
