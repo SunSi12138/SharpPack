@@ -32,7 +32,7 @@ jobs:
         run: git restore --source=6666ada1d878da64b2f4d2c1107fbea30fad074f -- src
       - name: Publish baseline for scoped read-only performance comparison
         if: matrix.runner == 'ubuntu-24.04'
-        run: dotnet publish sandbox/DeserializeOnlyAot -c Release -o "$RUNNER_TEMP/baseline-read-only"
+        run: dotnet publish sandbox/DeserializeOnlyAot -c Release -p:DefineConstants=BASELINE_COMPARISON -o "$RUNNER_TEMP/baseline-read-only"
       - name: Restore exact candidate sources
         if: matrix.runner == 'ubuntu-24.04'
         run: git restore --source=HEAD -- src
@@ -52,14 +52,17 @@ jobs:
           dotnet publish sandbox/NativeAot/NativeAot.csproj -c Release -o "$RUNNER_TEMP/original-aot" 2>&1 | tee "$RUNNER_TEMP/original-aot-publish.txt"
           if grep -q 'IL2111' "$RUNNER_TEMP/original-aot-publish.txt"; then exit 1; fi
           "$RUNNER_TEMP/original-aot/NativeAot"
+      - name: Publish matching-corpus candidate performance binary
+        if: matrix.runner == 'ubuntu-24.04'
+        run: dotnet publish sandbox/DeserializeOnlyAot -c Release -p:DefineConstants=BASELINE_COMPARISON -o "$RUNNER_TEMP/candidate-read-only"
       - name: Compare warmed read-only paths in ABBA process order
         if: matrix.runner == 'ubuntu-24.04'
         run: |
-          for variant in baseline-read-only deserialize-only deserialize-only baseline-read-only; do
+          for variant in baseline-read-only candidate-read-only candidate-read-only baseline-read-only; do
             echo "PERF_PROCESS $variant"
             "$RUNNER_TEMP/$variant/DeserializeOnlyAot" --performance
           done
-          stat -c '%n %s bytes' "$RUNNER_TEMP/baseline-read-only/DeserializeOnlyAot" "$RUNNER_TEMP/deserialize-only/DeserializeOnlyAot"
+          stat -c '%n %s bytes' "$RUNNER_TEMP/baseline-read-only/DeserializeOnlyAot" "$RUNNER_TEMP/candidate-read-only/DeserializeOnlyAot"
       - name: Publish explicitly rooted trimming positive control
         run: dotnet publish sandbox/DeserializeOnlyAot -c Release -p:DefineConstants=FACTORY_ROOT_POSITIVE_CONTROL -o "$RUNNER_TEMP/positive-control"
       - name: Verify negative factory-root trimming control

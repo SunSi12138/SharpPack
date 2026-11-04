@@ -44,7 +44,9 @@ Check("closed generic member root", () => SharpPackSerializer.Deserialize<Generi
 Check("closed generic member context root", () => SharpPackSerializer.Deserialize<GenericNestedContextHost>(nested, context)?.Item?.Value == 43);
 Check("external type-name collision", () => SharpPackSerializer.Deserialize<CollisionTypes.__SharpPackPreserveFactory>(new byte[] { 6, 1, 42, 0, 0, 0 }) is CollisionTypes.Item { Value: 42 });
 Check("external value-name collision", () => SharpPackSerializer.Deserialize<CollisionTypes.__SharpPackPreserveFactoryValue>(new byte[] { 7, 1, 42, 0, 0, 0 }) is CollisionTypes.ValueItem { Value: 42 });
+#if !BASELINE_COMPARISON
 Check("escaped generic parameters", () => SharpPackSerializer.Deserialize<MetadataNames.KeywordParameters<int, long>>(model)?.Value == 42);
+#endif
 Check("multiple nested generic parameters", () => SharpPackSerializer.Deserialize<MetadataNames.Outer<int, long>.Inner<byte, short>>(model)?.Value == 42);
 // Literal wire bytes avoid any Type or model Serialize call in this program.
 byte[] typeId = [250, 255, 255, 255, 5, 0, 0, 0, 107, 110, 111, 119, 110]; // "known"
@@ -154,7 +156,9 @@ namespace CollisionTypes
 
 namespace MetadataNames
 {
+#if !BASELINE_COMPARISON
     [SharpPackable] public partial class KeywordParameters<@event, @namespace> { public int Value { get; set; } }
+#endif
     public partial class Outer<TOne, TTwo>
     {
         [SharpPackable] public partial class Inner<TThree, TFour> { public int Value { get; set; } }
