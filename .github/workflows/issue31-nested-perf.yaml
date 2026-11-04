@@ -25,7 +25,7 @@ jobs:
           python3 -c 'import os; print("CPU_AFFINITY", sorted(os.sched_getaffinity(0)))'
           for label in baseline1 candidate1 candidate2 baseline2; do
             work="$RUNNER_TEMP/source-$label"
-            git worktree add --detach "$work" 7dd3dfdfa104ce8f9df52c009f77550c8c25e1d3
+            git worktree add --detach "$work" 2c61f93dfda9da0eba9bfb0b6af2e93b48cd739e
             if [[ "$label" == baseline* ]]; then
               git -C "$work" restore --source=6666ada1d878da64b2f4d2c1107fbea30fad074f -- src
             fi
@@ -64,3 +64,4 @@ jobs:
         run: python3 tools/issue31-perf/disassemble.py "$RUNNER_TEMP"
       - name: Check validation sources unchanged
         run: git diff --exit-code
+
