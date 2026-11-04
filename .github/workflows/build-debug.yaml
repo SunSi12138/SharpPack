@@ -6,6 +6,7 @@ on:
     branches:
       - "main"
       - "fix/issue31-deserialization-roots"
+      - "validate/issue31-declarative-roots"
   pull_request:
     branches:
       - "main"
