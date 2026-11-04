@@ -747,7 +747,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
     }
 
     string EmitSelfFactoryRootRead()
-        => HasUserStaticInitialization() ? "" : $"        _ = {GetSelfRootMethodName()}Value;";
+        => HasUserStaticInitialization() ? "" : $"        var {GetSelfRootMethodName()} = {GetSelfRootMethodName()}Value;";
 
     string EmitSelfFactoryRoots(bool includeContextFactory)
     {

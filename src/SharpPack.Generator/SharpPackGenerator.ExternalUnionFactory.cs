@@ -178,7 +178,7 @@ partial class SharpPackGenerator
         sb.AppendLine(
             $"        global::SharpPack.ISharpPackFormatterFactory<{targetType}>.CreateFormatter()");
         sb.AppendLine("    {");
-        sb.AppendLine($"        _ = {rootName}Value;");
+        sb.AppendLine($"        var {rootName} = {rootName}Value;");
 
         var emittedPatterns = new HashSet<string>(StringComparer.Ordinal);
         ExternalUnionFactoryEntry? openEntry = null;
@@ -321,4 +321,5 @@ partial class SharpPackGenerator
         }
     }
 }
+
 

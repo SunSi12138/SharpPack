@@ -12,7 +12,7 @@ public class FactoryRootInitializationTests
         var generated = Generate("public int Value { get; set; }");
         generated.Should().NotContain("static Model()");
         generated.Should().Contain("private static readonly bool __SharpPackPreserveSelfFactoryRootsValue = __SharpPackPreserveSelfFactoryRoots();");
-        generated.Should().Contain("_ = __SharpPackPreserveSelfFactoryRootsValue;");
+        generated.Should().Contain("var __SharpPackPreserveSelfFactoryRoots = __SharpPackPreserveSelfFactoryRootsValue;");
         generated.Should().NotContain(".GetMethods(");
     }
 
@@ -26,6 +26,45 @@ public class FactoryRootInitializationTests
         generated.Should().Contain("static Model()");
         generated.Should().Contain("StaticConstructor();");
         generated.Should().NotContain("private static readonly bool __SharpPackPreserveSelfFactoryRootsValue");
+    }
+
+    [Theory]
+    [InlineData("public static string? _;")]
+    [InlineData("public static bool _;")]
+    [InlineData("[SharpPackIgnore] public string? _;")]
+    public void UnderscoreMember_DoesNotCaptureRootRead(string member)
+    {
+        var generated = Generate("public int Value { get; set; } " + member);
+        generated.Should().Contain("var __SharpPackPreserveSelfFactoryRoots = __SharpPackPreserveSelfFactoryRootsValue;");
+        generated.Should().NotContain("_ = __SharpPackPreserveSelfFactoryRootsValue");
+    }
+
+    [Fact]
+    public void InheritedUnderscoreMember_DoesNotCaptureRootRead()
+    {
+        var generated = Run("""
+namespace Generated;
+public class ModelBase { protected static string? _; }
+[SharpPackable]
+public partial class Model : ModelBase { public int Value { get; set; } }
+""");
+        generated.Should().Contain("var __SharpPackPreserveSelfFactoryRoots = __SharpPackPreserveSelfFactoryRootsValue;");
+    }
+
+    [Fact]
+    public void ExternalUnionUnderscoreMember_DoesNotCaptureRootRead()
+    {
+        var generated = Run("""
+namespace Generated;
+public abstract partial class Union { public static string? _; }
+[SharpPackable]
+public partial class Case : Union { public int Value { get; set; } }
+[SharpPackUnionFormatter(typeof(Union))]
+[SharpPackUnion(0, typeof(Case))]
+public partial class UnionFormatter { }
+""");
+        generated.Should().Contain("var __SharpPackPreserveFactory = __SharpPackPreserveFactoryValue;");
+        generated.Should().NotContain("_ = __SharpPackPreserveFactoryValue");
     }
 
     [Fact]

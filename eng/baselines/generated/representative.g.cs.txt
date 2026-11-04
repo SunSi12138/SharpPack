@@ -56,7 +56,7 @@ partial class Cat : ISharpPackable<Cat>, global::SharpPack.IFixedSizeSharpPackab
     [global::SharpPack.Internal.Preserve]
     static global::SharpPack.SharpPackFormatter<Cat> global::SharpPack.ISharpPackFormatterFactory<Cat>.CreateFormatter()
     {
-        _ = __SharpPackPreserveSelfFactoryRootsValue;
+        var __SharpPackPreserveSelfFactoryRoots = __SharpPackPreserveSelfFactoryRootsValue;
 
         return new global::SharpPack.Formatters.SharpPackableFormatter<Cat>();
     }
@@ -65,7 +65,7 @@ partial class Cat : ISharpPackable<Cat>, global::SharpPack.IFixedSizeSharpPackab
     static global::SharpPack.SharpPackFormatter<Cat> global::SharpPack.ISharpPackContextFormatterFactory<Cat>.CreateFormatter(
         global::SharpPack.SharpPackSerializerContext context)
     {
-        _ = __SharpPackPreserveSelfFactoryRootsValue;
+        var __SharpPackPreserveSelfFactoryRoots = __SharpPackPreserveSelfFactoryRootsValue;
 
                 if (context.HasFormatterOverrideDependency<int>())
         {
@@ -375,7 +375,7 @@ partial class Dog : ISharpPackable<Dog>, global::SharpPack.ISharpPackExactSizeSe
     [global::SharpPack.Internal.Preserve]
     static global::SharpPack.SharpPackFormatter<Dog> global::SharpPack.ISharpPackFormatterFactory<Dog>.CreateFormatter()
     {
-        _ = __SharpPackPreserveSelfFactoryRootsValue;
+        var __SharpPackPreserveSelfFactoryRoots = __SharpPackPreserveSelfFactoryRootsValue;
 
         return new global::SharpPack.Formatters.SharpPackableFormatter<Dog>();
     }
@@ -384,7 +384,7 @@ partial class Dog : ISharpPackable<Dog>, global::SharpPack.ISharpPackExactSizeSe
     static global::SharpPack.SharpPackFormatter<Dog> global::SharpPack.ISharpPackContextFormatterFactory<Dog>.CreateFormatter(
         global::SharpPack.SharpPackSerializerContext context)
     {
-        _ = __SharpPackPreserveSelfFactoryRootsValue;
+        var __SharpPackPreserveSelfFactoryRoots = __SharpPackPreserveSelfFactoryRootsValue;
 
                 if (context.HasFormatterOverrideDependency<string>())
         {
@@ -673,7 +673,7 @@ partial struct Fixed : ISharpPackable<Fixed>, global::SharpPack.ISharpPackFormat
     [global::SharpPack.Internal.Preserve]
     static global::SharpPack.SharpPackFormatter<Fixed> global::SharpPack.ISharpPackFormatterFactory<Fixed>.CreateFormatter()
     {
-        _ = __SharpPackPreserveSelfFactoryRootsValue;
+        var __SharpPackPreserveSelfFactoryRoots = __SharpPackPreserveSelfFactoryRootsValue;
 
         return new global::SharpPack.Formatters.SharpPackableFormatter<Fixed>();
     }
@@ -682,7 +682,7 @@ partial struct Fixed : ISharpPackable<Fixed>, global::SharpPack.ISharpPackFormat
     static global::SharpPack.SharpPackFormatter<Fixed> global::SharpPack.ISharpPackContextFormatterFactory<Fixed>.CreateFormatter(
         global::SharpPack.SharpPackSerializerContext context)
     {
-        _ = __SharpPackPreserveSelfFactoryRootsValue;
+        var __SharpPackPreserveSelfFactoryRoots = __SharpPackPreserveSelfFactoryRootsValue;
 
         return new global::SharpPack.Formatters.SharpPackableFormatter<Fixed>();
     }
@@ -751,7 +751,7 @@ partial interface IAnimal : global::SharpPack.ISharpPackFormatterFactory<IAnimal
     [global::SharpPack.Internal.Preserve]
     static global::SharpPack.SharpPackFormatter<IAnimal> global::SharpPack.ISharpPackFormatterFactory<IAnimal>.CreateFormatter()
     {
-        _ = __SharpPackPreserveSelfFactoryRootsValue;
+        var __SharpPackPreserveSelfFactoryRoots = __SharpPackPreserveSelfFactoryRootsValue;
         return new IAnimalFormatter();
     }
 
@@ -886,7 +886,7 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
     [global::SharpPack.Internal.Preserve]
     static global::SharpPack.SharpPackFormatter<Node> global::SharpPack.ISharpPackFormatterFactory<Node>.CreateFormatter()
     {
-        _ = __SharpPackPreserveSelfFactoryRootsValue;
+        var __SharpPackPreserveSelfFactoryRoots = __SharpPackPreserveSelfFactoryRootsValue;
         __SharpPackEnsureAotFormatterRoots();
         return new global::SharpPack.Formatters.SharpPackableFormatter<Node>();
     }
@@ -895,7 +895,7 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
     static global::SharpPack.SharpPackFormatter<Node> global::SharpPack.ISharpPackContextFormatterFactory<Node>.CreateFormatter(
         global::SharpPack.SharpPackSerializerContext context)
     {
-        _ = __SharpPackPreserveSelfFactoryRootsValue;
+        var __SharpPackPreserveSelfFactoryRoots = __SharpPackPreserveSelfFactoryRootsValue;
         __SharpPackEnsureAotFormatterRoots();
                 if (context.HasFormatterOverrideDependency<int>() || context.HasFormatterOverrideDependency<global::BaselineFixtures.Node>())
         {
@@ -1355,7 +1355,7 @@ partial class Inner<U> : ISharpPackable<Inner<U>>, global::SharpPack.ISharpPackF
     [global::SharpPack.Internal.Preserve]
     static global::SharpPack.SharpPackFormatter<Inner<U>> global::SharpPack.ISharpPackFormatterFactory<Inner<U>>.CreateFormatter()
     {
-        _ = __SharpPackPreserveSelfFactoryRootsValue;
+        var __SharpPackPreserveSelfFactoryRoots = __SharpPackPreserveSelfFactoryRootsValue;
         __SharpPackEnsureAotFormatterRoots();
         return new global::SharpPack.Formatters.SharpPackableFormatter<Inner<U>>();
     }
@@ -1364,7 +1364,7 @@ partial class Inner<U> : ISharpPackable<Inner<U>>, global::SharpPack.ISharpPackF
     static global::SharpPack.SharpPackFormatter<Inner<U>> global::SharpPack.ISharpPackContextFormatterFactory<Inner<U>>.CreateFormatter(
         global::SharpPack.SharpPackSerializerContext context)
     {
-        _ = __SharpPackPreserveSelfFactoryRootsValue;
+        var __SharpPackPreserveSelfFactoryRoots = __SharpPackPreserveSelfFactoryRootsValue;
         __SharpPackEnsureAotFormatterRoots();
                 if (context.HasFormatterOverrideDependency<U>() || context.HasFormatterOverrideDependency<global::BaselineFixtures.Simple>())
         {
@@ -2026,7 +2026,7 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
     [global::SharpPack.Internal.Preserve]
     static global::SharpPack.SharpPackFormatter<Versioned> global::SharpPack.ISharpPackFormatterFactory<Versioned>.CreateFormatter()
     {
-        _ = __SharpPackPreserveSelfFactoryRootsValue;
+        var __SharpPackPreserveSelfFactoryRoots = __SharpPackPreserveSelfFactoryRootsValue;
 
         return new global::SharpPack.Formatters.SharpPackableFormatter<Versioned>();
     }
@@ -2035,7 +2035,7 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
     static global::SharpPack.SharpPackFormatter<Versioned> global::SharpPack.ISharpPackContextFormatterFactory<Versioned>.CreateFormatter(
         global::SharpPack.SharpPackSerializerContext context)
     {
-        _ = __SharpPackPreserveSelfFactoryRootsValue;
+        var __SharpPackPreserveSelfFactoryRoots = __SharpPackPreserveSelfFactoryRootsValue;
 
                 if (context.HasFormatterOverrideDependency<int>() || context.HasFormatterOverrideDependency<string>())
         {
