@@ -61,7 +61,7 @@ if variant == 'precise-constructors':
     path = Path('src/SharpPack.Generator/SharpPackGenerator.Emitter.cs')
     source = path.read_text()
     broad = '            global::System.GC.KeepAlive(typeof({{TypeName}}).GetMethods(global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly));'
-    precise = '\n'.join('            global::System.GC.KeepAlive(typeof({{TypeName}}).GetMethod("SharpPack.' + interface + '<{{Symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)}}>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly));' for interface in ['ISharpPackFormatterFactory', 'ISharpPackContextFormatterFactory'])
+    precise = '\n'.join('            global::System.GC.KeepAlive(typeof({{TypeName}}).GetMethod("global::SharpPack.' + interface + '<{{Symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)}}>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly));' for interface in ['ISharpPackFormatterFactory', 'ISharpPackContextFormatterFactory'])
     assert source.count(broad) == 3
     path.write_text(source.replace(broad, precise))
     path = Path('src/SharpPack.Generator/SharpPackGenerator.ExternalUnionFactory.cs')
@@ -77,7 +77,7 @@ if variant == 'precise-constructors':
         sb.AppendLine($"    private static bool {rootName}()");
         sb.AppendLine("    {");
         sb.AppendLine("        if (!global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)");
-        sb.AppendLine($"            global::System.GC.KeepAlive(typeof({targetType}).GetMethod(\"SharpPack.ISharpPackFormatterFactory<{target.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)}>.CreateFormatter\", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly));");
+        sb.AppendLine($"            global::System.GC.KeepAlive(typeof({targetType}).GetMethod(\"global::SharpPack.ISharpPackFormatterFactory<{target.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)}>.CreateFormatter\", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly));");
         sb.AppendLine("        return true;");
         sb.AppendLine("    }");
 '''

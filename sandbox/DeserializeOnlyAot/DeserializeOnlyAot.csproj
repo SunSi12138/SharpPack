@@ -15,6 +15,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <ProjectReference Include="../DeserializeOnlyAot.Contracts/DeserializeOnlyAot.Contracts.csproj" />
         <ProjectReference Include="..\..\src\SharpPack.Core\SharpPack.Core.csproj" />
         <ProjectReference Include="..\..\src\SharpPack.Generator\SharpPack.Generator.csproj"
                           OutputItemType="Analyzer"

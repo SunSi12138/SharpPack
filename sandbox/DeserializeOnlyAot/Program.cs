@@ -1,8 +1,16 @@
+using DeserializeOnlyAot.Contracts;
 using SharpPack;
 using SharpPack.Formatters;
 
-// No Serialize calls, model construction, factory registrations, or factory
-// references: these consumers must survive on their deserialization roots alone.
+if (args is ["--performance"])
+{
+    ReadOnlyPerformance.Run();
+    return;
+}
+
+// No Serialize calls or generated-model construction. Ordinary/same-assembly
+// consumers rely on deserialization roots; cross-assembly union uses its
+// required explicit context registration.
 var failures = new List<string>();
 byte[] model = [1, 42, 0, 0, 0];
 byte[] nested = [1, 1, 42, 0, 0, 0];
@@ -23,6 +31,11 @@ Check("external union", () => SharpPackSerializer.Deserialize<IExternalUnion>(ne
 Check("closed external union", () => SharpPackSerializer.Deserialize<IClosedExternalUnion<int>>(new byte[] { 4, 1, 42, 0, 0, 0 }) is ClosedExternalUnionItem<int> { Value: 42 });
 Check("member custom formatter", () => SharpPackSerializer.Deserialize<CustomMemberModel>(model)?.Value == 43);
 Check("nested namespaced generic", () => SharpPackSerializer.Deserialize<AotNames.Outer<int>.Inner<long>>(model)?.Value == 42);
+var remoteContext = new SharpPackSerializerContextBuilder()
+    .Register(new PlusOneFormatter())
+    .RegisterFactory<IRemoteUnion, RemoteUnionFormatter>()
+    .Build();
+Check("cross-assembly registered union", () => SharpPackSerializer.Deserialize<IRemoteUnion>(new byte[] { 5, 1, 42, 0, 0, 0 }, remoteContext) is RemoteUnionItem { Value: 43 });
 // Literal wire bytes avoid any Type or model Serialize call in this program.
 byte[] typeId = [250, 255, 255, 255, 5, 0, 0, 0, 107, 110, 111, 119, 110]; // "known"
 var typeContext = new SharpPackSerializerContextBuilder().EnableTypeSerialization().RegisterType<int>("known").Build();
@@ -30,7 +43,7 @@ Check("Type registered", () => SharpPackSerializer.Deserialize<Type>(typeId, typ
 Check("Type disabled", () => Reject(() => SharpPackSerializer.Deserialize<Type>(typeId)));
 Check("Type unknown", () => Reject(() => SharpPackSerializer.Deserialize<Type>(typeId, new SharpPackSerializerContextBuilder().EnableTypeSerialization().Build())));
 if (failures.Count != 0) throw new InvalidOperationException(string.Join("; ", failures));
-Console.WriteLine("Deserialize-only AOT: all fourteen cases passed.");
+Console.WriteLine("Deserialize-only AOT: all fifteen cases passed.");
 static bool Reject(Action action)
 {
     try { action(); return false; }
@@ -77,7 +90,7 @@ public sealed class PlusOneAttribute : SharpPackCustomFormatterAttribute<PlusOne
 [SharpPackable(GenerateType.NoGenerate)] public partial interface IExternalUnion
 {
     // A generated root must coexist with an application-owned static ctor.
-    static IExternalUnion() { }
+    static IExternalUnion() { _ = __SharpPackPreserveFactoryValue; }
     private static bool __SharpPackPreserveFactory() => false;
     private static readonly bool __SharpPackPreserveFactoryValue = false;
 }
@@ -98,3 +111,8 @@ namespace AotNames
         [SharpPackable] public partial class Inner<U> { public int Value { get; set; } }
     }
 }
+
+[SharpPackable] public partial class RemoteUnionItem : IRemoteUnion { public int Value { get; set; } }
+[SharpPackUnionFormatter(typeof(IRemoteUnion))]
+[SharpPackUnion(5, typeof(RemoteUnionItem))]
+public partial class RemoteUnionFormatter;
