@@ -894,6 +894,8 @@ type public static class SharpPack.SharpPackSerializer
   method public static System.Threading.Tasks.ValueTask<T> DeserializeAsync<[DynamicallyAccessedMembers(NonPublicConstructors)] T>(System.IO.Stream stream, System.Int32 payloadLength, System.Threading.CancellationToken cancellationToken = null)
   method public static System.Threading.Tasks.ValueTask<T> DeserializeAsync<[DynamicallyAccessedMembers(NonPublicConstructors)] T>(System.IO.Stream stream, System.Threading.CancellationToken cancellationToken = null)
   method public static System.Void ConfigureRuntime(SharpPack.SharpPackSerializerRuntimeOptions options)
+  method public static System.Void PreserveContextFormatterFactory<T>() where T : SharpPack.ISharpPackContextFormatterFactory<T>
+  method public static System.Void PreserveFormatterFactory<T>() where T : SharpPack.ISharpPackFormatterFactory<T>
   method public static T Deserialize<[DynamicallyAccessedMembers(NonPublicConstructors)] T>(System.ReadOnlySpan<System.Byte> buffer)
   method public static T Deserialize<[DynamicallyAccessedMembers(NonPublicConstructors)] T>(System.ReadOnlySpan<System.Byte> buffer, SharpPack.SharpPackSerializerContext context)
   method public static T Deserialize<[DynamicallyAccessedMembers(NonPublicConstructors)] T>(in System.Buffers.ReadOnlySequence<System.Byte> buffer)
@@ -1113,3 +1115,4 @@ type public sealed class SharpPack.Utf16StringFormatterAttribute : SharpPack.Sha
 type public sealed class SharpPack.Utf8StringFormatterAttribute : SharpPack.SharpPackCustomFormatterAttribute<SharpPack.Formatters.Utf8StringFormatter, System.String>
   ctor public Utf8StringFormatterAttribute()
   method public override SharpPack.Formatters.Utf8StringFormatter GetFormatter()
+
