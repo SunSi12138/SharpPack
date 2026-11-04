@@ -67,6 +67,9 @@ jobs:
             "$RUNNER_TEMP/$variant/DeserializeOnlyAot" --performance
           done
           stat -c '%n %s bytes' "$RUNNER_TEMP/baseline-read-only/DeserializeOnlyAot" "$RUNNER_TEMP/candidate-read-only/DeserializeOnlyAot"
+      - name: Inspect actual native initialization checks
+        if: matrix.runner == 'ubuntu-24.04'
+        run: python3 tools/inspect-self-root-native.py "$RUNNER_TEMP"
       - name: Publish explicitly rooted trimming positive control
         run: dotnet publish sandbox/DeserializeOnlyAot -c Release -p:DefineConstants=FACTORY_ROOT_POSITIVE_CONTROL -o "$RUNNER_TEMP/positive-control"
       - name: Verify native method trimming with an executed positive control

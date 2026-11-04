@@ -471,6 +471,9 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
     static {{Symbol.Name}}()
     {
         StaticConstructor();
+        // Keep the dependency-bearing ctor visible to the linker. The native
+        // compiler can erase this stateless call rather than retain self reflection.
+        global::System.GC.KeepAlive(null);
     }
 
     // Link-time root only. Never called, so otherwise empty model cctors
@@ -1462,6 +1465,9 @@ partial {{classOrInterfaceOrRecord}} {{TypeName}} : {{contextFactoryInterface}}
     static {{Symbol.Name}}()
     {
         StaticConstructor();
+        // Keep the dependency-bearing ctor visible to the linker. The native
+        // compiler can erase this stateless call rather than retain self reflection.
+        global::System.GC.KeepAlive(null);
     }
 
     // Link-time root only. Never called, so otherwise empty model cctors
@@ -1787,6 +1793,9 @@ partial class {{TypeName}} : {{contextFactoryInterface}}
     static {{Symbol.Name}}()
     {
         StaticConstructor();
+        // Keep the dependency-bearing ctor visible to the linker. The native
+        // compiler can erase this stateless call rather than retain self reflection.
+        global::System.GC.KeepAlive(null);
     }
 
     // Link-time root only. Never called, so otherwise empty model cctors
