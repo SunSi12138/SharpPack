@@ -14,8 +14,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-24.04]
-        variant: [baseline, no-annotations, interface-roots, constructor-roots]
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        variant: [precise-constructors]
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -28,9 +28,18 @@ jobs:
       - name: Apply isolated root-preservation candidate
         run: python3 tools/characterize-aot-roots.py '${{ matrix.variant }}'
       - name: Publish isolated consumer
-        run: dotnet publish sandbox/DeserializeOnlyAot -c Release -o "$RUNNER_TEMP/deserialize-only"
+        run: |
+          set -o pipefail
+          dotnet publish sandbox/DeserializeOnlyAot -c Release -o "$RUNNER_TEMP/deserialize-only" 2>&1 | tee "$RUNNER_TEMP/deserialize-only-publish.txt"
+          if grep -q 'IL2111' "$RUNNER_TEMP/deserialize-only-publish.txt"; then exit 1; fi
       - name: Run isolated consumer
         run: '"$RUNNER_TEMP/deserialize-only/DeserializeOnlyAot"'
       - name: Report native executable size
         if: always()
         run: stat -c '%n %s bytes' "$RUNNER_TEMP/deserialize-only/DeserializeOnlyAot"
+      - name: Publish and execute original NativeAOT regression sample
+        run: |
+          set -o pipefail
+          dotnet publish sandbox/NativeAot/NativeAot.csproj -c Release -o "$RUNNER_TEMP/original-aot" 2>&1 | tee "$RUNNER_TEMP/original-aot-publish.txt"
+          if grep -q 'IL2111' "$RUNNER_TEMP/original-aot-publish.txt"; then exit 1; fi
+          "$RUNNER_TEMP/original-aot/NativeAot"
