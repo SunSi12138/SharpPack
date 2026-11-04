@@ -64,7 +64,6 @@ partial class SharpPackGenerator
 
         var fullType = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
             .Replace("global::", "")
-            .Replace("@", "")
             .Replace("<", "_")
             .Replace(">", "_");
 
@@ -727,7 +726,6 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
     internal static string GetFactoryMetadataTypeName(INamedTypeSymbol symbol)
         => symbol.OriginalDefinition
             .ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
-            .Replace("@", "")
             .Replace(" ", "");
 
     // Generated static constructors are retained by the deserialization API's
