@@ -1,4 +1,6 @@
 using SharpPack;
+if (System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString() != Environment.GetEnvironmentVariable("PACKAGE_EXPECTED_ARCH"))
+    throw new Exception("Unexpected consumer process architecture");
 var expected = new PackageModel { Id = 42, Name = "nupkg-only" };
 var bytes = SharpPackSerializer.Serialize(expected);
 var actual = SharpPackSerializer.Deserialize<PackageModel>(bytes);

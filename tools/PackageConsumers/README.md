@@ -50,5 +50,8 @@ behavior. The branch is based on dev 6666ada, not the unmerged #30/#31/#16 stack
   or compatibility with arbitrary newer Core versions. Policy tightening remains.
 - ABI mixed-version diagnostics depend on #17 and are not implemented here.
 - Deserialize-only and warning-free AOT claims remain #31, not this roundtrip.
-- Candidate-stack replay and ARM64 coverage remain separate from this x64 baseline.
+- Candidate-stack replay remains separate from this dev baseline.
+- CI runs the same required checks on Linux X64 and Arm64. The harness checks
+  runner architecture, and every consumer (including AOT) checks actual process
+  architecture against its matrix leg before performing a roundtrip.
 - The small generated fixture is not exhaustive language or product coverage.

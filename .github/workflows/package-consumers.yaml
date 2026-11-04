@@ -6,7 +6,15 @@ on:
       - validation/issue18-package-matrix-20261104
 jobs:
   package-consumers:
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            architecture: X64
+          - runner: ubuntu-24.04-arm
+            architecture: Arm64
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     permissions:
       contents: read
@@ -16,7 +24,7 @@ jobs:
         with:
           dotnet-version: 10.0.114
       - name: Real nupkg consumers, isolated Roslyn hosts and AOT
-        run: python3 tools/PackageConsumers/verify.py --aot
+        run: python3 tools/PackageConsumers/verify.py --aot --architecture ${{ matrix.architecture }}
       - name: Verify clean tracked tree
         if: always()
         run: git diff --exit-code

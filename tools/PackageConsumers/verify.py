@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import platform
 import re
 from pathlib import Path
 import shutil
@@ -40,10 +41,15 @@ def project(path, refs, extra=''):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--aot', action='store_true')
+    parser.add_argument('--architecture', choices=['X64', 'Arm64'])
     args = parser.parse_args()
     work = Path(tempfile.mkdtemp(prefix='sharppack-package-', dir=os.environ.get('RUNNER_TEMP')))
     feed = work / 'feed'; feed.mkdir()
-    env = dict(os.environ, NUGET_PACKAGES=str(work / 'packages'), PACKAGE_WORK=str(work))
+    actual_arch = {'x86_64': 'X64', 'aarch64': 'Arm64', 'arm64': 'Arm64', 'AMD64': 'X64'}.get(platform.machine())
+    expected_arch = args.architecture or actual_arch
+    assert expected_arch is not None and actual_arch == expected_arch, 'Unexpected runner architecture'
+    env = dict(os.environ, NUGET_PACKAGES=str(work / 'packages'), PACKAGE_WORK=str(work), PACKAGE_EXPECTED_ARCH=expected_arch)
+    print('Verified runner architecture: ' + expected_arch, flush=True)
     sdk = SDK_VERSION
     assert re.fullmatch(r'10\.0\.\d{3}', sdk), 'Expected .NET 10 SDK'
     (work / 'global.json').write_text(json.dumps({'sdk': {'version': sdk, 'rollForward': 'disable', 'allowPrerelease': False}}))
@@ -92,7 +98,7 @@ def main():
         if name == 'streaming': expected.add('SharpPack.Streaming/' + VERSION)
         assert resolved == expected, (name, resolved)
         run(['dotnet', 'run', '-c', 'Release', '--no-restore'], path, env)
-        print('Package consumer passed: ' + name)
+        print('Package consumer passed: ' + name + '; runtime architecture: ' + expected_arch, flush=True)
     # Separate executables, each referencing only one Roslyn host package version.
     cache = Path(env['NUGET_PACKAGES'])
     core = cache / 'sharppack.core' / VERSION / 'lib/net10.0/SharpPack.Core.dll'
@@ -129,7 +135,7 @@ def main():
         path = work / 'aggregate'
         run(['dotnet', 'publish', '-c', 'Release', '-p:PublishAot=true', '-p:NuGetAudit=false', '--configfile', str(aot_config), '-o', str(work / 'aot')], path, env)
         run([str(work / 'aot/Consumer'), 'verify'], path, env)
-        print('Packaged NativeAOT passed')
+        print('Packaged NativeAOT passed; runtime architecture: ' + expected_arch, flush=True)
     print('Package matrix passed; raw logs retained only on temporary runner')
 
 if __name__ == '__main__':
