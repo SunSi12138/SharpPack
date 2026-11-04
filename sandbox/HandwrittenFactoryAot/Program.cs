@@ -1,19 +1,14 @@
 using SharpPack;
 
 #if STATIC_FACTORY_ROOTS
-// Static-abstract calls root native code; Delegate.Method requests the metadata
-// used by the existing resolver. Nothing is stored in a global registry.
-GC.KeepAlive(DefaultFactory<HandwrittenFactoryModel, HandwrittenFactoryModel>().Method);
-GC.KeepAlive(ContextFactory<HandwrittenFactoryModel, HandwrittenFactoryModel>().Method);
-static Func<SharpPackFormatter<T>> DefaultFactory<T, TFactory>()
-    where TFactory : ISharpPackFormatterFactory<T> => TFactory.CreateFormatter;
-static Func<SharpPackSerializerContext, SharpPackFormatter<T>> ContextFactory<T, TFactory>()
-    where TFactory : ISharpPackContextFormatterFactory<T> => TFactory.CreateFormatter;
-#elif DECLARATIVE_FACTORY_ROOTS
-PreserveHandwrittenFactories();
-[System.Diagnostics.CodeAnalysis.DynamicDependency("SharpPack.ISharpPackFormatterFactory<HandwrittenFactoryModel>.CreateFormatter", typeof(HandwrittenFactoryModel))]
-[System.Diagnostics.CodeAnalysis.DynamicDependency("SharpPack.ISharpPackContextFormatterFactory<HandwrittenFactoryModel>.CreateFormatter", typeof(HandwrittenFactoryModel))]
-static void PreserveHandwrittenFactories() { }
+SharpPackSerializer.PreserveFormatterFactory<HandwrittenFactoryModel>();
+SharpPackSerializer.PreserveContextFormatterFactory<HandwrittenFactoryModel>();
+SharpPackSerializer.PreserveFormatterFactory<HandwrittenGenericFactoryModel<long>>();
+SharpPackSerializer.PreserveContextFormatterFactory<HandwrittenGenericFactoryModel<long>>();
+SharpPackSerializer.PreserveFormatterFactory<DefaultOnlyModel>();
+SharpPackSerializer.PreserveContextFormatterFactory<ContextOnlyModel>();
+if (FactoryCalls.Default != 0 || FactoryCalls.Context != 0)
+    throw new InvalidOperationException("Preservation executed a factory.");
 #endif
 
 byte[] payload = [42, 0, 0, 0];
@@ -22,8 +17,25 @@ var failures = 0;
 var registered = new SharpPackSerializerContextBuilder().RegisterFactory<HandwrittenFactoryModel, HandwrittenFactoryModel>().Build();
 Check("registered handwritten default factory", () => SharpPackSerializer.Deserialize<HandwrittenFactoryModel>(payload, registered)?.Value == 42);
 #else
+var context = new SharpPackSerializerContextBuilder().Register(new MarkerIntFormatter()).Build();
 Check("handwritten explicit default", () => SharpPackSerializer.Deserialize<HandwrittenFactoryModel>(payload)?.Value == 42);
-Check("handwritten explicit context", () => SharpPackSerializer.Deserialize<HandwrittenFactoryModel>(payload, new SharpPackSerializerContextBuilder().Register(new MarkerIntFormatter()).Build())?.Value == 43);
+Check("handwritten explicit context", () => SharpPackSerializer.Deserialize<HandwrittenFactoryModel>(payload, context)?.Value == 43);
+#if STATIC_FACTORY_ROOTS
+Check("closed generic explicit default", () => SharpPackSerializer.Deserialize<HandwrittenGenericFactoryModel<long>>(payload)?.Value == 42);
+Check("closed generic explicit context", () => SharpPackSerializer.Deserialize<HandwrittenGenericFactoryModel<long>>(payload, context)?.Value == 43);
+Check("default-only factory", () => SharpPackSerializer.Deserialize<DefaultOnlyModel>(payload)?.Value == 42);
+Check("context-only factory", () => SharpPackSerializer.Deserialize<ContextOnlyModel>(payload, context)?.Value == 43);
+if (FactoryCalls.Default != 3 || FactoryCalls.Context != 3)
+    throw new InvalidOperationException($"Factory invocation counts were {FactoryCalls.Default}/{FactoryCalls.Context}");
+// Repeated reads must use existing slots, not execute a startup root or factory.
+for (int i = 0; i < 100; i++)
+{
+    _ = SharpPackSerializer.Deserialize<HandwrittenFactoryModel>(payload);
+    _ = SharpPackSerializer.Deserialize<HandwrittenFactoryModel>(payload, context);
+}
+if (FactoryCalls.Default != 3 || FactoryCalls.Context != 3)
+    throw new InvalidOperationException("Warm reads invoked a factory again.");
+#endif
 #endif
 Environment.ExitCode = failures == 0 ? 0 : 1;
 void Check(string name, Func<bool> read)
@@ -31,23 +43,50 @@ void Check(string name, Func<bool> read)
     try { if (!read()) throw new InvalidOperationException("Incorrect value"); Console.WriteLine("PASS " + name); }
     catch (Exception e) { failures++; Console.WriteLine("FAIL " + name + ": " + e); }
 }
-// Intentionally no generator, cctor, explicit root or prior model construction.
+public static class FactoryCalls { public static int Default; public static int Context; }
+// Intentionally no generator, cctor, explicit metadata names or model construction before reading.
 public sealed class HandwrittenFactoryModel : ISharpPackFormatterFactory<HandwrittenFactoryModel>, ISharpPackContextFormatterFactory<HandwrittenFactoryModel>
 {
     public int Value { get; set; }
-    static SharpPackFormatter<HandwrittenFactoryModel> ISharpPackFormatterFactory<HandwrittenFactoryModel>.CreateFormatter() => new HandwrittenFormatter(0);
-    static SharpPackFormatter<HandwrittenFactoryModel> ISharpPackContextFormatterFactory<HandwrittenFactoryModel>.CreateFormatter(SharpPackSerializerContext context) => new HandwrittenFormatter(1);
+    static SharpPackFormatter<HandwrittenFactoryModel> ISharpPackFormatterFactory<HandwrittenFactoryModel>.CreateFormatter() { FactoryCalls.Default++; return new HandwrittenFormatter(0); }
+    static SharpPackFormatter<HandwrittenFactoryModel> ISharpPackContextFormatterFactory<HandwrittenFactoryModel>.CreateFormatter(SharpPackSerializerContext context) { FactoryCalls.Context++; return new HandwrittenFormatter(1); }
 }
 public sealed class HandwrittenFormatter(int offset) : SharpPackFormatter<HandwrittenFactoryModel>
 {
     public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref HandwrittenFactoryModel? value) => throw new NotSupportedException();
-    public override void Deserialize(ref SharpPackReader reader, scoped ref HandwrittenFactoryModel? value)
-    {
-        reader.ReadUnmanaged(out int raw);
-        value = new HandwrittenFactoryModel { Value = raw + offset };
-    }
+    public override void Deserialize(ref SharpPackReader reader, scoped ref HandwrittenFactoryModel? value) { reader.ReadUnmanaged(out int raw); value = new HandwrittenFactoryModel { Value = raw + offset }; }
 }
-
+public sealed class HandwrittenGenericFactoryModel<T> : ISharpPackFormatterFactory<HandwrittenGenericFactoryModel<T>>, ISharpPackContextFormatterFactory<HandwrittenGenericFactoryModel<T>>
+{
+    public int Value { get; set; }
+    static SharpPackFormatter<HandwrittenGenericFactoryModel<T>> ISharpPackFormatterFactory<HandwrittenGenericFactoryModel<T>>.CreateFormatter() { FactoryCalls.Default++; return new GenericFormatter<T>(0); }
+    static SharpPackFormatter<HandwrittenGenericFactoryModel<T>> ISharpPackContextFormatterFactory<HandwrittenGenericFactoryModel<T>>.CreateFormatter(SharpPackSerializerContext context) { FactoryCalls.Context++; return new GenericFormatter<T>(1); }
+}
+public sealed class GenericFormatter<T>(int offset) : SharpPackFormatter<HandwrittenGenericFactoryModel<T>>
+{
+    public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref HandwrittenGenericFactoryModel<T>? value) => throw new NotSupportedException();
+    public override void Deserialize(ref SharpPackReader reader, scoped ref HandwrittenGenericFactoryModel<T>? value) { reader.ReadUnmanaged(out int raw); value = new HandwrittenGenericFactoryModel<T> { Value = raw + offset }; }
+}
+public sealed class DefaultOnlyModel : ISharpPackFormatterFactory<DefaultOnlyModel>
+{
+    public int Value { get; set; }
+    static SharpPackFormatter<DefaultOnlyModel> ISharpPackFormatterFactory<DefaultOnlyModel>.CreateFormatter() { FactoryCalls.Default++; return new DefaultOnlyFormatter(); }
+}
+public sealed class DefaultOnlyFormatter : SharpPackFormatter<DefaultOnlyModel>
+{
+    public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref DefaultOnlyModel? value) => throw new NotSupportedException();
+    public override void Deserialize(ref SharpPackReader reader, scoped ref DefaultOnlyModel? value) { reader.ReadUnmanaged(out int raw); value = new DefaultOnlyModel { Value = raw }; }
+}
+public sealed class ContextOnlyModel : ISharpPackContextFormatterFactory<ContextOnlyModel>
+{
+    public int Value { get; set; }
+    static SharpPackFormatter<ContextOnlyModel> ISharpPackContextFormatterFactory<ContextOnlyModel>.CreateFormatter(SharpPackSerializerContext context) { FactoryCalls.Context++; return new ContextOnlyFormatter(); }
+}
+public sealed class ContextOnlyFormatter : SharpPackFormatter<ContextOnlyModel>
+{
+    public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ContextOnlyModel? value) => throw new NotSupportedException();
+    public override void Deserialize(ref SharpPackReader reader, scoped ref ContextOnlyModel? value) { reader.ReadUnmanaged(out int raw); value = new ContextOnlyModel { Value = raw + 1 }; }
+}
 public sealed class MarkerIntFormatter : SharpPackFormatter<int>
 {
     public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref int value) => throw new NotSupportedException();

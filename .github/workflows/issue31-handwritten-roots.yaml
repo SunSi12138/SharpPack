@@ -7,7 +7,11 @@ permissions:
   contents: read
 jobs:
   characterize:
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -18,7 +22,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for variant in NO_ROOTS STATIC_FACTORY_ROOTS DECLARATIVE_FACTORY_ROOTS REGISTER_DEFAULT_FACTORY; do
+          for variant in NO_ROOTS STATIC_FACTORY_ROOTS REGISTER_DEFAULT_FACTORY; do
             dotnet publish sandbox/HandwrittenFactoryAot -c Release -p:DefineConstants="$variant" -o "$RUNNER_TEMP/$variant" 2>&1 | tee "$RUNNER_TEMP/publish-$variant.txt"
             if grep -Eq 'IL2037|IL2111' "$RUNNER_TEMP/publish-$variant.txt"; then exit 1; fi
             code=0
@@ -27,8 +31,14 @@ jobs:
             if [[ "$variant" == NO_ROOTS ]]; then
               if [[ "$code" != 1 ]]; then echo 'Negative control unexpectedly passed'; exit 1; fi
             else
-              if [[ "$code" != 0 ]]; then echo "Migration variant failed: $variant"; fi
+              if [[ "$code" != 0 ]]; then echo "Migration variant failed: $variant"; exit 1; fi
             fi
           done
+      - name: Verify startup roots with trimmed JIT
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet publish sandbox/HandwrittenFactoryAot -c Release -p:DefineConstants=STATIC_FACTORY_ROOTS -p:SharpPackTrimmedJit=true --self-contained true -r ${{ matrix.runner == 'ubuntu-24.04-arm' && 'linux-arm64' || 'linux-x64' }} -o "$RUNNER_TEMP/trimmed-jit"
+          "$RUNNER_TEMP/trimmed-jit/HandwrittenFactoryAot"
       - name: Verify clean validation checkout
         run: git diff --exit-code
