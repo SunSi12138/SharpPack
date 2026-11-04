@@ -1,0 +1,21 @@
+name: Package-Consumers
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - validation/issue18-package-matrix-20261104
+jobs:
+  package-consumers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Real nupkg consumers, isolated Roslyn hosts and AOT
+        run: python3 tools/PackageConsumers/verify.py --aot
+      - name: Verify clean tracked tree
+        run: git diff --exit-code
