@@ -79,4 +79,4 @@ jobs:
               }
           }
           CS
-          dotnet run --project "$RUNNER_TEMP/inspect" -- "$GITHUB_WORKSPACE/sandbox/DeserializeOnlyAot/bin/Release/net10.0/DeserializeOnlyAot.dll"
+          dotnet run --project "$RUNNER_TEMP/inspect" -- "$GITHUB_WORKSPACE/sandbox/DeserializeOnlyAot/bin/Release/net10.0/linux-x64/DeserializeOnlyAot.dll"
