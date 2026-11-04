@@ -21,6 +21,9 @@ jobs:
       contents: read
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
+    defaults:
+      run:
+        shell: python3 tools/ci-quiet-run.py {0}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -28,11 +31,11 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-      - name: Record selected SDK and installed runtimes
+      - name: Verify quiet runner suppression and failure propagation
+        run: python3 tools/test-ci-quiet-run.py
+      - name: Record selected SDK
         run: |
           dotnet --version
-          dotnet --info
-          dotnet --list-runtimes
       - name: Check AOT baseline parser failure modes
         run: python3 tools/verify-aot-security-baseline.py --self-test
       - run: dotnet build -c Release -p:EmitCompilerGeneratedFiles=true

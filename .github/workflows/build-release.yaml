@@ -13,6 +13,9 @@ jobs:
       contents: write
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    defaults:
+      run:
+        shell: python3 tools/ci-quiet-run.py {0}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -20,11 +23,9 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-      - name: Record selected SDK and installed runtimes
+      - name: Record selected SDK
         run: |
           dotnet --version
-          dotnet --info
-          dotnet --list-runtimes
       - name: Verify architecture baselines
         run: dotnet run --project tools/SharpPack.Baselines/SharpPack.Baselines.csproj -c Release -- verify
       - run: dotnet build -c Release -p:Version="$VERSION"
