@@ -1,7 +1,7 @@
-name: AOT deserialize-only characterization
+name: Declarative self-root experiment
 on:
   push:
-    branches: [fix/issue31-deserialization-roots]
+    branches: [validate/issue31-declarative-roots]
   pull_request:
     branches: [dev, main]
     paths:
@@ -42,7 +42,7 @@ jobs:
         run: |
           set -o pipefail
           dotnet publish sandbox/DeserializeOnlyAot -c Release -o "$RUNNER_TEMP/deserialize-only" 2>&1 | tee "$RUNNER_TEMP/deserialize-only-publish.txt"
-          if grep -q 'IL2111' "$RUNNER_TEMP/deserialize-only-publish.txt"; then exit 1; fi
+          if grep -Eq 'IL2111|IL2037' "$RUNNER_TEMP/deserialize-only-publish.txt"; then exit 1; fi
       - name: Inspect emitted factory metadata without rooting consumer methods
         run: dotnet run --project tools/SharpPack.FactoryMetadata -c Release -- sandbox/DeserializeOnlyAot/bin/Release/net10.0/${{ matrix.runner == 'ubuntu-24.04-arm' && 'linux-arm64' || 'linux-x64' }}/DeserializeOnlyAot.dll
       - name: Run isolated consumer
@@ -54,7 +54,7 @@ jobs:
         run: |
           set -o pipefail
           dotnet publish sandbox/NativeAot/NativeAot.csproj -c Release -o "$RUNNER_TEMP/original-aot" 2>&1 | tee "$RUNNER_TEMP/original-aot-publish.txt"
-          if grep -q 'IL2111' "$RUNNER_TEMP/original-aot-publish.txt"; then exit 1; fi
+          if grep -Eq 'IL2111|IL2037' "$RUNNER_TEMP/original-aot-publish.txt"; then exit 1; fi
           "$RUNNER_TEMP/original-aot/NativeAot"
       - name: Publish matching-corpus candidate performance binary
         if: matrix.runner == 'ubuntu-24.04'
