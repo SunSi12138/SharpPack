@@ -360,7 +360,7 @@ public static partial class SharpPackSerializer
     {
         if (payloadLength != consumed)
         {
-            throw new SharpPackSerializationException(
+            throw new SharpPackSerializationException(SharpPackErrorCode.FrameLengthMismatch,
                 $"The formatter consumed {consumed} of the " +
                 $"{payloadLength}-byte payload.");
         }

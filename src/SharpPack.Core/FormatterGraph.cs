@@ -56,7 +56,7 @@ internal sealed class FormatterGraph
         var type = typeof(T);
         if (!creatingFormatterTypes.Add(type))
         {
-            throw new SharpPackSerializationException(
+            throw new SharpPackSerializationException(SharpPackErrorCode.RecursiveFormatterConstruction,
                 $"Recursive formatter construction was detected for {type.FullName}.");
         }
 

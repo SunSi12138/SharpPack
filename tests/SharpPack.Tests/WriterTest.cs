@@ -40,8 +40,9 @@ public class WriterTest
             {
                 writer.Advance(9999);
             }
-            catch (SharpPackSerializationException)
+            catch (SharpPackSerializationException exception)
             {
+                exception.ErrorCode.Should().Be(SharpPackErrorCode.Unknown);
                 error = true;
             }
             error.Should().BeTrue();

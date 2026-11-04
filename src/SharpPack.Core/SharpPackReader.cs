@@ -474,7 +474,7 @@ public ref partial struct SharpPackReader
             }
             catch (DecoderFallbackException ex)
             {
-                throw new SharpPackSerializationException("Failed to decode a strict UTF-8 payload.", ex);
+                throw new SharpPackSerializationException(SharpPackErrorCode.InvalidEncoding, "Failed to decode a strict UTF-8 payload.", ex);
             }
         }
         else

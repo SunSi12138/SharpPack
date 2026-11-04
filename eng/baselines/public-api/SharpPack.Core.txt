@@ -719,6 +719,21 @@ type public abstract class SharpPack.SharpPackCustomFormatterAttribute<TFormatte
   ctor protected SharpPackCustomFormatterAttribute()
   method public abstract TFormatter GetFormatter()
 
+type public enum SharpPack.SharpPackErrorCode : System.Int32, System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  field public System.Int32 value__
+  field public const SharpPack.SharpPackErrorCode DepthLimitExceeded = 6
+  field public const SharpPack.SharpPackErrorCode FormatterResolutionFailed = 8
+  field public const SharpPack.SharpPackErrorCode FrameLengthMismatch = 10
+  field public const SharpPack.SharpPackErrorCode InvalidEncoding = 5
+  field public const SharpPack.SharpPackErrorCode InvalidLength = 2
+  field public const SharpPack.SharpPackErrorCode InvalidWireData = 4
+  field public const SharpPack.SharpPackErrorCode RecursiveFormatterConstruction = 11
+  field public const SharpPack.SharpPackErrorCode ResourceLimitExceeded = 7
+  field public const SharpPack.SharpPackErrorCode SizeOverflow = 3
+  field public const SharpPack.SharpPackErrorCode TypeResolutionFailed = 9
+  field public const SharpPack.SharpPackErrorCode UnexpectedEndOfPayload = 1
+  field public const SharpPack.SharpPackErrorCode Unknown = 0
+
 type public abstract class SharpPack.SharpPackFormatter<T> : SharpPack.ISharpPackFormatter<T>
   ctor protected SharpPackFormatter()
   method public abstract System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref T value)
@@ -847,6 +862,8 @@ type public static class SharpPack.SharpPackReaderOptionalStatePool
   method public static SharpPack.SharpPackReaderOptionalStateLease Rent(SharpPack.SharpPackSerializerContext context = null)
 
 type public class SharpPack.SharpPackSerializationException : System.Exception, System.Runtime.Serialization.ISerializable
+  ctor public SharpPackSerializationException(SharpPack.SharpPackErrorCode errorCode, System.String message)
+  ctor public SharpPackSerializationException(SharpPack.SharpPackErrorCode errorCode, System.String message, System.Exception innerException)
   ctor public SharpPackSerializationException(System.String message)
   ctor public SharpPackSerializationException(System.String message, System.Exception innerException)
   method public static System.Void ThrowAlreadyDecompressed()
@@ -871,6 +888,7 @@ type public class SharpPack.SharpPackSerializationException : System.Exception, 
   method public static System.Void ThrowSequenceReachedEnd()
   method public static System.Void ThrowSizeOverflow()
   method public static System.Void ThrowWriteInvalidMemberCount(System.Byte memberCount)
+  property SharpPack.SharpPackErrorCode ErrorCode { get:public; }
 
 type public static class SharpPack.SharpPackSerializer
   method public static SharpPack.SharpPackWriter<SharpPack.Internal.SharpPackExactArrayBufferWriter> CreateExactWriter(ref SharpPack.Internal.SharpPackExactArrayBufferWriter bufferWriter)

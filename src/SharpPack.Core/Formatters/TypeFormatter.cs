@@ -25,7 +25,7 @@ public sealed class TypeFormatter : SharpPackFormatter<Type>
     {
         if (context is null)
         {
-            throw new SharpPackSerializationException("System.Type serialization requires an explicitly enabled context.");
+            throw new SharpPackSerializationException(SharpPackErrorCode.TypeResolutionFailed, "System.Type serialization requires an explicitly enabled context.");
         }
         context.TypeRegistry.EnsureEnabled();
         return context.TypeRegistry;

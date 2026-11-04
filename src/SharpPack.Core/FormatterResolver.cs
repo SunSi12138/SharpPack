@@ -238,17 +238,17 @@ internal sealed class ErrorSharpPackFormatter<T> : SharpPackFormatter<T>
     {
         if (exception != null)
         {
-            throw new SharpPackSerializationException(
+            throw new SharpPackSerializationException(SharpPackSerializationException.ClassifyFormatterFailure(exception),
                 $"Failed to resolve a formatter for {typeof(T).FullName}.",
                 exception);
         }
         else if (message != null)
         {
-            SharpPackSerializationException.ThrowMessage(message);
+            throw new SharpPackSerializationException(SharpPackErrorCode.FormatterResolutionFailed, message);
         }
         else
         {
-            throw new SharpPackSerializationException(
+            throw new SharpPackSerializationException(SharpPackErrorCode.FormatterResolutionFailed,
                 $"No formatter can be resolved for {typeof(T).FullName}.");
         }
     }

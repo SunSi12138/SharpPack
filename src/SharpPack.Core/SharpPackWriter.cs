@@ -107,7 +107,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         var rest = bufferLength - count;
         if (rest < 0)
         {
-            SharpPackSerializationException.ThrowInvalidAdvance();
+            SharpPackSerializationException.ThrowInvalidWriteAdvance();
         }
 
         bufferLength = rest;

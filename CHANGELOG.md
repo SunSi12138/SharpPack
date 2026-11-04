@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Added stable `SharpPackErrorCode` and `SharpPackSerializationException.ErrorCode`
+  for machine-readable failure classification. Existing constructors remain
+  compatible and report `Unknown`; exception messages and transport/user-code
+  exception boundaries are preserved. See `docs/architecture/error-codes.md`.
+
 ## 1.1.0
 
 ### MemoryPack-compatible unmanaged semantics

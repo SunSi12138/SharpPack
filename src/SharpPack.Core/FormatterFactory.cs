@@ -191,7 +191,7 @@ internal static class FormatterResolver<T>
         {
             if (context is not null)
             {
-                throw new SharpPackSerializationException(
+                throw new SharpPackSerializationException(SharpPackSerializationException.ClassifyFormatterFailure(ex),
                     $"Failed to resolve a formatter for {type.FullName}.",
                     ex);
             }

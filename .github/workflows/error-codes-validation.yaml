@@ -1,0 +1,23 @@
+name: Error code validation
+on:
+  push:
+    branches: [validation/issue16-error-codes-20261104]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - run: dotnet build SharpPack.sln -c Release
+      - run: dotnet run --project tools/SharpPack.Baselines -c Release -- verify
+      - name: Test error codes and existing boundary contracts
+        run: dotnet test tests/SharpPack.Tests -c Release --no-build --filter 'FullyQualifiedName~ErrorCodeTest|FullyQualifiedName~TypeRegistryTest|FullyQualifiedName~SharpPackSerializerContextTest|FullyQualifiedName~TransportContractTest|FullyQualifiedName~LengthPrefixedStreamingTest|FullyQualifiedName~StringTest|FullyQualifiedName~ReaderTest|FullyQualifiedName~WriterTest|FullyQualifiedName~CollectionSerializationContractTest' --logger 'console;verbosity=normal'
+      - name: Full regression suite
+        run: dotnet test tests/SharpPack.Tests -c Release --no-build --blame-hang-timeout 3m
+      - run: git diff --exit-code
