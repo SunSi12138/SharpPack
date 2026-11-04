@@ -333,26 +333,43 @@ public class StreamingSerializer
             values,
             flushRate: 16).AsTask();
 
-        serialization.IsCompleted.Should().BeFalse(
-            "the writer must await a blocked FlushAsync once the pipe reaches its pause threshold");
-
-        var read = await pipe.Reader.ReadAsync();
-        read.Buffer.Length.Should().BeGreaterThanOrEqualTo(64);
-        pipe.Reader.AdvanceTo(read.Buffer.End);
-
-        while (!serialization.IsCompleted)
+        var writerCompletion = CompleteWriterAfterSerializationAsync();
+        try
         {
-            read = await pipe.Reader.ReadAsync();
-            pipe.Reader.AdvanceTo(read.Buffer.End);
+            serialization.IsCompleted.Should().BeFalse(
+                "the writer must await a blocked FlushAsync once the pipe reaches its pause threshold");
+
+            var read = await pipe.Reader.ReadAsync();
+            read.Buffer.Length.Should().BeGreaterThanOrEqualTo(64);
+            while (true)
+            {
+                pipe.Reader.AdvanceTo(read.Buffer.End);
+                if (read.IsCompleted)
+                {
+                    break;
+                }
+
+                read = await pipe.Reader.ReadAsync();
+            }
+        }
+        finally
+        {
+            await pipe.Reader.CompleteAsync();
+            await writerCompletion;
         }
 
-        await serialization;
-        await pipe.Writer.CompleteAsync();
-
-        read = await pipe.Reader.ReadAsync();
-        pipe.Reader.AdvanceTo(read.Buffer.End);
-        read.IsCompleted.Should().BeTrue();
-        await pipe.Reader.CompleteAsync();
+        async Task CompleteWriterAfterSerializationAsync()
+        {
+            try
+            {
+                await serialization;
+            }
+            finally
+            {
+                // Wake the reader even if serialization fails after its last flush.
+                await pipe.Writer.CompleteAsync();
+            }
+        }
     }
 
 }
