@@ -1,6 +1,19 @@
 using SharpPack;
 using SharpPack.Formatters;
 
+// Exercise the additive error-code API after native compilation, without
+// rooting extra serialization types or changing the existing AOT model corpus.
+try
+{
+    _ = SharpPackSerializer.Deserialize<int>(new byte[3]);
+    throw new InvalidOperationException("Truncated payload was accepted.");
+}
+catch (SharpPackSerializationException error) when (error.ErrorCode == SharpPackErrorCode.UnexpectedEndOfPayload)
+{
+}
+if (new SharpPackSerializationException("legacy").ErrorCode != SharpPackErrorCode.Unknown)
+    throw new InvalidOperationException("Legacy exception code changed.");
+
 if (!System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)
 {
     // Root the closed collection formatters used directly as serializer root
@@ -31,7 +44,7 @@ try
     _ = SharpPackSerializer.Serialize<Type>(typeof(AotSharpPackModel));
     throw new InvalidOperationException("Default Type serialization must be disabled under NativeAOT.");
 }
-catch (SharpPackSerializationException)
+catch (SharpPackSerializationException error) when (error.ErrorCode == SharpPackErrorCode.TypeResolutionFailed)
 {
 }
 try
@@ -39,7 +52,7 @@ try
     _ = SharpPackSerializer.Deserialize<Type>(SharpPackSerializer.Serialize("unknown-id"), typeContext);
     throw new InvalidOperationException("Unknown Type IDs must be rejected under NativeAOT.");
 }
-catch (SharpPackSerializationException)
+catch (SharpPackSerializationException error) when (error.ErrorCode == SharpPackErrorCode.TypeResolutionFailed)
 {
 }
 var registeredPayload = SharpPackSerializer.Serialize(value, typeContext);
