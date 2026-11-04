@@ -1,0 +1,65 @@
+name: Issue31 nested paired performance investigation
+on:
+  push:
+    branches: [validate/issue31-nested-perf]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  investigate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Record host and build two independent copies of each exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet --info
+          lscpu
+          python3 -c 'import os; print("CPU_AFFINITY", sorted(os.sched_getaffinity(0)))'
+          for label in baseline1 candidate1 candidate2 baseline2; do
+            work="$RUNNER_TEMP/source-$label"
+            git worktree add --detach "$work" 7dd3dfdfa104ce8f9df52c009f77550c8c25e1d3
+            if [[ "$label" == baseline* ]]; then
+              git -C "$work" restore --source=6666ada1d878da64b2f4d2c1107fbea30fad074f -- src
+            fi
+            cp tools/issue31-perf/ReadOnlyPerformance.cs "$work/sandbox/DeserializeOnlyAot/ReadOnlyPerformance.cs"
+            (cd "$work" && dotnet publish sandbox/DeserializeOnlyAot -c Release -p:DefineConstants=BASELINE_COMPARISON -p:PathMap="$work=/source" -o "$RUNNER_TEMP/$label")
+            sha256sum "$RUNNER_TEMP/$label/DeserializeOnlyAot"
+          done
+      - name: Characterize handwritten explicit factories without generated roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          for label in baseline1 candidate1; do
+            work="$RUNNER_TEMP/source-$label"
+            mkdir -p "$work/sandbox/HandwrittenFactoryAot"
+            cp tools/issue31-perf/HandwrittenProgram.cs "$work/sandbox/HandwrittenFactoryAot/Program.cs"
+            cat > "$work/sandbox/HandwrittenFactoryAot/HandwrittenFactoryAot.csproj" <<'PROJECT'
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><PublishAot>true</PublishAot></PropertyGroup>
+            <ItemGroup><ProjectReference Include="../../src/SharpPack.Core/SharpPack.Core.csproj" /></ItemGroup>
+          </Project>
+          PROJECT
+            (cd "$work" && dotnet publish sandbox/HandwrittenFactoryAot -c Release -o "$RUNNER_TEMP/handwritten-$label")
+            result=0
+            "$RUNNER_TEMP/handwritten-$label/HandwrittenFactoryAot" || result=$?
+            echo "HANDWRITTEN_RESULT $label exit=$result"
+            if [[ "$label" == baseline1 && "$result" != 0 ]]; then
+              echo 'Baseline control failed; candidate comparison is invalid.'
+              exit 1
+            fi
+          done
+      - name: Repeat paired balanced processes and same-binary noise controls
+        run: python3 tools/issue31-perf/compare.py "$RUNNER_TEMP"
+      - name: Compare nested native code shape
+        if: always()
+        run: python3 tools/issue31-perf/disassemble.py "$RUNNER_TEMP"
+      - name: Check validation sources unchanged
+        run: git diff --exit-code
