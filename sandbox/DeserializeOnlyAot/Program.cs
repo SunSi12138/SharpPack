@@ -48,6 +48,8 @@ Check("external value-name collision", () => SharpPackSerializer.Deserialize<Col
 Check("escaped generic parameters", () => SharpPackSerializer.Deserialize<MetadataNames.KeywordParameters<int, long>>(model)?.Value == 42);
 #endif
 Check("multiple nested generic parameters", () => SharpPackSerializer.Deserialize<MetadataNames.Outer<int, long>.Inner<byte, short>>(model)?.Value == 42);
+Check("reentrant model initialization", () => SharpPackSerializer.Deserialize<ReentrantModel>(model)?.Value == 42);
+Check("reentrant external union initialization", () => SharpPackSerializer.Deserialize<IReentrantUnion>(new byte[] { 8, 1, 42, 0, 0, 0 }) is ReentrantUnionItem { Value: 42 });
 // Literal wire bytes avoid any Type or model Serialize call in this program.
 byte[] typeId = [250, 255, 255, 255, 5, 0, 0, 0, 107, 110, 111, 119, 110]; // "known"
 var typeContext = new SharpPackSerializerContextBuilder().EnableTypeSerialization().RegisterType<int>("known").Build();
@@ -55,7 +57,7 @@ Check("Type registered", () => SharpPackSerializer.Deserialize<Type>(typeId, typ
 Check("Type disabled", () => Reject(() => SharpPackSerializer.Deserialize<Type>(typeId)));
 Check("Type unknown", () => Reject(() => SharpPackSerializer.Deserialize<Type>(typeId, new SharpPackSerializerContextBuilder().EnableTypeSerialization().Build())));
 if (failures.Count != 0) throw new InvalidOperationException(string.Join("; ", failures));
-Console.WriteLine("Deserialize-only AOT: all twenty-one cases passed.");
+Console.WriteLine("Deserialize-only AOT: all twenty-three cases passed.");
 static bool Reject(Action action)
 {
     try { action(); return false; }
@@ -164,3 +166,27 @@ namespace MetadataNames
         [SharpPackable] public partial class Inner<TThree, TFour> { public int Value { get; set; } }
     }
 }
+
+[SharpPackable] public partial class ReentryTarget { public int Value { get; set; } }
+[SharpPackable] public partial class ReentrantModel
+{
+    public int Value { get; set; }
+    static partial void StaticConstructor()
+    {
+        if (SharpPackSerializer.Deserialize<ReentryTarget>(new byte[] { 1, 17, 0, 0, 0 })?.Value != 17)
+            throw new InvalidOperationException("Reentrant model initialization failed.");
+    }
+}
+[SharpPackable] public partial class UnionReentryTarget { public int Value { get; set; } }
+[SharpPackable(GenerateType.NoGenerate)] public partial interface IReentrantUnion
+{
+    static IReentrantUnion()
+    {
+        if (SharpPackSerializer.Deserialize<UnionReentryTarget>(new byte[] { 1, 17, 0, 0, 0 })?.Value != 17)
+            throw new InvalidOperationException("Reentrant union initialization failed.");
+    }
+}
+[SharpPackable] public partial class ReentrantUnionItem : IReentrantUnion { public int Value { get; set; } }
+[SharpPackUnionFormatter(typeof(IReentrantUnion))]
+[SharpPackUnion(8, typeof(ReentrantUnionItem))]
+public partial class ReentrantUnionFormatter;

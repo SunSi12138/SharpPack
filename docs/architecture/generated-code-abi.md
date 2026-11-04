@@ -110,3 +110,12 @@ The CI characterization also checks that an unused private method is absent
 from the native executable; a separately compiled, explicitly rooted method serves as the positive
 control. This checks one unused method body, not every item of reflection metadata. Performance output is a scoped warm-read microbenchmark, not a full
 statistical performance acceptance result.
+
+This NativeAOT root contract requires rebuilding model assemblies with the
+matching updated Generator as well as updating Core. A runtime-only DLL update
+cannot retrofit the new static-constructor roots into old generated code.
+The frozen generated-code ABI gate checks compilation against the runtime; it
+does not promise deserialize-only NativeAOT compatibility for older generated
+assemblies. Prefer the SharpPack meta-package and upgrade Core/Generator
+together. Direct references to the separate packages must be kept in sync.
+No package has been released by this change.

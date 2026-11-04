@@ -22,7 +22,11 @@ internal static class ReadOnlyPerformance
     static void Measure(string name, Func<int> read)
     {
         for (int i = 0; i < 20000; i++) sink = read();
-        const int iterations = 200000;
+        const int calibrationIterations = 200000;
+        var calibrationStart = Stopwatch.GetTimestamp();
+        for (int i = 0; i < calibrationIterations; i++) sink = read();
+        var calibrationSeconds = (Stopwatch.GetTimestamp() - calibrationStart) / (double)Stopwatch.Frequency;
+        var iterations = (int)Math.Clamp(calibrationIterations * (0.1 / Math.Max(calibrationSeconds, 0.000001)), 100000, 10000000);
         double[] nanoseconds = new double[7];
         long[] allocations = new long[7];
         for (int sample = 0; sample < nanoseconds.Length; sample++)
