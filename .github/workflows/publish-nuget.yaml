@@ -50,7 +50,12 @@ jobs:
       - name: Verify NativeAOT compiler security baseline
         run: python3 tools/verify-aot-security-baseline.py sandbox/NativeAot/obj/project.assets.json
       - run: '"$RUNNER_TEMP/sharppack-aot/NativeAot"'
-      - run: dotnet list SharpPack.sln package --vulnerable --include-transitive
+      - name: Verify package audit parser failure modes
+        run: python3 tools/verify-package-audit.py --self-test
+      - name: Audit packages with fail-closed JSON validation
+        run: |
+          dotnet list SharpPack.sln package --vulnerable --include-transitive --format json --output-version 1 > "$RUNNER_TEMP/package-audit.json"
+          python3 tools/verify-package-audit.py "$RUNNER_TEMP/package-audit.json" SharpPack.sln
       - name: Pack
         run: |
           dotnet pack src/SharpPack.Core/SharpPack.Core.csproj -c Release --no-build -p:Version="$VERSION" -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg -o ./publish

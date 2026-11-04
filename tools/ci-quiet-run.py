@@ -37,6 +37,12 @@ def main():
                 summaries.add(f"AOT compiler: {compiler[1]}/{compiler[2]}")
             if line == "SharpPack NativeAOT verification passed.":
                 summaries.add("NativeAOT verification including Brotli round-trips: passed")
+            if re.fullmatch(r"Package audit: projects=\d+, vulnerable_packages=\d+, advisories=\d+", line):
+                summaries.add(line)
+                if not line.endswith("vulnerable_packages=0, advisories=0"):
+                    categories.add("package vulnerabilities")
+            if line == "Package audit rejected: invalid or incomplete report.":
+                categories.add("invalid or incomplete package audit")
             if "error CS" in line or "error MSB" in line:
                 categories.add("compilation")
             if "error NU" in line:
@@ -45,13 +51,13 @@ def main():
                 categories.add("tests")
             if "AssertionError" in line or "ValueError" in line:
                 categories.add("validation assertion")
+    for summary in sorted(summaries):
+        print(summary)
     if result.returncode:
         classification = ", ".join(sorted(categories)) or "command or validation failure"
         print(f"Validation failed: {classification}; exit={result.returncode}. Raw output remains only on the temporary runner.")
         return result.returncode if result.returncode > 0 else 1
     print("Validation step passed.")
-    for summary in sorted(summaries):
-        print(summary)
     return 0
 
 
