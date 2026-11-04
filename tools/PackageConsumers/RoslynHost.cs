@@ -4,7 +4,8 @@ using Microsoft.CodeAnalysis.CSharp;
 using SharpPack.Generator;
 var actualVersion = typeof(CSharpCompilation).Assembly.GetName().Version!;
 if (actualVersion.ToString() != args[0]) throw new Exception("Unexpected Roslyn host");
-var parse = new CSharpParseOptions(LanguageVersion.Preview, preprocessorSymbols: new[] { "NET10_0_OR_GREATER" });
+var language = args[0] == "5.6.0.0" ? Enum.Parse<LanguageVersion>("CSharp14") : LanguageVersion.Preview;
+var parse = new CSharpParseOptions(language, preprocessorSymbols: new[] { "NET10_0_OR_GREATER" });
 var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
     .Append(args[1]).Distinct().Select(p => MetadataReference.CreateFromFile(p));
 var compilation = CSharpCompilation.Create("PackageHostFixture", new[] { CSharpSyntaxTree.ParseText(File.ReadAllText(args[2]), parse) },
