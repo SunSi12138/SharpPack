@@ -13,13 +13,15 @@ def bodies(path, tier):
         size = re.search(r'; Total bytes of code (\d+)', rest)
         if size:
             found[header] = (code, int(size.group(1)))
-    assert len(found) == 3, (str(path), list(found))
+    assert any('StringFormatter:Serialize[' in k for k in found), (str(path), list(found))
+    if tier == '(Tier1)':
+        assert len(found) == 3, (str(path), list(found))
     return found
 
 for mode, tier in [('tiered', '(Tier1)'), ('fullopts', '(FullOpts)')]:
     a, b = [bodies(root / f'jit-{mode}-{side}.asm', tier) for side in ('baseline', 'candidate')]
     assert set(a) == set(b)
-    print(f'## {mode}: final completed compilation for each of three UTF8 hot-path methods')
+    print(f'## {mode}: final completed UTF8 hot-path bodies ({len(a)} methods; fully inlined methods have no separate body)')
     for name in a:
         ac, az = a[name]; bc, bz = b[name]
         same = ac == bc
