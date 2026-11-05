@@ -77,6 +77,8 @@ public class CompilerServicesMigrationTest
             public partial class Pooled { [SharpPackOrder(0)] public Exact? Value { get; set; } }
             """);
         diagnostics.Should().BeEmpty();
+        compilation.GetDiagnostics().Where(x => x.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error)
+            .Should().BeEmpty();
         var source = string.Join("\n", compilation.SyntaxTrees.Where(x => x.FilePath.EndsWith(".g.cs")));
         source.Should().Contain("SharpPack.CompilerServices.SharpPackExactBufferWriter")
             .And.Contain("SharpPack.CompilerServices.SharpPackPooledBufferWriter")

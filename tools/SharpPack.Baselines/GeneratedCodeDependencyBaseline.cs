@@ -71,6 +71,7 @@ static class GeneratedCodeDependencyBaseline
             "NullableFormatter`1", "SharpPackableFormatter`1", "GenericCollectionFormatter`2",
             "GenericSetFormatter`2", "GenericDictionaryFormatter`3" })
             Require("M:SharpPack.Formatters." + formatter + ".#ctor");
+        Require("M:SharpPack.SharpPackWriter`1.GetUnmanageArrayWriteLength``1(``0[])");
         foreach (var family in new[] { "ReadUnmanaged", "DangerousReadUnmanaged",
             "WriteUnmanaged", "DangerousWriteUnmanaged", "WriteUnmanagedWithObjectHeader", "DangerousWriteUnmanagedWithObjectHeader" })
         {
@@ -187,7 +188,8 @@ static class GeneratedCodeDependencyBaseline
             if (type.Name is "ISharpPackable" or "ISharpPackFormatter" or "SharpPackFormatter" or
                 "SharpPackReader" or "SharpPackWriter" or "SharpPackReaderOptionalState" or
                 "SharpPackWriterOptionalState" or "SharpPackSerializerContext" or "SharpPackSerializerContextBuilder" or
-                "SharpPackSerializationException" or "SharpPackSerializer" or "SharpPackCode" ||
+                "SharpPackSerializationException" or "SharpPackSerializer" or "SharpPackCode" or
+                "OrdinalIgnoreCaseStringDictionaryFormatter" ||
                 type.Name.EndsWith("FormatterAttribute", StringComparison.Ordinal))
                 return "user";
         }

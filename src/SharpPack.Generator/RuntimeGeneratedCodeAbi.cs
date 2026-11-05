@@ -42,7 +42,50 @@ internal static class RuntimeGeneratedCodeAbi
             var helper = assembly.GetTypeByMetadataName("SharpPack.CompilerServices." + name);
             if (helper is null || helper.DeclaredAccessibility != Accessibility.Public)
                 return "1 (missing compiler-services capability: " + name + ")";
+            if (!HasRequiredShape(helper, name))
+                return "1 (invalid compiler-services capability: " + name + ")";
         }
         return null;
+    }
+
+    static bool HasRequiredShape(INamedTypeSymbol type, string name)
+    {
+        bool IsByteArray(ITypeSymbol value) => value is IArrayTypeSymbol array &&
+            array.IsSZArray && array.ElementType.SpecialType == SpecialType.System_Byte;
+        bool IsSelf(ITypeSymbol value) => SymbolEqualityComparer.Default.Equals(value, type);
+        bool IsWriter(ITypeSymbol value, ITypeSymbol argument) => value is INamedTypeSymbol named &&
+            named.OriginalDefinition.ToDisplayString() == "SharpPack.SharpPackWriter<TBufferWriter>" &&
+            named.TypeArguments.Length == 1 && SymbolEqualityComparer.Default.Equals(named.TypeArguments[0], argument);
+        bool Method(string member, Func<IMethodSymbol, bool> predicate) => type.GetMembers(member)
+            .OfType<IMethodSymbol>().Any(method => method.DeclaredAccessibility == Accessibility.Public && predicate(method));
+        bool Constructor(Func<IMethodSymbol, bool> predicate) => type.InstanceConstructors
+            .Any(method => method.DeclaredAccessibility == Accessibility.Public && predicate(method));
+
+        if (name == "PreserveAttribute")
+            return type.TypeKind == TypeKind.Class && !type.IsAbstract &&
+                type.BaseType?.ToDisplayString() == "System.Attribute" && Constructor(ctor => ctor.Parameters.Length == 0);
+
+        if (type.TypeKind != TypeKind.Struct || !type.AllInterfaces.Any(iface =>
+            iface.OriginalDefinition.ToDisplayString() == "System.Buffers.IBufferWriter<T>" &&
+            iface.TypeArguments[0].SpecialType == SpecialType.System_Byte)) return false;
+
+        if (name == "SharpPackExactBufferWriter")
+            return Constructor(ctor => ctor.Parameters.Length == 1 && IsByteArray(ctor.Parameters[0].Type) &&
+                       ctor.Parameters[0].RefKind == RefKind.None) &&
+                Method("GetFilledBuffer", method => !method.IsStatic && method.Arity == 0 &&
+                    method.Parameters.Length == 0 && IsByteArray(method.ReturnType)) &&
+                Method("CreateWriter", method => method.IsStatic && method.Arity == 0 &&
+                    method.Parameters.Length == 1 && method.Parameters[0].RefKind == RefKind.Ref &&
+                    IsSelf(method.Parameters[0].Type) && IsWriter(method.ReturnType, type));
+
+        return Method("Rent", method => method.IsStatic && method.Arity == 0 && IsSelf(method.ReturnType) &&
+                method.Parameters.Length == 1 && method.Parameters[0].RefKind == RefKind.Out &&
+                method.Parameters[0].Type.SpecialType == SpecialType.System_Int64) &&
+            Method("Return", method => method.IsStatic && method.Arity == 0 && method.ReturnsVoid &&
+                method.Parameters.Length == 2 && method.Parameters.All(parameter => parameter.RefKind == RefKind.None) &&
+                IsSelf(method.Parameters[0].Type) && method.Parameters[1].Type.SpecialType == SpecialType.System_Int64) &&
+            Method("WriteToAndReset", method => !method.IsStatic && method.Arity == 1 && method.ReturnsVoid &&
+                method.Parameters.Length == 1 && method.Parameters[0].RefKind == RefKind.Ref &&
+                IsWriter(method.Parameters[0].Type, method.TypeParameters[0]));
     }
 }

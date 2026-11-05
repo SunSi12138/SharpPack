@@ -55,6 +55,22 @@ public class RuntimeAbiDiagnosticsTest
     }
 
     [Fact]
+    public void PresentButMalformedHelper_IsRejectedBeforeEmission()
+    {
+        var runtime = CreateRuntime("public const int Version = 1;", """
+            namespace SharpPack.CompilerServices
+            {
+                public sealed class PreserveAttribute : System.Attribute { }
+                public struct SharpPackExactBufferWriter { }
+                public struct SharpPackPooledBufferWriter { }
+            }
+            """);
+        var (output, diagnostics, result) = Run(runtime, Models);
+        AssertMismatch(output, diagnostics, result,
+            "1 (invalid compiler-services capability: SharpPackExactBufferWriter)", "First");
+    }
+
+    [Fact]
     public void ExternalUnionOnly_ReportsOnceAndDoesNotGenerateFactories()
     {
         const string source = """
@@ -173,7 +189,7 @@ public class RuntimeAbiDiagnosticsTest
     static MetadataReference CurrentRuntime() =>
         MetadataReference.CreateFromFile(typeof(SharpPackableAttribute).Assembly.Location);
 
-    static MetadataReference CreateRuntime(string? member)
+    static MetadataReference CreateRuntime(string? member, string extra = "")
     {
         var source = """
             namespace SharpPack
@@ -191,6 +207,7 @@ public class RuntimeAbiDiagnosticsTest
                 + member + " } }";
         }
 
+        source += extra;
         var compilation = CSharpCompilation.Create("SharpPack.Core",
             new[] { CSharpSyntaxTree.ParseText(source, ParseOptions) }, FrameworkReferences,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));

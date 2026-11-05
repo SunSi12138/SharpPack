@@ -61,3 +61,7 @@ public sealed class UntypedOffsetAttribute : SharpPackCustomFormatterAttribute<i
 {
     [UntypedOffset] public int Value { get; set; }
 }
+[SharpPackable(GenerateType.VersionTolerant)] public partial class OptimizedArrays
+{
+    [SharpPackOrder(0)] public int[]? Values { get; set; }
+}

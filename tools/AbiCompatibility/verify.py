@@ -11,6 +11,8 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 PREVIOUS = "6666ada1d878da64b2f4d2c1107fbea30fad074f"
+HANDSHAKE = "d4c15564af7c754e87dd019ca3cc25997097cda3"
+HANDSHAKE_VERSION = "1.1.0-abi17.handshake"
 CURRENT_VERSION = "1.1.0-abi17.current"
 PREVIOUS_VERSION = "1.1.0-abi17.previous"
 
@@ -31,14 +33,18 @@ def main():
         feed.mkdir()
         old = work / "previous"
         old.mkdir()
-        archive = work / "previous.tar"
-        with archive.open("wb") as stream:
-            subprocess.run(["git", "archive", PREVIOUS], cwd=ROOT, stdout=stream, check=True)
-        with tarfile.open(archive) as tree:
-            tree.extractall(old, filter="data")
+        handshake = work / "handshake"
+        handshake.mkdir()
+        for revision, target in ((PREVIOUS, old), (HANDSHAKE, handshake)):
+            archive = work / (target.name + ".tar")
+            with archive.open("wb") as stream:
+                subprocess.run(["git", "archive", revision], cwd=ROOT, stdout=stream, check=True)
+            with tarfile.open(archive) as tree:
+                tree.extractall(target, filter="data")
         env = dict(os.environ, NUGET_PACKAGES=str(work / "packages"))
         for source, version, projects in (
             (old, PREVIOUS_VERSION, ("SharpPack.Core", "SharpPack.Generator")),
+            (handshake, HANDSHAKE_VERSION, ("SharpPack.Core", "SharpPack.Generator")),
             (ROOT, CURRENT_VERSION, ("SharpPack.Core", "SharpPack.Generator", "SharpPack")),
         ):
             for project in projects:
@@ -51,6 +57,8 @@ def main():
             ("current-aggregate", CURRENT_VERSION, CURRENT_VERSION, True, True),
             ("previous-generator", CURRENT_VERSION, PREVIOUS_VERSION, False, True),
             ("previous-runtime", PREVIOUS_VERSION, CURRENT_VERSION, False, False),
+            ("handshake-generator", CURRENT_VERSION, HANDSHAKE_VERSION, False, True),
+            ("handshake-runtime", HANDSHAKE_VERSION, CURRENT_VERSION, False, False),
         ):
             directory = work / name
             directory.mkdir()
@@ -99,7 +107,8 @@ public partial class Model { public int Value { get; set; } public string? Text 
                 print(f"{name}: expected Core/Generator packages resolved; build and round trip passed", flush=True)
             else:
                 assert "error SHARPPACK043" in log, log
-                assert "ABI 'missing'" in log and "[1, 1]" in log, log
+                detected = "1 (missing compiler-services capability: PreserveAttribute)" if name == "handshake-runtime" else "missing"
+                assert f"ABI '{detected}'" in log and "[1, 1]" in log, log
                 assert not re.search(r"\b(?:error|warning) CS\d+\b", log), log
                 # MSBuild may repeat the diagnostic in its summary. It must refer
                 # to one source location, and not to any generated source.
