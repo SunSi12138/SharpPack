@@ -1,0 +1,32 @@
+name: Package baseline Pipe test diagnosis
+on:
+  push:
+    branches: [validation/issue18-pipe-diagnostics-20261105]
+jobs:
+  repeat-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [baseline, completion-fix]
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          path: subject
+          ref: ${{ matrix.variant == 'baseline' && '722f248bb276eaf97ac71b9190dd59addd930fdd' || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.114
+      - name: Repeat full unit suite with bounded hang diagnostics
+        run: python3 harness/tools/PackageConsumers/diagnose_pipe_test.py subject
+      - name: Verify clean tracked source
+        if: always()
+        run: git -C subject diff --exit-code
