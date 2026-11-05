@@ -1,0 +1,79 @@
+name: Read-limit state and copy diagnosis
+on:
+  push:
+    branches: [validation/pr30-costs-20261105]
+jobs:
+  paired:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        group: [component, copy]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+      DOTNET_TieredCompilation: 1
+      DOTNET_TieredPGO: 1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: harness
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          path: baseline
+          ref: 6666ada1d878da64b2f4d2c1107fbea30fad074f
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          path: candidate
+          ref: 56113519bb9771fe33ec39daed59181024918228
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.114
+      - name: Verify summary controls and immutable production baseline
+        run: |
+          set -euo pipefail
+          python3 harness/tools/ReadLimitsCosts/test_summary.py
+          python3 harness/tools/ReadLimitsCosts/test_design.py
+          git -C harness diff --exit-code 6666ada1d878da64b2f4d2c1107fbea30fad074f HEAD -- src Directory.Build.props global.json
+          test "$(git -C baseline rev-parse HEAD)" = 6666ada1d878da64b2f4d2c1107fbea30fad074f
+          test "$(git -C candidate rev-parse HEAD)" = 56113519bb9771fe33ec39daed59181024918228
+          git -C baseline diff --exit-code 8efea5afc79eaefc5023806a2588c4ad2f09a9c6 HEAD -- src Directory.Build.props global.json
+          test "$(git -C baseline rev-parse HEAD:src/SharpPack.Generator)" = "$(git -C candidate rev-parse HEAD:src/SharpPack.Generator)"
+      - name: Build one neutral IL harness and both runtime revisions
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/harness" "$RUNNER_TEMP/runtime-a" "$RUNNER_TEMP/runtime-b"
+          cp harness/tools/ReadLimitsCosts/{Perf.csproj,Program.cs} "$RUNNER_TEMP/harness/"
+          printf '{"sdk":{"version":"10.0.114","rollForward":"disable"}}' > "$RUNNER_TEMP/global.json"
+          test "$(cd "$RUNNER_TEMP/harness"; dotnet --version)" = 10.0.114
+          test "$(cd candidate; dotnet --version)" = 10.0.114
+          if ! dotnet build "$RUNNER_TEMP/harness/Perf.csproj" -c Release -p:RepoRoot="$GITHUB_WORKSPACE/baseline" -o "$RUNNER_TEMP/runtime-a" > "$RUNNER_TEMP/harness-build.log" 2>&1; then
+            python3 -c 'import os,re; from pathlib import Path; t=(Path(os.environ["RUNNER_TEMP"])/"harness-build.log").read_text(); print("Harness build failed; codes="+",".join(sorted(set(re.findall(r"\b(?:CS|NU|MSB|SHARPPACK)\d{3,5}\b",t)))))'
+            exit 1
+          fi
+          if ! dotnet build candidate/src/SharpPack.Streaming/SharpPack.Streaming.csproj -c Release > "$RUNNER_TEMP/candidate-build.log" 2>&1; then
+            echo 'Candidate runtime build failed; raw output retained locally'
+            exit 1
+          fi
+          cp -a "$RUNNER_TEMP/runtime-a/." "$RUNNER_TEMP/runtime-b/"
+          cp candidate/src/SharpPack.Core/bin/Release/net10.0/SharpPack.Core.dll "$RUNNER_TEMP/runtime-b/"
+          cp candidate/src/SharpPack.Streaming/bin/Release/net10.0/SharpPack.Streaming.dll "$RUNNER_TEMP/runtime-b/"
+          cmp "$RUNNER_TEMP/runtime-a/Perf.dll" "$RUNNER_TEMP/runtime-b/Perf.dll"
+          echo 'One byte-identical harness; exact baseline/candidate runtime revisions built; SDK10.0.114'
+      - name: Measure components or allocation/copy controls
+        run: python3 harness/tools/ReadLimitsCosts/paired.py --a "$RUNNER_TEMP/runtime-a" --b "$RUNNER_TEMP/runtime-b" --work "$RUNNER_TEMP/measurements" --group ${{ matrix.group }}
+      - name: Verify unchanged source checkouts
+        if: always()
+        run: |
+          git -C baseline diff --exit-code
+          git -C candidate diff --exit-code
+          git -C harness diff --exit-code
