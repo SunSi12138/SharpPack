@@ -1,8 +1,9 @@
 # Focused read-limit JIT diagnosis
 
 The first context/platform matrix (run41995910039, head9ce22f0) showed equal
-allocation medians but multimodal timings and large same-binary variation in
-some cases. Those results are retained. Synchronized A/B modes can still yield
+A/B allocation medians in aggregate and non-1 MiB surface rows, but small
+allocation-count differences in 1 MiB rows. Timings were multimodal with large
+same-binary variation in some cases. Those results are retained. Synchronized A/B modes can still yield
 useful paired ratios; the broad limited-after-common comparison has additional
 order bias and is not evidence of a speedup.
 
