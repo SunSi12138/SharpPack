@@ -1,0 +1,95 @@
+name: Bounded read callback diagnosis
+on:
+  push:
+    branches: [validation/pr30-callbacks-20261105]
+jobs:
+  paired:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+      DOTNET_TieredCompilation: 1
+      DOTNET_TieredPGO: 1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: harness
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          path: baseline
+          ref: 6666ada1d878da64b2f4d2c1107fbea30fad074f
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          path: pr
+          ref: 56113519bb9771fe33ec39daed59181024918228
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          path: candidate
+          ref: ff724136dafdd0c1b9a4c98b1ddf115ca81b860a
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.114
+      - name: Verify bounded design and immutable production heads
+        run: |
+          set -euo pipefail
+          python3 harness/tools/ReadLimitsCallbacks/test_summary.py
+          python3 harness/tools/ReadLimitsCallbacks/test_jit_summary.py
+          python3 harness/tools/ReadLimitsCallbacks/test_visibility.py
+          python3 harness/tools/ReadLimitsCallbacks/test_design.py
+          git -C harness diff --exit-code 6666ada1d878da64b2f4d2c1107fbea30fad074f HEAD -- src Directory.Build.props global.json
+          test "$(git -C baseline rev-parse HEAD)" = 6666ada1d878da64b2f4d2c1107fbea30fad074f
+          test "$(git -C pr rev-parse HEAD)" = 56113519bb9771fe33ec39daed59181024918228
+          test "$(git -C candidate rev-parse HEAD)" = ff724136dafdd0c1b9a4c98b1ddf115ca81b860a
+          git -C baseline diff --exit-code 8efea5afc79eaefc5023806a2588c4ad2f09a9c6 HEAD -- src Directory.Build.props global.json
+          for repo in pr candidate; do
+            test "$(git -C baseline rev-parse HEAD:src/SharpPack.Generator)" = "$(git -C "$repo" rev-parse HEAD:src/SharpPack.Generator)"
+          done
+          python3 candidate/tools/ReadLimitsResetHelper/verify_production.py --pr pr --candidate candidate
+      - name: Build one neutral IL harness and exact runtimes
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/harness" "$RUNNER_TEMP/runtime-a" "$RUNNER_TEMP/runtime-b" "$RUNNER_TEMP/runtime-c"
+          cp harness/tools/ReadLimitsCallbacks/{Perf.csproj,Program.cs} "$RUNNER_TEMP/harness/"
+          printf '{"sdk":{"version":"10.0.114","rollForward":"disable"}}' > "$RUNNER_TEMP/global.json"
+          test "$(cd "$RUNNER_TEMP/harness"; dotnet --version)" = 10.0.114
+          if ! dotnet build "$RUNNER_TEMP/harness/Perf.csproj" -c Release -p:RepoRoot="$GITHUB_WORKSPACE/baseline" -o "$RUNNER_TEMP/runtime-a" > "$RUNNER_TEMP/harness-build.log" 2>&1; then
+            python3 -c 'import os,re; from pathlib import Path; t=(Path(os.environ["RUNNER_TEMP"])/"harness-build.log").read_text(); print("Harness build failed; codes="+",".join(sorted(set(re.findall(r"\b(?:CS|NU|MSB|SHARPPACK)\d{3,5}\b",t)))))'
+            exit 1
+          fi
+          for spec in pr:b candidate:c; do
+            repo="${spec%:*}"
+            side="${spec#*:}"
+            test "$(cd "$repo"; dotnet --version)" = 10.0.114
+            if ! dotnet build "$repo/src/SharpPack.Streaming/SharpPack.Streaming.csproj" -c Release > "$RUNNER_TEMP/runtime-$side-build.log" 2>&1; then
+              echo "Runtime $side build failed; raw output retained locally"
+              exit 1
+            fi
+            cp -a "$RUNNER_TEMP/runtime-a/." "$RUNNER_TEMP/runtime-$side/"
+            cp "$repo/src/SharpPack.Core/bin/Release/net10.0/SharpPack.Core.dll" "$RUNNER_TEMP/runtime-$side/"
+            cp "$repo/src/SharpPack.Streaming/bin/Release/net10.0/SharpPack.Streaming.dll" "$RUNNER_TEMP/runtime-$side/"
+            cmp "$RUNNER_TEMP/runtime-a/Perf.dll" "$RUNNER_TEMP/runtime-$side/Perf.dll"
+          done
+          echo 'Identical harness IL; exact A/B/C runtime heads; no production changes in this diagnostic.'
+      - name: Measure only four callback cases once
+        run: python3 harness/tools/ReadLimitsCallbacks/paired.py --a "$RUNNER_TEMP/runtime-a" --b "$RUNNER_TEMP/runtime-b" --c "$RUNNER_TEMP/runtime-c" --work "$RUNNER_TEMP/callbacks"
+      - name: Verify unchanged source checkouts
+        if: always()
+        run: |
+          git -C baseline diff --exit-code
+          git -C pr diff --exit-code
+          git -C candidate diff --exit-code
+          git -C harness diff --exit-code
