@@ -104,3 +104,12 @@ signal do not trigger additional runs. Preserve all outcomes and explain whether
 the evidence changes confidence in the measurement mechanism. The original PR's
 performance status and C's rejection do not change automatically. No original PR
 update, production edit, merge, release, deletion or permission change is included.
+
+## Recorded outcome
+
+Run 42019395403 completed both architectures. ARM64 met the predeclared raw-shape
+diagnostic rule; x64 failed its B/B control condition, so cross-architecture
+strong support was not established. The original PR context signal remains,
+and the Reset-helper candidate remains unselected. Independent result review
+is complete. No follow-on timing run was added. See the
+[full evidence report](../../docs/validation/pr30-callbacks-20261105.md).
