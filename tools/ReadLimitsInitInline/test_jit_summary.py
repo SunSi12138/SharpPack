@@ -29,6 +29,16 @@ G_M000_IG01:
         self.assertEqual(2, sum(rows[0]['calls'].values()))
         self.assertTrue(selected(rows[0], 'SharpPack.Core'))
 
+    def test_perf_selector_is_bounded(self):
+        self.assertTrue(selected({'method': 'Program+X:g__ReadInt() (Tier1)'}, 'Perf'))
+        self.assertFalse(selected({'method': 'System.Foo:Init() (Tier1)'}, 'Perf'))
+        self.assertFalse(selected({'method': 'Program:Setup() (Tier1)'}, 'Perf'))
+
+    def test_arm_symbols_are_retained(self):
+        rows = blocks('; Assembly listing for method Program:g__Read() (Tier1)\n       blr x1 ; SharpPack.SharpPackReaderOptionalState:Init()\n; Total bytes of code 4\n')
+        self.assertTrue(any('ReaderOptionalState:Init' in x for x in rows[0]['calls']))
+        self.assertTrue(any('ReaderOptionalState:Init' in x for x in rows[0]['symbolicReferences']))
+
     def test_incomplete_fails(self):
         with self.assertRaises(RuntimeError): blocks('; Assembly listing for method A:B() (Tier0)\n mov rax, rbx')
 

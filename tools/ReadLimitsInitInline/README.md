@@ -13,14 +13,17 @@ copying at the payload guard were ruled out by source inspection.
 ## Controls
 
 The validation workflow proves the production diff is exactly the single
-attribute and pins A to dev `6666ada`, B to PR `56113519`, and C to this workflow
-head. It builds one neutral managed harness against A and swaps only Core and
+attribute and pins A to dev `6666ada`, B to PR `56113519`, and C to frozen validation head `f50b9fd`. It builds one neutral managed harness against A and swaps only Core and
 Streaming DLLs. Hashes, settings, affinity, fixture behavior and payload hashes
 are checked. It also runs the original Build-Debug suite on both architectures.
 
 JIT probes run separately from timings on x64 and ARM64, for tiered compilation
 and PGO both ON and both OFF. Each selected case warms for eight seconds. Core
-and harness disassembly use separate processes with exact assembly filters.
+and harness probes use separate processes. Runtime assembly filtering was not
+effective in the first diagnostic run; explicit method-name filtering now
+bounds the selected output independently. The first JIT jobs failed their count
+guard after retaining FullOpts evidence; this repair does not change candidate
+production code or repeat performance measurements. Candidate C remains f50b9fd.
 Only structured method identity, tier, code size, opcode and call-target counts
 are printed. Raw listings remain temporary runner files. No method's absence
 alone proves inlining; inspect caller code/call targets and observed tiers.

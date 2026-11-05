@@ -1,16 +1,15 @@
-name: Reader state initialization experiment
+name: Reader state JIT evidence repair
 on:
   push:
-    branches: [validation/pr30-init-inline-20261105]
+    branches: [validation/pr30-init-jit-fix-20261105]
 jobs:
   diagnose:
     strategy:
       fail-fast: false
       matrix:
         runner: [ubuntu-24.04, ubuntu-24.04-arm]
-        kind: [jit, performance]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 15
     permissions:
       contents: read
     env:
@@ -21,7 +20,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
           path: candidate
+          ref: f50b9fd28673fdde87c7357dbce5fc1115478c94
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/checkout@v7
@@ -41,11 +45,11 @@ jobs:
       - name: Verify controls and one-attribute production diff
         run: |
           set -euo pipefail
-          python3 candidate/tools/ReadLimitsInitInline/test_summary.py
-          python3 candidate/tools/ReadLimitsInitInline/test_jit_summary.py
+          python3 harness/tools/ReadLimitsInitInline/test_summary.py
+          python3 harness/tools/ReadLimitsInitInline/test_jit_summary.py
           test "$(git -C baseline rev-parse HEAD)" = 6666ada1d878da64b2f4d2c1107fbea30fad074f
           test "$(git -C pr rev-parse HEAD)" = 56113519bb9771fe33ec39daed59181024918228
-          test "$(git -C candidate rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C candidate rev-parse HEAD)" = f50b9fd28673fdde87c7357dbce5fc1115478c94
           git -C baseline diff --exit-code 8efea5afc79eaefc5023806a2588c4ad2f09a9c6 HEAD -- src Directory.Build.props global.json
           test "$(git -C baseline rev-parse HEAD:src/SharpPack.Generator)" = "$(git -C candidate rev-parse HEAD:src/SharpPack.Generator)"
           python3 - <<'PY'
@@ -87,14 +91,11 @@ jobs:
           done
           echo 'One managed IL harness; A baseline, B exact PR, C one-attribute candidate; SDK 10.0.114.'
       - name: Capture structured JIT evidence
-        if: matrix.kind == 'jit'
-        run: python3 candidate/tools/ReadLimitsInitInline/jit_summary.py --a "$RUNNER_TEMP/runtime-a" --b "$RUNNER_TEMP/runtime-b" --c "$RUNNER_TEMP/runtime-c" --work "$RUNNER_TEMP/jit"
-      - name: Measure default-runtime balanced triples
-        if: matrix.kind == 'performance'
-        run: python3 candidate/tools/ReadLimitsInitInline/threeway.py --a "$RUNNER_TEMP/runtime-a" --b "$RUNNER_TEMP/runtime-b" --c "$RUNNER_TEMP/runtime-c" --work "$RUNNER_TEMP/performance"
+        run: python3 harness/tools/ReadLimitsInitInline/jit_summary.py --a "$RUNNER_TEMP/runtime-a" --b "$RUNNER_TEMP/runtime-b" --c "$RUNNER_TEMP/runtime-c" --work "$RUNNER_TEMP/jit"
       - name: Verify unchanged source checkouts
         if: always()
         run: |
           git -C baseline diff --exit-code
           git -C pr diff --exit-code
           git -C candidate diff --exit-code
+          git -C harness diff --exit-code

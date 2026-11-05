@@ -20,9 +20,13 @@ def blocks(text):
         header = lines[0]
         tier = re.search(r'\(([^()]*)\)\s*$', header)
         body = part[:end.start()].splitlines()[1:]
-        instructions, calls = [], []
+        instructions, calls, symbols = [], [], []
         for line in body:
-            clean = line.split(';', 1)[0].strip()
+            parts = re.split(r';|//', line, maxsplit=1)
+            clean = parts[0].strip()
+            comment = parts[1].strip() if len(parts) == 2 else ''
+            if any(name in comment for name in ('SharpPack.', 'Program', 'CORINFO_HELP')):
+                symbols.append(re.sub(r'0x[0-9A-Fa-f]+', '<address>', comment))
             match = re.match(r'^([a-z][a-z0-9.]*)(?:\s+(.*))?$', clean)
             if match is None or clean.endswith(':'):
                 continue
@@ -32,18 +36,21 @@ def blocks(text):
             if opcode in ('call', 'bl', 'blr', 'tail.jmp') or (opcode in ('jmp', 'b') and (':' in operand or 'CORINFO' in operand)):
                 # Method and helper identities are useful; code addresses are not.
                 target = re.sub(r'0x[0-9A-Fa-f]+', '<address>', operand)
+                if any(name in comment for name in ('SharpPack.', 'Program', 'CORINFO_HELP')):
+                    target += ' symbol=' + re.sub(r'0x[0-9A-Fa-f]+', '<address>', comment)
                 target = re.sub(r'\b[0-9A-Fa-f]{12,16}\b', '<address>', target)
                 calls.append(target)
         result.append({'method': header, 'tier': tier.group(1) if tier else 'unknown',
                        'codeBytes': int(end.group(1)), 'instructionCount': len(instructions),
                        'opcodes': dict(sorted(Counter(instructions).items())),
-                       'calls': dict(sorted(Counter(calls).items()))})
+                       'calls': dict(sorted(Counter(calls).items())),
+                       'symbolicReferences': dict(sorted(Counter(symbols).items()))})
     return result
 
 
 def selected(row, assembly):
     if assembly == 'Perf':
-        return True
+        return row['method'].startswith('Program') and any(name in row['method'] for name in ('g__Read', 'g__RunBatch', 'b__40', 'b__53'))
     return any(x in row['method'] for x in (
         'SharpPackReaderOptionalState:Init', 'SharpPackReaderOptionalState:Reset',
         'SharpPackReader:.ctor', 'SharpPackReader:ReadValue', 'SharpPackReader:EnterDepth',
@@ -94,7 +101,9 @@ def main():
                     if not rows or len(rows) > 500: raise RuntimeError('Unexpected selected JIT listing count')
                     summaries.append({'label': label, 'environment': observed,
                                       'selectedCount': len(rows), 'allListingCount': len(all_rows), 'methods': rows})
-                    print('JIT_SUMMARY ' + json.dumps(summaries[-1]), flush=True)
+                    print('JIT_ENV ' + json.dumps({key: value for key, value in summaries[-1].items() if key != 'methods'}), flush=True)
+                    for row in rows:
+                        print('JIT_METHOD ' + json.dumps({'label': label, **row}), flush=True)
     text = json.dumps(summaries, indent=2)
     (args.work / 'summary.json').write_text(text)
     if os.environ.get('GITHUB_STEP_SUMMARY'):
