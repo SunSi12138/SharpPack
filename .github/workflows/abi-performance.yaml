@@ -1,0 +1,34 @@
+name: ABI-Wrapper-Performance
+on:
+  push:
+    branches: [validation/issue17-scoped-perf-20261105]
+    paths: [tools/AbiPerformance/**, .github/workflows/abi-performance.yaml]
+  workflow_dispatch:
+jobs:
+  compare:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Compare pinned pre-wrapper and candidate implementations
+        env:
+          ABI_PERF_RESULTS: ${{ runner.temp }}/abi-performance
+        run: python3 tools/AbiPerformance/compare.py
+      - name: Preserve raw timings, generated code and JIT diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: abi-wrapper-performance-${{ matrix.runner }}-${{ github.sha }}
+          path: ${{ runner.temp }}/abi-performance
+      - run: git diff --exit-code
