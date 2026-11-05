@@ -44,3 +44,12 @@ an isolated microprobe win is insufficient. Preserve prior failed Init-only
 and diagnostic experiments, original PR, and all earlier evidence. No merge,
 release, deletion, permissions change or raw-log/artifact upload is part of this
 experiment.
+
+## Recorded outcome
+
+Do not promote candidate ff724136. Both architectures passed all 665 tests and
+all validation jobs, but legacy primitive/context paths regress without a
+reliable compensating whole-path gain. Keep all slow-state observations and
+prior candidates. The [reviewed report](../../docs/validation/pr30-reset-helper-20261105.md)
+contains the complete comparison tables, JIT-only raw-path follow-up, exact
+run links and limitations. The original PR is unchanged.
