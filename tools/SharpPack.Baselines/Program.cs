@@ -36,6 +36,8 @@ static class BaselineProgram
                     static type => type == typeof(SharpPackGenerator)),
             ["eng/baselines/generated/representative.g.cs.txt"] =
                 GeneratedSourceBaseline.Create(),
+            ["eng/baselines/generated/runtime-dependencies.txt"] =
+                GeneratedCodeDependencyBaseline.Create(repoRoot),
         };
 
         return mode == "update"
@@ -774,9 +776,7 @@ static class PublicApiBaseline
 
 static class GeneratedSourceBaseline
 {
-    public static string Create()
-    {
-        const string source = """
+    internal const string FixtureSource = """
 #nullable enable
 using SharpPack;
 
@@ -868,6 +868,9 @@ public partial class Outer<T>
 }
 """;
 
+    public static string Create()
+    {
+        const string source = FixtureSource;
         var parseOptions = new CSharpParseOptions(
             LanguageVersion.CSharp14,
             preprocessorSymbols: ["NET10_0_OR_GREATER"]);

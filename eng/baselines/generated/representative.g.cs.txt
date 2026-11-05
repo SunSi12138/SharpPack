@@ -45,19 +45,19 @@ partial class Cat : ISharpPackable<Cat>, global::SharpPack.IFixedSizeSharpPackab
         StaticConstructor();
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static int global::SharpPack.IFixedSizeSharpPackable.Size => 1 + System.Runtime.CompilerServices.Unsafe.SizeOf<int>();
 
 
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<Cat> global::SharpPack.ISharpPackFormatterFactory<Cat>.CreateFormatter()
     {
 
         return new global::SharpPack.Formatters.SharpPackableFormatter<Cat>();
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<Cat> global::SharpPack.ISharpPackContextFormatterFactory<Cat>.CreateFormatter(
         global::SharpPack.SharpPackSerializerContext context)
     {
@@ -179,7 +179,7 @@ partial class Cat : ISharpPackable<Cat>, global::SharpPack.IFixedSizeSharpPackab
         return;
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     sealed class __SharpPackContextFormatter
         : global::SharpPack.SharpPackFormatter<Cat>,
           global::SharpPack.ISharpPackContextOverrideFormatter
@@ -195,7 +195,7 @@ partial class Cat : ISharpPackable<Cat>, global::SharpPack.IFixedSizeSharpPackab
             => __SharpPackDeserializeWithFormatterOverrides(ref reader, ref value);
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static void ISharpPackable<Cat>.Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Cat? value) 
     {
 
@@ -212,7 +212,7 @@ partial class Cat : ISharpPackable<Cat>, global::SharpPack.IFixedSizeSharpPackab
         return;
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static void ISharpPackable<Cat>.Deserialize(ref SharpPackReader reader, scoped ref Cat? value)
     {
 
@@ -340,7 +340,7 @@ partial class Dog : ISharpPackable<Dog>, global::SharpPack.ISharpPackExactSizeSe
     }
 
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     byte[] global::SharpPack.ISharpPackExactSizeSerializable<Dog>.SerializeExact()
     {
         var __value0 = this.@Name;
@@ -355,8 +355,8 @@ partial class Dog : ISharpPackable<Dog>, global::SharpPack.ISharpPackExactSizeSe
         }
         var buffer = global::System.GC.AllocateUninitializedArray<byte>((int)size);
         var bufferWriter =
-            new global::SharpPack.Internal.SharpPackExactArrayBufferWriter(buffer);
-        var writer = global::SharpPack.SharpPackSerializer.CreateExactWriter(
+            new global::SharpPack.CompilerServices.SharpPackExactBufferWriter(buffer);
+        var writer = global::SharpPack.CompilerServices.SharpPackExactBufferWriter.CreateWriter(
             ref bufferWriter);
         writer.WriteObjectHeader(1);
         writer.WriteUtf8Exact(__value0, __utf8Length0);
@@ -364,14 +364,14 @@ partial class Dog : ISharpPackable<Dog>, global::SharpPack.ISharpPackExactSizeSe
         return bufferWriter.GetFilledBuffer();
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<Dog> global::SharpPack.ISharpPackFormatterFactory<Dog>.CreateFormatter()
     {
 
         return new global::SharpPack.Formatters.SharpPackableFormatter<Dog>();
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<Dog> global::SharpPack.ISharpPackContextFormatterFactory<Dog>.CreateFormatter(
         global::SharpPack.SharpPackSerializerContext context)
     {
@@ -493,7 +493,7 @@ partial class Dog : ISharpPackable<Dog>, global::SharpPack.ISharpPackExactSizeSe
         return;
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     sealed class __SharpPackContextFormatter
         : global::SharpPack.SharpPackFormatter<Dog>,
           global::SharpPack.ISharpPackContextOverrideFormatter
@@ -509,7 +509,7 @@ partial class Dog : ISharpPackable<Dog>, global::SharpPack.ISharpPackExactSizeSe
             => __SharpPackDeserializeWithFormatterOverrides(ref reader, ref value);
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static void ISharpPackable<Dog>.Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Dog? value) 
     {
 
@@ -527,7 +527,7 @@ partial class Dog : ISharpPackable<Dog>, global::SharpPack.ISharpPackExactSizeSe
         return;
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static void ISharpPackable<Dog>.Deserialize(ref SharpPackReader reader, scoped ref Dog? value)
     {
 
@@ -657,14 +657,14 @@ partial struct Fixed : ISharpPackable<Fixed>, global::SharpPack.ISharpPackFormat
 
 
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<Fixed> global::SharpPack.ISharpPackFormatterFactory<Fixed>.CreateFormatter()
     {
 
         return new global::SharpPack.Formatters.SharpPackableFormatter<Fixed>();
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<Fixed> global::SharpPack.ISharpPackContextFormatterFactory<Fixed>.CreateFormatter(
         global::SharpPack.SharpPackSerializerContext context)
     {
@@ -674,7 +674,7 @@ partial struct Fixed : ISharpPackable<Fixed>, global::SharpPack.ISharpPackFormat
 
 
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static void ISharpPackable<Fixed>.Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Fixed value) 
     {
 
@@ -684,7 +684,7 @@ partial struct Fixed : ISharpPackable<Fixed>, global::SharpPack.ISharpPackFormat
         return;
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static void ISharpPackable<Fixed>.Deserialize(ref SharpPackReader reader, scoped ref Fixed value)
     {
 
@@ -731,13 +731,13 @@ partial interface IAnimal : global::SharpPack.ISharpPackFormatterFactory<IAnimal
         StaticConstructor();
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<IAnimal> global::SharpPack.ISharpPackFormatterFactory<IAnimal>.CreateFormatter()
     {
         return new IAnimalFormatter();
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     sealed class IAnimalFormatter : SharpPackFormatter<IAnimal>
     {
         static readonly System.Collections.Generic.Dictionary<Type, ushort> __typeToTag = new(2)
@@ -746,7 +746,7 @@ partial interface IAnimal : global::SharpPack.ISharpPackFormatterFactory<IAnimal
             { typeof(global::BaselineFixtures.Dog), 1 },
         };
 
-        [global::SharpPack.Internal.Preserve]
+        [global::SharpPack.CompilerServices.Preserve]
         public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref IAnimal? value)
         {
 
@@ -776,7 +776,7 @@ partial interface IAnimal : global::SharpPack.ISharpPackFormatterFactory<IAnimal
 
         }
 
-        [global::SharpPack.Internal.Preserve]
+        [global::SharpPack.CompilerServices.Preserve]
         public override void Deserialize(ref SharpPackReader reader, scoped ref IAnimal? value)
         {
 
@@ -862,14 +862,14 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
 
 
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<Node> global::SharpPack.ISharpPackFormatterFactory<Node>.CreateFormatter()
     {
         __SharpPackEnsureAotFormatterRoots();
         return new global::SharpPack.Formatters.SharpPackableFormatter<Node>();
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<Node> global::SharpPack.ISharpPackContextFormatterFactory<Node>.CreateFormatter(
         global::SharpPack.SharpPackSerializerContext context)
     {
@@ -881,7 +881,7 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
         return new global::SharpPack.Formatters.SharpPackableFormatter<Node>();
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static void __SharpPackEnsureAotFormatterRoots()
     {
         if (!global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)
@@ -914,12 +914,12 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
             writer.WriteObjectReferenceId(id);
             goto END;
         }
-        var tempBuffer = global::SharpPack.Internal.ReusableLinkedArrayBufferWriterPool.Rent(
+        var tempBuffer = global::SharpPack.CompilerServices.SharpPackPooledBufferWriter.Rent(
             out var tempBufferLeaseId);
         try
         {
             Span<int> offsets = stackalloc int[2];
-            var tempWriter = new SharpPackWriter<global::SharpPack.Internal.ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
+            var tempWriter = new SharpPackWriter<global::SharpPack.CompilerServices.SharpPackPooledBufferWriter>(ref tempBuffer, writer.OptionalState);
 
             tempWriter.WriteValue(value.@Value); offsets[0] = tempWriter.WrittenCount;
             tempWriter.WriteValue(value.@Next); offsets[1] = tempWriter.WrittenCount;
@@ -946,7 +946,7 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
         }
         finally
         {
-            global::SharpPack.Internal.ReusableLinkedArrayBufferWriterPool.Return(
+            global::SharpPack.CompilerServices.SharpPackPooledBufferWriter.Return(
                 tempBuffer,
                 tempBufferLeaseId);
         }
@@ -1081,7 +1081,7 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
         return;
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     sealed class __SharpPackContextFormatter
         : global::SharpPack.SharpPackFormatter<Node>,
           global::SharpPack.ISharpPackContextOverrideFormatter
@@ -1097,7 +1097,7 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
             => __SharpPackDeserializeWithFormatterOverrides(ref reader, ref value);
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static void ISharpPackable<Node>.Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Node? value) 
     {
 
@@ -1112,12 +1112,12 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
             writer.WriteObjectReferenceId(id);
             goto END;
         }
-        var tempBuffer = global::SharpPack.Internal.ReusableLinkedArrayBufferWriterPool.Rent(
+        var tempBuffer = global::SharpPack.CompilerServices.SharpPackPooledBufferWriter.Rent(
             out var tempBufferLeaseId);
         try
         {
             Span<int> offsets = stackalloc int[2];
-            var tempWriter = new SharpPackWriter<global::SharpPack.Internal.ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
+            var tempWriter = new SharpPackWriter<global::SharpPack.CompilerServices.SharpPackPooledBufferWriter>(ref tempBuffer, writer.OptionalState);
 
             tempWriter.WriteUnmanaged(value.@Value); offsets[0] = tempWriter.WrittenCount;
             tempWriter.WritePackable(value.@Next); offsets[1] = tempWriter.WrittenCount;
@@ -1144,7 +1144,7 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
         }
         finally
         {
-            global::SharpPack.Internal.ReusableLinkedArrayBufferWriterPool.Return(
+            global::SharpPack.CompilerServices.SharpPackPooledBufferWriter.Return(
                 tempBuffer,
                 tempBufferLeaseId);
         }
@@ -1153,7 +1153,7 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
         return;
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static void ISharpPackable<Node>.Deserialize(ref SharpPackReader reader, scoped ref Node? value)
     {
 
@@ -1325,14 +1325,14 @@ partial class Inner<U> : ISharpPackable<Inner<U>>, global::SharpPack.ISharpPackF
 
 
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<Inner<U>> global::SharpPack.ISharpPackFormatterFactory<Inner<U>>.CreateFormatter()
     {
         __SharpPackEnsureAotFormatterRoots();
         return new global::SharpPack.Formatters.SharpPackableFormatter<Inner<U>>();
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<Inner<U>> global::SharpPack.ISharpPackContextFormatterFactory<Inner<U>>.CreateFormatter(
         global::SharpPack.SharpPackSerializerContext context)
     {
@@ -1344,7 +1344,7 @@ partial class Inner<U> : ISharpPackable<Inner<U>>, global::SharpPack.ISharpPackF
         return new global::SharpPack.Formatters.SharpPackableFormatter<Inner<U>>();
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static void __SharpPackEnsureAotFormatterRoots()
     {
         if (!global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)
@@ -1477,7 +1477,7 @@ partial class Inner<U> : ISharpPackable<Inner<U>>, global::SharpPack.ISharpPackF
         return;
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     sealed class __SharpPackContextFormatter
         : global::SharpPack.SharpPackFormatter<Inner<U>>,
           global::SharpPack.ISharpPackContextOverrideFormatter
@@ -1493,7 +1493,7 @@ partial class Inner<U> : ISharpPackable<Inner<U>>, global::SharpPack.ISharpPackF
             => __SharpPackDeserializeWithFormatterOverrides(ref reader, ref value);
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static void ISharpPackable<Inner<U>>.Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Inner<U>? value) 
     {
 
@@ -1512,7 +1512,7 @@ partial class Inner<U> : ISharpPackable<Inner<U>>, global::SharpPack.ISharpPackF
         return;
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static void ISharpPackable<Inner<U>>.Deserialize(ref SharpPackReader reader, scoped ref Inner<U>? value)
     {
 
@@ -1654,14 +1654,14 @@ partial class Simple : ISharpPackable<Simple>, global::SharpPack.ISharpPackForma
 
 
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<Simple> global::SharpPack.ISharpPackFormatterFactory<Simple>.CreateFormatter()
     {
 
         return new global::SharpPack.Formatters.SharpPackableFormatter<Simple>();
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<Simple> global::SharpPack.ISharpPackContextFormatterFactory<Simple>.CreateFormatter(
         global::SharpPack.SharpPackSerializerContext context)
     {
@@ -1803,7 +1803,7 @@ partial class Simple : ISharpPackable<Simple>, global::SharpPack.ISharpPackForma
         return;
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     sealed class __SharpPackContextFormatter
         : global::SharpPack.SharpPackFormatter<Simple>,
           global::SharpPack.ISharpPackContextOverrideFormatter
@@ -1819,7 +1819,7 @@ partial class Simple : ISharpPackable<Simple>, global::SharpPack.ISharpPackForma
             => __SharpPackDeserializeWithFormatterOverrides(ref reader, ref value);
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static void ISharpPackable<Simple>.Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Simple? value) 
     {
 
@@ -1838,7 +1838,7 @@ partial class Simple : ISharpPackable<Simple>, global::SharpPack.ISharpPackForma
         return;
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static void ISharpPackable<Simple>.Deserialize(ref SharpPackReader reader, scoped ref Simple? value)
     {
 
@@ -1986,14 +1986,14 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
 
 
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<Versioned> global::SharpPack.ISharpPackFormatterFactory<Versioned>.CreateFormatter()
     {
 
         return new global::SharpPack.Formatters.SharpPackableFormatter<Versioned>();
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<Versioned> global::SharpPack.ISharpPackContextFormatterFactory<Versioned>.CreateFormatter(
         global::SharpPack.SharpPackSerializerContext context)
     {
@@ -2020,12 +2020,12 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
             goto END;
         }
 
-        var tempBuffer = global::SharpPack.Internal.ReusableLinkedArrayBufferWriterPool.Rent(
+        var tempBuffer = global::SharpPack.CompilerServices.SharpPackPooledBufferWriter.Rent(
             out var tempBufferLeaseId);
         try
         {
             Span<int> offsets = stackalloc int[2];
-            var tempWriter = new SharpPackWriter<global::SharpPack.Internal.ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
+            var tempWriter = new SharpPackWriter<global::SharpPack.CompilerServices.SharpPackPooledBufferWriter>(ref tempBuffer, writer.OptionalState);
 
             tempWriter.WriteValue(value.@Id); offsets[0] = tempWriter.WrittenCount;
             tempWriter.WriteValue(value.@Name); offsets[1] = tempWriter.WrittenCount;
@@ -2052,7 +2052,7 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
         }
         finally
         {
-            global::SharpPack.Internal.ReusableLinkedArrayBufferWriterPool.Return(
+            global::SharpPack.CompilerServices.SharpPackPooledBufferWriter.Return(
                 tempBuffer,
                 tempBufferLeaseId);
         }
@@ -2176,7 +2176,7 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
         return;
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     sealed class __SharpPackContextFormatter
         : global::SharpPack.SharpPackFormatter<Versioned>,
           global::SharpPack.ISharpPackContextOverrideFormatter
@@ -2192,7 +2192,7 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
             => __SharpPackDeserializeWithFormatterOverrides(ref reader, ref value);
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static void ISharpPackable<Versioned>.Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Versioned? value) 
     {
 
@@ -2215,7 +2215,7 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
         return;
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static void ISharpPackable<Versioned>.Deserialize(ref SharpPackReader reader, scoped ref Versioned? value)
     {
 

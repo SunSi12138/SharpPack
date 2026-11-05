@@ -30,8 +30,19 @@ internal static class RuntimeGeneratedCodeAbi
             return "invalid";
         }
 
-        return value >= MinimumVersion && value <= MaximumVersion
-            ? null
-            : value.ToString(CultureInfo.InvariantCulture);
+        if (value < MinimumVersion || value > MaximumVersion)
+            return value.ToString(CultureInfo.InvariantCulture);
+
+        // ABI 1 was introduced on an unpublished handshake-only candidate.
+        // Additive compiler-services capabilities are checked explicitly so that
+        // candidate (or an incomplete runtime) gets this diagnostic, not CS errors.
+        var assembly = attribute!.ContainingAssembly;
+        foreach (var name in new[] { "PreserveAttribute", "SharpPackExactBufferWriter", "SharpPackPooledBufferWriter" })
+        {
+            var helper = assembly.GetTypeByMetadataName("SharpPack.CompilerServices." + name);
+            if (helper is null || helper.DeclaredAccessibility != Accessibility.Public)
+                return "1 (missing compiler-services capability: " + name + ")";
+        }
+        return null;
     }
 }

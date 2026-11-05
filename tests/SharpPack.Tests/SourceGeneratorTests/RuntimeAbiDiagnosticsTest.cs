@@ -38,6 +38,7 @@ public class RuntimeAbiDiagnosticsTest
 
     [Theory]
     [InlineData(null, "missing")]
+    [InlineData("public const int Version = 1;", "1 (missing compiler-services capability: PreserveAttribute)")]
     [InlineData("public const int Version = 0;", "0")]
     [InlineData("public const int Version = 2;", "2")]
     [InlineData("public const int Version = -1;", "-1")]

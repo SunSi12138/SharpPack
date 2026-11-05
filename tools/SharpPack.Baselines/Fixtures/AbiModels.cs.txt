@@ -1,0 +1,63 @@
+#nullable enable
+using SharpPack;
+using System.Collections.Generic;
+namespace AbiFixtures;
+
+public enum SampleEnum { Zero }
+[SharpPackable] public partial struct RefStruct { public string? Name { get; set; } }
+[SharpPackable] public partial class Shapes
+{
+    public SampleEnum Enum { get; set; }
+    public BaselineFixtures.Simple[]? Objects { get; set; }
+    public int[]? Integers { get; set; }
+    public int?[]? NullableIntegers { get; set; }
+    public BaselineFixtures.Simple[,]? Rank2 { get; set; }
+    public BaselineFixtures.Simple[,,]? Rank3 { get; set; }
+    public BaselineFixtures.Simple[,,,]? Rank4 { get; set; }
+    public RefStruct? Nullable { get; set; }
+    public List<BaselineFixtures.Simple>? Packables { get; set; }
+    public List<BaselineFixtures.Fixed>? UnmanagedPackables { get; set; }
+}
+[SharpPackable] public partial class ImmutableLists
+{
+    public List<BaselineFixtures.Simple>? Objects { get; }
+    public List<BaselineFixtures.Fixed>? Values { get; }
+    public ImmutableLists(List<BaselineFixtures.Simple>? objects, List<BaselineFixtures.Fixed>? values)
+    { Objects = objects; Values = values; }
+}
+[SharpPackable(GenerateType.VersionTolerant)] public partial class Versioned
+{
+    [SharpPackOrder(0)] public Shapes? Object { get; set; }
+    [SharpPackOrder(2)] public List<BaselineFixtures.Simple>? Items { get; set; }
+}
+[SharpPackable(GenerateType.Collection)] public partial class CustomList : List<BaselineFixtures.Simple> { }
+[SharpPackable(GenerateType.Collection)] public partial class CustomSet : HashSet<BaselineFixtures.Simple> { }
+[SharpPackable(GenerateType.Collection)] public partial class CustomDictionary : Dictionary<int, BaselineFixtures.Simple> { }
+
+public partial interface IExternal<T> { }
+[SharpPackable] public partial class ExternalInt : IExternal<int> { public int Value { get; set; } }
+[SharpPackUnionFormatter(typeof(IExternal<int>))]
+[SharpPackUnion(1, typeof(ExternalInt))]
+public partial class ExternalFormatter { }
+
+[SharpPackable] public partial class ShippedCustomFormatters
+{
+    [Utf8StringFormatter] public string? Utf8 { get; set; }
+    [Utf16StringFormatter] public string? Utf16 { get; set; }
+    [InternStringFormatter] public string? Intern { get; set; }
+    [BitPackFormatter] public bool[]? Bits { get; set; }
+    [BrotliFormatter] public byte[]? Compressed { get; set; }
+    [BrotliFormatter<int>] public int CompressedInt { get; set; }
+    [BrotliStringFormatter] public string? CompressedString { get; set; }
+    [OrdinalIgnoreCaseStringDictionaryFormatter<int>] public Dictionary<string, int>? Names { get; set; }
+    [MemoryPoolFormatter<int>] public System.Memory<int> Memory { get; set; }
+    [ReadOnlyMemoryPoolFormatter<int>] public System.ReadOnlyMemory<int> ReadOnlyMemory { get; set; }
+}
+public sealed class UntypedOffsetAttribute : SharpPackCustomFormatterAttribute<int>
+{
+    public override ISharpPackFormatter<int> GetFormatter() => new BaselineFixtures.OffsetFormatter();
+}
+[SharpPackable] public partial class UntypedCustom
+{
+    [UntypedOffset] public int Value { get; set; }
+}
