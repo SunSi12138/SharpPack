@@ -242,7 +242,25 @@ public sealed class SharpPackReaderOptionalState : IDisposable
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Reset()
+    {
+        if (sequentialReferences is not null || sparseReferences is not null)
+        {
+            ResetReferences();
+        }
+
+        SerializerContext = null;
+        FormatterGraph = null;
+        referenceCount = 0;
+        maxReferenceCount = int.MaxValue;
+        MaxDepth = SharpPackReadLimits.CurrentCompatibleMaxDepth;
+        MaxCollectionLength = int.MaxValue;
+        requiresReset = false;
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    void ResetReferences()
     {
         if (sequentialReferences is { Count: > MaxRetainedReferenceCount })
         {
@@ -261,14 +279,6 @@ public sealed class SharpPackReaderOptionalState : IDisposable
         {
             sparseReferences?.Clear();
         }
-
-        SerializerContext = null;
-        FormatterGraph = null;
-        referenceCount = 0;
-        maxReferenceCount = int.MaxValue;
-        MaxDepth = SharpPackReadLimits.CurrentCompatibleMaxDepth;
-        MaxCollectionLength = int.MaxValue;
-        requiresReset = false;
     }
 
     void IDisposable.Dispose()

@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - "main"
+      - "validation/pr30-reset-helper-20261105"
   pull_request:
     branches:
       - "main"
