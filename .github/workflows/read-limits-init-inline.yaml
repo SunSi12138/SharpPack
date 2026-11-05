@@ -1,0 +1,100 @@
+name: Reader state initialization experiment
+on:
+  push:
+    branches: [validation/pr30-init-inline-20261105]
+jobs:
+  diagnose:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        kind: [jit, performance]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+      DOTNET_TieredCompilation: 1
+      DOTNET_TieredPGO: 1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          path: baseline
+          ref: 6666ada1d878da64b2f4d2c1107fbea30fad074f
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          path: pr
+          ref: 56113519bb9771fe33ec39daed59181024918228
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.114
+      - name: Verify controls and one-attribute production diff
+        run: |
+          set -euo pipefail
+          python3 candidate/tools/ReadLimitsInitInline/test_summary.py
+          python3 candidate/tools/ReadLimitsInitInline/test_jit_summary.py
+          test "$(git -C baseline rev-parse HEAD)" = 6666ada1d878da64b2f4d2c1107fbea30fad074f
+          test "$(git -C pr rev-parse HEAD)" = 56113519bb9771fe33ec39daed59181024918228
+          test "$(git -C candidate rev-parse HEAD)" = "$GITHUB_SHA"
+          git -C baseline diff --exit-code 8efea5afc79eaefc5023806a2588c4ad2f09a9c6 HEAD -- src Directory.Build.props global.json
+          test "$(git -C baseline rev-parse HEAD:src/SharpPack.Generator)" = "$(git -C candidate rev-parse HEAD:src/SharpPack.Generator)"
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          path = 'src/SharpPack.Core/SharpPackReaderOptionalState.cs'
+          before = (Path('pr') / path).read_text()
+          after = (Path('candidate') / path).read_text()
+          target = '    internal void Init(SharpPackSerializerContext context)'
+          assert before.count(target) == 1
+          assert after == before.replace(target, '    [MethodImpl(MethodImplOptions.AggressiveInlining)]\n' + target)
+          changed = subprocess.check_output(['git', '-C', 'candidate', 'diff', '--name-only', '56113519bb9771fe33ec39daed59181024918228', 'HEAD', '--', 'src'], text=True).splitlines()
+          assert changed == [path], changed
+          print('Production change verified: one Init attribute; baseline production and generator unchanged.')
+          PY
+      - name: Build byte-identical harness and three runtime variants
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/harness" "$RUNNER_TEMP/runtime-a" "$RUNNER_TEMP/runtime-b" "$RUNNER_TEMP/runtime-c"
+          cp candidate/tools/ReadLimitsInitInline/{Perf.csproj,Program.cs} "$RUNNER_TEMP/harness/"
+          printf '{"sdk":{"version":"10.0.114","rollForward":"disable"}}' > "$RUNNER_TEMP/global.json"
+          test "$(cd "$RUNNER_TEMP/harness"; dotnet --version)" = 10.0.114
+          if ! dotnet build "$RUNNER_TEMP/harness/Perf.csproj" -c Release -p:RepoRoot="$GITHUB_WORKSPACE/baseline" -o "$RUNNER_TEMP/runtime-a" > "$RUNNER_TEMP/harness-build.log" 2>&1; then
+            echo 'Harness build failed; raw output retained locally'
+            exit 1
+          fi
+          for spec in pr:b candidate:c; do
+            repo="${spec%:*}"
+            side="${spec#*:}"
+            test "$(cd "$repo"; dotnet --version)" = 10.0.114
+            if ! dotnet build "$repo/src/SharpPack.Streaming/SharpPack.Streaming.csproj" -c Release > "$RUNNER_TEMP/runtime-$side-build.log" 2>&1; then
+              echo "Runtime $side build failed; raw output retained locally"
+              exit 1
+            fi
+            cp -a "$RUNNER_TEMP/runtime-a/." "$RUNNER_TEMP/runtime-$side/"
+            cp "$repo/src/SharpPack.Core/bin/Release/net10.0/SharpPack.Core.dll" "$RUNNER_TEMP/runtime-$side/"
+            cp "$repo/src/SharpPack.Streaming/bin/Release/net10.0/SharpPack.Streaming.dll" "$RUNNER_TEMP/runtime-$side/"
+            cmp "$RUNNER_TEMP/runtime-a/Perf.dll" "$RUNNER_TEMP/runtime-$side/Perf.dll"
+          done
+          echo 'One managed IL harness; A baseline, B exact PR, C one-attribute candidate; SDK 10.0.114.'
+      - name: Capture structured JIT evidence
+        if: matrix.kind == 'jit'
+        run: python3 candidate/tools/ReadLimitsInitInline/jit_summary.py --a "$RUNNER_TEMP/runtime-a" --b "$RUNNER_TEMP/runtime-b" --c "$RUNNER_TEMP/runtime-c" --work "$RUNNER_TEMP/jit"
+      - name: Measure default-runtime balanced triples
+        if: matrix.kind == 'performance'
+        run: python3 candidate/tools/ReadLimitsInitInline/threeway.py --a "$RUNNER_TEMP/runtime-a" --b "$RUNNER_TEMP/runtime-b" --c "$RUNNER_TEMP/runtime-c" --work "$RUNNER_TEMP/performance"
+      - name: Verify unchanged source checkouts
+        if: always()
+        run: |
+          git -C baseline diff --exit-code
+          git -C pr diff --exit-code
+          git -C candidate diff --exit-code

@@ -109,6 +109,7 @@ public sealed class SharpPackReaderOptionalState : IDisposable
         => FormatterGraph is { } graph &&
            graph.HasFormatterOverride<T>();
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void Init(SharpPackSerializerContext context)
     {
         requiresReset = true;

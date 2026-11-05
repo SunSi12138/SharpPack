@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - "main"
+      - "validation/pr30-init-inline-20261105"
   pull_request:
     branches:
       - "main"
@@ -41,3 +42,4 @@ jobs:
       - run: '"$RUNNER_TEMP/sharppack-aot/NativeAot"'
       - run: dotnet list SharpPack.sln package --vulnerable --include-transitive
       - run: git diff --exit-code
+
