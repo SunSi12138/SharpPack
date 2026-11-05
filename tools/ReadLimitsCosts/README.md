@@ -66,3 +66,11 @@ acceptance gate. Fixed warmup does not prove tier convergence; method-level
 microprobes do not reproduce every optimizer or cache interaction in public
 entry points. No outliers are removed. Raw subprocess logs stay in temporary
 runner storage; no logs or artifacts are uploaded.
+
+## Recorded outcome
+
+All four measurement jobs passed. The old 64 KiB allocating-read regression was
+not reproduced in this changed harness; no production fix is claimed. Small
+Int32/context costs remain. See the [reviewed evidence and next experiments](../../docs/validation/pr30-state-copy-20261105.md), including alignment confounds,
+retained JIT instrumentation failure, successful controls and all comparison
+rows. The prior Init-only candidate remains unsuccessful and unchanged.
