@@ -1,385 +1,386 @@
 # Generated-code runtime dependency inventory
 # Exact Roslyn documentation IDs, normalized to original generic definitions.
+# Semantic scope contracts include effective parameter ScopedKind and UnscopedRef/receiver semantics.
 # Each member is owned by Core; source selection and coverage are owned by Generator.
 # user = supported low-level API; legacy-generated = retained 1.x generated ABI;
 # compiler-services = generated-only ABI. Internal implementation types are forbidden.
 # Coverage: 67 formatter-map entries; unmanaged arities 1..15; representative and extended fixtures.
-user | F:SharpPack.SharpPackCode.ReferenceId
-user | M:SharpPack.BitPackFormatterAttribute.#ctor
-user | M:SharpPack.BitPackFormatterAttribute.GetFormatter
-user | M:SharpPack.BrotliFormatterAttribute.#ctor(System.IO.Compression.CompressionLevel,System.Int32,System.Int32)
-user | M:SharpPack.BrotliFormatterAttribute.GetFormatter
-user | M:SharpPack.BrotliFormatterAttribute`1.#ctor(System.IO.Compression.CompressionLevel,System.Int32)
-user | M:SharpPack.BrotliFormatterAttribute`1.GetFormatter
-user | M:SharpPack.BrotliStringFormatterAttribute.#ctor(System.IO.Compression.CompressionLevel,System.Int32,System.Int32)
-user | M:SharpPack.BrotliStringFormatterAttribute.GetFormatter
-compiler-services | M:SharpPack.CompilerServices.PreserveAttribute.#ctor
-compiler-services | M:SharpPack.CompilerServices.SharpPackExactBufferWriter.#ctor(System.Byte[])
-compiler-services | M:SharpPack.CompilerServices.SharpPackExactBufferWriter.CreateWriter(SharpPack.CompilerServices.SharpPackExactBufferWriter@)
-compiler-services | M:SharpPack.CompilerServices.SharpPackExactBufferWriter.GetFilledBuffer
-compiler-services | M:SharpPack.CompilerServices.SharpPackPooledBufferWriter.Rent(System.Int64@)
-compiler-services | M:SharpPack.CompilerServices.SharpPackPooledBufferWriter.Return(SharpPack.CompilerServices.SharpPackPooledBufferWriter,System.Int64)
-compiler-services | M:SharpPack.CompilerServices.SharpPackPooledBufferWriter.WriteToAndReset``1(SharpPack.SharpPackWriter{``0}@)
-user | M:SharpPack.Formatters.ArrayFormatter`1.#ctor
-user | M:SharpPack.Formatters.ArraySegmentFormatter`1.#ctor
-user | M:SharpPack.Formatters.BlockingCollectionFormatter`1.#ctor
-user | M:SharpPack.Formatters.CollectionFormatter`1.#ctor
-user | M:SharpPack.Formatters.ConcurrentBagFormatter`1.#ctor
-user | M:SharpPack.Formatters.ConcurrentDictionaryFormatter`2.#ctor
-user | M:SharpPack.Formatters.ConcurrentQueueFormatter`1.#ctor
-user | M:SharpPack.Formatters.ConcurrentStackFormatter`1.#ctor
-user | M:SharpPack.Formatters.DictionaryFormatter`2.#ctor
-user | M:SharpPack.Formatters.FourDimensionalArrayFormatter`1.#ctor
-user | M:SharpPack.Formatters.FrozenDictionaryFormatter`2.#ctor
-user | M:SharpPack.Formatters.FrozenSetFormatter`1.#ctor
-user | M:SharpPack.Formatters.GenericCollectionFormatter`2.#ctor
-user | M:SharpPack.Formatters.GenericDictionaryFormatter`3.#ctor
-user | M:SharpPack.Formatters.GenericSetFormatter`2.#ctor
-user | M:SharpPack.Formatters.HashSetFormatter`1.#ctor
-user | M:SharpPack.Formatters.ImmutableArrayFormatter`1.#ctor
-user | M:SharpPack.Formatters.ImmutableDictionaryFormatter`2.#ctor
-user | M:SharpPack.Formatters.ImmutableHashSetFormatter`1.#ctor
-user | M:SharpPack.Formatters.ImmutableListFormatter`1.#ctor
-user | M:SharpPack.Formatters.ImmutableQueueFormatter`1.#ctor
-user | M:SharpPack.Formatters.ImmutableSortedDictionaryFormatter`2.#ctor
-user | M:SharpPack.Formatters.ImmutableSortedSetFormatter`1.#ctor
-user | M:SharpPack.Formatters.ImmutableStackFormatter`1.#ctor
-user | M:SharpPack.Formatters.InterfaceCollectionFormatter`1.#ctor
-user | M:SharpPack.Formatters.InterfaceDictionaryFormatter`2.#ctor
-user | M:SharpPack.Formatters.InterfaceEnumerableFormatter`1.#ctor
-user | M:SharpPack.Formatters.InterfaceGroupingFormatter`2.#ctor
-user | M:SharpPack.Formatters.InterfaceImmutableDictionaryFormatter`2.#ctor
-user | M:SharpPack.Formatters.InterfaceImmutableListFormatter`1.#ctor
-user | M:SharpPack.Formatters.InterfaceImmutableQueueFormatter`1.#ctor
-user | M:SharpPack.Formatters.InterfaceImmutableSetFormatter`1.#ctor
-user | M:SharpPack.Formatters.InterfaceImmutableStackFormatter`1.#ctor
-user | M:SharpPack.Formatters.InterfaceListFormatter`1.#ctor
-user | M:SharpPack.Formatters.InterfaceLookupFormatter`2.#ctor
-user | M:SharpPack.Formatters.InterfaceReadOnlyCollectionFormatter`1.#ctor
-user | M:SharpPack.Formatters.InterfaceReadOnlyDictionaryFormatter`2.#ctor
-user | M:SharpPack.Formatters.InterfaceReadOnlyListFormatter`1.#ctor
-user | M:SharpPack.Formatters.InterfaceReadOnlySetFormatter`1.#ctor
-user | M:SharpPack.Formatters.InterfaceSetFormatter`1.#ctor
-user | M:SharpPack.Formatters.KeyValuePairFormatter`2.#ctor
-user | M:SharpPack.Formatters.LazyFormatter`1.#ctor
-user | M:SharpPack.Formatters.LinkedListFormatter`1.#ctor
-legacy-generated | M:SharpPack.Formatters.ListFormatter.DeserializePackableUnmanaged``1(SharpPack.SharpPackReader@)
-legacy-generated | M:SharpPack.Formatters.ListFormatter.DeserializePackableUnmanaged``1(SharpPack.SharpPackReader@,System.Collections.Generic.List{``0}@)
-legacy-generated | M:SharpPack.Formatters.ListFormatter.DeserializePackable``1(SharpPack.SharpPackReader@)
-legacy-generated | M:SharpPack.Formatters.ListFormatter.DeserializePackable``1(SharpPack.SharpPackReader@,System.Collections.Generic.List{``0}@)
-legacy-generated | M:SharpPack.Formatters.ListFormatter.SerializePackableUnmanaged``2(SharpPack.SharpPackWriter{``1}@,System.Collections.Generic.List{``0})
-legacy-generated | M:SharpPack.Formatters.ListFormatter.SerializePackable``2(SharpPack.SharpPackWriter{``1}@,System.Collections.Generic.List{``0})
-user | M:SharpPack.Formatters.ListFormatter`1.#ctor
-user | M:SharpPack.Formatters.MemoryFormatter`1.#ctor
-user | M:SharpPack.Formatters.NullableFormatter`1.#ctor
-user | M:SharpPack.Formatters.ObservableCollectionFormatter`1.#ctor
-user | M:SharpPack.Formatters.PriorityQueueFormatter`2.#ctor
-user | M:SharpPack.Formatters.QueueFormatter`1.#ctor
-user | M:SharpPack.Formatters.ReadOnlyCollectionFormatter`1.#ctor
-user | M:SharpPack.Formatters.ReadOnlyMemoryFormatter`1.#ctor
-user | M:SharpPack.Formatters.ReadOnlyObservableCollectionFormatter`1.#ctor
-user | M:SharpPack.Formatters.ReadOnlySequenceFormatter`1.#ctor
-user | M:SharpPack.Formatters.SharpPackableFormatter`1.#ctor
-user | M:SharpPack.Formatters.SortedDictionaryFormatter`2.#ctor
-user | M:SharpPack.Formatters.SortedListFormatter`2.#ctor
-user | M:SharpPack.Formatters.SortedSetFormatter`1.#ctor
-user | M:SharpPack.Formatters.StackFormatter`1.#ctor
-user | M:SharpPack.Formatters.ThreeDimensionalArrayFormatter`1.#ctor
-user | M:SharpPack.Formatters.TupleFormatter`1.#ctor
-user | M:SharpPack.Formatters.TupleFormatter`2.#ctor
-user | M:SharpPack.Formatters.TupleFormatter`3.#ctor
-user | M:SharpPack.Formatters.TupleFormatter`4.#ctor
-user | M:SharpPack.Formatters.TupleFormatter`5.#ctor
-user | M:SharpPack.Formatters.TupleFormatter`6.#ctor
-user | M:SharpPack.Formatters.TupleFormatter`7.#ctor
-user | M:SharpPack.Formatters.TupleFormatter`8.#ctor
-user | M:SharpPack.Formatters.TwoDimensionalArrayFormatter`1.#ctor
-user | M:SharpPack.Formatters.UnmanagedFormatter`1.#ctor
-user | M:SharpPack.Formatters.ValueTupleFormatter`1.#ctor
-user | M:SharpPack.Formatters.ValueTupleFormatter`2.#ctor
-user | M:SharpPack.Formatters.ValueTupleFormatter`3.#ctor
-user | M:SharpPack.Formatters.ValueTupleFormatter`4.#ctor
-user | M:SharpPack.Formatters.ValueTupleFormatter`5.#ctor
-user | M:SharpPack.Formatters.ValueTupleFormatter`6.#ctor
-user | M:SharpPack.Formatters.ValueTupleFormatter`7.#ctor
-user | M:SharpPack.Formatters.ValueTupleFormatter`8.#ctor
-legacy-generated | M:SharpPack.ISharpPackContextFormatterFactory`1.CreateFormatter(SharpPack.SharpPackSerializerContext)
-legacy-generated | M:SharpPack.ISharpPackExactSizeSerializable`1.SerializeExact
-user | M:SharpPack.ISharpPackFormatterFactory`1.CreateFormatter
-user | M:SharpPack.ISharpPackable`1.Deserialize(SharpPack.SharpPackReader@,`0@)
-user | M:SharpPack.ISharpPackable`1.Serialize``1(SharpPack.SharpPackWriter{``0}@,`0@)
-user | M:SharpPack.InternStringFormatterAttribute.#ctor
-user | M:SharpPack.InternStringFormatterAttribute.GetFormatter
-user | M:SharpPack.MemoryPoolFormatterAttribute`1.#ctor
-user | M:SharpPack.MemoryPoolFormatterAttribute`1.GetFormatter
-user | M:SharpPack.OrdinalIgnoreCaseStringDictionaryFormatter`1.#ctor
-user | M:SharpPack.OrdinalIgnoreCaseStringDictionaryFormatter`1.GetFormatter
-user | M:SharpPack.ReadOnlyMemoryPoolFormatterAttribute`1.#ctor
-user | M:SharpPack.ReadOnlyMemoryPoolFormatterAttribute`1.GetFormatter
-user | M:SharpPack.SharpPackFormatter`1.#ctor
-user | M:SharpPack.SharpPackFormatter`1.Deserialize(SharpPack.SharpPackReader@,`0@)
-user | M:SharpPack.SharpPackFormatter`1.Serialize``1(SharpPack.SharpPackWriter{``0}@,`0@)
-user | M:SharpPack.SharpPackReader.Advance(System.Int32)
-user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``1(``0@)
-user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``10(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@)
-user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``11(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@)
-user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``12(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@)
-user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``13(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@)
-user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``14(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@)
-user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``15(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@,``14@)
-user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``2(``0@,``1@)
-user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``3(``0@,``1@,``2@)
-user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``4(``0@,``1@,``2@,``3@)
-user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``5(``0@,``1@,``2@,``3@,``4@)
-user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``6(``0@,``1@,``2@,``3@,``4@,``5@)
-user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``7(``0@,``1@,``2@,``3@,``4@,``5@,``6@)
-user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``8(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@)
-user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``9(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@)
-user | M:SharpPack.SharpPackReader.ReadArray``1
-user | M:SharpPack.SharpPackReader.ReadArray``1(``0[]@)
-user | M:SharpPack.SharpPackReader.ReadPackableArray``1
-user | M:SharpPack.SharpPackReader.ReadPackableArray``1(``0[]@)
-user | M:SharpPack.SharpPackReader.ReadPackable``1
-user | M:SharpPack.SharpPackReader.ReadPackable``1(``0@)
-user | M:SharpPack.SharpPackReader.ReadString
-user | M:SharpPack.SharpPackReader.ReadUnmanagedArray``1
-user | M:SharpPack.SharpPackReader.ReadUnmanagedArray``1(``0[]@)
-user | M:SharpPack.SharpPackReader.ReadUnmanaged``1(``0@)
-user | M:SharpPack.SharpPackReader.ReadUnmanaged``10(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@)
-user | M:SharpPack.SharpPackReader.ReadUnmanaged``11(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@)
-user | M:SharpPack.SharpPackReader.ReadUnmanaged``12(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@)
-user | M:SharpPack.SharpPackReader.ReadUnmanaged``13(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@)
-user | M:SharpPack.SharpPackReader.ReadUnmanaged``14(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@)
-user | M:SharpPack.SharpPackReader.ReadUnmanaged``15(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@,``14@)
-user | M:SharpPack.SharpPackReader.ReadUnmanaged``2(``0@,``1@)
-user | M:SharpPack.SharpPackReader.ReadUnmanaged``3(``0@,``1@,``2@)
-user | M:SharpPack.SharpPackReader.ReadUnmanaged``4(``0@,``1@,``2@,``3@)
-user | M:SharpPack.SharpPackReader.ReadUnmanaged``5(``0@,``1@,``2@,``3@,``4@)
-user | M:SharpPack.SharpPackReader.ReadUnmanaged``6(``0@,``1@,``2@,``3@,``4@,``5@)
-user | M:SharpPack.SharpPackReader.ReadUnmanaged``7(``0@,``1@,``2@,``3@,``4@,``5@,``6@)
-user | M:SharpPack.SharpPackReader.ReadUnmanaged``8(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@)
-user | M:SharpPack.SharpPackReader.ReadUnmanaged``9(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@)
-user | M:SharpPack.SharpPackReader.ReadValueWithFormatter``2(``0)
-user | M:SharpPack.SharpPackReader.ReadValueWithFormatter``2(``0,``1@)
-user | M:SharpPack.SharpPackReader.ReadValue``1
-user | M:SharpPack.SharpPackReader.ReadValue``1(``0@)
-user | M:SharpPack.SharpPackReader.ReadVarIntInt32
-user | M:SharpPack.SharpPackReader.ReadVarIntUInt32
-user | M:SharpPack.SharpPackReader.TryReadObjectHeader(System.Byte@)
-user | M:SharpPack.SharpPackReader.TryReadUnionHeader(System.UInt16@)
-user | M:SharpPack.SharpPackReaderOptionalState.AddObjectReference(System.UInt32,System.Object)
-user | M:SharpPack.SharpPackReaderOptionalState.GetObjectReference(System.UInt32)
-user | M:SharpPack.SharpPackSerializationException.#ctor(System.String)
-legacy-generated | M:SharpPack.SharpPackSerializationException.ThrowInvalidAdvance
-legacy-generated | M:SharpPack.SharpPackSerializationException.ThrowInvalidLength(System.Int32)
-legacy-generated | M:SharpPack.SharpPackSerializationException.ThrowInvalidPropertyCount(System.Type,System.Byte,System.Byte)
-legacy-generated | M:SharpPack.SharpPackSerializationException.ThrowInvalidTag(System.UInt16,System.Type)
-legacy-generated | M:SharpPack.SharpPackSerializationException.ThrowNotFoundInUnionType(System.Type,System.Type)
-legacy-generated | M:SharpPack.SharpPackSerializationException.ThrowSizeOverflow
-legacy-generated | M:SharpPack.SharpPackSerializerContext.HasFormatterOverrideDependency``1
-user | M:SharpPack.SharpPackSerializerContextBuilder.RegisterFactory``2
-user | M:SharpPack.SharpPackWriterOptionalState.GetOrAddReference(System.Object)
-user | M:SharpPack.SharpPackWriter`1.#ctor(`0@,SharpPack.SharpPackWriterOptionalState)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``1(System.Byte,``0@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``10(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``11(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``12(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``13(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``14(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``15(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@,``14@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``2(System.Byte,``0@,``1@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``3(System.Byte,``0@,``1@,``2@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``4(System.Byte,``0@,``1@,``2@,``3@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``5(System.Byte,``0@,``1@,``2@,``3@,``4@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``6(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``7(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``8(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``9(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``1(``0@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``10(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``11(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``12(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``13(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``14(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``15(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@,``14@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``2(``0@,``1@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``3(``0@,``1@,``2@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``4(``0@,``1@,``2@,``3@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``5(``0@,``1@,``2@,``3@,``4@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``6(``0@,``1@,``2@,``3@,``4@,``5@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``7(``0@,``1@,``2@,``3@,``4@,``5@,``6@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``8(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@)
-user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``9(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@)
-user | M:SharpPack.SharpPackWriter`1.Flush
-user | M:SharpPack.SharpPackWriter`1.GetStringWriteLength(System.String)
-user | M:SharpPack.SharpPackWriter`1.GetUnmanageArrayWriteLength``1(``0[])
-user | M:SharpPack.SharpPackWriter`1.WriteArray``1(``0[])
-user | M:SharpPack.SharpPackWriter`1.WriteNullObjectHeader
-user | M:SharpPack.SharpPackWriter`1.WriteNullUnionHeader
-user | M:SharpPack.SharpPackWriter`1.WriteObjectHeader(System.Byte)
-user | M:SharpPack.SharpPackWriter`1.WriteObjectReferenceId(System.UInt32)
-user | M:SharpPack.SharpPackWriter`1.WritePackableArray``1(``0[])
-user | M:SharpPack.SharpPackWriter`1.WritePackable``1(``0@)
-user | M:SharpPack.SharpPackWriter`1.WriteString(System.String)
-user | M:SharpPack.SharpPackWriter`1.WriteUnionHeader(System.UInt16)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedArray``1(``0[])
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``1(System.Byte,``0@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``10(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``11(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``12(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``13(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``14(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``15(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@,``14@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``2(System.Byte,``0@,``1@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``3(System.Byte,``0@,``1@,``2@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``4(System.Byte,``0@,``1@,``2@,``3@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``5(System.Byte,``0@,``1@,``2@,``3@,``4@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``6(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``7(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``8(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``9(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``1(``0@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``10(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``11(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``12(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``13(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``14(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``15(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@,``14@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``2(``0@,``1@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``3(``0@,``1@,``2@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``4(``0@,``1@,``2@,``3@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``5(``0@,``1@,``2@,``3@,``4@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``6(``0@,``1@,``2@,``3@,``4@,``5@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``7(``0@,``1@,``2@,``3@,``4@,``5@,``6@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``8(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@)
-user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``9(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@)
-legacy-generated | M:SharpPack.SharpPackWriter`1.WriteUtf8Exact(System.String,System.Int32)
-user | M:SharpPack.SharpPackWriter`1.WriteValueWithFormatter``2(``0,``1@)
-user | M:SharpPack.SharpPackWriter`1.WriteValue``1(``0@)
-user | M:SharpPack.SharpPackWriter`1.WriteVarInt(System.Int32)
-user | M:SharpPack.SharpPackWriter`1.WriteVarInt(System.UInt32)
-user | M:SharpPack.Utf16StringFormatterAttribute.#ctor
-user | M:SharpPack.Utf16StringFormatterAttribute.GetFormatter
-user | M:SharpPack.Utf8StringFormatterAttribute.#ctor
-user | M:SharpPack.Utf8StringFormatterAttribute.GetFormatter
-legacy-generated | P:SharpPack.IFixedSizeSharpPackable.Size
-user | P:SharpPack.SharpPackReader.OptionalState
-user | P:SharpPack.SharpPackReader.Remaining
-user | P:SharpPack.SharpPackWriter`1.OptionalState
-user | P:SharpPack.SharpPackWriter`1.WrittenCount
-user | T:SharpPack.BitPackFormatterAttribute
-user | T:SharpPack.BrotliFormatterAttribute
-user | T:SharpPack.BrotliFormatterAttribute`1
-user | T:SharpPack.BrotliStringFormatterAttribute
-compiler-services | T:SharpPack.CompilerServices.PreserveAttribute
-compiler-services | T:SharpPack.CompilerServices.SharpPackExactBufferWriter
-compiler-services | T:SharpPack.CompilerServices.SharpPackPooledBufferWriter
-user | T:SharpPack.Compression.BitPackFormatter
-user | T:SharpPack.Compression.BrotliFormatter
-user | T:SharpPack.Compression.BrotliFormatter`1
-user | T:SharpPack.Formatters.ArrayFormatter`1
-user | T:SharpPack.Formatters.ArraySegmentFormatter`1
-user | T:SharpPack.Formatters.BlockingCollectionFormatter`1
-user | T:SharpPack.Formatters.BrotliStringFormatter
-user | T:SharpPack.Formatters.CollectionFormatter`1
-user | T:SharpPack.Formatters.ConcurrentBagFormatter`1
-user | T:SharpPack.Formatters.ConcurrentDictionaryFormatter`2
-user | T:SharpPack.Formatters.ConcurrentQueueFormatter`1
-user | T:SharpPack.Formatters.ConcurrentStackFormatter`1
-user | T:SharpPack.Formatters.DictionaryFormatter`2
-user | T:SharpPack.Formatters.FourDimensionalArrayFormatter`1
-user | T:SharpPack.Formatters.FrozenDictionaryFormatter`2
-user | T:SharpPack.Formatters.FrozenSetFormatter`1
-user | T:SharpPack.Formatters.GenericCollectionFormatter`2
-user | T:SharpPack.Formatters.GenericDictionaryFormatter`3
-user | T:SharpPack.Formatters.GenericSetFormatter`2
-user | T:SharpPack.Formatters.HashSetFormatter`1
-user | T:SharpPack.Formatters.ImmutableArrayFormatter`1
-user | T:SharpPack.Formatters.ImmutableDictionaryFormatter`2
-user | T:SharpPack.Formatters.ImmutableHashSetFormatter`1
-user | T:SharpPack.Formatters.ImmutableListFormatter`1
-user | T:SharpPack.Formatters.ImmutableQueueFormatter`1
-user | T:SharpPack.Formatters.ImmutableSortedDictionaryFormatter`2
-user | T:SharpPack.Formatters.ImmutableSortedSetFormatter`1
-user | T:SharpPack.Formatters.ImmutableStackFormatter`1
-user | T:SharpPack.Formatters.InterfaceCollectionFormatter`1
-user | T:SharpPack.Formatters.InterfaceDictionaryFormatter`2
-user | T:SharpPack.Formatters.InterfaceEnumerableFormatter`1
-user | T:SharpPack.Formatters.InterfaceGroupingFormatter`2
-user | T:SharpPack.Formatters.InterfaceImmutableDictionaryFormatter`2
-user | T:SharpPack.Formatters.InterfaceImmutableListFormatter`1
-user | T:SharpPack.Formatters.InterfaceImmutableQueueFormatter`1
-user | T:SharpPack.Formatters.InterfaceImmutableSetFormatter`1
-user | T:SharpPack.Formatters.InterfaceImmutableStackFormatter`1
-user | T:SharpPack.Formatters.InterfaceListFormatter`1
-user | T:SharpPack.Formatters.InterfaceLookupFormatter`2
-user | T:SharpPack.Formatters.InterfaceReadOnlyCollectionFormatter`1
-user | T:SharpPack.Formatters.InterfaceReadOnlyDictionaryFormatter`2
-user | T:SharpPack.Formatters.InterfaceReadOnlyListFormatter`1
-user | T:SharpPack.Formatters.InterfaceReadOnlySetFormatter`1
-user | T:SharpPack.Formatters.InterfaceSetFormatter`1
-user | T:SharpPack.Formatters.InternStringFormatter
-user | T:SharpPack.Formatters.KeyValuePairFormatter`2
-user | T:SharpPack.Formatters.LazyFormatter`1
-user | T:SharpPack.Formatters.LinkedListFormatter`1
-legacy-generated | T:SharpPack.Formatters.ListFormatter
-user | T:SharpPack.Formatters.ListFormatter`1
-user | T:SharpPack.Formatters.MemoryFormatter`1
-user | T:SharpPack.Formatters.MemoryPoolFormatter`1
-user | T:SharpPack.Formatters.NullableFormatter`1
-user | T:SharpPack.Formatters.ObservableCollectionFormatter`1
-user | T:SharpPack.Formatters.PriorityQueueFormatter`2
-user | T:SharpPack.Formatters.QueueFormatter`1
-user | T:SharpPack.Formatters.ReadOnlyCollectionFormatter`1
-user | T:SharpPack.Formatters.ReadOnlyMemoryFormatter`1
-user | T:SharpPack.Formatters.ReadOnlyMemoryPoolFormatter`1
-user | T:SharpPack.Formatters.ReadOnlyObservableCollectionFormatter`1
-user | T:SharpPack.Formatters.ReadOnlySequenceFormatter`1
-user | T:SharpPack.Formatters.SharpPackableFormatter`1
-user | T:SharpPack.Formatters.SortedDictionaryFormatter`2
-user | T:SharpPack.Formatters.SortedListFormatter`2
-user | T:SharpPack.Formatters.SortedSetFormatter`1
-user | T:SharpPack.Formatters.StackFormatter`1
-user | T:SharpPack.Formatters.ThreeDimensionalArrayFormatter`1
-user | T:SharpPack.Formatters.TupleFormatter`1
-user | T:SharpPack.Formatters.TupleFormatter`2
-user | T:SharpPack.Formatters.TupleFormatter`3
-user | T:SharpPack.Formatters.TupleFormatter`4
-user | T:SharpPack.Formatters.TupleFormatter`5
-user | T:SharpPack.Formatters.TupleFormatter`6
-user | T:SharpPack.Formatters.TupleFormatter`7
-user | T:SharpPack.Formatters.TupleFormatter`8
-user | T:SharpPack.Formatters.TwoDimensionalArrayFormatter`1
-user | T:SharpPack.Formatters.UnmanagedFormatter`1
-user | T:SharpPack.Formatters.Utf16StringFormatter
-user | T:SharpPack.Formatters.Utf8StringFormatter
-user | T:SharpPack.Formatters.ValueTupleFormatter`1
-user | T:SharpPack.Formatters.ValueTupleFormatter`2
-user | T:SharpPack.Formatters.ValueTupleFormatter`3
-user | T:SharpPack.Formatters.ValueTupleFormatter`4
-user | T:SharpPack.Formatters.ValueTupleFormatter`5
-user | T:SharpPack.Formatters.ValueTupleFormatter`6
-user | T:SharpPack.Formatters.ValueTupleFormatter`7
-user | T:SharpPack.Formatters.ValueTupleFormatter`8
-legacy-generated | T:SharpPack.IFixedSizeSharpPackable
-legacy-generated | T:SharpPack.ISharpPackContextFormatterFactory`1
-legacy-generated | T:SharpPack.ISharpPackContextOverrideFormatter
-legacy-generated | T:SharpPack.ISharpPackExactSizeSerializable`1
-user | T:SharpPack.ISharpPackFormatterFactory`1
-user | T:SharpPack.ISharpPackFormatter`1
-user | T:SharpPack.ISharpPackable`1
-user | T:SharpPack.InternStringFormatterAttribute
-user | T:SharpPack.MemoryPoolFormatterAttribute`1
-user | T:SharpPack.OrdinalIgnoreCaseStringDictionaryFormatter`1
-user | T:SharpPack.ReadOnlyMemoryPoolFormatterAttribute`1
-user | T:SharpPack.SharpPackCode
-user | T:SharpPack.SharpPackFormatter`1
-user | T:SharpPack.SharpPackReader
-user | T:SharpPack.SharpPackReaderOptionalState
-user | T:SharpPack.SharpPackSerializationException
-user | T:SharpPack.SharpPackSerializerContext
-user | T:SharpPack.SharpPackSerializerContextBuilder
-user | T:SharpPack.SharpPackWriterOptionalState
-user | T:SharpPack.SharpPackWriter`1
-user | T:SharpPack.Utf16StringFormatterAttribute
-user | T:SharpPack.Utf8StringFormatterAttribute
+user | F:SharpPack.SharpPackCode.ReferenceId | ref=None;readonly=False
+user | M:SharpPack.BitPackFormatterAttribute.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.BitPackFormatterAttribute.GetFormatter | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.BrotliFormatterAttribute.#ctor(System.IO.Compression.CompressionLevel,System.Int32,System.Int32) | parameters=[0:None/None/unscoped-ref=False,1:None/None/unscoped-ref=False,2:None/None/unscoped-ref=False];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.BrotliFormatterAttribute.GetFormatter | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.BrotliFormatterAttribute`1.#ctor(System.IO.Compression.CompressionLevel,System.Int32) | parameters=[0:None/None/unscoped-ref=False,1:None/None/unscoped-ref=False];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.BrotliFormatterAttribute`1.GetFormatter | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.BrotliStringFormatterAttribute.#ctor(System.IO.Compression.CompressionLevel,System.Int32,System.Int32) | parameters=[0:None/None/unscoped-ref=False,1:None/None/unscoped-ref=False,2:None/None/unscoped-ref=False];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.BrotliStringFormatterAttribute.GetFormatter | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+compiler-services | M:SharpPack.CompilerServices.PreserveAttribute.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+compiler-services | M:SharpPack.CompilerServices.SharpPackExactBufferWriter.#ctor(System.Byte[]) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+compiler-services | M:SharpPack.CompilerServices.SharpPackExactBufferWriter.CreateWriter(SharpPack.CompilerServices.SharpPackExactBufferWriter@) | parameters=[0:Ref/None/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
+compiler-services | M:SharpPack.CompilerServices.SharpPackExactBufferWriter.GetFilledBuffer | parameters=[];return=None;receiver=value;readonly=False;unscoped-ref=False
+compiler-services | M:SharpPack.CompilerServices.SharpPackPooledBufferWriter.Rent(System.Int64@) | parameters=[0:Out/ScopedRef/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
+compiler-services | M:SharpPack.CompilerServices.SharpPackPooledBufferWriter.Return(SharpPack.CompilerServices.SharpPackPooledBufferWriter,System.Int64) | parameters=[0:None/None/unscoped-ref=False,1:None/None/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
+compiler-services | M:SharpPack.CompilerServices.SharpPackPooledBufferWriter.WriteToAndReset``1(SharpPack.SharpPackWriter{``0}@) | parameters=[0:Ref/None/unscoped-ref=False];return=None;receiver=value;readonly=True;unscoped-ref=False
+user | M:SharpPack.Formatters.ArrayFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ArraySegmentFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.BlockingCollectionFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.CollectionFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ConcurrentBagFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ConcurrentDictionaryFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ConcurrentQueueFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ConcurrentStackFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.DictionaryFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.FourDimensionalArrayFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.FrozenDictionaryFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.FrozenSetFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.GenericCollectionFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.GenericDictionaryFormatter`3.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.GenericSetFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.HashSetFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ImmutableArrayFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ImmutableDictionaryFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ImmutableHashSetFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ImmutableListFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ImmutableQueueFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ImmutableSortedDictionaryFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ImmutableSortedSetFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ImmutableStackFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.InterfaceCollectionFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.InterfaceDictionaryFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.InterfaceEnumerableFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.InterfaceGroupingFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.InterfaceImmutableDictionaryFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.InterfaceImmutableListFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.InterfaceImmutableQueueFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.InterfaceImmutableSetFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.InterfaceImmutableStackFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.InterfaceListFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.InterfaceLookupFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.InterfaceReadOnlyCollectionFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.InterfaceReadOnlyDictionaryFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.InterfaceReadOnlyListFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.InterfaceReadOnlySetFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.InterfaceSetFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.KeyValuePairFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.LazyFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.LinkedListFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+legacy-generated | M:SharpPack.Formatters.ListFormatter.DeserializePackableUnmanaged``1(SharpPack.SharpPackReader@) | parameters=[0:Ref/None/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
+legacy-generated | M:SharpPack.Formatters.ListFormatter.DeserializePackableUnmanaged``1(SharpPack.SharpPackReader@,System.Collections.Generic.List{``0}@) | parameters=[0:Ref/None/unscoped-ref=False,1:Ref/ScopedRef/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
+legacy-generated | M:SharpPack.Formatters.ListFormatter.DeserializePackable``1(SharpPack.SharpPackReader@) | parameters=[0:Ref/None/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
+legacy-generated | M:SharpPack.Formatters.ListFormatter.DeserializePackable``1(SharpPack.SharpPackReader@,System.Collections.Generic.List{``0}@) | parameters=[0:Ref/None/unscoped-ref=False,1:Ref/ScopedRef/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
+legacy-generated | M:SharpPack.Formatters.ListFormatter.SerializePackableUnmanaged``2(SharpPack.SharpPackWriter{``1}@,System.Collections.Generic.List{``0}) | parameters=[0:Ref/None/unscoped-ref=False,1:None/None/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
+legacy-generated | M:SharpPack.Formatters.ListFormatter.SerializePackable``2(SharpPack.SharpPackWriter{``1}@,System.Collections.Generic.List{``0}) | parameters=[0:Ref/None/unscoped-ref=False,1:None/None/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ListFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.MemoryFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.NullableFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ObservableCollectionFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.PriorityQueueFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.QueueFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ReadOnlyCollectionFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ReadOnlyMemoryFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ReadOnlyObservableCollectionFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ReadOnlySequenceFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.SharpPackableFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.SortedDictionaryFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.SortedListFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.SortedSetFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.StackFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ThreeDimensionalArrayFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.TupleFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.TupleFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.TupleFormatter`3.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.TupleFormatter`4.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.TupleFormatter`5.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.TupleFormatter`6.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.TupleFormatter`7.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.TupleFormatter`8.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.TwoDimensionalArrayFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.UnmanagedFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ValueTupleFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ValueTupleFormatter`2.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ValueTupleFormatter`3.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ValueTupleFormatter`4.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ValueTupleFormatter`5.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ValueTupleFormatter`6.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ValueTupleFormatter`7.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Formatters.ValueTupleFormatter`8.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+legacy-generated | M:SharpPack.ISharpPackContextFormatterFactory`1.CreateFormatter(SharpPack.SharpPackSerializerContext) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
+legacy-generated | M:SharpPack.ISharpPackExactSizeSerializable`1.SerializeExact | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.ISharpPackFormatterFactory`1.CreateFormatter | parameters=[];return=None;receiver=none;readonly=False;unscoped-ref=False
+user | M:SharpPack.ISharpPackable`1.Deserialize(SharpPack.SharpPackReader@,`0@) | parameters=[0:Ref/None/unscoped-ref=False,1:Ref/ScopedRef/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
+user | M:SharpPack.ISharpPackable`1.Serialize``1(SharpPack.SharpPackWriter{``0}@,`0@) | parameters=[0:Ref/None/unscoped-ref=False,1:Ref/ScopedRef/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
+user | M:SharpPack.InternStringFormatterAttribute.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.InternStringFormatterAttribute.GetFormatter | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.MemoryPoolFormatterAttribute`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.MemoryPoolFormatterAttribute`1.GetFormatter | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.OrdinalIgnoreCaseStringDictionaryFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.OrdinalIgnoreCaseStringDictionaryFormatter`1.GetFormatter | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.ReadOnlyMemoryPoolFormatterAttribute`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.ReadOnlyMemoryPoolFormatterAttribute`1.GetFormatter | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackFormatter`1.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackFormatter`1.Deserialize(SharpPack.SharpPackReader@,`0@) | parameters=[0:Ref/None/unscoped-ref=False,1:Ref/ScopedRef/unscoped-ref=False];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackFormatter`1.Serialize``1(SharpPack.SharpPackWriter{``0}@,`0@) | parameters=[0:Ref/None/unscoped-ref=False,1:Ref/ScopedRef/unscoped-ref=False];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.Advance(System.Int32) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``1(``0@) | parameters=[0:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``10(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False,7:Out/ScopedRef/unscoped-ref=False,8:Out/ScopedRef/unscoped-ref=False,9:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``11(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False,7:Out/ScopedRef/unscoped-ref=False,8:Out/ScopedRef/unscoped-ref=False,9:Out/ScopedRef/unscoped-ref=False,10:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``12(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False,7:Out/ScopedRef/unscoped-ref=False,8:Out/ScopedRef/unscoped-ref=False,9:Out/ScopedRef/unscoped-ref=False,10:Out/ScopedRef/unscoped-ref=False,11:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``13(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False,7:Out/ScopedRef/unscoped-ref=False,8:Out/ScopedRef/unscoped-ref=False,9:Out/ScopedRef/unscoped-ref=False,10:Out/ScopedRef/unscoped-ref=False,11:Out/ScopedRef/unscoped-ref=False,12:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``14(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False,7:Out/ScopedRef/unscoped-ref=False,8:Out/ScopedRef/unscoped-ref=False,9:Out/ScopedRef/unscoped-ref=False,10:Out/ScopedRef/unscoped-ref=False,11:Out/ScopedRef/unscoped-ref=False,12:Out/ScopedRef/unscoped-ref=False,13:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``15(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@,``14@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False,7:Out/ScopedRef/unscoped-ref=False,8:Out/ScopedRef/unscoped-ref=False,9:Out/ScopedRef/unscoped-ref=False,10:Out/ScopedRef/unscoped-ref=False,11:Out/ScopedRef/unscoped-ref=False,12:Out/ScopedRef/unscoped-ref=False,13:Out/ScopedRef/unscoped-ref=False,14:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``2(``0@,``1@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``3(``0@,``1@,``2@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``4(``0@,``1@,``2@,``3@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``5(``0@,``1@,``2@,``3@,``4@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``6(``0@,``1@,``2@,``3@,``4@,``5@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``7(``0@,``1@,``2@,``3@,``4@,``5@,``6@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``8(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False,7:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.DangerousReadUnmanaged``9(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False,7:Out/ScopedRef/unscoped-ref=False,8:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadArray``1 | parameters=[];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadArray``1(``0[]@) | parameters=[0:Ref/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadPackableArray``1 | parameters=[];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadPackableArray``1(``0[]@) | parameters=[0:Ref/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadPackable``1 | parameters=[];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadPackable``1(``0@) | parameters=[0:Ref/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadString | parameters=[];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadUnmanagedArray``1 | parameters=[];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadUnmanagedArray``1(``0[]@) | parameters=[0:Ref/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadUnmanaged``1(``0@) | parameters=[0:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadUnmanaged``10(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False,7:Out/ScopedRef/unscoped-ref=False,8:Out/ScopedRef/unscoped-ref=False,9:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadUnmanaged``11(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False,7:Out/ScopedRef/unscoped-ref=False,8:Out/ScopedRef/unscoped-ref=False,9:Out/ScopedRef/unscoped-ref=False,10:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadUnmanaged``12(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False,7:Out/ScopedRef/unscoped-ref=False,8:Out/ScopedRef/unscoped-ref=False,9:Out/ScopedRef/unscoped-ref=False,10:Out/ScopedRef/unscoped-ref=False,11:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadUnmanaged``13(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False,7:Out/ScopedRef/unscoped-ref=False,8:Out/ScopedRef/unscoped-ref=False,9:Out/ScopedRef/unscoped-ref=False,10:Out/ScopedRef/unscoped-ref=False,11:Out/ScopedRef/unscoped-ref=False,12:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadUnmanaged``14(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False,7:Out/ScopedRef/unscoped-ref=False,8:Out/ScopedRef/unscoped-ref=False,9:Out/ScopedRef/unscoped-ref=False,10:Out/ScopedRef/unscoped-ref=False,11:Out/ScopedRef/unscoped-ref=False,12:Out/ScopedRef/unscoped-ref=False,13:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadUnmanaged``15(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@,``14@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False,7:Out/ScopedRef/unscoped-ref=False,8:Out/ScopedRef/unscoped-ref=False,9:Out/ScopedRef/unscoped-ref=False,10:Out/ScopedRef/unscoped-ref=False,11:Out/ScopedRef/unscoped-ref=False,12:Out/ScopedRef/unscoped-ref=False,13:Out/ScopedRef/unscoped-ref=False,14:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadUnmanaged``2(``0@,``1@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadUnmanaged``3(``0@,``1@,``2@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadUnmanaged``4(``0@,``1@,``2@,``3@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadUnmanaged``5(``0@,``1@,``2@,``3@,``4@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadUnmanaged``6(``0@,``1@,``2@,``3@,``4@,``5@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadUnmanaged``7(``0@,``1@,``2@,``3@,``4@,``5@,``6@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadUnmanaged``8(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False,7:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadUnmanaged``9(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@) | parameters=[0:Out/ScopedRef/unscoped-ref=False,1:Out/ScopedRef/unscoped-ref=False,2:Out/ScopedRef/unscoped-ref=False,3:Out/ScopedRef/unscoped-ref=False,4:Out/ScopedRef/unscoped-ref=False,5:Out/ScopedRef/unscoped-ref=False,6:Out/ScopedRef/unscoped-ref=False,7:Out/ScopedRef/unscoped-ref=False,8:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadValueWithFormatter``2(``0) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadValueWithFormatter``2(``0,``1@) | parameters=[0:None/None/unscoped-ref=False,1:Ref/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadValue``1 | parameters=[];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadValue``1(``0@) | parameters=[0:Ref/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadVarIntInt32 | parameters=[];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.ReadVarIntUInt32 | parameters=[];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.TryReadObjectHeader(System.Byte@) | parameters=[0:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReader.TryReadUnionHeader(System.UInt16@) | parameters=[0:Out/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReaderOptionalState.AddObjectReference(System.UInt32,System.Object) | parameters=[0:None/None/unscoped-ref=False,1:None/None/unscoped-ref=False];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackReaderOptionalState.GetObjectReference(System.UInt32) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackSerializationException.#ctor(System.String) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=reference;readonly=False;unscoped-ref=False
+legacy-generated | M:SharpPack.SharpPackSerializationException.ThrowInvalidAdvance | parameters=[];return=None;receiver=none;readonly=False;unscoped-ref=False
+legacy-generated | M:SharpPack.SharpPackSerializationException.ThrowInvalidLength(System.Int32) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
+legacy-generated | M:SharpPack.SharpPackSerializationException.ThrowInvalidPropertyCount(System.Type,System.Byte,System.Byte) | parameters=[0:None/None/unscoped-ref=False,1:None/None/unscoped-ref=False,2:None/None/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
+legacy-generated | M:SharpPack.SharpPackSerializationException.ThrowInvalidTag(System.UInt16,System.Type) | parameters=[0:None/None/unscoped-ref=False,1:None/None/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
+legacy-generated | M:SharpPack.SharpPackSerializationException.ThrowNotFoundInUnionType(System.Type,System.Type) | parameters=[0:None/None/unscoped-ref=False,1:None/None/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
+legacy-generated | M:SharpPack.SharpPackSerializationException.ThrowSizeOverflow | parameters=[];return=None;receiver=none;readonly=False;unscoped-ref=False
+legacy-generated | M:SharpPack.SharpPackSerializerContext.HasFormatterOverrideDependency``1 | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackSerializerContextBuilder.RegisterFactory``2 | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriterOptionalState.GetOrAddReference(System.Object) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.#ctor(`0@,SharpPack.SharpPackWriterOptionalState) | parameters=[0:Ref/None/unscoped-ref=False,1:None/None/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``1(System.Byte,``0@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``10(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``11(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``12(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False,12:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``13(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False,12:In/ScopedRef/unscoped-ref=False,13:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``14(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False,12:In/ScopedRef/unscoped-ref=False,13:In/ScopedRef/unscoped-ref=False,14:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``15(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@,``14@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False,12:In/ScopedRef/unscoped-ref=False,13:In/ScopedRef/unscoped-ref=False,14:In/ScopedRef/unscoped-ref=False,15:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``2(System.Byte,``0@,``1@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``3(System.Byte,``0@,``1@,``2@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``4(System.Byte,``0@,``1@,``2@,``3@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``5(System.Byte,``0@,``1@,``2@,``3@,``4@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``6(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``7(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``8(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanagedWithObjectHeader``9(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``1(``0@) | parameters=[0:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``10(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``11(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``12(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``13(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False,12:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``14(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False,12:In/ScopedRef/unscoped-ref=False,13:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``15(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@,``14@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False,12:In/ScopedRef/unscoped-ref=False,13:In/ScopedRef/unscoped-ref=False,14:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``2(``0@,``1@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``3(``0@,``1@,``2@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``4(``0@,``1@,``2@,``3@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``5(``0@,``1@,``2@,``3@,``4@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``6(``0@,``1@,``2@,``3@,``4@,``5@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``7(``0@,``1@,``2@,``3@,``4@,``5@,``6@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``8(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.DangerousWriteUnmanaged``9(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.Flush | parameters=[];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.GetStringWriteLength(System.String) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.GetUnmanageArrayWriteLength``1(``0[]) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteArray``1(``0[]) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteNullObjectHeader | parameters=[];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteNullUnionHeader | parameters=[];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteObjectHeader(System.Byte) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteObjectReferenceId(System.UInt32) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WritePackableArray``1(``0[]) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WritePackable``1(``0@) | parameters=[0:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteString(System.String) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnionHeader(System.UInt16) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedArray``1(``0[]) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``1(System.Byte,``0@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``10(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``11(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``12(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False,12:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``13(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False,12:In/ScopedRef/unscoped-ref=False,13:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``14(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False,12:In/ScopedRef/unscoped-ref=False,13:In/ScopedRef/unscoped-ref=False,14:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``15(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@,``14@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False,12:In/ScopedRef/unscoped-ref=False,13:In/ScopedRef/unscoped-ref=False,14:In/ScopedRef/unscoped-ref=False,15:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``2(System.Byte,``0@,``1@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``3(System.Byte,``0@,``1@,``2@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``4(System.Byte,``0@,``1@,``2@,``3@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``5(System.Byte,``0@,``1@,``2@,``3@,``4@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``6(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``7(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``8(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanagedWithObjectHeader``9(System.Byte,``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``1(``0@) | parameters=[0:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``10(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``11(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``12(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``13(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False,12:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``14(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False,12:In/ScopedRef/unscoped-ref=False,13:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``15(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@,``9@,``10@,``11@,``12@,``13@,``14@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False,9:In/ScopedRef/unscoped-ref=False,10:In/ScopedRef/unscoped-ref=False,11:In/ScopedRef/unscoped-ref=False,12:In/ScopedRef/unscoped-ref=False,13:In/ScopedRef/unscoped-ref=False,14:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``2(``0@,``1@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``3(``0@,``1@,``2@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``4(``0@,``1@,``2@,``3@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``5(``0@,``1@,``2@,``3@,``4@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``6(``0@,``1@,``2@,``3@,``4@,``5@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``7(``0@,``1@,``2@,``3@,``4@,``5@,``6@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``8(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteUnmanaged``9(``0@,``1@,``2@,``3@,``4@,``5@,``6@,``7@,``8@) | parameters=[0:In/ScopedRef/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False,2:In/ScopedRef/unscoped-ref=False,3:In/ScopedRef/unscoped-ref=False,4:In/ScopedRef/unscoped-ref=False,5:In/ScopedRef/unscoped-ref=False,6:In/ScopedRef/unscoped-ref=False,7:In/ScopedRef/unscoped-ref=False,8:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+legacy-generated | M:SharpPack.SharpPackWriter`1.WriteUtf8Exact(System.String,System.Int32) | parameters=[0:None/None/unscoped-ref=False,1:None/None/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteValueWithFormatter``2(``0,``1@) | parameters=[0:None/None/unscoped-ref=False,1:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteValue``1(``0@) | parameters=[0:In/ScopedRef/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteVarInt(System.Int32) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.SharpPackWriter`1.WriteVarInt(System.UInt32) | parameters=[0:None/None/unscoped-ref=False];return=None;receiver=value;readonly=False;unscoped-ref=False
+user | M:SharpPack.Utf16StringFormatterAttribute.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Utf16StringFormatterAttribute.GetFormatter | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Utf8StringFormatterAttribute.#ctor | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+user | M:SharpPack.Utf8StringFormatterAttribute.GetFormatter | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False
+legacy-generated | P:SharpPack.IFixedSizeSharpPackable.Size | parameters=[];return=None;unscoped-ref=False;get=(parameters=[];return=None;receiver=none;readonly=False;unscoped-ref=False);set=(none)
+user | P:SharpPack.SharpPackReader.OptionalState | parameters=[];return=None;unscoped-ref=False;get=(parameters=[];return=None;receiver=value;readonly=False;unscoped-ref=False);set=(none)
+user | P:SharpPack.SharpPackReader.Remaining | parameters=[];return=None;unscoped-ref=False;get=(parameters=[];return=None;receiver=value;readonly=False;unscoped-ref=False);set=(none)
+user | P:SharpPack.SharpPackWriter`1.OptionalState | parameters=[];return=None;unscoped-ref=False;get=(parameters=[];return=None;receiver=value;readonly=False;unscoped-ref=False);set=(none)
+user | P:SharpPack.SharpPackWriter`1.WrittenCount | parameters=[];return=None;unscoped-ref=False;get=(parameters=[];return=None;receiver=value;readonly=False;unscoped-ref=False);set=(none)
+user | T:SharpPack.BitPackFormatterAttribute | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.BrotliFormatterAttribute | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.BrotliFormatterAttribute`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.BrotliStringFormatterAttribute | type=Class;ref-like=False;readonly=False
+compiler-services | T:SharpPack.CompilerServices.PreserveAttribute | type=Class;ref-like=False;readonly=False
+compiler-services | T:SharpPack.CompilerServices.SharpPackExactBufferWriter | type=Struct;ref-like=False;readonly=False
+compiler-services | T:SharpPack.CompilerServices.SharpPackPooledBufferWriter | type=Struct;ref-like=False;readonly=True
+user | T:SharpPack.Compression.BitPackFormatter | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Compression.BrotliFormatter | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Compression.BrotliFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ArrayFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ArraySegmentFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.BlockingCollectionFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.BrotliStringFormatter | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.CollectionFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ConcurrentBagFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ConcurrentDictionaryFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ConcurrentQueueFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ConcurrentStackFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.DictionaryFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.FourDimensionalArrayFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.FrozenDictionaryFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.FrozenSetFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.GenericCollectionFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.GenericDictionaryFormatter`3 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.GenericSetFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.HashSetFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ImmutableArrayFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ImmutableDictionaryFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ImmutableHashSetFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ImmutableListFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ImmutableQueueFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ImmutableSortedDictionaryFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ImmutableSortedSetFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ImmutableStackFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.InterfaceCollectionFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.InterfaceDictionaryFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.InterfaceEnumerableFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.InterfaceGroupingFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.InterfaceImmutableDictionaryFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.InterfaceImmutableListFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.InterfaceImmutableQueueFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.InterfaceImmutableSetFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.InterfaceImmutableStackFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.InterfaceListFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.InterfaceLookupFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.InterfaceReadOnlyCollectionFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.InterfaceReadOnlyDictionaryFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.InterfaceReadOnlyListFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.InterfaceReadOnlySetFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.InterfaceSetFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.InternStringFormatter | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.KeyValuePairFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.LazyFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.LinkedListFormatter`1 | type=Class;ref-like=False;readonly=False
+legacy-generated | T:SharpPack.Formatters.ListFormatter | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ListFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.MemoryFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.MemoryPoolFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.NullableFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ObservableCollectionFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.PriorityQueueFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.QueueFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ReadOnlyCollectionFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ReadOnlyMemoryFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ReadOnlyMemoryPoolFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ReadOnlyObservableCollectionFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ReadOnlySequenceFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.SharpPackableFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.SortedDictionaryFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.SortedListFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.SortedSetFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.StackFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ThreeDimensionalArrayFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.TupleFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.TupleFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.TupleFormatter`3 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.TupleFormatter`4 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.TupleFormatter`5 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.TupleFormatter`6 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.TupleFormatter`7 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.TupleFormatter`8 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.TwoDimensionalArrayFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.UnmanagedFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.Utf16StringFormatter | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.Utf8StringFormatter | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ValueTupleFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ValueTupleFormatter`2 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ValueTupleFormatter`3 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ValueTupleFormatter`4 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ValueTupleFormatter`5 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ValueTupleFormatter`6 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ValueTupleFormatter`7 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Formatters.ValueTupleFormatter`8 | type=Class;ref-like=False;readonly=False
+legacy-generated | T:SharpPack.IFixedSizeSharpPackable | type=Interface;ref-like=False;readonly=False
+legacy-generated | T:SharpPack.ISharpPackContextFormatterFactory`1 | type=Interface;ref-like=False;readonly=False
+legacy-generated | T:SharpPack.ISharpPackContextOverrideFormatter | type=Interface;ref-like=False;readonly=False
+legacy-generated | T:SharpPack.ISharpPackExactSizeSerializable`1 | type=Interface;ref-like=False;readonly=False
+user | T:SharpPack.ISharpPackFormatterFactory`1 | type=Interface;ref-like=False;readonly=False
+user | T:SharpPack.ISharpPackFormatter`1 | type=Interface;ref-like=False;readonly=False
+user | T:SharpPack.ISharpPackable`1 | type=Interface;ref-like=False;readonly=False
+user | T:SharpPack.InternStringFormatterAttribute | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.MemoryPoolFormatterAttribute`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.OrdinalIgnoreCaseStringDictionaryFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.ReadOnlyMemoryPoolFormatterAttribute`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.SharpPackCode | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.SharpPackFormatter`1 | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.SharpPackReader | type=Struct;ref-like=True;readonly=False
+user | T:SharpPack.SharpPackReaderOptionalState | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.SharpPackSerializationException | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.SharpPackSerializerContext | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.SharpPackSerializerContextBuilder | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.SharpPackWriterOptionalState | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.SharpPackWriter`1 | type=Struct;ref-like=True;readonly=False
+user | T:SharpPack.Utf16StringFormatterAttribute | type=Class;ref-like=False;readonly=False
+user | T:SharpPack.Utf8StringFormatterAttribute | type=Class;ref-like=False;readonly=False
