@@ -3,7 +3,14 @@ on:
   workflow_dispatch:
   push:
     branches:
+      - main
+      - dev
       - validation/issue18-streaming-lockstep-20261104
+      - validation/issue18-continuous-gates-20261105
+  pull_request:
+    branches:
+      - main
+      - dev
 jobs:
   package-consumers:
     strategy:

@@ -64,3 +64,18 @@ stack. This lockstep candidate builds on the dual-architecture package harness.
   runner architecture, and every consumer (including AOT) checks actual process
   architecture against its matrix leg before performing a roundtrip.
 - The small generated fixture is not exhaustive language or product coverage.
+
+## Continuous CI wiring
+
+Both the package consumer gate and ordinary Build-Debug validation run for pull
+requests targeting dev/main and pushes to dev/main. The package gate does not
+use path filters, so package/dependency changes cannot silently omit it. An
+isolated validation branch also runs both workflows on the same commit before
+integration. These trigger definitions take effect on dev/main only after the
+candidate is merged; no branch-protection or release permissions are changed.
+
+Package success is separate from full repository regression success. Keep both
+results for the exact candidate commit: package tests exercise the produced
+assets, while Build-Debug covers the existing API/generated-source baselines,
+unit tests, collectible ALC, original wire corpus and NativeAOT sample. Neither
+result establishes unmerged #17 ABI or #31 deserialize-only compatibility.

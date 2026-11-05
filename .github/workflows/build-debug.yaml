@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - "main"
+      - "dev"
+      - "validation/issue18-continuous-gates-20261105"
   pull_request:
     branches:
       - "main"
