@@ -71,9 +71,10 @@ public class RuntimeAbiDiagnosticsTest
     }
 
     [Theory]
-    [InlineData("class, System.Buffers.IBufferWriter<byte>")]
-    [InlineData("System.Buffers.IBufferWriter<byte>, new()")]
-    public void NarrowerHelperConstraint_IsRejectedBeforeEmission(string constraint)
+    [InlineData("class, System.Buffers.IBufferWriter<byte>", false)]
+    [InlineData("System.Buffers.IBufferWriter<byte>, new()", false)]
+    [InlineData("System.Buffers.IBufferWriter<byte>", true)]
+    public void MalformedPooledHelper_IsRejectedBeforeEmission(string constraint, bool refLike)
     {
         var helpers = """
             namespace SharpPack
@@ -105,7 +106,10 @@ public class RuntimeAbiDiagnosticsTest
                         where TBufferWriter : CONSTRAINT { }
                 }
             }
-            """.Replace("CONSTRAINT", constraint, StringComparison.Ordinal);
+            """.Replace("CONSTRAINT", constraint, StringComparison.Ordinal)
+            .Replace("public struct SharpPackPooledBufferWriter", refLike
+                ? "public ref struct SharpPackPooledBufferWriter"
+                : "public struct SharpPackPooledBufferWriter", StringComparison.Ordinal);
         var (output, diagnostics, result) = Run(CreateRuntime("public const int Version = 1;", helpers), Models);
         AssertMismatch(output, diagnostics, result,
             "1 (invalid compiler-services capability: SharpPackPooledBufferWriter)", "First");

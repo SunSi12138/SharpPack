@@ -89,11 +89,17 @@ public static class Program
         var bytes = SharpPackSerializer.Serialize(value);
         var copy = SharpPackSerializer.Deserialize<Model>(bytes);
         if (copy?.Value != 42 || copy.Text != "ABI") throw new Exception("Round trip failed");
+        var wrapped = new Versioned { Payload = value };
+        var wrappedCopy = SharpPackSerializer.Deserialize<Versioned>(SharpPackSerializer.Serialize(wrapped));
+        if (wrappedCopy?.Payload?.Value != 42 || wrappedCopy.Payload.Text != "ABI")
+            throw new Exception("Buffered version-tolerant round trip failed");
         Console.WriteLine("ABI_CONSUMER_OK");
     }
 }
 [SharpPackable]
 public partial class Model { public int Value { get; set; } public string? Text { get; set; } }
+[SharpPackable(GenerateType.VersionTolerant)]
+public partial class Versioned { [SharpPackOrder(0)] public Model? Payload { get; set; } }
 """)
             log = run(["dotnet", "build", "-c", "Release", "--nologo"], directory, env, success)
             assets = json.loads((directory / "obj/project.assets.json").read_text())

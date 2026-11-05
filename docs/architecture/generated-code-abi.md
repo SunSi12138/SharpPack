@@ -150,8 +150,10 @@ not evidence that any execution gate passed.
 `eng/baselines/generated/runtime-dependencies.txt` records exact bound Core type,
 constructor, method, property, and field documentation IDs, normalized to original
 generic definitions. The public API baseline independently freezes signatures,
-constraints, ref/scoped-related metadata, and accessor contracts. Together they
+constraints, ref/in/out and custom-modifier metadata, and accessor contracts. Together they
 record what generated C# uses and the shape Core must continue providing.
+Scoped-only annotations are not independently fingerprinted by these inventories;
+compilation tests provide complementary coverage, not an exhaustive scoped-metadata gate.
 
 `GeneratedCodeDependencyBaseline` inspects only generated trees using Roslyn
 symbol/type information. It also records explicit-interface implementations,

@@ -68,7 +68,7 @@ internal static class RuntimeGeneratedCodeAbi
                     .All(attribute => attribute.ConstructorArguments.Length == 1 &&
                         attribute.ConstructorArguments[0].Value is int targets && targets == (int)AttributeTargets.All);
 
-        if (type.TypeKind != TypeKind.Struct || !type.AllInterfaces.Any(iface =>
+        if (type.TypeKind != TypeKind.Struct || type.IsRefLikeType || !type.AllInterfaces.Any(iface =>
             iface.OriginalDefinition.ToDisplayString() == "System.Buffers.IBufferWriter<T>" &&
             iface.TypeArguments[0].SpecialType == SpecialType.System_Byte)) return false;
 

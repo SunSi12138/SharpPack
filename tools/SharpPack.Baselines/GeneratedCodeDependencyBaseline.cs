@@ -99,6 +99,12 @@ static class GeneratedCodeDependencyBaseline
             .Any(id => id.StartsWith("M:SharpPack.SharpPackSerializer.Serialize", StringComparison.Ordinal)))
             throw new InvalidOperationException("Dependency gate failed its added-call mutation check.");
 
+        var comment = CSharpSyntaxTree.ParseText(
+            "// SharpPack.Internal.ReusableLinkedArrayBufferWriterPool is only a comment.", parse, "Comment.g.cs");
+        var commented = Collect(compilation.AddSyntaxTrees(comment), trees.Append(comment));
+        if (!commented.SequenceEqual(dependencies))
+            throw new InvalidOperationException("A comment changed the semantic dependency inventory.");
+
         var output = new StringBuilder();
         output.AppendLine("# Generated-code runtime dependency inventory");
         output.AppendLine("# Exact Roslyn documentation IDs, normalized to original generic definitions.");
