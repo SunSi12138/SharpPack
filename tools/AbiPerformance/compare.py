@@ -15,6 +15,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "d4c15564af7c754e87dd019ca3cc25997097cda3"
+PRESERVED = "42488401cf4f78ba0b2320c6da2701deef574702"
 RESULTS = Path(os.environ.get("ABI_PERF_RESULTS", ROOT / "artifacts/abi-performance")).resolve()
 
 
@@ -42,9 +43,9 @@ def main():
     RESULTS.mkdir(parents=True, exist_ok=True)
     candidate = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     cpu = min(os.sched_getaffinity(0))
-    metadata = {"baseline": BASELINE, "candidate": candidate, "cpuAffinity": cpu,
+    metadata = {"baseline": BASELINE, "candidate": candidate, "preservedWrapper": PRESERVED, "cpuAffinity": cpu,
                 "os": platform.platform(), "machine": platform.machine(),
-                "protocol": "8 independent process pairs, alternating AB/BA; per case 1s warmup and 9 batches after >=100ms calibration; default tiered PGO; process medians; paired log-mean bootstrap95% CI",
+                "protocol": "8 independent case-isolated process blocks per case, rotating/reversed three-way order; 5s warmup and 9 batches after >=100ms calibration; default tiered PGO; process medians; paired log-mean bootstrap95% CI",
                 "harnessSha256": hashlib.sha256((ROOT / "tools/AbiPerformance/Program.cs").read_bytes()).hexdigest()}
     run(["dotnet", "--info"], ROOT, os.environ, RESULTS / "dotnet-info.txt")
     run(["lscpu"], ROOT, os.environ, RESULTS / "cpu-info.txt")
@@ -54,7 +55,7 @@ def main():
         env = dict(os.environ, DOTNET_TieredCompilation="1", DOTNET_TieredPGO="1",
                    DOTNET_ReadyToRun="0", DOTNET_PROCESSOR_COUNT="1",
                    DOTNET_CLI_TELEMETRY_OPTOUT="1")
-        for label, revision in (("baseline", BASELINE), ("candidate", candidate)):
+        for label, revision in (("baseline", BASELINE), ("preserved-wrapper", PRESERVED), ("candidate", candidate)):
             source = work / label
             source.mkdir()
             archive = work / f"{label}.tar"
@@ -83,48 +84,72 @@ def main():
             assert all(name in generated for name in expected), (label, "Expected generated wrapper paths absent")
             (RESULTS / f"{label}-generated.cs.txt").write_text(generated)
             executables[label] = harness / "bin/Release/net10.0/AbiPerf.dll"
-        pairs = []
-        for pair in range(8):
-            result = {}
-            order = ["baseline", "candidate"] if pair % 2 == 0 else ["candidate", "baseline"]
-            for label in order:
-                log = RESULTS / f"pair-{pair:02}-{label}.json"
-                output = run(["dotnet", str(executables[label])], work, env, log, cpu)
-                result[label] = json.loads(output.strip().splitlines()[-1])
-                print(f"Finished pair {pair + 1}/8 {label}", flush=True)
-            pairs.append(result)
+        names = ["exact-small", "exact-large", "buffered-version-tolerant", "circular-reference"]
         summary = {}
-        for index, case in enumerate(pairs[0]["baseline"]["results"]):
-            name = case["name"]
+        for name in names:
+            pairs = []
+            for pair in range(8):
+                result = {}
+                labels = ["baseline", "preserved-wrapper", "candidate"]
+                shift = pair % 3
+                order = labels[shift:] + labels[:shift]
+                if pair % 2: order.reverse()
+                for label in order:
+                    log = RESULTS / f"{name}-pair-{pair:02}-{label}.json"
+                    output = run(["dotnet", str(executables[label]), "--case=" + name], work, env, log, cpu)
+                    result[label] = json.loads(output.strip().splitlines()[-1])
+                    print(f"Finished {name} pair {pair + 1}/8 {label}", flush=True)
+                pairs.append(result)
             ratios, baseline_ns, candidate_ns, allocated = [], [], [], []
+            preserved_ns, candidate_preserved, preserved_baseline = [], [], []
             for pair in pairs:
-                before, after = (pair[label]["results"][index] for label in ("baseline", "candidate"))
-                assert before["name"] == after["name"] == name
+                before, after = (pair[label]["results"][0] for label in ("baseline", "candidate"))
+                preserved = pair["preserved-wrapper"]["results"][0]
+                assert before["name"] == after["name"] == preserved["name"] == name
+                assert preserved["sha256"] == before["sha256"] and preserved["payloadBytes"] == before["payloadBytes"], name
                 assert before["sha256"] == after["sha256"] and before["payloadBytes"] == after["payloadBytes"], name
                 b = statistics.median(x["Nanoseconds"] for x in before["samples"])
                 a = statistics.median(x["Nanoseconds"] for x in after["samples"])
+                p = statistics.median(x["Nanoseconds"] for x in preserved["samples"])
+                preserved_ns.append(p); candidate_preserved.append(math.log(a / p)); preserved_baseline.append(math.log(p / b))
                 baseline_ns.append(b); candidate_ns.append(a); ratios.append(math.log(a / b))
                 b_alloc = statistics.median(x["AllocatedBytes"] for x in before["samples"])
                 a_alloc = statistics.median(x["AllocatedBytes"] for x in after["samples"])
-                assert abs(a_alloc - b_alloc) <= .01, (name, "Allocation changed", b_alloc, a_alloc)
+                p_alloc = statistics.median(x["AllocatedBytes"] for x in preserved["samples"])
+                assert abs(a_alloc - b_alloc) <= .01 and abs(p_alloc - b_alloc) <= .01, (name, "Allocation changed", b_alloc, p_alloc, a_alloc)
                 allocated.append([b_alloc, a_alloc])
+            case = pairs[0]["baseline"]["results"][0]
             low, high = bootstrap_interval(ratios)
             summary[name] = {"candidateBaselineRatio": math.exp(statistics.mean(ratios)),
-                "bootstrap95": [low, high], "baselineProcessMediansNs": baseline_ns,
+                "bootstrap95": [low, high],
+                "candidatePreservedRatio": math.exp(statistics.mean(candidate_preserved)),
+                "candidatePreservedBootstrap95": bootstrap_interval(candidate_preserved),
+                "preservedBaselineRatio": math.exp(statistics.mean(preserved_baseline)),
+                "preservedBaselineBootstrap95": bootstrap_interval(preserved_baseline),
+                "preservedProcessMediansNs": preserved_ns, "baselineProcessMediansNs": baseline_ns,
                 "candidateProcessMediansNs": candidate_ns, "allocatedBytesPerOp": allocated,
                 "payloadBytes": case["payloadBytes"], "sha256": case["sha256"],
                 "interpretation": "slower interval" if low > 1 else "faster interval" if high < 1 else "inconclusive interval"}
-        # Optimized no-tier JIT diagnostic is separate from default-tier timing.
+        # Diagnostics are separate from timing. Keep fully optimized no-tier code
+        # and the actual tiered-PGO exact-small code, not just the former.
         jit = {}
-        for label, executable in executables.items():
-            jit_env = dict(env, DOTNET_TieredCompilation="0", DOTNET_JitDisasm="*SerializeExact* *WriteToAndReset*")
-            output = run(["dotnet", str(executable), "--jit"], work, jit_env, RESULTS / f"{label}-jit.txt", cpu)
-            listings = [line for line in output.splitlines() if "Assembly listing for method" in line]
-            assert any("SerializeExact" in line for line in listings), (label, "JIT assembly missing")
-            jit[label] = {"listings": listings,
-                "codeSizes": [line for line in output.splitlines() if "Total bytes of code" in line],
-                "compilerServicesReferencedCallSites": [line.strip() for line in output.splitlines()
-                    if re.search(r"\b(?:call|bl|blr)\s+", line) and "CompilerServices.SharpPack" in line]}
+        for mode in ("no-tier", "tiered-exact-small"):
+            jit[mode] = {}
+            for label, executable in executables.items():
+                jit_env = dict(env, DOTNET_JitDisasm="*SerializeExact* *WriteToAndReset*")
+                args = ["dotnet", str(executable)]
+                if mode == "no-tier":
+                    jit_env["DOTNET_TieredCompilation"] = "0"
+                    args += ["--jit"]
+                else:
+                    args += ["--jit-tiered", "--case=exact-small"]
+                output = run(args, work, jit_env, RESULTS / f"{label}-{mode}-jit.txt", cpu)
+                listings = [line for line in output.splitlines() if "Assembly listing for method" in line]
+                assert any("SerializeExact" in line for line in listings), (label, mode, "JIT assembly missing")
+                jit[mode][label] = {"listings": listings,
+                    "codeSizes": [line for line in output.splitlines() if "Total bytes of code" in line],
+                    "compilerServicesReferencedCallSites": [line.strip() for line in output.splitlines()
+                        if re.search(r"\b(?:call|bl|blr)\s+", line) and "CompilerServices.SharpPack" in line]}
         report = {"metadata": metadata, "summary": summary, "jit": jit}
         (RESULTS / "summary.json").write_text(json.dumps(report, indent=2) + "\n")
         print("ABI_PERF_SUMMARY " + json.dumps(report), flush=True)

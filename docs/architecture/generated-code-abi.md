@@ -112,8 +112,10 @@ required additions must be accompanied by capability checks or an ABI change.
 The additive migration routes exact-size output and temporary version-tolerant
 buffers through `CompilerServices.SharpPackExactBufferWriter` and
 `CompilerServices.SharpPackPooledBufferWriter`, and emitted preservation markers
-through `CompilerServices.PreserveAttribute`. The adapters are value types with
-direct forwards to the existing storage and lease implementation. They add no
+through `CompilerServices.PreserveAttribute`. The helpers are value types. The pooled adapter forwards to the existing storage
+and lease implementation. The exact writer owns a flat array/cursor pair with the
+same validation behavior as its retained legacy counterpart; parity tests cover
+default/empty buffers, invalid bounds, aliasing and returned-array identity. They add no
 resolver, registry, dictionary, new buffer object, or virtual-dispatch layer.
 The pool's lease IDs, finally-return, reset ordering, and duplicate-return checks
 are retained. The old Internal types, preservation marker, exact writer factory,

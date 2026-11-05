@@ -22,14 +22,19 @@ static class Program
             ("buffered-version-tolerant", () => SharpPackSerializer.Serialize(buffered)),
             ("circular-reference", () => SharpPackSerializer.Serialize(node)) };
         Validate(small, large, buffered, node);
+        var selected = args.FirstOrDefault(x => x.StartsWith("--case=", StringComparison.Ordinal))?[7..];
+        if (selected is not null && !cases.Any(x => x.Name == selected)) throw new Exception("Unknown case");
         var results = new List<object>();
-        foreach (var item in cases)
+        foreach (var item in cases.Where(x => selected is null || x.Name == selected))
         {
             var payload = item.Run();
             if (args.Contains("--jit")) { for (var i = 0; i < 64; i++) Consume(item.Run()); continue; }
             // Warm default tiered compilation/PGO on each fresh process before measurement.
             var warm = Stopwatch.StartNew();
-            while (warm.ElapsedMilliseconds < 1000) Batch(item.Run, 1000);
+            while (warm.ElapsedMilliseconds < 5000) Batch(item.Run, 1000);
+            Thread.Sleep(100); // Give the background tiering thread an opportunity to finish.
+            Batch(item.Run, 10000);
+            if (args.Contains("--jit-tiered")) continue;
             var iterations = 1024;
             while (Measure(item.Run, iterations).Nanoseconds * iterations < 100_000_000 && iterations < 16_777_216)
                 iterations *= 2;

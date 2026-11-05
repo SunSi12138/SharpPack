@@ -1,7 +1,7 @@
 name: ABI-Inventory
 on:
   push:
-    branches: [validation/issue17-abi-inventory-20261105, validation/issue17-scoped-perf-20261105]
+    branches: [validation/issue17-abi-inventory-20261105, validation/issue17-scoped-perf-20261105, validation/issue17-flat-exact-20261105]
   workflow_dispatch:
 jobs:
   verify:

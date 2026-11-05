@@ -1,7 +1,7 @@
 name: ABI-Wrapper-Performance
 on:
   push:
-    branches: [validation/issue17-scoped-perf-20261105]
+    branches: [validation/issue17-scoped-perf-20261105, validation/issue17-flat-exact-20261105]
     paths: [tools/AbiPerformance/**, .github/workflows/abi-performance.yaml]
   workflow_dispatch:
 jobs:

@@ -34,6 +34,56 @@ public class CompilerServicesMigrationTest
         underfilled.Should().Throw<SharpPackSerializationException>();
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(32)]
+    public void ExactBuffer_ValidationAndStorageMatchLegacy(int size)
+    {
+        var bytes = new byte[size];
+        var oldBytes = new byte[size];
+        var buffer = new SharpPackExactBufferWriter(bytes);
+        var legacy = new Internal.SharpPackExactArrayBufferWriter(oldBytes);
+        var empty = default(SharpPackExactBufferWriter);
+        var oldEmpty = default(Internal.SharpPackExactArrayBufferWriter);
+        AssertSameFailure(() => empty.Advance(-1), () => oldEmpty.Advance(-1));
+        AssertSameFailure(() => empty.Advance(0), () => oldEmpty.Advance(0));
+        AssertSameFailure(() => empty.GetMemory(), () => oldEmpty.GetMemory());
+        AssertSameFailure(() => empty.GetSpan(), () => oldEmpty.GetSpan());
+        AssertSameFailure(() => empty.GetFilledBuffer(), () => oldEmpty.GetFilledBuffer());
+        AssertSameFailure(() => new SharpPackExactBufferWriter(null!),
+            () => new Internal.SharpPackExactArrayBufferWriter(null!));
+        foreach (var hint in new[] { -1, 0, 1, size, size + 1, int.MaxValue })
+        {
+            AssertSameFailure(() => buffer.GetMemory(hint), () => legacy.GetMemory(hint));
+            AssertSameFailure(() => buffer.GetSpan(hint), () => legacy.GetSpan(hint));
+        }
+        AssertSameFailure(() => buffer.Advance(-1), () => legacy.Advance(-1));
+        AssertSameFailure(() => buffer.Advance(size + 1), () => legacy.Advance(size + 1));
+        AssertSameFailure(() => buffer.GetFilledBuffer(), () => legacy.GetFilledBuffer());
+        buffer.GetMemory().Span.Fill(0x24);
+        legacy.GetMemory().Span.Fill(0x24);
+        bytes.Should().Equal(oldBytes).And.OnlyContain(value => value == 0x24);
+        buffer.GetSpan().Fill(0x42);
+        legacy.GetSpan().Fill(0x42);
+        bytes.Should().OnlyContain(value => value == 0x42);
+        buffer.Advance(size);
+        legacy.Advance(size);
+        buffer.GetFilledBuffer().Should().BeSameAs(bytes).And.Equal(legacy.GetFilledBuffer());
+        buffer.GetMemory().Length.Should().Be(legacy.GetMemory().Length).And.Be(0);
+        AssertSameFailure(() => buffer.Advance(1), () => legacy.Advance(1));
+        AssertSameFailure(() => buffer.GetSpan(1), () => legacy.GetSpan(1));
+
+        static void AssertSameFailure(Action current, Action previous)
+        {
+            var actual = Record.Exception(current);
+            var expected = Record.Exception(previous);
+            (actual?.GetType()).Should().Be(expected?.GetType());
+            (actual?.Message).Should().Be(expected?.Message);
+            if (expected is null) actual.Should().BeNull();
+        }
+    }
+
     [Fact]
     public void PooledBuffer_PreservesLeaseChecksAndReset()
     {
