@@ -94,6 +94,9 @@ def main():
                 shift = pair % 3
                 order = labels[shift:] + labels[:shift]
                 if pair % 2: order.reverse()
+                # The final two blocks are a reversal pair, so every pairwise
+                # comparison has four A-before-B and four B-before-A blocks.
+                if pair == 7: order = list(reversed(labels))
                 for label in order:
                     log = RESULTS / f"{name}-pair-{pair:02}-{label}.json"
                     output = run(["dotnet", str(executables[label]), "--case=" + name], work, env, log, cpu)
@@ -117,7 +120,7 @@ def main():
                 a_alloc = statistics.median(x["AllocatedBytes"] for x in after["samples"])
                 p_alloc = statistics.median(x["AllocatedBytes"] for x in preserved["samples"])
                 assert abs(a_alloc - b_alloc) <= .01 and abs(p_alloc - b_alloc) <= .01, (name, "Allocation changed", b_alloc, p_alloc, a_alloc)
-                allocated.append([b_alloc, a_alloc])
+                allocated.append([b_alloc, p_alloc, a_alloc])
             case = pairs[0]["baseline"]["results"][0]
             low, high = bootstrap_interval(ratios)
             summary[name] = {"candidateBaselineRatio": math.exp(statistics.mean(ratios)),

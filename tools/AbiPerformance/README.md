@@ -17,10 +17,11 @@ The workflow runs separately on hosted x64 and ARM64 Linux machines. Within each
 machine, all processes are pinned to the same available CPU and use workstation
 GC, default tiered compilation/PGO, ReadyToRun disabled and one reported processor.
 There are eight independent case-isolated process blocks per case in rotating,
-reversed three-way order (96 timed processes total). Each case warms for five seconds, briefly
+reversed three-way order (96 timed processes total). The first six blocks cover
+all six orders; the last two are reversals, balancing each pairwise comparison. Each case warms for five seconds, briefly
 yields for background tier compilation, calibrates its own batch to at least 100 ms, then measures
 nine batches at that count (individual batches can be shorter). Each process contributes its median batch result. The summary gives
-the geometric mean candidate/baseline ratio and a deterministic 20,000-resample
+all three geometric-mean pairwise ratios and a deterministic 20,000-resample
 95% bootstrap interval over the eight block-paired log ratios. Raw samples are retained.
 
 This is targeted serialization characterization, not a general serializer

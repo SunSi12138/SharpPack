@@ -63,10 +63,10 @@ public class CompilerServicesMigrationTest
         AssertSameFailure(() => buffer.GetFilledBuffer(), () => legacy.GetFilledBuffer());
         buffer.GetMemory().Span.Fill(0x24);
         legacy.GetMemory().Span.Fill(0x24);
-        bytes.Should().Equal(oldBytes).And.OnlyContain(value => value == 0x24);
+        bytes.Should().Equal(oldBytes).And.Equal(Enumerable.Repeat((byte)0x24, size));
         buffer.GetSpan().Fill(0x42);
         legacy.GetSpan().Fill(0x42);
-        bytes.Should().OnlyContain(value => value == 0x42);
+        bytes.Should().Equal(Enumerable.Repeat((byte)0x42, size));
         buffer.Advance(size);
         legacy.Advance(size);
         buffer.GetFilledBuffer().Should().BeSameAs(bytes).And.Equal(legacy.GetFilledBuffer());
