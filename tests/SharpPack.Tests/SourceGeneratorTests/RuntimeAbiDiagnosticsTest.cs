@@ -70,6 +70,62 @@ public class RuntimeAbiDiagnosticsTest
             "1 (invalid compiler-services capability: SharpPackExactBufferWriter)", "First");
     }
 
+    [Theory]
+    [InlineData("class, System.Buffers.IBufferWriter<byte>")]
+    [InlineData("System.Buffers.IBufferWriter<byte>, new()")]
+    public void NarrowerHelperConstraint_IsRejectedBeforeEmission(string constraint)
+    {
+        var helpers = """
+            namespace SharpPack
+            {
+                public ref struct SharpPackWriter<TBufferWriter>
+                    where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+            }
+            namespace SharpPack.CompilerServices
+            {
+                public sealed class PreserveAttribute : System.Attribute { }
+                public struct SharpPackExactBufferWriter : System.Buffers.IBufferWriter<byte>
+                {
+                    public SharpPackExactBufferWriter(byte[] value) { }
+                    public void Advance(int count) { }
+                    public System.Span<byte> GetSpan(int sizeHint = 0) => default;
+                    public System.Memory<byte> GetMemory(int sizeHint = 0) => default;
+                    public byte[] GetFilledBuffer() => System.Array.Empty<byte>();
+                    public static SharpPack.SharpPackWriter<SharpPackExactBufferWriter> CreateWriter(
+                        ref SharpPackExactBufferWriter writer) => default;
+                }
+                public struct SharpPackPooledBufferWriter : System.Buffers.IBufferWriter<byte>
+                {
+                    public void Advance(int count) { }
+                    public System.Span<byte> GetSpan(int sizeHint = 0) => default;
+                    public System.Memory<byte> GetMemory(int sizeHint = 0) => default;
+                    public static SharpPackPooledBufferWriter Rent(out long lease) { lease = 0; return default; }
+                    public static void Return(SharpPackPooledBufferWriter writer, long lease) { }
+                    public void WriteToAndReset<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer)
+                        where TBufferWriter : CONSTRAINT { }
+                }
+            }
+            """.Replace("CONSTRAINT", constraint, StringComparison.Ordinal);
+        var (output, diagnostics, result) = Run(CreateRuntime("public const int Version = 1;", helpers), Models);
+        AssertMismatch(output, diagnostics, result,
+            "1 (invalid compiler-services capability: SharpPackPooledBufferWriter)", "First");
+    }
+
+    [Fact]
+    public void RestrictedPreserveAttribute_IsRejectedBeforeEmission()
+    {
+        var runtime = CreateRuntime("public const int Version = 1;", """
+            namespace SharpPack.CompilerServices
+            {
+                [System.AttributeUsage(System.AttributeTargets.Assembly)]
+                public sealed class PreserveAttribute : System.Attribute { }
+            }
+            """);
+        var (output, diagnostics, result) = Run(runtime, Models);
+        AssertMismatch(output, diagnostics, result,
+            "1 (invalid compiler-services capability: PreserveAttribute)", "First");
+    }
+
     [Fact]
     public void ExternalUnionOnly_ReportsOnceAndDoesNotGenerateFactories()
     {

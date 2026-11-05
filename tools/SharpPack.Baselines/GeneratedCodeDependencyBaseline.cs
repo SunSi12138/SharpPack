@@ -176,16 +176,17 @@ static class GeneratedCodeDependencyBaseline
         if (ns == "SharpPack.CompilerServices") return "compiler-services";
         if (ns == "SharpPack.Internal")
             throw new InvalidOperationException("Generated code leaks an Internal dependency: " + symbol);
+        if (ns == "SharpPack.Formatters" && type.MetadataName == "ListFormatter") return "legacy-generated";
         if (ns is "SharpPack.Formatters" or "SharpPack.Compression") return "user";
         if (ns == "SharpPack")
         {
             if (type.Name is "ISharpPackContextFormatterFactory" or "ISharpPackContextOverrideFormatter" or
-                "ISharpPackExactSizeSerializable" or "ISharpPackFormatterFactory" or "IFixedSizeSharpPackable")
+                "ISharpPackExactSizeSerializable" or "IFixedSizeSharpPackable")
                 return "legacy-generated";
             if (symbol.Name is "WriteUtf8Exact" or "HasFormatterOverrideDependency" or "HasFormatterOverrides" ||
                 (type.Name == "SharpPackSerializationException" && symbol.Name.StartsWith("Throw", StringComparison.Ordinal)))
                 return "legacy-generated";
-            if (type.Name is "ISharpPackable" or "ISharpPackFormatter" or "SharpPackFormatter" or
+            if (type.Name is "ISharpPackable" or "ISharpPackFormatter" or "ISharpPackFormatterFactory" or "SharpPackFormatter" or
                 "SharpPackReader" or "SharpPackWriter" or "SharpPackReaderOptionalState" or
                 "SharpPackWriterOptionalState" or "SharpPackSerializerContext" or "SharpPackSerializerContextBuilder" or
                 "SharpPackSerializationException" or "SharpPackSerializer" or "SharpPackCode" or

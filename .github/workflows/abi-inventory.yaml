@@ -4,7 +4,7 @@ on:
     branches: [validation/issue17-abi-inventory-20261105]
   workflow_dispatch:
 jobs:
-  capture:
+  verify:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -16,18 +16,7 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-      - name: Compile full fixture and capture candidate baselines for review
-        run: |
-          dotnet run --project tools/SharpPack.Baselines -c Release -- update
-          python3 - <<'PY'
-          from pathlib import Path
-          import base64
-          for path in ('eng/baselines/public-api/SharpPack.Core.txt', 'eng/baselines/generated/representative.g.cs.txt', 'eng/baselines/generated/runtime-dependencies.txt'):
-              data = base64.b64encode(Path(path).read_bytes()).decode()
-              print('BASELINE_START ' + path)
-              for start in range(0, len(data), 3000):
-                  print('BASELINE_DATA ' + data[start:start+3000])
-              print('BASELINE_END ' + path)
-          PY
-      - name: Test migration and retained ABI
-        run: dotnet test tests/SharpPack.Tests -c Release --filter 'FullyQualifiedName~CompilerServicesMigrationTest|FullyQualifiedName~RuntimeAbiDiagnosticsTest|FullyQualifiedName~FrozenGeneratedCodeAbi'
+      - name: Verify reviewed semantic and public baselines
+        run: dotnet run --project tools/SharpPack.Baselines -c Release -- verify
+      - name: Verify clean tracked tree
+        run: git diff --exit-code

@@ -63,7 +63,10 @@ internal static class RuntimeGeneratedCodeAbi
 
         if (name == "PreserveAttribute")
             return type.TypeKind == TypeKind.Class && !type.IsAbstract &&
-                type.BaseType?.ToDisplayString() == "System.Attribute" && Constructor(ctor => ctor.Parameters.Length == 0);
+                type.BaseType?.ToDisplayString() == "System.Attribute" && Constructor(ctor => ctor.Parameters.Length == 0) &&
+                type.GetAttributes().Where(attribute => attribute.AttributeClass?.ToDisplayString() == "System.AttributeUsageAttribute")
+                    .All(attribute => attribute.ConstructorArguments.Length == 1 &&
+                        attribute.ConstructorArguments[0].Value is int targets && targets == (int)AttributeTargets.All);
 
         if (type.TypeKind != TypeKind.Struct || !type.AllInterfaces.Any(iface =>
             iface.OriginalDefinition.ToDisplayString() == "System.Buffers.IBufferWriter<T>" &&
@@ -86,6 +89,15 @@ internal static class RuntimeGeneratedCodeAbi
                 IsSelf(method.Parameters[0].Type) && method.Parameters[1].Type.SpecialType == SpecialType.System_Int64) &&
             Method("WriteToAndReset", method => !method.IsStatic && method.Arity == 1 && method.ReturnsVoid &&
                 method.Parameters.Length == 1 && method.Parameters[0].RefKind == RefKind.Ref &&
-                IsWriter(method.Parameters[0].Type, method.TypeParameters[0]));
+                IsWriter(method.Parameters[0].Type, method.TypeParameters[0]) &&
+                HasBufferWriterConstraint(method.TypeParameters[0]));
     }
+
+    static bool HasBufferWriterConstraint(ITypeParameterSymbol parameter)
+        => !parameter.HasConstructorConstraint && !parameter.HasReferenceTypeConstraint &&
+            !parameter.HasValueTypeConstraint && !parameter.HasUnmanagedTypeConstraint &&
+            !parameter.HasNotNullConstraint && parameter.ConstraintTypes.Length == 1 &&
+            parameter.ConstraintTypes[0] is INamedTypeSymbol constraint &&
+            constraint.OriginalDefinition.ToDisplayString() == "System.Buffers.IBufferWriter<T>" &&
+            constraint.TypeArguments[0].SpecialType == SpecialType.System_Byte;
 }

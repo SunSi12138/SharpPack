@@ -100,11 +100,28 @@ TypeScript output is also suppressed. A project with no recognized SharpPack
 annotations does not require the runtime marker; ordinary unresolved-attribute
 compiler diagnostics still apply when Core is completely absent.
 
-This is an additive handshake stage of #17. It does not rename or remove any
-existing helper, change generated C# for a supported pair, change wire bytes, or
-add runtime dispatch/allocation. Existing generated source remains supported by
-the frozen ABI compilation gate. The complete per-member generated dependency
-inventory and eventual wrapper migration remain separate work.
+ABI 1 is an unreleased contract being finalized in the #17 validation branches.
+The handshake-only candidate `d4c15564` predates the compiler-services adapters.
+The Generator therefore validates both the ABI number and the required helper
+shapes from the same runtime assembly. A missing helper, malformed constructor or
+method, restrictive generic constraint, or incompatible preservation-attribute
+usage produces `SHARPPACK043` before emission. Consumer-defined lookalikes cannot
+satisfy the runtime capability check. Before any release freezes ABI 1, further
+required additions must be accompanied by capability checks or an ABI change.
+
+The additive migration routes exact-size output and temporary version-tolerant
+buffers through `CompilerServices.SharpPackExactBufferWriter` and
+`CompilerServices.SharpPackPooledBufferWriter`, and emitted preservation markers
+through `CompilerServices.PreserveAttribute`. The adapters are value types with
+direct forwards to the existing storage and lease implementation. They add no
+resolver, registry, dictionary, new buffer object, or virtual-dispatch layer.
+The pool's lease IDs, finally-return, reset ordering, and duplicate-return checks
+are retained. The old Internal types, preservation marker, exact writer factory,
+and all old interfaces stay available for 1.x generated source and binaries.
+
+Generated-source snapshots intentionally change helper names and generic writer
+arguments. Wire layout does not change. Throughput or allocation performance
+acceptance must be established separately; source structure is not timing evidence.
 
 `RuntimeAbiDiagnosticsTest` verifies matching/missing/invalid/older/newer markers,
 one error for multiple models, external-union suppression, consumer marker
@@ -127,3 +144,50 @@ packages to a runtime carrying ABI 1. Full CI additionally checks public API and
 unchanged generated-source baselines, the ordinary test suite, original wire
 corpus, and NativeAOT publish/run on x64 and ARM64. Passing source checks alone is
 not evidence that any execution gate passed.
+
+## Per-member inventory and ownership
+
+`eng/baselines/generated/runtime-dependencies.txt` records exact bound Core type,
+constructor, method, property, and field documentation IDs, normalized to original
+generic definitions. The public API baseline independently freezes signatures,
+constraints, ref/scoped-related metadata, and accessor contracts. Together they
+record what generated C# uses and the shape Core must continue providing.
+
+`GeneratedCodeDependencyBaseline` inspects only generated trees using Roslyn
+symbol/type information. It also records explicit-interface implementations,
+overrides, and implicit parameterless formatter-base constructor calls. It rejects
+unclassified Core references and any semantic dependency on `SharpPack.Internal`.
+A comment mentioning a helper is not a dependency. User-owned declarations and
+custom-formatter implementations are outside Core's fixed inventory; the fixture
+covers both custom-formatter attribute forms and the shipped attributes.
+
+The inventory fixture includes the representative models plus all 67 known generic
+formatter mappings, ten other concrete formatter definitions (77 constructors in
+total), all 90 selected unmanaged overloads (six families, arities 1–15), ordinary
+and external generic unions, collection/set/dictionary models, optimized and
+buffered version-tolerant paths, circular references, exact-size paths, and mutable
+and immutable list deserialization. Coverage assertions fail if a mapped formatter
+or required unmanaged overload is not reached. A valid injected generated
+Serialize call must change the collected member set, characterizing detection of
+an extra runtime dependency. Every update to the map or emitter requires reviewing
+the inventory diff, not automatically accepting regenerated text.
+
+Classification decisions:
+
+- `user`: reader/writer operations, formatter interfaces/base classes and concrete
+  formatter constructors, factory registration, and custom formatter attributes
+  remain supported low-level APIs. They are not duplicated in CompilerServices.
+- `legacy-generated`: fixed-size/exact-size/context factory markers, optimized
+  non-generic ListFormatter helper overloads, hidden exact UTF8 and context
+  dependency helpers, and generated throw helpers remain explicit 1.x ABI.
+  Their identity is retained; later optional forwarding does not justify removal.
+- `compiler-services`: newly introduced generated-only adapters and marker.
+- Accidental public implementation surface not used by the generator, such as the
+  reusable writer's constructor, enumeration and async-reset helpers, is outside
+  this generated dependency inventory but still protected by the public API
+  baseline. No 1.x removals or narrowing are authorized by this classification.
+
+The package matrix additionally tests `d4c15564` Generator + current Core and
+current Generator + `d4c15564` Core. The former must build/run using retained old
+helpers; the latter must report the missing compiler-services capability instead
+of unrelated C# errors. The pinned pre-handshake `6666ada1` cases remain in place.

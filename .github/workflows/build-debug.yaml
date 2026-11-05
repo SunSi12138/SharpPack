@@ -6,6 +6,7 @@ on:
     branches:
       - "main"
       - "validation/issue17-runtime-handshake-20261104"
+      - "validation/issue17-abi-inventory-20261105"
   pull_request:
     branches:
       - "main"

@@ -26,8 +26,27 @@ type public sealed class SharpPack.BrotliStringFormatterAttribute : SharpPack.Sh
   property System.Int32 DecompressionSizeLimit { get:public; }
   property System.Int32 Window { get:public; }
 
+type public sealed class SharpPack.CompilerServices.PreserveAttribute : System.Attribute
+  ctor public PreserveAttribute()
+
+type public struct SharpPack.CompilerServices.SharpPackExactBufferWriter : System.Buffers.IBufferWriter<System.Byte>
+  ctor public SharpPackExactBufferWriter(System.Byte[] buffer)
+  method public System.Byte[] GetFilledBuffer()
+  method public sealed override System.Memory<System.Byte> GetMemory(System.Int32 sizeHint = 0)
+  method public sealed override System.Span<System.Byte> GetSpan(System.Int32 sizeHint = 0)
+  method public sealed override System.Void Advance(System.Int32 count)
+  method public static SharpPack.SharpPackWriter<SharpPack.CompilerServices.SharpPackExactBufferWriter> CreateWriter(ref SharpPack.CompilerServices.SharpPackExactBufferWriter bufferWriter)
+
 type public static class SharpPack.CompilerServices.SharpPackGeneratedCodeContract
   field public const System.Int32 Version = 1
+
+type public readonly struct SharpPack.CompilerServices.SharpPackPooledBufferWriter : System.Buffers.IBufferWriter<System.Byte>
+  method public System.Void WriteToAndReset<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
+  method public sealed override System.Memory<System.Byte> GetMemory(System.Int32 sizeHint = 0)
+  method public sealed override System.Span<System.Byte> GetSpan(System.Int32 sizeHint = 0)
+  method public sealed override System.Void Advance(System.Int32 count)
+  method public static SharpPack.CompilerServices.SharpPackPooledBufferWriter Rent(out System.Int64 leaseId)
+  method public static System.Void Return(SharpPack.CompilerServices.SharpPackPooledBufferWriter writer, System.Int64 leaseId)
 
 type public sealed class SharpPack.Compression.BitPackFormatter : SharpPack.SharpPackFormatter<System.Boolean[]>, SharpPack.ISharpPackFormatter<System.Boolean[]>
   ctor public BitPackFormatter()
