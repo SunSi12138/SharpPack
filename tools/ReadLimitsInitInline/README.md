@@ -44,3 +44,11 @@ The earlier broad/focused evidence is retained and must not be overwritten.
 
 This experiment does not execute the unsafe old BitArray formatter, remove any
 limit, alter PR #30, merge, release, delete, change permissions or upload logs.
+
+## Recorded outcome
+
+The candidate passed functional checks but did not show a stable, meaningful
+cross-scenario performance improvement. Do not promote it into PR #30. See
+[the complete investigation](../../docs/validation/pr30-init-inline-20261105.md)
+for the three-way results, repaired JIT evidence, retained failed probes and
+independent review.
