@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import platform
 import random
+import re
 import statistics
 import subprocess
 import tarfile
@@ -122,12 +123,12 @@ def main():
             assert any("SerializeExact" in line for line in listings), (label, "JIT assembly missing")
             jit[label] = {"listings": listings,
                 "codeSizes": [line for line in output.splitlines() if "Total bytes of code" in line],
-                "wrapperCalls": [line.strip() for line in output.splitlines()
-                    if "call" in line and "CompilerServices.SharpPack" in line]}
+                "compilerServicesReferencedCallSites": [line.strip() for line in output.splitlines()
+                    if re.search(r"\b(?:call|bl|blr)\s+", line) and "CompilerServices.SharpPack" in line]}
         report = {"metadata": metadata, "summary": summary, "jit": jit}
         (RESULTS / "summary.json").write_text(json.dumps(report, indent=2) + "\n")
         print("ABI_PERF_SUMMARY " + json.dumps(report), flush=True)
-        print("Payloads, roundtrips, generated paths and allocations matched. Timing is descriptive, not a performance acceptance gate.", flush=True)
+        print("Payloads, roundtrips and generated paths verified; median allocated bytes/op match within 0.01 B/op. Timing is descriptive, not a performance acceptance gate.", flush=True)
 
 
 if __name__ == "__main__":

@@ -149,11 +149,20 @@ not evidence that any execution gate passed.
 
 `eng/baselines/generated/runtime-dependencies.txt` records exact bound Core type,
 constructor, method, property, and field documentation IDs, normalized to original
-generic definitions. The public API baseline independently freezes signatures,
-constraints, ref/in/out and custom-modifier metadata, and accessor contracts. Together they
-record what generated C# uses and the shape Core must continue providing.
-Scoped-only annotations are not independently fingerprinted by these inventories;
-compilation tests provide complementary coverage, not an exhaustive scoped-metadata gate.
+generic definitions. Each identity retains its ownership category and adds a
+readable semantic scope contract. Parameters record their ordinal, `RefKind`,
+effective Roslyn `ScopedKind` (including implicit `out` scope), and `UnscopedRef`.
+Methods and property/event accessors record return ref-kind, receiver shape,
+readonly state, and member/property-level `UnscopedRef`; containing types record
+ref-like and readonly state. Parameter names and comments are not part of the
+contract. Thus a scoped-only contract change is reviewable even when its exact
+member ID stays unchanged.
+
+The public API baseline independently freezes signatures, constraints, ref/in/out
+and custom-modifier metadata, and accessor contracts. Together they record what
+generated C# uses and the shape Core must continue providing. The semantic scope
+gate covers inventoried dependencies under the pinned compiler and target, not
+every runtime member or every possible consumer/compiler combination.
 
 `GeneratedCodeDependencyBaseline` inspects only generated trees using Roslyn
 symbol/type information. It also records explicit-interface implementations,
@@ -171,7 +180,15 @@ buffered version-tolerant paths, circular references, exact-size paths, and muta
 and immutable list deserialization. Coverage assertions fail if a mapped formatter
 or required unmanaged overload is not reached. A valid injected generated
 Serialize call must change the collected member set, characterizing detection of
-an extra runtime dependency. Every update to the map or emitter requires reviewing
+an extra runtime dependency. Same-member mutation controls separately remove
+`scoped ref`, `scoped in`, and `scoped` value/indexer annotations, add `UnscopedRef`
+to an `out` parameter and method/property receivers, and change a readonly
+receiver. Every control keeps the complete member-ID/category set fixed and must
+change exactly the intended member's contract. Controls run against both source
+symbols and emitted/re-imported Core metadata and require identical results.
+Equivalent explicit/implicit `out` scope, renamed parameters, and comments must
+leave the inventory unchanged. These checks run on both baseline verification and
+capture. Every update to the map, emitter, or scope contract requires reviewing
 the inventory diff, not automatically accepting regenerated text.
 
 Classification decisions:

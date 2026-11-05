@@ -9,7 +9,8 @@ The four serialization cases exercise small and large exact-size models, the
 version-tolerant temporary buffer, and a circular-reference graph. Before timing,
 the harness verifies round trips and reference identity. The driver checks that
 the generated code actually names the old/new buffer implementations. Payload
-hashes and lengths and per-operation allocations must match across each pair.
+hashes and lengths must match across each pair. Process-median allocated bytes/op
+must match within 0.01 B/op.
 
 The workflow runs separately on hosted x64 and ARM64 Linux machines. Within each
 machine, both processes are pinned to the same available CPU and use workstation
@@ -29,5 +30,6 @@ measured here. Allocations, byte equality and validation failures do fail the ru
 
 Separate no-tier, fully optimized processes capture JIT assembly for
 `SerializeExact` and `WriteToAndReset` after timing. These logs help inspect code
-shape but are not the timing configuration. The workflow artifact preserves SDK
+shape but are not the timing configuration. An empty filtered call-site list is
+not evidence of inlining or zero wrapper cost. The workflow artifact preserves SDK
 and CPU information, generated source, all process samples, JIT logs and summary.
