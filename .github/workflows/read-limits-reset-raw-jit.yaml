@@ -1,0 +1,100 @@
+name: Reader reset raw-path JIT diagnostic
+on:
+  push:
+    branches: [validation/pr30-reset-raw-jit-20261105]
+jobs:
+  diagnose:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+      DOTNET_TieredCompilation: 1
+      DOTNET_TieredPGO: 1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: harness
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          path: candidate
+          ref: ff724136dafdd0c1b9a4c98b1ddf115ca81b860a
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          path: baseline
+          ref: 6666ada1d878da64b2f4d2c1107fbea30fad074f
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          path: pr
+          ref: 56113519bb9771fe33ec39daed59181024918228
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.114
+      - name: Verify controls and exact reset-only production diff
+        run: |
+          set -euo pipefail
+          python3 candidate/tools/ReadLimitsResetHelper/test_summary.py
+          python3 candidate/tools/ReadLimitsResetHelper/test_jit_summary.py
+          python3 candidate/tools/ReadLimitsResetHelper/test_design.py
+          test "$(git -C baseline rev-parse HEAD)" = 6666ada1d878da64b2f4d2c1107fbea30fad074f
+          test "$(git -C pr rev-parse HEAD)" = 56113519bb9771fe33ec39daed59181024918228
+          test "$(git -C candidate rev-parse HEAD)" = ff724136dafdd0c1b9a4c98b1ddf115ca81b860a
+          git -C harness diff --exit-code ff724136dafdd0c1b9a4c98b1ddf115ca81b860a HEAD -- src Directory.Build.props global.json
+          python3 -m py_compile harness/tools/ReadLimitsResetHelper/raw_jit.py
+          git -C baseline diff --exit-code 8efea5afc79eaefc5023806a2588c4ad2f09a9c6 HEAD -- src Directory.Build.props global.json
+          test "$(git -C baseline rev-parse HEAD:src/SharpPack.Generator)" = "$(git -C candidate rev-parse HEAD:src/SharpPack.Generator)"
+          python3 candidate/tools/ReadLimitsResetHelper/verify_production.py --pr pr --candidate candidate
+      - name: Build identical IL per harness and three runtime variants
+        run: |
+          set -euo pipefail
+          printf '{"sdk":{"version":"10.0.114","rollForward":"disable"}}' > "$RUNNER_TEMP/global.json"
+          for repo in pr candidate; do
+            test "$(cd "$repo"; dotnet --version)" = 10.0.114
+            if ! dotnet build "$repo/src/SharpPack.Streaming/SharpPack.Streaming.csproj" -c Release > "$RUNNER_TEMP/$repo-build.log" 2>&1; then
+              echo "Runtime $repo build failed; raw output retained locally"
+              exit 1
+            fi
+          done
+          for suite in legacy; do
+            mkdir -p "$RUNNER_TEMP/harness-$suite" "$RUNNER_TEMP/$suite-a" "$RUNNER_TEMP/$suite-b" "$RUNNER_TEMP/$suite-c"
+            cp candidate/tools/ReadLimitsResetHelper/Perf.csproj "$RUNNER_TEMP/harness-$suite/"
+            source=Program.cs
+            if [ "$suite" = selected ]; then source=SelectedProgram.cs; fi
+            cp "candidate/tools/ReadLimitsResetHelper/$source" "$RUNNER_TEMP/harness-$suite/Program.cs"
+            test "$(cd "$RUNNER_TEMP/harness-$suite"; dotnet --version)" = 10.0.114
+            if ! dotnet build "$RUNNER_TEMP/harness-$suite/Perf.csproj" -c Release -p:RepoRoot="$GITHUB_WORKSPACE/baseline" -o "$RUNNER_TEMP/$suite-a" > "$RUNNER_TEMP/$suite-build.log" 2>&1; then
+              echo "Harness $suite build failed; raw output retained locally"
+              exit 1
+            fi
+            for spec in pr:b candidate:c; do
+              repo="${spec%:*}"
+              side="${spec#*:}"
+              cp -a "$RUNNER_TEMP/$suite-a/." "$RUNNER_TEMP/$suite-$side/"
+              cp "$repo/src/SharpPack.Core/bin/Release/net10.0/SharpPack.Core.dll" "$RUNNER_TEMP/$suite-$side/"
+              cp "$repo/src/SharpPack.Streaming/bin/Release/net10.0/SharpPack.Streaming.dll" "$RUNNER_TEMP/$suite-$side/"
+              cmp "$RUNNER_TEMP/$suite-a/Perf.dll" "$RUNNER_TEMP/$suite-$side/Perf.dll"
+            done
+          done
+          echo 'Same legacy harness; A dev, B exact PR, C pinned reset candidate ff724136; no timing rerun.'
+      - name: Capture raw Int32 JIT only
+        run: python3 harness/tools/ReadLimitsResetHelper/raw_jit.py --a "$RUNNER_TEMP/legacy-a" --b "$RUNNER_TEMP/legacy-b" --c "$RUNNER_TEMP/legacy-c" --work "$RUNNER_TEMP/jit"
+      - name: Verify unchanged source checkouts
+        if: always()
+        run: |
+          git -C baseline diff --exit-code
+          git -C pr diff --exit-code
+          git -C candidate diff --exit-code
+          git -C harness diff --exit-code
