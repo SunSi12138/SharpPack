@@ -1,7 +1,7 @@
-name: Read-limit copy JIT diagnosis
+name: Read-limit pure copy JIT controls
 on:
   push:
-    branches: [validation/pr30-copy-jit-20261105]
+    branches: [validation/pr30-copy-jit-controls-20261105]
 jobs:
   paired:
     strategy:

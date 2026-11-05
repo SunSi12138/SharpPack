@@ -1,5 +1,5 @@
 import unittest
-from jit_summary import blocks, selected
+from jit_summary import blocks, selected, allows_empty
 
 
 class JitSummaryTests(unittest.TestCase):
@@ -38,6 +38,12 @@ G_M000_IG01:
         rows = blocks('; Assembly listing for method Program:g__Read() (Tier1)\n       blr x1 ; SharpPack.SharpPackReaderOptionalState:Init()\n; Total bytes of code 4\n')
         self.assertTrue(any('ReaderOptionalState:Init' in x for x in rows[0]['calls']))
         self.assertTrue(any('ReaderOptionalState:Init' in x for x in rows[0]['symbolicReferences']))
+
+    def test_empty_core_only_for_pure_controls(self):
+        self.assertTrue(allows_empty('SharpPack.Core', 'CopyAlloc.raw.65536'))
+        self.assertTrue(allows_empty('SharpPack.Core', 'CopyReuse.raw.normal.65536'))
+        self.assertFalse(allows_empty('Perf', 'CopyAlloc.raw.65536'))
+        self.assertFalse(allows_empty('SharpPack.Core', 'ReadAlloc.empty.65536'))
 
     def test_incomplete_fails(self):
         with self.assertRaises(RuntimeError): blocks('; Assembly listing for method A:B() (Tier0)\n mov rax, rbx')

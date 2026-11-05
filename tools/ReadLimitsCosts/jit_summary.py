@@ -62,6 +62,11 @@ def selected(row, assembly):
         'ArrayFormatter', 'UnmanagedArrayFormatter'))
 
 
+def allows_empty(assembly, case):
+    # Pure allocation/copy controls deliberately execute no reader method.
+    return assembly == 'SharpPack.Core' and case.startswith(('CopyAlloc.', 'CopyReuse.'))
+
+
 def main():
     parser = argparse.ArgumentParser()
     for name in ('a', 'b', 'work'): parser.add_argument('--' + name, type=Path, required=True)
@@ -71,7 +76,7 @@ def main():
     if cpu >= 63: raise RuntimeError('Unsupported affinity')
     summaries = []
     for tier in ('1',):
-        for case in ('ReadAlloc.empty.65536', 'ReadReuse.empty.normal.65536', 'CopyAlloc.raw.65536', 'CopyReuse.raw.normal.65536'):
+        for case in ('CopyAlloc.raw.65536', 'CopyReuse.raw.normal.65536'):
             for side in ('a', 'b'):
                 root = getattr(args, side)
                 for assembly in ('SharpPack.Core', 'Perf'):
@@ -102,7 +107,9 @@ def main():
                     if not dump.is_file(): raise RuntimeError('Missing JIT output file: ' + label)
                     all_rows = blocks(dump.read_text())
                     rows = [row for row in all_rows if selected(row, assembly)]
-                    if not rows or len(rows) > 500: raise RuntimeError('Unexpected selected JIT listing count')
+                    if not all_rows: raise RuntimeError('JIT emitted no listings')
+                    if len(rows) > 500 or (not rows and not allows_empty(assembly, case)):
+                        raise RuntimeError('Unexpected selected JIT listing count')
                     if assembly == 'Perf' and not any('g__RunBatch' in row['method'] and row['tier'] == 'Tier1' for row in rows):
                         raise RuntimeError('Missing Tier1 batch listing: ' + label)
                     summaries.append({'label': label, 'environment': observed,
