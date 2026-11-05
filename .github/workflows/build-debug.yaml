@@ -78,7 +78,7 @@ jobs:
       - name: Characterize baseline failure modes
         if: matrix.runner == 'ubuntu-24.04'
         run: bash tools/SharpPack.Baselines/characterize-failures.sh
-      - run: dotnet test -c Release --no-build
+      - run: dotnet test -c Release --no-build --blame-hang-timeout 3m --blame-hang-dump-type none
       - run: dotnet run --project sandbox/CollectibleAlcSample -c Release
       - run: dotnet pack -c Release --no-build -o "$GITHUB_WORKSPACE/artifacts"
       - run: tools/CompatibilityBaseline/generate-original-head-corpus.sh

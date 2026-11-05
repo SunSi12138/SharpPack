@@ -79,3 +79,11 @@ results for the exact candidate commit: package tests exercise the produced
 assets, while Build-Debug covers the existing API/generated-source baselines,
 unit tests, collectible ALC, original wire corpus and NativeAOT sample. Neither
 result establishes unmerged #17 ABI or #31 deserialize-only compatibility.
+
+The full-suite validation also carries the existing Pipe backpressure test's
+writer-completion repair, independently of the #31 runtime changes. The reader
+waits for explicit writer completion instead of racing a task status check. A
+three-minute test inactivity limit records hangs without producing crash dumps.
+The earlier candidate's ARM64 test hang is retained as separate evidence; it
+was not reproduced by five baseline and five repaired test runs and is not
+claimed to have been conclusively attributed to that race.
