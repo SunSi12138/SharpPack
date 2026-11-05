@@ -7,6 +7,7 @@ import re
 import subprocess
 import tarfile
 import tempfile
+from xml.sax.saxutils import escape
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -122,6 +123,34 @@ public partial class Versioned { [SharpPackOrder(0)] public Model? Payload { get
                           if "error SHARPPACK043" in line}
                 assert len(errors) == 1 and "Program.cs(" in next(iter(errors)), log
                 print(f"{name}: SHARPPACK043 at the model; no unrelated C# diagnostics", flush=True)
+
+        # Exercise the migrated generated helpers in real packaged native binaries,
+        # not only the source-project NativeAOT sample. Platform/compiler packages
+        # may come from NuGet; SharpPack packages are mapped only to this local feed.
+        aot_config = work / "Aot.NuGet.Config"
+        aot_config.write_text("<configuration><packageSources><clear/>"
+            '<add key="artifact" value="' + escape(str(feed)) + '"/>'
+            '<add key="nuget" value="https://api.nuget.org/v3/index.json"/>'
+            '</packageSources><packageSourceMapping><packageSource key="artifact">'
+            '<package pattern="SharpPack*"/></packageSource><packageSource key="nuget">'
+            '<package pattern="*"/></packageSource></packageSourceMapping></configuration>')
+        aot_env = dict(env, NUGET_PACKAGES=str(work / "aot-packages"))
+        for name in ("current-aggregate", "current-split"):
+            directory = work / name
+            output_directory = work / (name + "-aot")
+            publish_log = run(["dotnet", "publish", "-c", "Release", "-p:PublishAot=true",
+                 "--configfile", str(aot_config), "-o", str(output_directory)], directory, aot_env)
+            for warning in sorted({line for line in publish_log.splitlines() if re.search(r"\bwarning IL\d+", line)}):
+                print(f"{name}: {warning}", flush=True)
+            assets = json.loads((directory / "obj/project.assets.json").read_text())
+            packages = assets["libraries"]
+            expected = {f"SharpPack.Core/{CURRENT_VERSION}", f"SharpPack.Generator/{CURRENT_VERSION}"}
+            if name == "current-aggregate": expected.add(f"SharpPack/{CURRENT_VERSION}")
+            assert {item for item in packages if item.startswith("SharpPack")} == expected, (name, packages.keys())
+            assert all(item["type"] == "package" for item in packages.values()), name
+            output = run([str(output_directory / "Consumer")], directory, aot_env)
+            assert "ABI_CONSUMER_OK" in output, (name, output)
+            print(f"{name}: packaged NativeAOT publish and native round trip passed", flush=True)
 
 
 if __name__ == "__main__":
