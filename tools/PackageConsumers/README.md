@@ -87,3 +87,33 @@ three-minute test inactivity limit records hangs without producing crash dumps.
 The earlier candidate's ARM64 test hang is retained as separate evidence; it
 was not reproduced by five baseline and five repaired test runs and is not
 claimed to have been conclusively attributed to that race.
+
+## Pre-publication verification of the actual release files
+
+`verify_artifacts.py --feed ./publish --version <release-version> --aot
+--architecture X64` validates the already-packed release directory. It never
+builds or repacks SharpPack, logs in to NuGet, creates a release, or pushes a
+package. The producer's selected .NET 10 SDK is pinned for all temporary
+consumers; the SDK-based generated-source compilation uses C# 14.
+
+Both release workflows call this guard after their existing Pack step and
+before any login or publication step. Their triggers, permissions, environment,
+credentials, pack commands, destinations and publication commands are unchanged.
+A failed guard stops that workflow before publication.
+
+The guard requires the four production nupkgs and the existing Core/Streaming
+snupkgs, verifies identity/version alignment, analyzer placement, runtime and
+symbol assets, and Streaming's exact Core dependency. Aggregate, split,
+Streaming and NativeAOT consumers use the original release files. Each consumer
+has its own empty package cache outside the repository. Ordinary restores have
+only the local release source; AOT maps SharpPack exclusively to that source
+while allowing runtime/compiler tooling from NuGet. All six package hashes must
+be unchanged after validation. Raw compiler output stays in the runner's
+temporary directory and is not uploaded.
+
+The separate read-only Release-Package-Consumers-Validation workflow exercises
+stable and prerelease versions on the isolated release-gate branch. It repeats
+the existing release Pack commands but contains no publication steps. This
+extends, rather than replaces, the afb5b17 dual-architecture evidence. It does
+not claim mixed-version ABI compatibility (#17), deserialize-only/warning-free
+AOT (#31), or that branch protection has been enabled.

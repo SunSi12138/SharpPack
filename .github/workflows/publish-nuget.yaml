@@ -51,6 +51,10 @@ jobs:
           dotnet pack src/SharpPack/SharpPack.csproj -c Release --no-build -p:Version="$VERSION" -o ./publish
         env:
           VERSION: ${{ inputs.version }}
+      - name: Verify exact release packages before publication
+        run: python3 tools/PackageConsumers/verify_artifacts.py --feed "$GITHUB_WORKSPACE/publish" --version "$VERSION" --aot --architecture X64
+        env:
+          VERSION: ${{ inputs.version }}
       - run: git diff --exit-code
       - name: NuGet login
         id: login

@@ -1,0 +1,42 @@
+name: Release-Package-Consumers-Validation
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - validation/issue18-release-package-gates
+jobs:
+  release-packages:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['1.1.0', '1.1.0-issue18-release-validation']
+    env:
+      VERSION: ${{ matrix.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Verify package guard failure modes
+        run: |
+          python3 tools/PackageConsumers/test_lockstep.py
+          python3 tools/PackageConsumers/test_artifacts.py
+      - name: Build release-versioned outputs
+        run: dotnet build SharpPack.sln -c Release -p:Version="$VERSION"
+      - name: Pack with the unchanged release commands
+        run: |
+          dotnet pack src/SharpPack.Core/SharpPack.Core.csproj -c Release --no-build -p:Version="$VERSION" -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg -o ./publish
+          dotnet pack src/SharpPack.Generator/SharpPack.Generator.csproj -c Release --no-build -p:Version="$VERSION" -o ./publish
+          dotnet pack src/SharpPack.Streaming/SharpPack.Streaming.csproj -c Release --no-build -p:Version="$VERSION" -p:IncludeSymbols=true -p:SymbolPackageFormat=snupkg -o ./publish
+          dotnet pack src/SharpPack/SharpPack.csproj -c Release --no-build -p:Version="$VERSION" -o ./publish
+      - name: Verify exact release packages without publication
+        run: python3 tools/PackageConsumers/verify_artifacts.py --feed "$GITHUB_WORKSPACE/publish" --version "$VERSION" --aot --architecture X64
+      - name: Verify clean tracked tree
+        if: always()
+        run: git diff --exit-code
