@@ -22,3 +22,18 @@ explicit explanation in the pull request.
 3. Explain every intentional wire, API, or generated-source baseline diff.
 4. Never weaken the wire, collectible-context, or NativeAOT checks merely to make
    an unrelated refactor pass.
+
+## Regenerate repetitive Core source
+
+To change the well-known formatter table, tuple formatters, or unmanaged reader
+and writer overloads, edit their renderer in `tools/SharpPack.CodeGen` and run
+these commands from the repository root:
+
+```sh
+dotnet run --project tools/SharpPack.CodeGen -- update
+dotnet run --project tools/SharpPack.CodeGen -- verify
+```
+
+Commit the tool and the regenerated `.cs` files together. Normal builds compile
+the checked-in files without running a generator. `verify` reports stale files
+without writing to them; CI checks the UTF-8/LF output on Linux and Windows.
