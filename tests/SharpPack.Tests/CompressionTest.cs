@@ -280,7 +280,7 @@ public class CompressionTest
     {
         var complete = SharpPackSerializer.Serialize(new BrotliIntEnvelope { Value = 123 });
         var truncated = complete[..^1];
-        var segmented = ReadOnlySequenceBuilder.Create(truncated[..1], truncated[1..]);
+        var segmented = ReadOnlySequenceBuilder.Create(truncated[..2], truncated[2..]);
 
         Assert.Equal(123, SharpPackSerializer.Deserialize<BrotliIntEnvelope>(complete)!.Value);
         Assert.Equal(SharpPackErrorCode.UnexpectedEndOfPayload, Assert.Throws<SharpPackSerializationException>(
