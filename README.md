@@ -19,6 +19,12 @@ This is a breaking change from the published 1.1.0 Type-name wire contract.
 See [Type payload migration](docs/formatter-context.md#systemtype-payload-capability)
 before upgrading applications that exchange Type values.
 
+NativeAOT and trimming now preserve generated formatter factories precisely.
+Upgrade Core and Generator together and rebuild generated model assemblies.
+Handwritten factory implementations require explicit startup preservation or
+formatter registration. See [AOT factory migration](docs/aot-factory-migration.md)
+before upgrading deserialize-only applications.
+
 Its speed comes from a C#-specific binary format, modern .NET APIs, generic
 static formatter dispatch, and an incremental source generator. The format
 copies compatible C# memory directly where possible and does not require a
@@ -747,3 +753,4 @@ First unsigned byte is tag that for discriminated value type or flag, `0` to `24
 License
 ---
 This library is licensed under the MIT License.
+

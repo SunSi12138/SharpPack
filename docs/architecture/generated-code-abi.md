@@ -81,3 +81,41 @@ for the current generator/runtime pair.
 Snapshot text is a detector rather than a promise of forever-identical source.
 An intentional update must state whether it changes ABI, wire bytes, allocation
 behavior, or only implementation text.
+
+## Deserialize-only NativeAOT roots
+
+Generic deserialization retains `NonPublicConstructors`, including generated
+static constructors. This is narrower than retaining every non-public method
+on an arbitrary caller type (notably `System.Type`), but it still retains all
+non-public constructors, not only the static constructor.
+
+Generated static initialization calls the same typed preservation methods
+available to handwritten models. Each uses a static-interface delegate to keep
+the corresponding factory available to runtime resolution. Known member
+factory dependencies are preserved when creating the enclosing type's factory.
+The generated code does not depend on the compiler's private metadata spelling.
+A private static initializer is anchored on the cold factory path when the
+model does not require strict initialization. The generator chooses its names
+without rebinding existing identifiers. No global registry or per-read dispatch
+is needed.
+
+Cross-assembly unions continue to require the generated context registration
+extension. Runtime-discovered public factories should still use explicit
+`RegisterFactory<T, TFactory>()` for AOT. Closed collection formatter native
+code still needs the explicit roots described in the README.
+
+The isolated `sandbox/DeserializeOnlyAot` consumer uses literal payloads and no
+model serialization or model construction before reading. It is separate from
+the round-trip sample so serialization cannot accidentally preserve factories.
+CI checks that a non-inlined unused private method has no native code symbol;
+a separately compiled, explicitly invoked method serves as the positive
+control. The isolated consumer also covers generic wrapper annotations and
+the application-owned factory consumer runs in NativeAOT and trimmed JIT.
+
+This NativeAOT root contract requires rebuilding model assemblies with the
+matching updated Generator as well as updating Core. A runtime-only DLL update
+cannot retrofit the new static-constructor roots into old generated code.
+The frozen generated-code ABI gate checks compilation against the runtime; it
+does not promise deserialize-only NativeAOT compatibility for older generated
+assemblies. The [migration guide](../aot-factory-migration.md) covers package
+alignment, generic wrappers, and handwritten factories.

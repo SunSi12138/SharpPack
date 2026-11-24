@@ -2,10 +2,27 @@
 
 ## Unreleased
 
-- Added stable `SharpPackErrorCode` and `SharpPackSerializationException.ErrorCode`
-  for machine-readable failure classification. Existing constructors remain
-  compatible and report `Unknown`; exception messages and transport/user-code
-  exception boundaries are preserved. See `docs/architecture/error-codes.md`.
+### NativeAOT deserialization roots
+
+- Narrow generic deserialization preservation from non-public methods to
+  non-public constructors and have generated initialization retain exact
+  formatter factories. Direct System.Type reads no longer need unrelated
+  reflection methods.
+- Core and Generator must be upgraded together and model assemblies fully
+  rebuilt. Older generated assemblies do not contain these roots; runtime-only
+  DLL replacement is not a supported deserialize-only NativeAOT upgrade.
+  Prefer the SharpPack meta-package; keep separate package references in sync.
+- Generic wrappers must propagate `NonPublicConstructors`. Handwritten
+  factories used through automatic resolution must be preserved explicitly.
+  See [the AOT migration guide](docs/aot-factory-migration.md).
+- Add isolated deserialize-only NativeAOT coverage, including collection roots,
+  custom/context formatters, generic and external unions, and reentrant startup.
+
+### Error classification
+
+- Use `SharpPackSerializationException.ErrorCode` to classify failures without
+  parsing messages. Existing constructors report `Unknown`; transport and
+  user-code exceptions keep their original types. See [stable error codes](docs/architecture/error-codes.md).
 
 ## 1.1.0
 
