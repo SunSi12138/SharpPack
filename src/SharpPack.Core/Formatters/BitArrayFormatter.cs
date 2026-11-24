@@ -46,7 +46,7 @@ public sealed class BitArrayFormatter : SharpPackFormatter<BitArray>
         var requiredWordCount = (int)(((long)length + 31) / 32);
         if (words is null || words.Length < requiredWordCount)
         {
-            SharpPackSerializationException.ThrowMessage(
+            throw new SharpPackSerializationException(SharpPackErrorCode.InvalidWireData,
                 $"BitArray length {length} requires at least {requiredWordCount} words.");
         }
 

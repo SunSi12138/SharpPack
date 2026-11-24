@@ -85,7 +85,7 @@ internal static class FormatterValidation
         }
         if (payloadLength != product)
         {
-            SharpPackSerializationException.ThrowMessage(
+            throw new SharpPackSerializationException(SharpPackErrorCode.InvalidWireData,
                 $"The multidimensional array declares {payloadLength} elements " +
                 $"but its dimensions require {product}.");
         }
