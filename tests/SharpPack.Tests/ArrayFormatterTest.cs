@@ -232,10 +232,10 @@ public class ArrayFormatterTest
             overflow.AsSpan(1 + sizeof(int)),
             2);
 
-        Assert.Throws<SharpPackSerializationException>(
-            () => SharpPackSerializer.Deserialize<int[,]>(negative));
-        Assert.Throws<SharpPackSerializationException>(
-            () => SharpPackSerializer.Deserialize<int[,]>(overflow));
+        Assert.Equal(SharpPackErrorCode.InvalidLength, Assert.Throws<SharpPackSerializationException>(
+            () => SharpPackSerializer.Deserialize<int[,]>(negative)).ErrorCode);
+        Assert.Equal(SharpPackErrorCode.SizeOverflow, Assert.Throws<SharpPackSerializationException>(
+            () => SharpPackSerializer.Deserialize<int[,]>(overflow)).ErrorCode);
     }
 }
 

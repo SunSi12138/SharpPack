@@ -5,6 +5,8 @@ namespace SharpPack;
 
 public class SharpPackSerializationException : Exception
 {
+    const string CompressionFailure = "Failed in Brotli compression/decompression process";
+
     /// <summary>Stable machine-readable classification; do not parse Message.</summary>
     public SharpPackErrorCode ErrorCode { get; }
 
@@ -158,13 +160,23 @@ public class SharpPackSerializationException : Exception
     [DoesNotReturn]
     public static void ThrowCompressionFailed(OperationStatus status)
     {
-        throw new SharpPackSerializationException($"Failed in Brotli compression/decompression process, status: {status}.");
+        throw new SharpPackSerializationException($"{CompressionFailure}, status: {status}.");
     }
 
     [DoesNotReturn]
     public static void ThrowCompressionFailed()
     {
-        throw new SharpPackSerializationException($"Failed in Brotli compression/decompression process.");
+        throw new SharpPackSerializationException(CompressionFailure + ".");
+    }
+
+    [DoesNotReturn]
+    internal static void ThrowInvalidCompressedPayload(OperationStatus? status = null)
+    {
+        throw new SharpPackSerializationException(
+            status == OperationStatus.NeedMoreData
+                ? SharpPackErrorCode.UnexpectedEndOfPayload
+                : SharpPackErrorCode.InvalidWireData,
+            status is { } result ? $"{CompressionFailure}, status: {result}." : CompressionFailure + ".");
     }
 
     [DoesNotReturn]

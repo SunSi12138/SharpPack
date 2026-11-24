@@ -231,17 +231,17 @@ public class CompressionTest
         using var readerState = SharpPackReaderOptionalStatePool.Rent();
         var reader = new SharpPackReader(sequence, readerState);
         string? restored = null;
-        var error = false;
+        SharpPackErrorCode? error = null;
         try
         {
             formatter.Deserialize(ref reader, ref restored);
         }
-        catch (SharpPackSerializationException)
+        catch (SharpPackSerializationException exception)
         {
-            error = true;
+            error = exception.ErrorCode;
         }
 
-        error.Should().BeTrue();
+        error.Should().Be(SharpPackErrorCode.InvalidWireData);
     }
 
     [Fact]
@@ -253,21 +253,41 @@ public class CompressionTest
             SharpPackSerializer.Serialize(ref compressor, 123);
             SharpPackSerializer.Serialize(ref compressor, 456);
             var payload = compressor.ToArray();
-            var context = new SharpPackSerializerContextBuilder()
-                .Register<int>(new BrotliFormatter<int>())
-                .Build();
-
-            Action deserialize = () =>
-                SharpPackSerializer.Deserialize<int>(payload, context);
-
-            deserialize.Should().Throw<SharpPackSerializationException>();
+            Assert.Equal(SharpPackErrorCode.InvalidWireData, Assert.Throws<SharpPackSerializationException>(
+                () => DeserializeCompressedInt(payload)).ErrorCode);
         }
         finally
         {
             compressor.Dispose();
         }
+
+        static void DeserializeCompressedInt(byte[] payload)
+        {
+            using var state = SharpPackReaderOptionalStatePool.Rent();
+            var reader = new SharpPackReader(payload, state);
+            try
+            {
+                int value = default;
+                new BrotliFormatter<int>().Deserialize(ref reader, ref value);
+            }
+            finally { reader.Dispose(); }
+        }
     }
 
+
+    [Fact]
+    public void BrotliReportsTruncatedCompressedPayload()
+    {
+        var complete = SharpPackSerializer.Serialize(new BrotliIntEnvelope { Value = 123 });
+        var truncated = complete[..^1];
+        var segmented = ReadOnlySequenceBuilder.Create(truncated[..1], truncated[1..]);
+
+        Assert.Equal(123, SharpPackSerializer.Deserialize<BrotliIntEnvelope>(complete)!.Value);
+        Assert.Equal(SharpPackErrorCode.UnexpectedEndOfPayload, Assert.Throws<SharpPackSerializationException>(
+            () => SharpPackSerializer.Deserialize<BrotliIntEnvelope>(truncated)).ErrorCode);
+        Assert.Equal(SharpPackErrorCode.UnexpectedEndOfPayload, Assert.Throws<SharpPackSerializationException>(
+            () => SharpPackSerializer.Deserialize<BrotliIntEnvelope>(segmented)).ErrorCode);
+    }
 
     byte[] ReferenceDecompress(byte[] bytes)
     {
@@ -319,4 +339,11 @@ public partial class CompressionEdgeData
 {
     [BrotliFormatter]
     public byte[]? Data { get; set; }
+}
+
+[SharpPackable]
+public partial class BrotliIntEnvelope
+{
+    [BrotliFormatter<int>]
+    public int Value { get; set; }
 }

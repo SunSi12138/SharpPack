@@ -11,10 +11,10 @@ Messages remain human-facing and may change independently of classification.
 
 ## Throw-site inventory
 
-- Buffer/sequence exhaustion: `UnexpectedEndOfPayload`.
+- Buffer/sequence exhaustion and truncated compressed data: `UnexpectedEndOfPayload`.
 - Negative lengths/dimensions, unsupported member counts on write, declared collection-count mismatch: `InvalidLength`.
 - Unrepresentable buffer/frame sizes and dimension products: `SizeOverflow`.
-- Invalid headers, property counts on read, union tags, reference IDs, array dimension/count mismatch and unexpected nulls: `InvalidWireData`.
+- Invalid headers, property counts on read, union tags, reference IDs, array dimension/count mismatch, unexpected nulls, and malformed compressed fields: `InvalidWireData`.
 - Invalid UTF encoding or encoded-length mismatch: `InvalidEncoding`.
 - Reader/writer recursion depth: `DepthLimitExceeded`.
 - Decompression and configured frame size limits: `ResourceLimitExceeded`.
@@ -22,7 +22,7 @@ Messages remain human-facing and may change independently of classification.
 - Disabled/unregistered Type values or IDs and unregistered union types: `TypeResolutionFailed`.
 - Exact payload consumption mismatch: `FrameLengthMismatch`.
 - Reentrant formatter construction: `RecursiveFormatterConstruction`.
-- Arbitrary messages, concurrent collection mutation, Brotli operation failures,
+- Arbitrary messages, concurrent collection mutation, ambiguous or write-side Brotli failures,
   repeated decompression and exact-size writer misuse retain `Unknown` rather
   than claiming a malformed-wire diagnosis without evidence.
 
