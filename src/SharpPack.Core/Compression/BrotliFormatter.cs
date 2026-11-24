@@ -105,14 +105,9 @@ public sealed class BrotliFormatter : SharpPackFormatter<byte[]>
 
         reader.DangerousReadUnmanagedSpanView<byte>(out var isNull, out var compressedBuffer);
 
-        if (isNull)
+        if (isNull || compressedBuffer.IsEmpty)
         {
-            SharpPackSerializationException.ThrowCompressionFailed();
-        }
-
-        if (compressedBuffer.Length == 0)
-        {
-            SharpPackSerializationException.ThrowCompressionFailed();
+            SharpPackSerializationException.ThrowInvalidCompressedPayload();
         }
 
         // security, require to check length
@@ -131,12 +126,12 @@ public sealed class BrotliFormatter : SharpPackFormatter<byte[]>
         var status = decoder.Decompress(compressedBuffer, value, out var bytesConsumed, out var bytesWritten);
         if (status != OperationStatus.Done)
         {
-            SharpPackSerializationException.ThrowCompressionFailed(status);
+            SharpPackSerializationException.ThrowInvalidCompressedPayload(status);
         }
 
         if (bytesConsumed != compressedBuffer.Length || bytesWritten != value.Length)
         {
-            SharpPackSerializationException.ThrowCompressionFailed();
+            SharpPackSerializationException.ThrowInvalidCompressedPayload();
         }
     }
 }
@@ -221,7 +216,7 @@ public sealed class BrotliFormatter<T> : SharpPackFormatter<T>
         coReader.ReadValue(ref value);
         if (coReader.Remaining != 0)
         {
-            SharpPackSerializationException.ThrowCompressionFailed();
+            SharpPackSerializationException.ThrowInvalidCompressedPayload();
         }
 
         reader.Advance(consumed);

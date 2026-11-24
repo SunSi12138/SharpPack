@@ -18,6 +18,12 @@
 - Add isolated deserialize-only NativeAOT coverage, including collection roots,
   custom/context formatters, generic and external unions, and reentrant startup.
 
+### Error classification
+
+- Use `SharpPackSerializationException.ErrorCode` to classify failures without
+  parsing messages. Existing constructors report `Unknown`; transport and
+  user-code exceptions keep their original types. See [stable error codes](docs/architecture/error-codes.md).
+
 ## 1.1.0
 
 ### MemoryPack-compatible unmanaged semantics

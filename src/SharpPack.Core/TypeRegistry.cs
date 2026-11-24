@@ -22,7 +22,7 @@ internal sealed class TypeRegistry
     {
         if (mode != TypeSerializationMode.RegisteredOnly)
         {
-            throw new SharpPackSerializationException("System.Type serialization is disabled for this context.");
+            throw new SharpPackSerializationException(SharpPackErrorCode.TypeResolutionFailed, "System.Type serialization is disabled for this context.");
         }
     }
 
@@ -31,7 +31,7 @@ internal sealed class TypeRegistry
         EnsureEnabled();
         return idsByType.TryGetValue(type, out var id)
             ? id
-            : throw new SharpPackSerializationException("The Type is not explicitly registered in this context.");
+            : throw new SharpPackSerializationException(SharpPackErrorCode.TypeResolutionFailed, "The Type is not explicitly registered in this context.");
     }
 
     internal Type GetType(string id)
@@ -39,6 +39,6 @@ internal sealed class TypeRegistry
         EnsureEnabled();
         return typesById.TryGetValue(id, out var type)
             ? type
-            : throw new SharpPackSerializationException("The Type ID is not explicitly registered in this context.");
+            : throw new SharpPackSerializationException(SharpPackErrorCode.TypeResolutionFailed, "The Type ID is not explicitly registered in this context.");
     }
 }
