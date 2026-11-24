@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Linq;
 
@@ -652,7 +653,21 @@ public partial class Model
                         ".g.cs",
                         StringComparison.Ordinal))
                 .Select(static tree => tree.ToString()));
-        generated.Should().NotContain("System.Reflection");
+        var generatedNodes = compilation.SyntaxTrees
+            .Where(static tree => tree.FilePath.EndsWith(".g.cs", StringComparison.Ordinal))
+            .SelectMany(static tree => tree.GetRoot().DescendantNodes())
+            .ToArray();
+        var attributeField = generatedNodes.OfType<FieldDeclarationSyntax>()
+            .Single(static field => field.Declaration.Variables
+                .Any(static variable => variable.Identifier.ValueText == "__ValueFormatter"));
+        attributeField.ToString().Should().NotContain("System.Reflection");
+        generated.Should().NotContain(".GetCustomAttribute");
+        generated.Should().NotContain(".GetProperty(");
+        generated.Should().NotContain(".GetField(");
+        generated.Should().NotContain(".GetMethods(");
+        generated.Should().NotContain(".GetMethod(");
+        generated.Should().Contain("SharpPackSerializer.PreserveFormatterFactory<Model>();");
+        generated.Should().Contain("SharpPackSerializer.PreserveContextFormatterFactory<Model>();");
         generated.Should().Contain(
             "new global::Generated.CustomIntFormatterAttribute(" +
             "7, typeof(global::Generated.Model), \"marker\", " +
@@ -751,3 +766,4 @@ public sealed class FrozenModel :
     }
 
 }
+

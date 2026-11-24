@@ -158,11 +158,14 @@ partial class SharpPackGenerator
         sb.AppendLine(TypeMeta.EmitTypeParameterConstraints(
             target.TypeParameters));
         sb.AppendLine("{");
+        var rootName = TypeMeta.GetFactoryRootName(target, "__SharpPackPreserveFactory");
+        sb.AppendLine(TypeMeta.EmitFactoryRootField(rootName, targetType, includeContextFactory: false));
         sb.AppendLine(
             $"    static global::SharpPack.SharpPackFormatter<{targetType}>");
         sb.AppendLine(
             $"        global::SharpPack.ISharpPackFormatterFactory<{targetType}>.CreateFormatter()");
         sb.AppendLine("    {");
+        sb.AppendLine(TypeMeta.EmitFactoryRootRead(rootName));
 
         var emittedPatterns = new HashSet<string>(StringComparer.Ordinal);
         ExternalUnionFactoryEntry? openEntry = null;
@@ -305,3 +308,5 @@ partial class SharpPackGenerator
         }
     }
 }
+
+

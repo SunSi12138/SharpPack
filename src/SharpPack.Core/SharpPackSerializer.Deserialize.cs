@@ -15,7 +15,7 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static T? Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(ReadOnlySpan<byte> buffer)
     {
         T? value = default;
@@ -25,7 +25,7 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(ReadOnlySpan<byte> buffer, ref T? value)
         => !RuntimeHelpers.IsReferenceOrContainsReferences<T>()
             ? DeserializeUnmanaged(buffer, ref value)
@@ -33,7 +33,7 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static int DeserializeReference<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(ReadOnlySpan<byte> buffer, ref T? value)
     {
         var state = AcquireReaderOptionalState();
@@ -53,7 +53,7 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static int DeserializeUnmanaged<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(ReadOnlySpan<byte> buffer, ref T? value)
     {
         if (buffer.Length < Unsafe.SizeOf<T>())
@@ -68,7 +68,7 @@ public static partial class SharpPackSerializer
     }
 
     public static T? Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(in ReadOnlySequence<byte> buffer)
     {
         T? value = default;
@@ -77,7 +77,7 @@ public static partial class SharpPackSerializer
     }
 
     public static int Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(in ReadOnlySequence<byte> buffer, ref T? value)
         => !RuntimeHelpers.IsReferenceOrContainsReferences<T>()
             ? DeserializeUnmanaged(buffer, ref value)
@@ -85,7 +85,7 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static int DeserializeReference<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(in ReadOnlySequence<byte> buffer, ref T? value)
     {
         var state = AcquireReaderOptionalState();
@@ -105,7 +105,7 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static int DeserializeUnmanaged<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(in ReadOnlySequence<byte> buffer, ref T? value)
     {
         int sizeOfT = Unsafe.SizeOf<T>();
@@ -164,7 +164,7 @@ public static partial class SharpPackSerializer
     /// deterministic exact-consumption enforcement.
     /// </remarks>
     public static async ValueTask<T?> DeserializeAsync<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(Stream stream, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(stream);
@@ -255,7 +255,7 @@ public static partial class SharpPackSerializer
     /// payload length.
     /// </remarks>
     public static ValueTask<T?> DeserializeAsync<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(
         Stream stream,
         int payloadLength,
@@ -267,7 +267,7 @@ public static partial class SharpPackSerializer
             cancellationToken);
 
     static async ValueTask<T?> DeserializeLengthDelimitedAsync<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(
         Stream stream,
         int payloadLength,

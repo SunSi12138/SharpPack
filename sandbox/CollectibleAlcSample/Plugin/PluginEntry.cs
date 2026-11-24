@@ -6,6 +6,8 @@ public static class PluginEntry
 {
     public static bool Run(SharpPackSerializerContext context)
     {
+        SharpPackSerializer.PreserveFormatterFactory<PluginMessage>();
+        SharpPackSerializer.PreserveContextFormatterFactory<PluginMessage>();
         var value = new PluginMessage
         {
             Id = 42,

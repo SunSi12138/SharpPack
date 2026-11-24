@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### NativeAOT deserialization roots
+
+- Narrow generic deserialization preservation from non-public methods to
+  non-public constructors and have generated initialization retain exact
+  formatter factories. Direct System.Type reads no longer need unrelated
+  reflection methods.
+- Core and Generator must be upgraded together and model assemblies fully
+  rebuilt. Older generated assemblies do not contain these roots; runtime-only
+  DLL replacement is not a supported deserialize-only NativeAOT upgrade.
+  Prefer the SharpPack meta-package; keep separate package references in sync.
+- Generic wrappers must propagate `NonPublicConstructors`. Handwritten
+  factories used through automatic resolution must be preserved explicitly.
+  See [the AOT migration guide](docs/aot-factory-migration.md).
+- Add isolated deserialize-only NativeAOT coverage, including collection roots,
+  custom/context formatters, generic and external unions, and reentrant startup.
+
 ## 1.1.0
 
 ### MemoryPack-compatible unmanaged semantics
