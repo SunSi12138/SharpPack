@@ -19,11 +19,12 @@ var context = new SharpPackSerializerContext(
 ```
 
 `MaxDepth` is inclusive and defaults to 999. It counts active reader scopes,
-not the total number of values: direct reads of non-empty array and list
-elements share one scope for all siblings. The default retains the historical
-cutoff and now applies it to optimized collection paths that previously did not
-count their element depth. Raw unmanaged copies do not add a scope. Collection
-and reference limits default to `int.MaxValue`; zero selects the default.
+not the total number of values: direct reads of non-empty arrays, lists, and
+generated collections share one element scope for all siblings. The default
+retains the historical cutoff and now applies it to optimized collection paths
+that previously did not count their element depth. Dedicated raw unmanaged
+paths do not add a scope. Collection and reference limits default to `int.MaxValue`;
+zero selects the default.
 
 `MaxCollectionLength` is checked after structural header validation and before
 SharpPack allocates or grows the corresponding collection. Specialized array,
@@ -32,6 +33,9 @@ public headerless reads with a caller-supplied length, public Dangerous
 collection-header, and legacy Streaming
 collection paths honor the same effective limit. String lengths are
 intentionally not governed by this setting.
+If legacy Streaming rejects a collection header, it releases the pipe read
+without consuming the header. Reading again may wait for more input or for
+the writer to complete.
 
 `MaxReferenceCount` is checked only when circular-reference deserialization is
 about to insert a new reference-table entry. Ordinary payloads do not pay this

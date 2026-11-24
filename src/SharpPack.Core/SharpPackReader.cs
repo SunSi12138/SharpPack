@@ -682,13 +682,19 @@ public ref partial struct SharpPackReader
             return;
         }
 
-        // T[] support overwrite
-        if (value == null || value.Length != length)
+        EnterDepth<T>();
+        try
         {
-            value = new T?[length];
+            if (value == null || value.Length != length)
+            {
+                value = new T?[length];
+            }
+            ReadElements<T>(value);
         }
-
-        ReadElements<T>(value);
+        finally
+        {
+            ExitDepth();
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -713,12 +719,7 @@ public ref partial struct SharpPackReader
             return;
         }
 
-        if (value.Length != length)
-        {
-            value = new T?[length];
-        }
-
-        ReadElements(value);
+        ReadManagedSpan(length, ref value);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -758,13 +759,19 @@ public ref partial struct SharpPackReader
             return;
         }
 
-        // T[] support overwrite
-        if (value is null || value.Length != length)
+        EnterDepth<T>();
+        try
         {
-            value = new T?[length];
+            if (value is null || value.Length != length)
+            {
+                value = new T?[length];
+            }
+            ReadPackableElements<T>(value);
         }
-
-        ReadPackableElements<T>(value);
+        finally
+        {
+            ExitDepth();
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -795,12 +802,7 @@ public ref partial struct SharpPackReader
             return;
         }
 
-        if (value.Length != length)
-        {
-            value = new T?[length];
-        }
-
-        ReadPackableElements(value);
+        ReadManagedPackableSpan(length, ref value);
     }
 
     #endregion
@@ -933,12 +935,7 @@ public ref partial struct SharpPackReader
         }
         else
         {
-            if (value.Length != length)
-            {
-                value = new T?[length];
-            }
-
-            ReadElements(value);
+            ReadManagedSpan(length, ref value);
         }
     }
 
@@ -974,6 +971,12 @@ public ref partial struct SharpPackReader
             value = AllocateUninitializedArray<T>(length);
         }
 
+        ReadUnmanagedSpanPayload(byteCount, value);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    void ReadUnmanagedSpanPayload<T>(int byteCount, scoped Span<T> value)
+    {
         ref var src = ref GetSpanReference(byteCount);
         ref var dest = ref Unsafe.As<T, byte>(
             ref MemoryMarshal.GetReference(value));
@@ -987,13 +990,6 @@ public ref partial struct SharpPackReader
     {
         ValidateLength(length);
         ThrowIfCollectionLimitExceeded(length);
-        ReadValidatedPackableSpan(length, ref value);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void ReadValidatedPackableSpan<T>(int length, scoped ref Span<T?> value)
-        where T : ISharpPackable<T>
-    {
         if (optionalState.FormatterGraph is not null)
         {
             ReadValidatedSpan(length, ref value);
@@ -1013,46 +1009,88 @@ public ref partial struct SharpPackReader
         }
         else
         {
-            if (value.Length != length)
-            {
-                value = new T?[length];
-            }
-
-            ReadPackableElements(value);
+            ReadManagedPackableSpan(length, ref value);
         }
     }
 
-    // A direct element loop enters one shared depth scope, not one per item.
-    internal void ReadElements<T>(scoped Span<T?> values)
+    void ReadManagedSpan<T>(int length, scoped ref Span<T?> value)
     {
         EnterDepth<T>();
         try
         {
-            var formatter = GetFormatter<T>();
-            foreach (ref var value in values)
+            if (value.Length != length)
             {
-                formatter.Deserialize(ref this, ref value);
+                value = new T?[length];
             }
+            ReadElements(value);
         }
         finally
         {
             ExitDepth();
+        }
+    }
+
+    void ReadManagedPackableSpan<T>(int length, scoped ref Span<T?> value)
+        where T : ISharpPackable<T>
+    {
+        EnterDepth<T>();
+        try
+        {
+            if (value.Length != length)
+            {
+                value = new T?[length];
+            }
+            ReadPackableElements(value);
+        }
+        finally
+        {
+            ExitDepth();
+        }
+    }
+
+    // List callers have validated the length and entered the element scope
+    // before preparing this span.
+    internal void ReadPreparedListSpan<T>(scoped Span<T?> values)
+    {
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
+            !HasFormatterOverride<T>())
+        {
+            int byteCount = GetValidatedUnmanagedByteCount<T>(values.Length);
+            ReadUnmanagedSpanPayload(byteCount, values);
+        }
+        else
+        {
+            ReadElements(values);
+        }
+    }
+
+    internal void ReadPreparedPackableListSpan<T>(scoped Span<T?> values) where T : ISharpPackable<T>
+    {
+        if (optionalState.FormatterGraph is not null || !RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        {
+            ReadPreparedListSpan(values);
+        }
+        else
+        {
+            ReadPackableElements(values);
+        }
+    }
+
+    // Direct element loops share the depth scope that their caller entered.
+    internal void ReadElements<T>(scoped Span<T?> values)
+    {
+        var formatter = GetFormatter<T>();
+        foreach (ref var value in values)
+        {
+            formatter.Deserialize(ref this, ref value);
         }
     }
 
     void ReadPackableElements<T>(scoped Span<T?> values) where T : ISharpPackable<T>
     {
-        EnterDepth<T>();
-        try
+        foreach (ref var value in values)
         {
-            foreach (ref var value in values)
-            {
-                T.Deserialize(ref this, ref value);
-            }
-        }
-        finally
-        {
-            ExitDepth();
+            T.Deserialize(ref this, ref value);
         }
     }
 

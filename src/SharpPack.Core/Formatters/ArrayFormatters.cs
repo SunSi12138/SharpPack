@@ -108,12 +108,19 @@ namespace SharpPack.Formatters
                 return;
             }
 
-            if (value == null || value.Length != length)
+            reader.EnterDepth<T>();
+            try
             {
-                value = new T[length];
+                if (value == null || value.Length != length)
+                {
+                    value = new T[length];
+                }
+                reader.ReadElements<T>((T?[])value);
             }
-
-            reader.ReadElements<T>((T?[])value);
+            finally
+            {
+                reader.ExitDepth();
+            }
         }
     }
 

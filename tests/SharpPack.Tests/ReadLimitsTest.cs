@@ -162,10 +162,36 @@ public class ReadLimitsTest
             Assert.Same(existing, destination.Children);
         }
 
-        destination = preallocated ? new() { Children = new(count) } : null;
+        var marker = new ReadLimitListNode();
+        var retained = preallocated ? new List<ReadLimitListNode?>(count) { marker } : null;
+        destination = preallocated ? new() { Children = retained } : null;
         var error = Assert.Throws<SharpPackSerializationException>(() =>
             SharpPackSerializer.Deserialize(payload, ref destination, AtDepth(1)));
         Assert.Equal(SharpPackReadLimitKind.Depth, error.ReadLimitKind);
+        if (preallocated)
+        {
+            Assert.Same(retained, destination!.Children);
+            Assert.Same(marker, Assert.Single(retained!));
+        }
+    }
+
+    [Fact]
+    public void DepthLimit_CountsGeneratedCollectionSetAndDictionaryElements()
+    {
+        AssertDepthLimit(new ReadLimitCollection { new() { new() } });
+        AssertDepthLimit(new ReadLimitSet { new() { new() } });
+        AssertDepthLimit(new ReadLimitDictionary { [1] = new() { [2] = new() } });
+
+        static void AssertDepthLimit<T>(T value) where T : class
+        {
+            var payload = SharpPackSerializer.Serialize(value);
+            T? result = null;
+            Assert.Equal(payload.Length, SharpPackSerializer.Deserialize(payload, ref result, AtDepth(3)));
+            Assert.NotNull(result);
+            var error = Assert.Throws<SharpPackSerializationException>(() =>
+                SharpPackSerializer.Deserialize<T>(payload, AtDepth(2)));
+            Assert.Equal(SharpPackReadLimitKind.Depth, error.ReadLimitKind);
+        }
     }
 
     [Fact]
@@ -414,6 +440,21 @@ public partial class ReadLimitArrayNode
 public partial class ReadLimitListNode
 {
     public List<ReadLimitListNode?>? Children { get; set; }
+}
+
+[SharpPackable(GenerateType.Collection)]
+public partial class ReadLimitCollection : List<ReadLimitCollection?>
+{
+}
+
+[SharpPackable(GenerateType.Collection)]
+public partial class ReadLimitSet : HashSet<ReadLimitSet?>
+{
+}
+
+[SharpPackable(GenerateType.Collection)]
+public partial class ReadLimitDictionary : Dictionary<int, ReadLimitDictionary?>
+{
 }
 
 [SharpPackable]

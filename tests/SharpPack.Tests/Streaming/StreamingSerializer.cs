@@ -248,8 +248,7 @@ public class StreamingSerializer
     {
         var payload = SharpPackSerializer.Serialize(new[] { 1, 2, 3 });
         var pipe = new Pipe();
-        pipe.Writer.Write(payload);
-        await pipe.Writer.CompleteAsync();
+        await pipe.Writer.WriteAsync(payload.AsMemory(0, sizeof(int)));
         var context = new SharpPackSerializerContext(
             SharpPackSerializerConfiguration.Default with
             {
@@ -271,6 +270,8 @@ public class StreamingSerializer
             }
         });
         Assert.Equal(SharpPackReadLimitKind.CollectionLength, error.ReadLimitKind);
+        await pipe.Writer.WriteAsync(payload.AsMemory(sizeof(int)));
+        await pipe.Writer.CompleteAsync();
         Assert.True(pipe.Reader.TryRead(out var retry));
         Assert.Equal(payload, retry.Buffer.ToArray());
         pipe.Reader.AdvanceTo(retry.Buffer.End);

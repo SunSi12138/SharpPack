@@ -109,43 +109,83 @@ namespace SharpPack.Formatters
                 return;
             }
 
-            if (value == null)
+            if (length == 0)
             {
-                value = new List<T?>(
-                    FormatterValidation.InitialCapacity(length));
-            }
-
-            if (length > FormatterValidation.MaximumInitialCollectionCapacity &&
-                value.Capacity < length)
-            {
-                value.Clear();
-                value.EnsureCapacity(
-                    FormatterValidation.MaximumInitialCollectionCapacity);
-                ReadGrowingList(ref reader, value, length);
+                CollectionsMarshalEx.CreateSpan(value ??= new List<T?>(), 0);
                 return;
             }
 
-            var span = CollectionsMarshalEx.CreateSpan(value, length);
-            reader.ReadValidatedPackableSpan(length, ref span);
-        }
-
-        internal static void ReadGrowingList<T>(ref SharpPackReader reader, List<T?> value, int length)
-        {
             reader.EnterDepth<T>();
             try
             {
-                var formatter = reader.GetFormatter<T>();
-                for (int i = 0; i < length; i++)
+                value ??= new List<T?>(FormatterValidation.InitialCapacity(length));
+                if (!TryReadGrowingList(ref reader, value, length))
                 {
-                    T? item = default;
-                    formatter.Deserialize(ref reader, ref item);
-                    value.Add(item);
+                    reader.ReadPreparedPackableListSpan(CollectionsMarshalEx.CreateSpan(value, length));
                 }
             }
             finally
             {
                 reader.ExitDepth();
             }
+        }
+
+        internal static void ReadWithFormatter<T>(
+            ref SharpPackReader reader, scoped ref List<T?>? value, bool allowRawCopy)
+        {
+            if (!reader.TryReadCollectionHeader(out var length))
+            {
+                value = null;
+                return;
+            }
+            if (length == 0)
+            {
+                CollectionsMarshalEx.CreateSpan(value ??= new List<T?>(), 0);
+                return;
+            }
+
+            reader.EnterDepth<T>();
+            try
+            {
+                value ??= new List<T?>(FormatterValidation.InitialCapacity(length));
+                if (TryReadGrowingList(ref reader, value, length))
+                {
+                    return;
+                }
+
+                var span = CollectionsMarshalEx.CreateSpan(value, length);
+                if (allowRawCopy)
+                {
+                    reader.ReadPreparedListSpan(span);
+                }
+                else
+                {
+                    reader.ReadElements(span);
+                }
+            }
+            finally
+            {
+                reader.ExitDepth();
+            }
+        }
+
+        static bool TryReadGrowingList<T>(ref SharpPackReader reader, List<T?> value, int length)
+        {
+            if (length <= FormatterValidation.MaximumInitialCollectionCapacity || value.Capacity >= length)
+            {
+                return false;
+            }
+
+            value.Clear();
+            value.EnsureCapacity(FormatterValidation.MaximumInitialCollectionCapacity);
+            var formatter = reader.GetFormatter<T>();
+            for (int i = 0; i < length; i++)
+            {
+                T? item = default;
+                formatter.Deserialize(ref reader, ref item);
+                value.Add(item);
+            }
+            return true;
         }
     }
 
@@ -176,32 +216,7 @@ namespace SharpPack.Formatters
 
         [Preserve]
         public override void Deserialize(ref SharpPackReader reader, scoped ref List<T?>? value)
-        {
-            if (!reader.TryReadCollectionHeader(out var length))
-            {
-                value = null;
-                return;
-            }
-
-            if (value == null)
-            {
-                value = new List<T?>(
-                    FormatterValidation.InitialCapacity(length));
-            }
-
-            if (length > FormatterValidation.MaximumInitialCollectionCapacity &&
-                value.Capacity < length)
-            {
-                value.Clear();
-                value.EnsureCapacity(
-                    FormatterValidation.MaximumInitialCollectionCapacity);
-                ListFormatter.ReadGrowingList(ref reader, value, length);
-                return;
-            }
-
-            var span = CollectionsMarshalEx.CreateSpan(value, length);
-            reader.ReadValidatedSpan(length, ref span);
-        }
+            => ListFormatter.ReadWithFormatter(ref reader, ref value, allowRawCopy: true);
     }
 
     [Preserve]
@@ -232,35 +247,7 @@ namespace SharpPack.Formatters
         public override void Deserialize(
             ref SharpPackReader reader,
             scoped ref List<T?>? value)
-        {
-            if (!reader.TryReadCollectionHeader(out var length))
-            {
-                value = null;
-                return;
-            }
-
-            if (value == null)
-            {
-                value = new List<T?>(
-                    FormatterValidation.InitialCapacity(length));
-            }
-
-            if (length > FormatterValidation.MaximumInitialCollectionCapacity &&
-                value.Capacity < length)
-            {
-                value.Clear();
-                value.EnsureCapacity(
-                    FormatterValidation.MaximumInitialCollectionCapacity);
-                ListFormatter.ReadGrowingList(ref reader, value, length);
-                return;
-            }
-
-            var span = CollectionsMarshalEx.CreateSpan(value, length);
-            if (!span.IsEmpty)
-            {
-                reader.ReadElements(span);
-            }
-        }
+            => ListFormatter.ReadWithFormatter(ref reader, ref value, allowRawCopy: false);
     }
 
     [Preserve]
