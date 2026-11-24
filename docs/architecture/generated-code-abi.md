@@ -89,14 +89,15 @@ static constructors. This is narrower than retaining every non-public method
 on an arbitrary caller type (notably `System.Type`), but it still retains all
 non-public constructors, not only the static constructor.
 
-Generated static initialization references only the explicit default/context
-factory methods by their exact metadata names. The names include Roslyn's
-literal `global::` prefix. Closed member types use the original generic
-definition's parameter names for method lookup. Self lookups reject missing or
-ambiguous methods. Same-assembly external union targets use a private static
-initializer that coexists with application static constructors and avoids
-member, type-name and generic-parameter collisions. No global type-registration
-table or extra per-read dispatch is introduced.
+Generated static initialization calls the same typed preservation methods
+available to handwritten models. Each uses a static-interface delegate to keep
+the corresponding factory available to runtime resolution. Known member
+factory dependencies are preserved when creating the enclosing type's factory.
+The generated code does not depend on the compiler's private metadata spelling.
+A private static initializer is anchored on the cold factory path when the
+model does not require strict initialization. The generator chooses its names
+without rebinding existing identifiers. No global registry or per-read dispatch
+is needed.
 
 Cross-assembly unions continue to require the generated context registration
 extension. Runtime-discovered public factories should still use explicit
@@ -106,16 +107,15 @@ code still needs the explicit roots described in the README.
 The isolated `sandbox/DeserializeOnlyAot` consumer uses literal payloads and no
 model serialization or model construction before reading. It is separate from
 the round-trip sample so serialization cannot accidentally preserve factories.
-The CI characterization also checks that a non-inlined unused private method has no native code symbol;
+CI checks that a non-inlined unused private method has no native code symbol;
 a separately compiled, explicitly invoked method serves as the positive
-control. This checks one unused method body, not every item of reflection metadata. Performance output is a scoped warm-read microbenchmark, not a full
-statistical performance acceptance result.
+control. The isolated consumer also covers generic wrapper annotations and
+the application-owned factory consumer runs in NativeAOT and trimmed JIT.
 
 This NativeAOT root contract requires rebuilding model assemblies with the
 matching updated Generator as well as updating Core. A runtime-only DLL update
 cannot retrofit the new static-constructor roots into old generated code.
 The frozen generated-code ABI gate checks compilation against the runtime; it
 does not promise deserialize-only NativeAOT compatibility for older generated
-assemblies. Prefer the SharpPack meta-package and upgrade Core/Generator
-together. Direct references to the separate packages must be kept in sync.
-No package has been released by this change.
+assemblies. The [migration guide](../aot-factory-migration.md) covers package
+alignment, generic wrappers, and handwritten factories.

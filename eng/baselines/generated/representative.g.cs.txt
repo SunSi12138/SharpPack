@@ -43,8 +43,8 @@ partial class Cat : ISharpPackable<Cat>, global::SharpPack.IFixedSizeSharpPackab
     private static readonly bool __SharpPackPreserveSelfFactoryRootsValue = __SharpPackPreserveSelfFactoryRoots();
     private static bool __SharpPackPreserveSelfFactoryRoots()
     {
-        global::System.GC.KeepAlive(typeof(Cat).GetMethod("global::SharpPack.ISharpPackFormatterFactory<BaselineFixtures.Cat>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
-        global::System.GC.KeepAlive(typeof(Cat).GetMethod("global::SharpPack.ISharpPackContextFormatterFactory<BaselineFixtures.Cat>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
+        global::SharpPack.SharpPackSerializer.PreserveFormatterFactory<Cat>();
+        global::SharpPack.SharpPackSerializer.PreserveContextFormatterFactory<Cat>();
         return true;
     }
 
@@ -342,8 +342,8 @@ partial class Dog : ISharpPackable<Dog>, global::SharpPack.ISharpPackExactSizeSe
     private static readonly bool __SharpPackPreserveSelfFactoryRootsValue = __SharpPackPreserveSelfFactoryRoots();
     private static bool __SharpPackPreserveSelfFactoryRoots()
     {
-        global::System.GC.KeepAlive(typeof(Dog).GetMethod("global::SharpPack.ISharpPackFormatterFactory<BaselineFixtures.Dog>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
-        global::System.GC.KeepAlive(typeof(Dog).GetMethod("global::SharpPack.ISharpPackContextFormatterFactory<BaselineFixtures.Dog>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
+        global::SharpPack.SharpPackSerializer.PreserveFormatterFactory<Dog>();
+        global::SharpPack.SharpPackSerializer.PreserveContextFormatterFactory<Dog>();
         return true;
     }
 
@@ -663,8 +663,8 @@ partial struct Fixed : ISharpPackable<Fixed>, global::SharpPack.ISharpPackFormat
     private static readonly bool __SharpPackPreserveSelfFactoryRootsValue = __SharpPackPreserveSelfFactoryRoots();
     private static bool __SharpPackPreserveSelfFactoryRoots()
     {
-        global::System.GC.KeepAlive(typeof(Fixed).GetMethod("global::SharpPack.ISharpPackFormatterFactory<BaselineFixtures.Fixed>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
-        global::System.GC.KeepAlive(typeof(Fixed).GetMethod("global::SharpPack.ISharpPackContextFormatterFactory<BaselineFixtures.Fixed>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
+        global::SharpPack.SharpPackSerializer.PreserveFormatterFactory<Fixed>();
+        global::SharpPack.SharpPackSerializer.PreserveContextFormatterFactory<Fixed>();
         return true;
     }
 
@@ -744,7 +744,7 @@ partial interface IAnimal : global::SharpPack.ISharpPackFormatterFactory<IAnimal
     private static readonly bool __SharpPackPreserveSelfFactoryRootsValue = __SharpPackPreserveSelfFactoryRoots();
     private static bool __SharpPackPreserveSelfFactoryRoots()
     {
-        global::System.GC.KeepAlive(typeof(IAnimal).GetMethod("global::SharpPack.ISharpPackFormatterFactory<BaselineFixtures.IAnimal>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
+        global::SharpPack.SharpPackSerializer.PreserveFormatterFactory<IAnimal>();
         return true;
     }
 
@@ -876,8 +876,8 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
     private static readonly bool __SharpPackPreserveSelfFactoryRootsValue = __SharpPackPreserveSelfFactoryRoots();
     private static bool __SharpPackPreserveSelfFactoryRoots()
     {
-        global::System.GC.KeepAlive(typeof(Node).GetMethod("global::SharpPack.ISharpPackFormatterFactory<BaselineFixtures.Node>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
-        global::System.GC.KeepAlive(typeof(Node).GetMethod("global::SharpPack.ISharpPackContextFormatterFactory<BaselineFixtures.Node>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
+        global::SharpPack.SharpPackSerializer.PreserveFormatterFactory<Node>();
+        global::SharpPack.SharpPackSerializer.PreserveContextFormatterFactory<Node>();
         return true;
     }
 
@@ -907,16 +907,8 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
     [global::SharpPack.Internal.Preserve]
     static void __SharpPackEnsureAotFormatterRoots()
     {
-        global::System.GC.KeepAlive(typeof(global::BaselineFixtures.Node).GetMethod("global::SharpPack.ISharpPackFormatterFactory<BaselineFixtures.Node>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly));
-        global::System.GC.KeepAlive(typeof(global::BaselineFixtures.Node).GetMethod("global::SharpPack.ISharpPackContextFormatterFactory<BaselineFixtures.Node>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly));
-        if (!global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)
-        {
-            global::System.GC.KeepAlive(PreserveFactory<global::BaselineFixtures.Node, global::BaselineFixtures.Node>());
-
-            static global::System.Func<global::SharpPack.SharpPackFormatter<TValue>> PreserveFactory<TValue, TFactory>()
-                where TFactory : global::SharpPack.ISharpPackFormatterFactory<TValue>
-                => TFactory.CreateFormatter;
-        }
+        global::SharpPack.SharpPackSerializer.PreserveFormatterFactory<global::BaselineFixtures.Node>();
+        global::SharpPack.SharpPackSerializer.PreserveContextFormatterFactory<global::BaselineFixtures.Node>();
     }
 
     [global::System.Runtime.CompilerServices.MethodImpl(
@@ -1345,8 +1337,8 @@ partial class Inner<U> : ISharpPackable<Inner<U>>, global::SharpPack.ISharpPackF
     private static readonly bool __SharpPackPreserveSelfFactoryRootsValue = __SharpPackPreserveSelfFactoryRoots();
     private static bool __SharpPackPreserveSelfFactoryRoots()
     {
-        global::System.GC.KeepAlive(typeof(Inner<U>).GetMethod("global::SharpPack.ISharpPackFormatterFactory<BaselineFixtures.Outer<T>.Inner<U>>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
-        global::System.GC.KeepAlive(typeof(Inner<U>).GetMethod("global::SharpPack.ISharpPackContextFormatterFactory<BaselineFixtures.Outer<T>.Inner<U>>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
+        global::SharpPack.SharpPackSerializer.PreserveFormatterFactory<Inner<U>>();
+        global::SharpPack.SharpPackSerializer.PreserveContextFormatterFactory<Inner<U>>();
         return true;
     }
 
@@ -1376,16 +1368,8 @@ partial class Inner<U> : ISharpPackable<Inner<U>>, global::SharpPack.ISharpPackF
     [global::SharpPack.Internal.Preserve]
     static void __SharpPackEnsureAotFormatterRoots()
     {
-        global::System.GC.KeepAlive(typeof(global::BaselineFixtures.Simple).GetMethod("global::SharpPack.ISharpPackFormatterFactory<BaselineFixtures.Simple>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly));
-        global::System.GC.KeepAlive(typeof(global::BaselineFixtures.Simple).GetMethod("global::SharpPack.ISharpPackContextFormatterFactory<BaselineFixtures.Simple>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly));
-        if (!global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)
-        {
-            global::System.GC.KeepAlive(PreserveFactory<global::BaselineFixtures.Simple, global::BaselineFixtures.Simple>());
-
-            static global::System.Func<global::SharpPack.SharpPackFormatter<TValue>> PreserveFactory<TValue, TFactory>()
-                where TFactory : global::SharpPack.ISharpPackFormatterFactory<TValue>
-                => TFactory.CreateFormatter;
-        }
+        global::SharpPack.SharpPackSerializer.PreserveFormatterFactory<global::BaselineFixtures.Simple>();
+        global::SharpPack.SharpPackSerializer.PreserveContextFormatterFactory<global::BaselineFixtures.Simple>();
     }
 
     [global::System.Runtime.CompilerServices.MethodImpl(
@@ -1680,8 +1664,8 @@ partial class Simple : ISharpPackable<Simple>, global::SharpPack.ISharpPackForma
     static Simple()
     {
         StaticConstructor();
-        global::System.GC.KeepAlive(typeof(Simple).GetMethod("global::SharpPack.ISharpPackFormatterFactory<BaselineFixtures.Simple>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
-        global::System.GC.KeepAlive(typeof(Simple).GetMethod("global::SharpPack.ISharpPackContextFormatterFactory<BaselineFixtures.Simple>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
+        global::SharpPack.SharpPackSerializer.PreserveFormatterFactory<Simple>();
+        global::SharpPack.SharpPackSerializer.PreserveContextFormatterFactory<Simple>();
     }
 
 
@@ -2016,8 +2000,8 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
     private static readonly bool __SharpPackPreserveSelfFactoryRootsValue = __SharpPackPreserveSelfFactoryRoots();
     private static bool __SharpPackPreserveSelfFactoryRoots()
     {
-        global::System.GC.KeepAlive(typeof(Versioned).GetMethod("global::SharpPack.ISharpPackFormatterFactory<BaselineFixtures.Versioned>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
-        global::System.GC.KeepAlive(typeof(Versioned).GetMethod("global::SharpPack.ISharpPackContextFormatterFactory<BaselineFixtures.Versioned>.CreateFormatter", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException("The generated SharpPack factory root was not found."));
+        global::SharpPack.SharpPackSerializer.PreserveFormatterFactory<Versioned>();
+        global::SharpPack.SharpPackSerializer.PreserveContextFormatterFactory<Versioned>();
         return true;
     }
 
@@ -2367,4 +2351,3 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
     }
 
 }
-

@@ -420,6 +420,8 @@ public partial class TypeMeta
         }
         return new global::SharpPack.Formatters.SharpPackableFormatter<{{TypeName}}>();
 """;
+        var selfFactoryRoot = GetSelfFactoryRootName();
+        var selfFactoryRootRead = EmitFactoryRootRead(selfFactoryRoot);
         var aotFormatterRoots = EmitAotFormatterRoots("        ");
         var aotRootMethodName = "__SharpPackEnsureAotFormatterRoots";
         while (Symbol.GetAllMembers().Any(
@@ -447,7 +449,7 @@ public partial class TypeMeta
     [global::SharpPack.Internal.Preserve]
     static global::SharpPack.SharpPackFormatter<{{TypeName}}> global::SharpPack.ISharpPackFormatterFactory<{{TypeName}}>.CreateFormatter()
     {
-{{EmitSelfFactoryRootRead()}}
+{{selfFactoryRootRead}}
 {{aotRootCall}}
         return new global::SharpPack.Formatters.SharpPackableFormatter<{{TypeName}}>();
     }
@@ -456,7 +458,7 @@ public partial class TypeMeta
     static global::SharpPack.SharpPackFormatter<{{TypeName}}> global::SharpPack.ISharpPackContextFormatterFactory<{{TypeName}}>.CreateFormatter(
         global::SharpPack.SharpPackSerializerContext context)
     {
-{{EmitSelfFactoryRootRead()}}
+{{selfFactoryRootRead}}
 {{aotRootCall}}
         {{contextFormatterSelection}}
     }
@@ -469,7 +471,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 {{(IsUnmanagedType ? "" : EmitCustomFormatters())}}
     static partial void StaticConstructor();
 
-{{EmitSelfFactoryRoots(true)}}
+{{EmitSelfFactoryRoots(selfFactoryRoot, includeContextFactory: true)}}
 {{fixedSizeMethod}}
 {{exactSizeMethod}}
 {{contextFactoryMethod}}
@@ -734,121 +736,100 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
                property.DeclaringSyntaxReferences.Any(reference =>
                    reference.GetSyntax() is PropertyDeclarationSyntax { Initializer: not null }));
 
-    string GetSelfRootMethodName()
+    string? GetSelfFactoryRootName()
+        => HasUserStaticInitialization() ? null : GetFactoryRootName(Symbol, "__SharpPackPreserveSelfFactoryRoots");
+
+    internal static string GetFactoryRootName(INamedTypeSymbol type, string stem)
     {
-        var name = "__SharpPackPreserveSelfFactoryRoots";
-        while (Symbol.Name == name || Symbol.Name == name + "Value" ||
-               Symbol.GetAllMembers().Any(member => member.Name == name || member.Name == name + "Value") ||
-               Symbol.TypeParameters.Any(parameter => parameter.Name == name || parameter.Name == name + "Value"))
+        // Avoid rebinding existing unqualified names, such as captured
+        // primary-constructor parameters and names imported by using static.
+        var names = new HashSet<string>(StringComparer.Ordinal) { type.Name };
+        foreach (var member in type.GetAllMembers())
+        {
+            names.Add(member.Name);
+        }
+        foreach (var reference in type.DeclaringSyntaxReferences)
+        {
+            foreach (var token in reference.GetSyntax().DescendantTokens())
+            {
+                if (token.IsKind(SyntaxKind.IdentifierToken) && token.ValueText.StartsWith(stem, StringComparison.Ordinal))
+                {
+                    names.Add(token.ValueText);
+                }
+            }
+        }
+
+        var name = stem;
+        while (names.Contains(name) || names.Contains(name + "Value"))
         {
             name += "_";
         }
         return name;
     }
 
-    string EmitSelfFactoryRootRead()
-        => HasUserStaticInitialization() ? "" : $"        var {GetSelfRootMethodName()} = {GetSelfRootMethodName()}Value;";
+    internal static string EmitFactoryRootRead(string? name)
+        => name is null ? "" : $"        var {name} = {name}Value;";
 
-    string EmitSelfFactoryRoots(bool includeContextFactory)
+    string EmitSelfFactoryRoots(string? name, bool includeContextFactory)
+        => name is not null
+            ? EmitFactoryRootField(name, TypeName, includeContextFactory)
+            : $$"""
+    static {{Symbol.Name}}()
     {
-        var sb = new StringBuilder();
-        var strictInitialization = HasUserStaticInitialization();
-        if (strictInitialization)
-        {
-            sb.AppendLine($"    static {Symbol.Name}()");
-            sb.AppendLine("    {");
-            sb.AppendLine("        StaticConstructor();");
-        }
-        else
-        {
-            var name = GetSelfRootMethodName();
-            sb.AppendLine($"    private static readonly bool {name}Value = {name}();");
-            sb.AppendLine($"    private static bool {name}()");
-            sb.AppendLine("    {");
-        }
-        var interfaces = includeContextFactory
-            ? new[] { "ISharpPackFormatterFactory", "ISharpPackContextFormatterFactory" }
-            : new[] { "ISharpPackFormatterFactory" };
-        foreach (var factoryInterface in interfaces)
-        {
-            sb.AppendLine($"        global::System.GC.KeepAlive(typeof({TypeName}).GetMethod(\"global::SharpPack.{factoryInterface}<{GetFactoryMetadataTypeName(Symbol)}>.CreateFormatter\", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException(\"The generated SharpPack factory root was not found.\"));");
-        }
-        if (!strictInitialization)
-        {
-            sb.AppendLine("        return true;");
-        }
-        sb.Append("    }");
-        return sb.ToString();
+        StaticConstructor();
+{{EmitFactoryPreservation("        ", TypeName, includeContextFactory)}}
     }
+""";
 
-    internal static string GetFactoryMetadataTypeName(INamedTypeSymbol symbol)
-        => symbol.OriginalDefinition
-            .ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
-            .Replace(" ", "");
+    internal static string EmitFactoryRootField(string name, string typeName, bool includeContextFactory)
+        => $$"""
+    private static readonly bool {{name}}Value = {{name}}();
+    private static bool {{name}}()
+    {
+{{EmitFactoryPreservation("        ", typeName, includeContextFactory)}}
+        return true;
+    }
+""";
 
-    // Generated static constructors are retained by the deserialization API's
-    // NonPublicConstructors contract. Their self lookups retain only the explicit
-    // factories, without retaining unrelated System.Type methods. Keep the
-    // literal global:: prefix: it is part of Roslyn's emitted method name.
-    // No global registration table or per-read dispatch is introduced.
+    static string EmitFactoryPreservation(string indent, string type, bool includeContextFactory)
+        => $"{indent}global::SharpPack.SharpPackSerializer.PreserveFormatterFactory<{type}>();" +
+            (includeContextFactory
+                ? $"\n{indent}global::SharpPack.SharpPackSerializer.PreserveContextFormatterFactory<{type}>();"
+                : "");
+
+    // The deserialization API retains model static constructors. Those roots
+    // and the first factory creation retain typed dependencies without relying
+    // on Roslyn's private explicit-interface metadata spelling.
     string EmitAotFormatterRoots(string indent)
     {
-        var formatterTypes = new HashSet<string>(StringComparer.Ordinal);
-        var factoryTypes = new Dictionary<string, INamedTypeSymbol>(StringComparer.Ordinal);
+        var formatterTypes = new SortedSet<string>(StringComparer.Ordinal);
+        var factoryTypes = new SortedDictionary<string, bool>(StringComparer.Ordinal);
+        var contextFactory = reference.Compilation.GetTypeByMetadataName("SharpPack.ISharpPackContextFormatterFactory`1");
 
         foreach (var member in Members)
         {
             AddFormatterTypes(member.MemberType);
         }
 
-        if (formatterTypes.Count == 0 && factoryTypes.Count == 0)
-        {
-            return "";
-        }
-
         var sb = new StringBuilder();
-        // Factory metadata is required in trimmed JIT as well as NativeAOT.
-        // Keep only native generic-instantiation roots behind the feature switch.
-        foreach (var entry in factoryTypes.OrderBy(static x => x.Key, StringComparer.Ordinal))
+        // Factory methods are needed by trimmed JIT as well as NativeAOT.
+        foreach (var entry in factoryTypes)
         {
-            var factoryType = entry.Key;
-            var metadataType = GetFactoryMetadataTypeName(entry.Value);
-            foreach (var factoryInterface in new[]
-                     { "ISharpPackFormatterFactory", "ISharpPackContextFormatterFactory" })
+            sb.AppendLine(EmitFactoryPreservation(indent, entry.Key, entry.Value));
+        }
+        if (formatterTypes.Count != 0)
+        {
+            sb.AppendLine(
+                $"{indent}if (!global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)");
+            sb.AppendLine($"{indent}{{");
+            foreach (var formatterType in formatterTypes)
             {
-                // The metadata name uses the generic definition's parameter names,
-                // even when typeof(factoryType) is a closed constructed type.
                 sb.AppendLine(
-                    $"{indent}global::System.GC.KeepAlive(typeof({factoryType}).GetMethod(\"global::SharpPack.{factoryInterface}<{metadataType}>.CreateFormatter\", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly));");
+                    $"{indent}    global::System.GC.KeepAlive(new {formatterType}());");
             }
+            sb.AppendLine($"{indent}}}");
         }
-        sb.AppendLine(
-            $"{indent}if (!global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)");
-        sb.AppendLine($"{indent}{{");
-        foreach (var formatterType in formatterTypes.OrderBy(static x => x))
-        {
-            sb.AppendLine(
-                $"{indent}    global::System.GC.KeepAlive(new {formatterType}());");
-        }
-        foreach (var entry in factoryTypes.OrderBy(static x => x.Key, StringComparer.Ordinal))
-        {
-            var factoryType = entry.Key;
-            sb.AppendLine(
-                $"{indent}    global::System.GC.KeepAlive(PreserveFactory<{factoryType}, {factoryType}>());");
-
-        }
-        if (factoryTypes.Count != 0)
-        {
-            sb.AppendLine();
-            sb.AppendLine(
-                $"{indent}    static global::System.Func<global::SharpPack.SharpPackFormatter<TValue>> PreserveFactory<TValue, TFactory>()");
-            sb.AppendLine(
-                $"{indent}        where TFactory : global::SharpPack.ISharpPackFormatterFactory<TValue>");
-            sb.AppendLine(
-                $"{indent}        => TFactory.CreateFormatter;");
-        }
-        sb.Append($"{indent}}}");
-        return sb.ToString();
+        return sb.ToString().TrimEnd('\r', '\n');
 
         void AddFormatterTypes(ITypeSymbol type)
         {
@@ -857,13 +838,20 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
                 formatterTypes.Add(formatter);
             }
 
-            if (type.TryGetSharpPackableType(
-                    reference,
-                    out var generateType,
-                    out _) &&
+            if (type is INamedTypeSymbol model &&
+                type.TryGetSharpPackableType(reference, out var generateType, out _) &&
                 generateType != GenerateType.NoGenerate)
             {
-                factoryTypes[type.FullyQualifiedToString()] = (INamedTypeSymbol)type;
+                // This compilation can add a factory to a source model; for
+                // referenced assemblies, check the interface actually shipped.
+                var willGenerateContextFactory =
+                    SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, reference.Compilation.Assembly) &&
+                    generateType is (GenerateType.Object or GenerateType.VersionTolerant or GenerateType.CircularReference) &&
+                    !type.ContainsAttribute(reference.SharpPackUnionAttribute);
+                var hasContextFactory = model.AllInterfaces.Any(i =>
+                    SymbolEqualityComparer.Default.Equals(i.OriginalDefinition, contextFactory) &&
+                    SymbolEqualityComparer.Default.Equals(i.TypeArguments[0], type));
+                factoryTypes[type.FullyQualifiedToString()] = willGenerateContextFactory || hasContextFactory;
             }
 
             if (type is IArrayTypeSymbol array)
@@ -1481,12 +1469,13 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 
         var contextFactoryInterface =
             $"global::SharpPack.ISharpPackFormatterFactory<{TypeName}>";
+        var selfFactoryRoot = GetSelfFactoryRootName();
         var contextFactoryMethod = $$"""
 
     [global::SharpPack.Internal.Preserve]
     static global::SharpPack.SharpPackFormatter<{{TypeName}}> global::SharpPack.ISharpPackFormatterFactory<{{TypeName}}>.CreateFormatter()
     {
-{{EmitSelfFactoryRootRead()}}
+{{EmitFactoryRootRead(selfFactoryRoot)}}
         return new {{Symbol.Name}}Formatter();
     }
 """;
@@ -1500,7 +1489,7 @@ partial {{classOrInterfaceOrRecord}} {{TypeName}} : {{contextFactoryInterface}}
 {
     static partial void StaticConstructor();
 
-{{EmitSelfFactoryRoots(false)}}
+{{EmitSelfFactoryRoots(selfFactoryRoot, includeContextFactory: false)}}
 {{contextFactoryMethod}}
 
     [global::SharpPack.Internal.Preserve]
@@ -1800,12 +1789,13 @@ public static class {{registrationClassName}}
         };
         var contextFactoryInterface =
             $"global::SharpPack.ISharpPackFormatterFactory<{TypeName}>";
+        var selfFactoryRoot = GetSelfFactoryRootName();
         var contextFactoryMethod = $$"""
 
     [global::SharpPack.Internal.Preserve]
     static global::SharpPack.SharpPackFormatter<{{TypeName}}> global::SharpPack.ISharpPackFormatterFactory<{{TypeName}}>.CreateFormatter()
     {
-{{EmitSelfFactoryRootRead()}}
+{{EmitFactoryRootRead(selfFactoryRoot)}}
         return new {{contextFormatterType}}();
     }
 """;
@@ -1815,7 +1805,7 @@ partial class {{TypeName}} : {{contextFactoryInterface}}
 {
     static partial void StaticConstructor();
 
-{{EmitSelfFactoryRoots(false)}}
+{{EmitSelfFactoryRoots(selfFactoryRoot, includeContextFactory: false)}}
 {{contextFactoryMethod}}
 }
 """;

@@ -1,6 +1,5 @@
 using SharpPack;
 
-#if STATIC_FACTORY_ROOTS
 SharpPackSerializer.PreserveFormatterFactory<HandwrittenFactoryModel>();
 SharpPackSerializer.PreserveContextFormatterFactory<HandwrittenFactoryModel>();
 SharpPackSerializer.PreserveFormatterFactory<HandwrittenGenericFactoryModel<long>>();
@@ -9,18 +8,12 @@ SharpPackSerializer.PreserveFormatterFactory<DefaultOnlyModel>();
 SharpPackSerializer.PreserveContextFormatterFactory<ContextOnlyModel>();
 if (FactoryCalls.Default != 0 || FactoryCalls.Context != 0 || FactoryCalls.Initialization != 0)
     throw new InvalidOperationException("Preservation executed a factory.");
-#endif
 
 byte[] payload = [42, 0, 0, 0];
 var failures = 0;
-#if REGISTER_DEFAULT_FACTORY
-var registered = new SharpPackSerializerContextBuilder().RegisterFactory<HandwrittenFactoryModel, HandwrittenFactoryModel>().Build();
-Check("registered handwritten default factory", () => SharpPackSerializer.Deserialize<HandwrittenFactoryModel>(payload, registered)?.Value == 42);
-#else
 var context = new SharpPackSerializerContextBuilder().Register(new MarkerIntFormatter()).Build();
 Check("handwritten explicit default", () => SharpPackSerializer.Deserialize<HandwrittenFactoryModel>(payload)?.Value == 42);
 Check("handwritten explicit context", () => SharpPackSerializer.Deserialize<HandwrittenFactoryModel>(payload, context)?.Value == 43);
-#if STATIC_FACTORY_ROOTS
 Check("closed generic explicit default", () => SharpPackSerializer.Deserialize<HandwrittenGenericFactoryModel<long>>(payload)?.Value == 42);
 Check("closed generic explicit context", () => SharpPackSerializer.Deserialize<HandwrittenGenericFactoryModel<long>>(payload, context)?.Value == 43);
 Check("default-only factory", () => SharpPackSerializer.Deserialize<DefaultOnlyModel>(payload)?.Value == 42);
@@ -35,8 +28,6 @@ for (int i = 0; i < 100; i++)
 }
 if (FactoryCalls.Default != 3 || FactoryCalls.Context != 3)
     throw new InvalidOperationException("Warm reads invoked a factory again.");
-#endif
-#endif
 Environment.ExitCode = failures == 0 ? 0 : 1;
 void Check(string name, Func<bool> read)
 {

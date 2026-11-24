@@ -653,8 +653,6 @@ public partial class Model
                         ".g.cs",
                         StringComparison.Ordinal))
                 .Select(static tree => tree.ToString()));
-        // Attribute construction remains direct. The only reflection allowed
-        // elsewhere in this model is exact generated-factory preservation.
         var generatedNodes = compilation.SyntaxTrees
             .Where(static tree => tree.FilePath.EndsWith(".g.cs", StringComparison.Ordinal))
             .SelectMany(static tree => tree.GetRoot().DescendantNodes())
@@ -667,23 +665,9 @@ public partial class Model
         generated.Should().NotContain(".GetProperty(");
         generated.Should().NotContain(".GetField(");
         generated.Should().NotContain(".GetMethods(");
-        var methodLookups = generatedNodes.OfType<InvocationExpressionSyntax>()
-            .Where(static invocation => invocation.Expression is MemberAccessExpressionSyntax member &&
-                member.Name.Identifier.ValueText == "GetMethod")
-            .ToArray();
-        methodLookups.Should().HaveCount(2);
-        foreach (var lookup in methodLookups)
-        {
-            // A dynamic-code feature guard is folded away by trimmed JIT,
-            // so it must never contain metadata-preservation lookups.
-            lookup.Ancestors().OfType<IfStatementSyntax>()
-                .Should().NotContain(statement =>
-                    statement.Condition.ToString().Contains("IsDynamicCodeSupported"));
-            var name = ((LiteralExpressionSyntax)lookup.ArgumentList.Arguments[0].Expression).Token.ValueText;
-            name.Should().BeOneOf(
-                "global::SharpPack.ISharpPackFormatterFactory<Generated.Model>.CreateFormatter",
-                "global::SharpPack.ISharpPackContextFormatterFactory<Generated.Model>.CreateFormatter");
-        }
+        generated.Should().NotContain(".GetMethod(");
+        generated.Should().Contain("SharpPackSerializer.PreserveFormatterFactory<Model>();");
+        generated.Should().Contain("SharpPackSerializer.PreserveContextFormatterFactory<Model>();");
         generated.Should().Contain(
             "new global::Generated.CustomIntFormatterAttribute(" +
             "7, typeof(global::Generated.Model), \"marker\", " +

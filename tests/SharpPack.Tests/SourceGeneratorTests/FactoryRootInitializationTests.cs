@@ -105,6 +105,38 @@ public partial class __SharpPackPreserveSelfFactoryRoots
         generated.Should().Contain("private static bool __SharpPackPreserveSelfFactoryRoots_()");
     }
 
+    [Fact]
+    public void RootValue_DoesNotShadowCapturedConstructorParameter()
+    {
+        var generated = Run("""
+namespace Generated;
+[SharpPackable]
+public partial class Model(int __SharpPackPreserveSelfFactoryRootsValue)
+{
+    public int __sharppackpreserveselffactoryrootsvalue { get; } = __SharpPackPreserveSelfFactoryRootsValue;
+    public int ReadCapturedParameter() => __SharpPackPreserveSelfFactoryRootsValue;
+}
+""");
+        generated.Should().Contain("private static readonly bool __SharpPackPreserveSelfFactoryRoots_Value");
+    }
+
+    [Fact]
+    public void ExternalUnionRoot_DoesNotShadowImportedStaticMember()
+    {
+        var generated = Run("""
+using static Generated.Imported;
+namespace Generated;
+public static class Imported { public static int __SharpPackPreserveFactoryValue => 42; }
+public abstract partial class Union { public int ReadImportedValue() => __SharpPackPreserveFactoryValue; }
+[SharpPackable]
+public partial class Case : Union { public int Value { get; set; } }
+[SharpPackUnionFormatter(typeof(Union))]
+[SharpPackUnion(0, typeof(Case))]
+public partial class UnionFormatter { }
+""");
+        generated.Should().Contain("private static readonly bool __SharpPackPreserveFactory_Value");
+    }
+
     static string Generate(string members)
         => Run("namespace Generated; [SharpPackable] public partial class Model { " + members + " }");
 

@@ -158,27 +158,14 @@ partial class SharpPackGenerator
         sb.AppendLine(TypeMeta.EmitTypeParameterConstraints(
             target.TypeParameters));
         sb.AppendLine("{");
-        var rootName = "__SharpPackPreserveFactory";
-        while (target.Name == rootName || target.Name == rootName + "Value" ||
-               target.GetAllMembers().Any(member =>
-                   member.Name == rootName || member.Name == rootName + "Value") ||
-               target.TypeParameters.Any(parameter =>
-                   parameter.Name == rootName || parameter.Name == rootName + "Value"))
-        {
-            rootName += "_";
-        }
-        sb.AppendLine($"    private static readonly bool {rootName}Value = {rootName}();");
-        sb.AppendLine($"    private static bool {rootName}()");
-        sb.AppendLine("    {");
-        sb.AppendLine($"        global::System.GC.KeepAlive(typeof({targetType}).GetMethod(\"global::SharpPack.ISharpPackFormatterFactory<{TypeMeta.GetFactoryMetadataTypeName(target)}>.CreateFormatter\", global::System.Reflection.BindingFlags.Static | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.DeclaredOnly) ?? throw new global::System.InvalidOperationException(\"The generated SharpPack factory root was not found.\"));");
-        sb.AppendLine("        return true;");
-        sb.AppendLine("    }");
+        var rootName = TypeMeta.GetFactoryRootName(target, "__SharpPackPreserveFactory");
+        sb.AppendLine(TypeMeta.EmitFactoryRootField(rootName, targetType, includeContextFactory: false));
         sb.AppendLine(
             $"    static global::SharpPack.SharpPackFormatter<{targetType}>");
         sb.AppendLine(
             $"        global::SharpPack.ISharpPackFormatterFactory<{targetType}>.CreateFormatter()");
         sb.AppendLine("    {");
-        sb.AppendLine($"        var {rootName} = {rootName}Value;");
+        sb.AppendLine(TypeMeta.EmitFactoryRootRead(rootName));
 
         var emittedPatterns = new HashSet<string>(StringComparer.Ordinal);
         ExternalUnionFactoryEntry? openEntry = null;

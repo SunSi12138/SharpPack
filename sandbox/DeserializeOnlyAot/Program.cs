@@ -1,16 +1,11 @@
 using DeserializeOnlyAot.Contracts;
 using SharpPack;
 using SharpPack.Formatters;
+using System.Diagnostics.CodeAnalysis;
 
 #if FACTORY_ROOT_POSITIVE_CONTROL
 Console.WriteLine(OrdinaryModel.RootUnusedPrivateMethodForControl());
 #endif
-
-if (args is ["--performance"])
-{
-    ReadOnlyPerformance.Run();
-    return;
-}
 
 // No Serialize calls or generated-model construction. Ordinary/same-assembly
 // consumers rely on deserialization roots; cross-assembly union uses its
@@ -23,6 +18,8 @@ var context = new SharpPackSerializerContextBuilder()
     .Register(new PlusOneFormatter()).Build();
 Check("ordinary", () => SharpPackSerializer.Deserialize<OrdinaryModel>(model)?.Value == 42);
 Check("context override", () => SharpPackSerializer.Deserialize<ContextModel>(model, context)?.Value == 43);
+Check("ordinary generic wrapper", () => DeserializeWrapped<WrappedModel>(model)?.Value == 42);
+Check("context generic wrapper", () => DeserializeWrapped<WrappedModel>(model, context)?.Value == 43);
 Check("nested", () => SharpPackSerializer.Deserialize<NestedModel>(nested)?.Item?.Value == 42);
 Check("nested context", () => SharpPackSerializer.Deserialize<ContextNestedModel>(nested, context)?.Item?.Value == 43);
 // Closed collection formatter rooting is the existing documented NativeAOT
@@ -44,9 +41,7 @@ Check("closed generic member root", () => SharpPackSerializer.Deserialize<Generi
 Check("closed generic member context root", () => SharpPackSerializer.Deserialize<GenericNestedContextHost>(nested, context)?.Item?.Value == 43);
 Check("external type-name collision", () => SharpPackSerializer.Deserialize<CollisionTypes.__SharpPackPreserveFactory>(new byte[] { 6, 1, 42, 0, 0, 0 }) is CollisionTypes.Item { Value: 42 });
 Check("external value-name collision", () => SharpPackSerializer.Deserialize<CollisionTypes.__SharpPackPreserveFactoryValue>(new byte[] { 7, 1, 42, 0, 0, 0 }) is CollisionTypes.ValueItem { Value: 42 });
-#if !BASELINE_COMPARISON
 Check("escaped generic parameters", () => SharpPackSerializer.Deserialize<MetadataNames.KeywordParameters<int, long>>(model)?.Value == 42);
-#endif
 Check("multiple nested generic parameters", () => SharpPackSerializer.Deserialize<MetadataNames.Outer<int, long>.Inner<byte, short>>(model)?.Value == 42);
 Check("reentrant model initialization", () => SharpPackSerializer.Deserialize<ReentrantModel>(model)?.Value == 42);
 Check("reentrant external union initialization", () => SharpPackSerializer.Deserialize<IReentrantUnion>(new byte[] { 8, 1, 42, 0, 0, 0 }) is ReentrantUnionItem { Value: 42 });
@@ -57,7 +52,13 @@ Check("Type registered", () => SharpPackSerializer.Deserialize<Type>(typeId, typ
 Check("Type disabled", () => Reject(() => SharpPackSerializer.Deserialize<Type>(typeId)));
 Check("Type unknown", () => Reject(() => SharpPackSerializer.Deserialize<Type>(typeId, new SharpPackSerializerContextBuilder().EnableTypeSerialization().Build())));
 if (failures.Count != 0) throw new InvalidOperationException(string.Join("; ", failures));
-Console.WriteLine("Deserialize-only AOT: all twenty-three cases passed.");
+Console.WriteLine("Deserialize-only AOT: all cases passed.");
+
+static T? DeserializeWrapped<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)] T>(
+    byte[] payload, SharpPackSerializerContext? context = null)
+    => context is null
+        ? SharpPackSerializer.Deserialize<T>(payload)
+        : SharpPackSerializer.Deserialize<T>(payload, context);
 static bool Reject(Action action)
 {
     try { action(); return false; }
@@ -86,6 +87,7 @@ void Check(string name, Func<bool> check)
     private static string UnusedPrivateMethod() => "SHARPPACK_UNUSED_PRIVATE_METHOD_SHOULD_BE_TRIMMED_31";
 }
 [SharpPackable] public partial class ContextModel { public int Value { get; set; } }
+[SharpPackable] public partial class WrappedModel { public int Value { get; set; } }
 [SharpPackable] public partial class NestedModel { public NestedItem? Item { get; set; } }
 [SharpPackable] public partial class NestedItem { public int Value { get; set; } }
 [SharpPackable] public partial class ContextNestedModel { public ContextNestedItem? Item { get; set; } }
@@ -159,9 +161,7 @@ namespace CollisionTypes
 
 namespace MetadataNames
 {
-#if !BASELINE_COMPARISON
     [SharpPackable] public partial class KeywordParameters<@event, @namespace> { public int Value { get; set; } }
-#endif
     public partial class Outer<TOne, TTwo>
     {
         [SharpPackable] public partial class Inner<TThree, TFour> { public int Value { get; set; } }

@@ -5,6 +5,7 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <WarningsAsErrors>$(WarningsAsErrors);IL2091;IL2111</WarningsAsErrors>
 
         <!-- AOT Options -->
         <!-- https://learn.microsoft.com/ja-jp/dotnet/core/deploying/native-aot/ -->
