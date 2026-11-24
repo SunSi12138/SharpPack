@@ -1,0 +1,4 @@
+src/SharpPack.Core/FormatterResolver.WellKnownTypes.cs text eol=lf
+src/SharpPack.Core/Formatters/TupleFormatter.cs text eol=lf
+src/SharpPack.Core/SharpPackReader.Unmanaged.cs text eol=lf
+src/SharpPack.Core/SharpPackWriter.Unmanaged.cs text eol=lf
