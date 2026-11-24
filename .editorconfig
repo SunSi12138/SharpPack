@@ -17,6 +17,10 @@ indent_size = 4
 charset = utf-8-bom
 end_of_line = unset
 
+[src/SharpPack.Core/{FormatterResolver.WellKnownTypes.cs,Formatters/TupleFormatter.cs,SharpPackReader.Unmanaged.cs,SharpPackWriter.Unmanaged.cs}]
+charset = utf-8
+end_of_line = lf
+
 # Solution files
 [*.{sln,slnx}]
 end_of_line = unset
