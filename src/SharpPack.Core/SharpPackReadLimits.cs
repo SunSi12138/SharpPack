@@ -4,8 +4,7 @@ namespace SharpPack;
 /// Bounds deserialization amplification at aggregate reader boundaries.
 /// </summary>
 /// <remarks>
-/// Limits are inclusive. Zero is the current-compatible sentinel so
-/// default(struct) configuration remains compatible with earlier releases.
+/// Limits are inclusive. Zero selects the default for each limit.
 /// </remarks>
 public readonly record struct SharpPackReadLimits
 {

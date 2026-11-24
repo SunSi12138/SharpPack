@@ -261,17 +261,16 @@ public static partial class SharpPackSerializer
         try
         {
             var maxPayloadBytes = context.MaxPayloadBytes;
-            pendingBuffer = ArrayPool<byte>.Shared.Rent(
-                (int)Math.Min(65536L, (long)maxPayloadBytes + 1));
+            pendingBuffer = ArrayPool<byte>.Shared.Rent(AllowProbeByte(65536, maxPayloadBytes));
             var offset = 0;
             long totalRead = 0;
             while (true)
             {
                 if (offset == pendingBuffer.Length)
                 {
-                    var nextRequest = (int)Math.Min(
+                    var nextRequest = AllowProbeByte(
                         Math.Min(MathEx.NewArrayCapacity(pendingBuffer.Length), MaximumStreamSegmentSize),
-                        (long)maxPayloadBytes - totalRead + 1);
+                        maxPayloadBytes - totalRead);
                     builder.Add(pendingBuffer, returnToPool: true);
                     pendingBuffer = null; // Ownership transferred only after Add succeeds.
                     pendingBuffer = ArrayPool<byte>.Shared.Rent(nextRequest);
@@ -281,9 +280,9 @@ public static partial class SharpPackSerializer
                 // A pool bucket can exceed the requested size. Bound the slice,
                 // including one probe byte to distinguish exact-limit EOF.
                 var read = await stream.ReadAsync(
-                    pendingBuffer.AsMemory(offset, (int)Math.Min(
+                    pendingBuffer.AsMemory(offset, AllowProbeByte(
                         pendingBuffer.Length - offset,
-                        (long)maxPayloadBytes - totalRead + 1)),
+                        maxPayloadBytes - totalRead)),
                     cancellationToken).ConfigureAwait(false);
                 offset += read;
                 totalRead += read;
@@ -324,6 +323,9 @@ public static partial class SharpPackSerializer
                 builder,
                 builderLeaseId);
         }
+
+        static int AllowProbeByte(int bufferLimit, long remainingBudget)
+            => (int)Math.Min(bufferLimit - 1L, remainingBudget) + 1;
     }
 
     /// <summary>

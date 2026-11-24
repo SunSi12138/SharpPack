@@ -40,6 +40,41 @@ public class ReadLimitsBoundaryTest
     }
 
     [Fact]
+    public void SuppliedCollectionLength_HonorsTheLimitWithoutAHeader()
+    {
+        var context = Context();
+        var integers = SharpPackSerializer.Serialize(new[] { 1, 2, 3 });
+        var nodes = SharpPackSerializer.Serialize(new ReadLimitDepthNode[] { new(), new(), new() });
+
+        ReadIntegers(2);
+        ReadNodes(2);
+        Assert.Equal(SharpPackReadLimitKind.CollectionLength,
+            Assert.Throws<SharpPackSerializationException>(() => ReadIntegers(3)).ReadLimitKind);
+        Assert.Equal(SharpPackReadLimitKind.CollectionLength,
+            Assert.Throws<SharpPackSerializationException>(() => ReadNodes(3)).ReadLimitKind);
+
+        void ReadIntegers(int count)
+        {
+            using var state = SharpPackReaderOptionalStatePool.Rent(context);
+            using var reader = new SharpPackReader(integers.AsSpan(sizeof(int)), state);
+            Span<int> destination = default;
+            reader.ReadSpanWithoutReadLengthHeader(count, ref destination);
+            Assert.Equal(new[] { 1, 2 }, destination.ToArray());
+        }
+
+        void ReadNodes(int count)
+        {
+            using var state = SharpPackReaderOptionalStatePool.Rent(context);
+            using var reader = new SharpPackReader(nodes.AsSpan(sizeof(int)), state);
+            Span<ReadLimitDepthNode?> destination = default;
+            reader.ReadPackableSpanWithoutReadLengthHeader(count, ref destination);
+            Assert.Equal(2, destination.Length);
+            Assert.NotNull(destination[0]);
+            Assert.NotNull(destination[1]);
+        }
+    }
+
+    [Fact]
     public void BrotliString_UsesStructuralLength_NotCollectionCardinality()
     {
         var context = new SharpPackSerializerContextBuilder()
@@ -114,13 +149,14 @@ public class ReadLimitsBoundaryTest
     }
 
     [Theory]
+    [InlineData(0)]
     [InlineData(4)]
     [InlineData(int.MaxValue)]
     public async Task UnknownStream_ExactPayloadSucceeds_WithoutProbeOverflow(int maximum)
     {
         using var stream = new ObservedStream(SharpPackSerializer.Serialize(123));
         Assert.Equal(123, await SharpPackSerializer.DeserializeAsync<int>(stream, Context(maximum)));
-        Assert.True(stream.LargestRequest <= Math.Min(65536L, (long)maximum + 1));
+        Assert.True(stream.LargestRequest <= (maximum == 0 ? 65536 : Math.Min(65536L, (long)maximum + 1)));
     }
 
     [Fact]

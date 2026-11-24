@@ -29,8 +29,8 @@ public class SharpPackSerializationException : Exception
     [DoesNotReturn]
     internal static void ThrowReadLimitExceeded(
         SharpPackReadLimitKind boundary,
-        int limit,
-        int actual,
+        long limit,
+        long actual,
         Type? type = null)
     {
         var typeSuffix = type is null

@@ -113,13 +113,7 @@ namespace SharpPack.Formatters
                 value = new T[length];
             }
 
-            var formatter = reader.GetFormatter<T>();
-            for (int i = 0; i < length; i++)
-            {
-                formatter.Deserialize(
-                    ref reader,
-                    ref Unsafe.As<T, T?>(ref value[i]));
-            }
+            reader.ReadElements<T>((T?[])value);
         }
     }
 
@@ -259,7 +253,7 @@ namespace SharpPack.Formatters
             {
                 var memory = array.AsMemory(0, length);
                 var span = memory.Span;
-                reader.ReadSpanWithoutReadLengthHeader(length, ref span);
+                reader.ReadValidatedSpan(length, ref span);
                 value = memory;
             }
             catch
@@ -302,7 +296,7 @@ namespace SharpPack.Formatters
             {
                 var memory = array.AsMemory(0, length);
                 var span = memory.Span;
-                reader.ReadSpanWithoutReadLengthHeader(length, ref span);
+                reader.ReadValidatedSpan(length, ref span);
                 value = memory;
             }
             catch

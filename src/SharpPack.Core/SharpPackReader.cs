@@ -688,11 +688,7 @@ public ref partial struct SharpPackReader
             value = new T?[length];
         }
 
-        var formatter = GetFormatter<T>();
-        for (int i = 0; i < length; i++)
-        {
-            formatter.Deserialize(ref this, ref value[i]);
-        }
+        ReadElements<T>(value);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -722,11 +718,7 @@ public ref partial struct SharpPackReader
             value = new T?[length];
         }
 
-        var formatter = GetFormatter<T>();
-        for (int i = 0; i < length; i++)
-        {
-            formatter.Deserialize(ref this, ref value[i]);
-        }
+        ReadElements(value);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -772,10 +764,7 @@ public ref partial struct SharpPackReader
             value = new T?[length];
         }
 
-        for (int i = 0; i < length; i++)
-        {
-            T.Deserialize(ref this, ref value[i]);
-        }
+        ReadPackableElements<T>(value);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -811,10 +800,7 @@ public ref partial struct SharpPackReader
             value = new T?[length];
         }
 
-        for (int i = 0; i < length; i++)
-        {
-            T.Deserialize(ref this, ref value[i]);
-        }
+        ReadPackableElements(value);
     }
 
     #endregion
@@ -926,6 +912,13 @@ public ref partial struct SharpPackReader
     public void ReadSpanWithoutReadLengthHeader<T>(int length, scoped ref Span<T?> value)
     {
         ValidateLength(length);
+        ThrowIfCollectionLimitExceeded(length);
+        ReadValidatedSpan(length, ref value);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void ReadValidatedSpan<T>(int length, scoped ref Span<T?> value)
+    {
         if (length == 0)
         {
             value = Array.Empty<T?>();
@@ -935,17 +928,8 @@ public ref partial struct SharpPackReader
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
             !HasFormatterOverride<T>())
         {
-            if (value.Length != length)
-            {
-                value = AllocateUninitializedArray<T?>(length);
-            }
-
-            var byteCount = GetUnmanagedByteCount<T>(length);
-            ref var src = ref GetSpanReference(byteCount);
-            ref var dest = ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(value)!);
-            Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);
-
-            AdvanceWithinSpan(byteCount);
+            int byteCount = GetValidatedUnmanagedByteCount<T>(length);
+            DangerousReadUnmanagedSpanWithoutReadLengthHeader(length, byteCount, ref value);
         }
         else
         {
@@ -954,11 +938,7 @@ public ref partial struct SharpPackReader
                 value = new T?[length];
             }
 
-            var formatter = GetFormatter<T>();
-            for (int i = 0; i < length; i++)
-            {
-                formatter.Deserialize(ref this, ref value[i]);
-            }
+            ReadElements(value);
         }
     }
 
@@ -1006,9 +986,17 @@ public ref partial struct SharpPackReader
         where T : ISharpPackable<T>
     {
         ValidateLength(length);
+        ThrowIfCollectionLimitExceeded(length);
+        ReadValidatedPackableSpan(length, ref value);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void ReadValidatedPackableSpan<T>(int length, scoped ref Span<T?> value)
+        where T : ISharpPackable<T>
+    {
         if (optionalState.FormatterGraph is not null)
         {
-            ReadSpanWithoutReadLengthHeader(length, ref value);
+            ReadValidatedSpan(length, ref value);
             return;
         }
 
@@ -1020,17 +1008,8 @@ public ref partial struct SharpPackReader
 
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
-            if (value.Length != length)
-            {
-                value = AllocateUninitializedArray<T?>(length);
-            }
-
-            var byteCount = GetUnmanagedByteCount<T>(length);
-            ref var src = ref GetSpanReference(byteCount);
-            ref var dest = ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(value)!);
-            Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);
-
-            AdvanceWithinSpan(byteCount);
+            int byteCount = GetValidatedUnmanagedByteCount<T>(length);
+            DangerousReadUnmanagedSpanWithoutReadLengthHeader(length, byteCount, ref value);
         }
         else
         {
@@ -1039,10 +1018,41 @@ public ref partial struct SharpPackReader
                 value = new T?[length];
             }
 
-            for (int i = 0; i < length; i++)
+            ReadPackableElements(value);
+        }
+    }
+
+    // A direct element loop enters one shared depth scope, not one per item.
+    internal void ReadElements<T>(scoped Span<T?> values)
+    {
+        EnterDepth<T>();
+        try
+        {
+            var formatter = GetFormatter<T>();
+            foreach (ref var value in values)
             {
-                T.Deserialize(ref this, ref value[i]);
+                formatter.Deserialize(ref this, ref value);
             }
+        }
+        finally
+        {
+            ExitDepth();
+        }
+    }
+
+    void ReadPackableElements<T>(scoped Span<T?> values) where T : ISharpPackable<T>
+    {
+        EnterDepth<T>();
+        try
+        {
+            foreach (ref var value in values)
+            {
+                T.Deserialize(ref this, ref value);
+            }
+        }
+        finally
+        {
+            ExitDepth();
         }
     }
 
@@ -1118,7 +1128,7 @@ public ref partial struct SharpPackReader
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    void EnterDepth<T>()
+    internal void EnterDepth<T>()
     {
         depth++;
         if (depth > maxDepth)
@@ -1127,8 +1137,11 @@ public ref partial struct SharpPackReader
             SharpPackSerializationException.ThrowReadLimitExceeded(
                 SharpPackReadLimitKind.Depth,
                 maxDepth,
-                maxDepth + 1,
+                (long)maxDepth + 1,
                 typeof(T));
         }
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void ExitDepth() => depth--;
 }

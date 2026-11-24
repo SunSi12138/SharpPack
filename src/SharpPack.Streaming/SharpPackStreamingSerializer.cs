@@ -76,7 +76,7 @@ public static class SharpPackStreamingSerializer
     {
         ArgumentNullException.ThrowIfNull(pipeReader);
         ArgumentOutOfRangeException.ThrowIfNegative(payloadLength);
-        ThrowIfPayloadLimitExceeded(payloadLength, context);
+        SharpPackSerializer.EnsurePayloadWithinLimit(payloadLength, context);
 
         var result = await pipeReader
             .ReadAtLeastAsync(payloadLength, cancellationToken)
@@ -302,21 +302,13 @@ public static class SharpPackStreamingSerializer
         }
 
         var payloadLength = (int)payloadLengthValue;
-        var maxPayloadBytes = GetMaxPayloadBytes(context);
         var effectiveMaxFrameLength = Math.Min(
             maxFrameLength,
-            maxPayloadBytes);
+            context?.MaxPayloadBytes ?? long.MaxValue);
         if (payloadLength > effectiveMaxFrameLength)
         {
             pipeReader.AdvanceTo(buffer.Start, headerReader.Position);
-            if (payloadLength > maxPayloadBytes)
-            {
-                SharpPackSerializationException.ThrowReadLimitExceeded(
-                    SharpPackReadLimitKind.PayloadBytes,
-                    maxPayloadBytes,
-                    payloadLength);
-            }
-
+            SharpPackSerializer.EnsurePayloadWithinLimit(payloadLength, context);
             throw new SharpPackSerializationException(
                 $"The frame payload length {payloadLength} exceeds the configured maximum " +
                 $"{effectiveMaxFrameLength}.");
@@ -426,23 +418,6 @@ public static class SharpPackStreamingSerializer
             {
                 ArrayPool<byte>.Shared.Return(rentedPayload);
             }
-        }
-    }
-
-    static int GetMaxPayloadBytes(SharpPackSerializerContext? context)
-        => context?.MaxPayloadBytes ?? int.MaxValue;
-
-    static void ThrowIfPayloadLimitExceeded(
-        int payloadLength,
-        SharpPackSerializerContext? context)
-    {
-        var maxPayloadBytes = GetMaxPayloadBytes(context);
-        if (payloadLength > maxPayloadBytes)
-        {
-            SharpPackSerializationException.ThrowReadLimitExceeded(
-                SharpPackReadLimitKind.PayloadBytes,
-                maxPayloadBytes,
-                payloadLength);
         }
     }
 
@@ -759,15 +734,21 @@ public static class SharpPackStreamingSerializer
                     continue;
                 }
 
-                ReadCollectionHeader(
-                    buffer,
-                    state,
-                    out remain);
-                parseStart = buffer.GetPosition(4);
-                if (remain > 0)
+                var headerEnd = buffer.GetPosition(sizeof(int));
+                try
                 {
-                    itemBuffer.EnsureCapacity(Math.Min(remain, 256));
+                    ReadCollectionHeader(buffer, state, out remain);
+                    if (remain > 0)
+                    {
+                        itemBuffer.EnsureCapacity(Math.Min(remain, 256));
+                    }
                 }
+                catch
+                {
+                    pipeReader.AdvanceTo(buffer.Start, headerEnd);
+                    throw;
+                }
+                parseStart = headerEnd;
             }
 
             if (remain == 0)

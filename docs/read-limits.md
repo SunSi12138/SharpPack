@@ -18,16 +18,18 @@ var context = new SharpPackSerializerContext(
     });
 ```
 
-`MaxDepth` is inclusive. The current-compatible default is 999, matching the
-historical reader behavior that rejected depth 1000. Collection and reference
-limits default to `int.MaxValue`. Zero is the compatibility sentinel for these
-settings, so `default(SharpPackSerializerConfiguration)` continues to behave
-like earlier releases.
+`MaxDepth` is inclusive and defaults to 999. It counts active reader scopes,
+not the total number of values: direct reads of non-empty array and list
+elements share one scope for all siblings. The default retains the historical
+cutoff and now applies it to optimized collection paths that previously did not
+count their element depth. Raw unmanaged copies do not add a scope. Collection
+and reference limits default to `int.MaxValue`; zero selects the default.
 
 `MaxCollectionLength` is checked after structural header validation and before
 SharpPack allocates or grows the corresponding collection. Specialized array,
 multidimensional-array, generated, BitArray logical length, compressed BitPack,
-public Dangerous collection-header, and legacy Streaming
+public headerless reads with a caller-supplied length, public Dangerous
+collection-header, and legacy Streaming
 collection paths honor the same effective limit. String lengths are
 intentionally not governed by this setting.
 
@@ -36,7 +38,8 @@ about to insert a new reference-table entry. Ordinary payloads do not pay this
 cost.
 
 `MaxPayloadBytes` is a top-level operation/transport boundary rather than
-reader state. In-memory context overloads check the supplied buffer once.
+reader state. Zero leaves the payload size unlimited. In-memory context
+overloads check the supplied buffer once.
 Length-delimited Stream and Pipe APIs reject an oversized declared length before
 renting or waiting for the payload. Length-prefixed Streaming combines its
 existing per-call `maxFrameLength` with the context limit and uses the smaller

@@ -121,15 +121,31 @@ namespace SharpPack.Formatters
                 value.Clear();
                 value.EnsureCapacity(
                     FormatterValidation.MaximumInitialCollectionCapacity);
-                for (int i = 0; i < length; i++)
-                {
-                    value.Add(reader.ReadValue<T>());
-                }
+                ReadGrowingList(ref reader, value, length);
                 return;
             }
 
             var span = CollectionsMarshalEx.CreateSpan(value, length);
-            reader.ReadPackableSpanWithoutReadLengthHeader(length, ref span);
+            reader.ReadValidatedPackableSpan(length, ref span);
+        }
+
+        internal static void ReadGrowingList<T>(ref SharpPackReader reader, List<T?> value, int length)
+        {
+            reader.EnterDepth<T>();
+            try
+            {
+                var formatter = reader.GetFormatter<T>();
+                for (int i = 0; i < length; i++)
+                {
+                    T? item = default;
+                    formatter.Deserialize(ref reader, ref item);
+                    value.Add(item);
+                }
+            }
+            finally
+            {
+                reader.ExitDepth();
+            }
         }
     }
 
@@ -179,18 +195,12 @@ namespace SharpPack.Formatters
                 value.Clear();
                 value.EnsureCapacity(
                     FormatterValidation.MaximumInitialCollectionCapacity);
-                var largeFormatter = reader.GetFormatter<T?>();
-                for (int i = 0; i < length; i++)
-                {
-                    T? item = default;
-                    largeFormatter.Deserialize(ref reader, ref item);
-                    value.Add(item);
-                }
+                ListFormatter.ReadGrowingList(ref reader, value, length);
                 return;
             }
 
             var span = CollectionsMarshalEx.CreateSpan(value, length);
-            reader.ReadSpanWithoutReadLengthHeader(length, ref span);
+            reader.ReadValidatedSpan(length, ref span);
         }
     }
 
@@ -241,21 +251,14 @@ namespace SharpPack.Formatters
                 value.Clear();
                 value.EnsureCapacity(
                     FormatterValidation.MaximumInitialCollectionCapacity);
-                var largeFormatter = reader.GetFormatter<T?>();
-                for (int i = 0; i < length; i++)
-                {
-                    T? item = default;
-                    largeFormatter.Deserialize(ref reader, ref item);
-                    value.Add(item);
-                }
+                ListFormatter.ReadGrowingList(ref reader, value, length);
                 return;
             }
 
             var span = CollectionsMarshalEx.CreateSpan(value, length);
-            var formatter = reader.GetFormatter<T>();
-            for (int i = 0; i < span.Length; i++)
+            if (!span.IsEmpty)
             {
-                formatter.Deserialize(ref reader, ref span[i]);
+                reader.ReadElements(span);
             }
         }
     }

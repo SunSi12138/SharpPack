@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using SharpPack.Compression;
 
@@ -31,6 +32,21 @@ public class ReadLimitsTest
         var sequenceFailure = () =>
             SharpPackSerializer.Deserialize<int[]>(sequence, tooSmall);
         sequenceFailure.Should().Throw<SharpPackSerializationException>();
+    }
+
+    [Fact]
+    public void PayloadLimit_DefaultDoesNotCapTheLengthOfASegmentedBuffer()
+    {
+        var prefix = SharpPackSerializer.Serialize(42);
+        var trailingSegment = new byte[1024 * 1024];
+        var sequence = ReadOnlySequenceBuilder.Create(
+            Enumerable.Repeat(trailingSegment, 2048).Prepend(prefix).ToArray());
+        Assert.True(sequence.Length > int.MaxValue);
+
+        Assert.Equal(42, SharpPackSerializer.Deserialize<int>(sequence, new SharpPackSerializerContext()));
+        var error = Assert.Throws<SharpPackSerializationException>(() =>
+            SharpPackSerializer.Deserialize<int>(sequence, CreateContext(maxPayloadBytes: int.MaxValue)));
+        Assert.Equal(SharpPackReadLimitKind.PayloadBytes, error.ReadLimitKind);
     }
 
     [Fact]
@@ -113,6 +129,43 @@ public class ReadLimitsTest
 
         deserialize.Should().Throw<SharpPackSerializationException>()
             .Which.ReadLimitKind.Should().Be(SharpPackReadLimitKind.Depth);
+    }
+
+    [Fact]
+    public void DepthLimit_CountsGeneratedArrayElementScopes()
+    {
+        var value = new ReadLimitArrayNode { Children = [new() { Children = [new()] }] };
+        var payload = SharpPackSerializer.Serialize(value);
+
+        SharpPackSerializer.Deserialize<ReadLimitArrayNode>(payload, AtDepth(3))
+            .Should().BeEquivalentTo(value);
+        var error = Assert.Throws<SharpPackSerializationException>(() =>
+            SharpPackSerializer.Deserialize<ReadLimitArrayNode>(payload, AtDepth(2)));
+        Assert.Equal(SharpPackReadLimitKind.Depth, error.ReadLimitKind);
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(4097, false)] // Above the capped initial list capacity.
+    [InlineData(4097, true)]
+    public void DepthLimit_CountsGeneratedListElementsIndependentlyOfCapacity(int count, bool preallocated)
+    {
+        var value = new ReadLimitListNode { Children = Enumerable.Repeat<ReadLimitListNode?>(new(), count).ToList() };
+        var payload = SharpPackSerializer.Serialize(value);
+        var existing = preallocated ? new List<ReadLimitListNode?>(count) : null;
+        ReadLimitListNode? destination = preallocated ? new() { Children = existing } : null;
+
+        SharpPackSerializer.Deserialize(payload, ref destination, AtDepth(2));
+        Assert.Equal(count, destination!.Children!.Count);
+        if (preallocated)
+        {
+            Assert.Same(existing, destination.Children);
+        }
+
+        destination = preallocated ? new() { Children = new(count) } : null;
+        var error = Assert.Throws<SharpPackSerializationException>(() =>
+            SharpPackSerializer.Deserialize(payload, ref destination, AtDepth(1)));
+        Assert.Equal(SharpPackReadLimitKind.Depth, error.ReadLimitKind);
     }
 
     [Fact]
@@ -303,6 +356,9 @@ public class ReadLimitsTest
             defaultStructContext).Should().BeEquivalentTo(value);
     }
 
+    static SharpPackSerializerContext AtDepth(int maxDepth)
+        => CreateContext(readLimits: new SharpPackReadLimits { MaxDepth = maxDepth });
+
     static SharpPackSerializerContext CreateContext(
         SharpPackReadLimits? readLimits = null,
         int maxPayloadBytes = int.MaxValue)
@@ -346,6 +402,18 @@ public class ReadLimitsTest
 public partial class ReadLimitDepthNode
 {
     public ReadLimitDepthNode? Next { get; set; }
+}
+
+[SharpPackable]
+public partial class ReadLimitArrayNode
+{
+    public ReadLimitArrayNode?[]? Children { get; set; }
+}
+
+[SharpPackable]
+public partial class ReadLimitListNode
+{
+    public List<ReadLimitListNode?>? Children { get; set; }
 }
 
 [SharpPackable]

@@ -362,15 +362,13 @@ public static partial class SharpPackSerializer
         long payloadLength,
         SharpPackSerializerContext? context)
     {
-        var maxPayloadBytes = context?.MaxPayloadBytes ?? int.MaxValue;
+        var maxPayloadBytes = context?.MaxPayloadBytes ?? long.MaxValue;
         if (payloadLength > maxPayloadBytes)
         {
             SharpPackSerializationException.ThrowReadLimitExceeded(
                 SharpPackReadLimitKind.PayloadBytes,
                 maxPayloadBytes,
-                payloadLength > int.MaxValue
-                    ? int.MaxValue
-                    : (int)payloadLength);
+                payloadLength);
         }
     }
 
