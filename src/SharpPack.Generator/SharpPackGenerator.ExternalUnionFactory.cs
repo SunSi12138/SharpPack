@@ -151,7 +151,7 @@ partial class SharpPackGenerator
             sb.AppendLine("{");
         }
 
-        sb.AppendLine("[global::SharpPack.Internal.Preserve]");
+        sb.AppendLine("[global::SharpPack.CompilerServices.Preserve]");
         sb.AppendLine(TypeMeta.EmitPartialTypeDeclaration(target) + " :");
         sb.AppendLine(
             $"    global::SharpPack.ISharpPackFormatterFactory<{targetType}>");

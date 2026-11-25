@@ -101,6 +101,28 @@ assemblies. Compatibility with an older standalone generator depends on the
 specific package pair and deployment mode; trimmed deployments must also
 follow the AOT migration below.
 
+## Generated dependency inventory
+
+`eng/baselines/generated/runtime-dependencies.txt` lists the Core types and
+members the generator binds in the ABI fixtures. It records exact symbol IDs,
+including generic arities, and scope details such as `scoped`, `UnscopedRef`,
+ref-like types, and ref returns. Update this manifest with the public API and
+generated-source baselines when intentionally changing a runtime dependency.
+
+The `SharpPack.CompilerServices` namespace owns new generated-only contracts,
+including the version marker and the generated preservation attribute. The
+inventory also identifies existing user APIs and legacy generated dependencies.
+The existing exact and pooled buffer types retain their signatures and emitted
+call paths; the handshake does not require a runtime wrapper or a buffer rewrite.
+Other `SharpPack.Internal` references fail the inventory check.
+
+`Generated ABI packages` builds isolated package consumers for the current
+aggregate package and split Core/Generator packages, then publishes and runs
+them under NativeAOT. It also builds the generator from the `v1.1.0` source tag
+against the current runtime for an untrimmed round trip, and expects
+`SHARPPACK043` from the current generator against that tag's older runtime.
+This is a tested package pair, not a compatibility promise for all versions.
+
 ## Deserialize-only NativeAOT roots
 
 Generic deserialization retains `NonPublicConstructors`, including generated
