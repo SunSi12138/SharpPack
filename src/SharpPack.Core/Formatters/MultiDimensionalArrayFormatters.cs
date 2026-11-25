@@ -78,6 +78,9 @@ public sealed class TwoDimensionalArrayFormatter<T> : SharpPackFormatter<T?[,]>
             iLength,
             jLength);
 
+        var unmanaged = !RuntimeHelpers.IsReferenceOrContainsReferences<T?>() && !reader.HasFormatterOverride<T>();
+        using var elements = reader.EnterCollectionDepth<T>(elementCount != 0 && !unmanaged);
+
         if (value != null && value.GetLength(0) == iLength && value.GetLength(1) == jLength && value.Length == length)
         {
             // allow overwrite
@@ -87,8 +90,7 @@ public sealed class TwoDimensionalArrayFormatter<T> : SharpPackFormatter<T?[,]>
             value = new T[iLength, jLength];
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>() &&
-            !reader.HasFormatterOverride<T>())
+        if (unmanaged)
         {
             var byteCount = FormatterValidation.ByteCount<T>(elementCount);
             ref var dest = ref MemoryMarshal.GetArrayDataReference(value);
@@ -196,6 +198,9 @@ public sealed class ThreeDimensionalArrayFormatter<T> : SharpPackFormatter<T?[,,
             jLength,
             kLength);
 
+        var unmanaged = !RuntimeHelpers.IsReferenceOrContainsReferences<T?>() && !reader.HasFormatterOverride<T>();
+        using var elements = reader.EnterCollectionDepth<T>(elementCount != 0 && !unmanaged);
+
         if (value != null && value.GetLength(0) == iLength && value.GetLength(1) == jLength && value.GetLength(2) == kLength && value.Length == length)
         {
             // allow overwrite
@@ -205,8 +210,7 @@ public sealed class ThreeDimensionalArrayFormatter<T> : SharpPackFormatter<T?[,,
             value = new T[iLength, jLength, kLength];
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>() &&
-            !reader.HasFormatterOverride<T>())
+        if (unmanaged)
         {
             var byteCount = FormatterValidation.ByteCount<T>(elementCount);
             ref var dest = ref MemoryMarshal.GetArrayDataReference(value);
@@ -323,6 +327,9 @@ public sealed class FourDimensionalArrayFormatter<T> : SharpPackFormatter<T?[,,,
             kLength,
             lLength);
 
+        var unmanaged = !RuntimeHelpers.IsReferenceOrContainsReferences<T?>() && !reader.HasFormatterOverride<T>();
+        using var elements = reader.EnterCollectionDepth<T>(elementCount != 0 && !unmanaged);
+
         if (value != null && value.GetLength(0) == iLength && value.GetLength(1) == jLength && value.GetLength(2) == kLength && value.GetLength(3) == lLength && value.Length == length)
         {
             // allow overwrite
@@ -332,8 +339,7 @@ public sealed class FourDimensionalArrayFormatter<T> : SharpPackFormatter<T?[,,,
             value = new T[iLength, jLength, kLength, lLength];
         }
 
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T?>() &&
-            !reader.HasFormatterOverride<T>())
+        if (unmanaged)
         {
             var byteCount = FormatterValidation.ByteCount<T>(elementCount);
             ref var dest = ref MemoryMarshal.GetArrayDataReference(value);

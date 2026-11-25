@@ -19,13 +19,15 @@ var context = new SharpPackSerializerContext(
 ```
 
 `MaxDepth` is inclusive and defaults to 999. It counts active reader scopes,
-not the total number of values: direct reads of non-empty arrays, lists, and
-generated collections share one element scope for all siblings. The default
-retains the historical cutoff and now applies it to optimized collection paths
-that previously did not count their element depth. An inner reader created by a
-Brotli formatter continues with the enclosing depth and limits. Dedicated raw unmanaged
-paths do not add a scope. Collection and reference limits default to `int.MaxValue`;
-zero selects the default.
+not the total number of values. A nonempty collection that dispatches element
+formatters enters one scope before it allocates or changes the destination.
+Siblings share that scope, including dictionary keys and values and the
+single-item and multi-item paths of immutable collections. Empty collections
+and dedicated raw copies do not add an element scope. Brotli inner readers
+inherit the enclosing depth and limits. The numeric cutoff is unchanged;
+collections whose element dispatch previously went uncounted now contribute
+to it. Collection and reference limits default to `int.MaxValue`; zero selects
+the default.
 
 `MaxCollectionLength` is checked after structural header validation and before
 SharpPack allocates or grows the corresponding collection. Specialized array,

@@ -62,15 +62,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
-            var byteCount = reader.GetValidatedUnmanagedByteCount<T>(
-                length);
-            value ??= new List<T>(
-                FormatterValidation.InitialCapacity(length));
-            var span = CollectionsMarshalEx.CreateSpan(value, length);
-            reader.DangerousReadUnmanagedSpanWithoutReadLengthHeader(
-                length,
-                byteCount,
-                ref span);
+            ReadUnmanagedPayload(ref reader, length, ref value);
         }
 
         [Preserve]
@@ -115,13 +107,19 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() && !reader.HasFormatterOverride<T>())
+            {
+                ReadUnmanagedPayload(ref reader, length, ref value);
+                return;
+            }
+
             reader.EnterDepth<T>();
             try
             {
                 value ??= new List<T?>(FormatterValidation.InitialCapacity(length));
                 if (!TryReadGrowingList(ref reader, value, length))
                 {
-                    reader.ReadPreparedPackableListSpan(CollectionsMarshalEx.CreateSpan(value, length));
+                    reader.ReadPackableListElements(CollectionsMarshalEx.CreateSpan(value, length));
                 }
             }
             finally
@@ -144,6 +142,12 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            if (allowRawCopy && !RuntimeHelpers.IsReferenceOrContainsReferences<T>() && !reader.HasFormatterOverride<T>())
+            {
+                ReadUnmanagedPayload(ref reader, length, ref value);
+                return;
+            }
+
             reader.EnterDepth<T>();
             try
             {
@@ -153,20 +157,20 @@ namespace SharpPack.Formatters
                     return;
                 }
 
-                var span = CollectionsMarshalEx.CreateSpan(value, length);
-                if (allowRawCopy)
-                {
-                    reader.ReadPreparedListSpan(span);
-                }
-                else
-                {
-                    reader.ReadElements(span);
-                }
+                reader.ReadElements(CollectionsMarshalEx.CreateSpan(value, length));
             }
             finally
             {
                 reader.ExitDepth();
             }
+        }
+
+        internal static void ReadUnmanagedPayload<T>(ref SharpPackReader reader, int length, scoped ref List<T?>? value)
+        {
+            var byteCount = reader.GetValidatedUnmanagedByteCount<T>(length);
+            value ??= new List<T?>(FormatterValidation.InitialCapacity(length));
+            var span = CollectionsMarshalEx.CreateSpan(value, length);
+            reader.DangerousReadUnmanagedSpanWithoutReadLengthHeader(length, byteCount, ref span);
         }
 
         static bool TryReadGrowingList<T>(ref SharpPackReader reader, List<T?> value, int length)
@@ -294,15 +298,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
-            var byteCount = reader.GetValidatedUnmanagedByteCount<T>(
-                length);
-            value ??= new List<T?>(
-                FormatterValidation.InitialCapacity(length));
-            var span = CollectionsMarshalEx.CreateSpan(value, length);
-            reader.DangerousReadUnmanagedSpanWithoutReadLengthHeader(
-                length,
-                byteCount,
-                ref span);
+            ListFormatter.ReadUnmanagedPayload(ref reader, length, ref value);
         }
     }
 
@@ -330,6 +326,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>(length != 0);
             if (value == null)
             {
                 value = new Stack<T?>(
@@ -382,6 +379,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>(length != 0);
             if (value == null)
             {
                 value = new Queue<T?>(
@@ -434,6 +432,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>(length != 0);
             if (value == null)
             {
                 value = new LinkedList<T?>();
@@ -495,6 +494,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>(length != 0);
             if (value == null)
             {
                 value = new HashSet<T?>(
@@ -558,6 +558,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>(length != 0);
             if (value == null)
             {
                 value = new SortedSet<T?>(comparer);
@@ -609,6 +610,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<(TElement, TPriority)>(length != 0);
             if (value == null)
             {
                 value = new PriorityQueue<TElement?, TPriority?>(
@@ -660,6 +662,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>(length != 0);
             if (value == null)
             {
                 value = new Collection<T?>();
@@ -709,6 +712,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>(length != 0);
             if (value == null)
             {
                 value = new ObservableCollection<T?>();
@@ -766,6 +770,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>(length != 0);
             if (value == null)
             {
                 value = new ConcurrentQueue<T?>();
@@ -831,6 +836,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>(length != 0);
             if (value == null)
             {
                 value = new ConcurrentStack<T?>();
@@ -885,6 +891,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>(length != 0);
             if (value == null)
             {
                 value = new ConcurrentBag<T?>();
@@ -949,6 +956,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var entries = KeyValuePairFormatter.EnterReadScope<TKey, TValue>(ref reader, length, out var unmanagedEntries);
             if (value == null)
             {
                 value = new Dictionary<TKey, TValue?>(
@@ -964,7 +972,7 @@ namespace SharpPack.Formatters
             var valueFormatter = reader.GetFormatter<TValue>();
             for (int i = 0; i < length; i++)
             {
-                KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
+                KeyValuePairFormatter.DeserializeEntry(keyFormatter, valueFormatter, ref reader, unmanagedEntries, out var k, out var v);
                 value.Add(k!, v);
             }
         }
@@ -1015,6 +1023,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var entries = KeyValuePairFormatter.EnterReadScope<TKey, TValue>(ref reader, length, out var unmanagedEntries);
             if (value == null)
             {
                 value = new SortedDictionary<TKey, TValue?>(comparer);
@@ -1028,7 +1037,7 @@ namespace SharpPack.Formatters
             var valueFormatter = reader.GetFormatter<TValue>();
             for (int i = 0; i < length; i++)
             {
-                KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
+                KeyValuePairFormatter.DeserializeEntry(keyFormatter, valueFormatter, ref reader, unmanagedEntries, out var k, out var v);
                 value.Add(k!, v);
             }
         }
@@ -1079,6 +1088,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var entries = KeyValuePairFormatter.EnterReadScope<TKey, TValue>(ref reader, length, out var unmanagedEntries);
             if (value == null)
             {
                 value = new SortedList<TKey, TValue?>(
@@ -1094,7 +1104,7 @@ namespace SharpPack.Formatters
             var valueFormatter = reader.GetFormatter<TValue>();
             for (int i = 0; i < length; i++)
             {
-                KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
+                KeyValuePairFormatter.DeserializeEntry(keyFormatter, valueFormatter, ref reader, unmanagedEntries, out var k, out var v);
                 value.Add(k!, v);
             }
         }
@@ -1150,6 +1160,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var entries = KeyValuePairFormatter.EnterReadScope<TKey, TValue>(ref reader, length, out var unmanagedEntries);
             if (value == null)
             {
                 value = length == 0
@@ -1168,7 +1179,7 @@ namespace SharpPack.Formatters
             var valueFormatter = reader.GetFormatter<TValue>();
             for (int i = 0; i < length; i++)
             {
-                KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
+                KeyValuePairFormatter.DeserializeEntry(keyFormatter, valueFormatter, ref reader, unmanagedEntries, out var k, out var v);
                 value.TryAdd(k!, v);
             }
         }
@@ -1278,6 +1289,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>(length != 0);
             value = new BlockingCollection<T?>();
 
             var formatter = reader.GetFormatter<T?>();

@@ -174,23 +174,16 @@ public abstract class GenericDictionaryFormatterBase<TDictionary, TKey, TValue> 
             return;
         }
 
-        reader.EnterDepth<KeyValuePair<TKey, TValue>>();
-        try
+        using var entries = KeyValuePairFormatter.EnterReadScope<TKey, TValue>(ref reader, length, out var unmanagedEntries);
+        var keyFormatter = reader.GetFormatter<TKey>();
+        var valueFormatter = reader.GetFormatter<TValue>();
+        var dict = CreateDictionary();
+        for (int i = 0; i < length; i++)
         {
-            var keyFormatter = reader.GetFormatter<TKey>();
-            var valueFormatter = reader.GetFormatter<TValue>();
-            var dict = CreateDictionary();
-            for (int i = 0; i < length; i++)
-            {
-                KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
-                dict.Add(k!, v);
-            }
-            value = dict;
+            KeyValuePairFormatter.DeserializeEntry(keyFormatter, valueFormatter, ref reader, unmanagedEntries, out var k, out var v);
+            dict.Add(k!, v);
         }
-        finally
-        {
-            reader.ExitDepth();
-        }
+        value = dict;
     }
 }
 

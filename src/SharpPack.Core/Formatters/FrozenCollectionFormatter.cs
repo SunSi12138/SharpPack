@@ -55,6 +55,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var entries = KeyValuePairFormatter.EnterReadScope<TKey, TValue>(ref reader, length, out var unmanagedEntries);
             var dict = new Dictionary<TKey, TValue?>(
                 FormatterValidation.InitialCapacity(length),
                 equalityComparer);
@@ -63,7 +64,7 @@ namespace SharpPack.Formatters
             var valueFormatter = reader.GetFormatter<TValue>();
             for (var i = 0; i < length; i++)
             {
-                KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
+                KeyValuePairFormatter.DeserializeEntry(keyFormatter, valueFormatter, ref reader, unmanagedEntries, out var k, out var v);
                 dict.Add(k!, v);
             }
             value = dict.ToFrozenDictionary(equalityComparer);
@@ -110,6 +111,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>(length != 0);
             var set = new HashSet<T>(
                 FormatterValidation.InitialCapacity(length),
                 equalityComparer);

@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -1089,27 +1090,12 @@ public ref partial struct SharpPackReader
         }
     }
 
-    // List callers have validated the length and entered the element scope
-    // before preparing this span.
-    internal void ReadPreparedListSpan<T>(scoped Span<T?> values)
+    // The list caller has already entered the depth scope and taken care of raw copies.
+    internal void ReadPackableListElements<T>(scoped Span<T?> values) where T : ISharpPackable<T>
     {
-        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() &&
-            !HasFormatterOverride<T>())
-        {
-            int byteCount = GetValidatedUnmanagedByteCount<T>(values.Length);
-            ReadUnmanagedSpanPayload(byteCount, values);
-        }
-        else
+        if (optionalState.FormatterGraph is not null)
         {
             ReadElements(values);
-        }
-    }
-
-    internal void ReadPreparedPackableListSpan<T>(scoped Span<T?> values) where T : ISharpPackable<T>
-    {
-        if (optionalState.FormatterGraph is not null || !RuntimeHelpers.IsReferenceOrContainsReferences<T>())
-        {
-            ReadPreparedListSpan(values);
         }
         else
         {
@@ -1223,4 +1209,33 @@ public ref partial struct SharpPackReader
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void ExitDepth() => depth--;
+
+    // Built-in collection formatters enter once before dispatching their
+    // elements. Empty collections and raw copies do not enter this scope.
+    [UnscopedRef]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal CollectionDepthScope EnterCollectionDepth<T>(bool dispatchesElements = true)
+    {
+        if (!dispatchesElements)
+        {
+            return default;
+        }
+
+        EnterDepth<T>();
+        return new(ref depth);
+    }
+
+    internal readonly ref struct CollectionDepthScope(ref int depth)
+    {
+        readonly ref int depth = ref depth;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Dispose()
+        {
+            if (!Unsafe.IsNullRef(ref depth))
+            {
+                depth--;
+            }
+        }
+    }
 }
