@@ -17,13 +17,18 @@ internal sealed record ContextDependencySet(
     EquatableArray<string> FactoryLookupTypes,
     bool HasOverridableWireMembers);
 
+internal sealed record AotRootSet(
+    EquatableArray<AotFactoryRoot> Factories,
+    EquatableArray<string> ClosedFormatters);
+
 internal sealed record SerializationPlan(
     TypeShape Shape,
     RootFastPath RootFastPath,
     EquatableArray<WireSlot> WireSlots,
     EquatableArray<ScalarBatch> ScalarBatches,
     ObjectWriteStrategy ObjectWriteStrategy,
-    ContextDependencySet ContextDependencies);
+    ContextDependencySet ContextDependencies,
+    AotRootSet AotRoots);
 
 internal static class SerializationPlanner
 {
@@ -34,7 +39,18 @@ internal static class SerializationPlanner
         var slots = PlanWireSlots(shape);
         var kinds = slots.Select(slot => slot.DeclaredMemberIndex is int i ? shape.Members[i].Kind : MemberKind.Blank).ToArray();
         return new(shape, ChooseRootFastPath(shape), slots, PlanScalarBatches(kinds),
-            ChooseObjectWriteStrategy(shape, kinds), PlanContextDependencies(shape, slots));
+            ChooseObjectWriteStrategy(shape, kinds), PlanContextDependencies(shape, slots),
+            PlanAotRoots(shape.AotDependencies));
+    }
+
+    static AotRootSet PlanAotRoots(AotDependencyFacts dependencies)
+    {
+        var factories = new SortedDictionary<string, AotFactoryRoot>(StringComparer.Ordinal);
+        foreach (var factory in dependencies.Factories)
+            factories[factory.TypeName] = factory;
+        return new(
+            new EquatableArray<AotFactoryRoot>(factories.Values),
+            new EquatableArray<string>(new SortedSet<string>(dependencies.ClosedFormatters, StringComparer.Ordinal)));
     }
 
     static ContextDependencySet PlanContextDependencies(TypeShape shape, EquatableArray<WireSlot> slots)
