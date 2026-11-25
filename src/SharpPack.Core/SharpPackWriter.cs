@@ -463,13 +463,16 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         try
         {
             var formatter = GetFormatter<T>();
-            if (RuntimeFeature.IsDynamicCodeSupported)
+            if (!RuntimeFeature.IsDynamicCodeSupported &&
+                typeof(TBufferWriter) == typeof(ReusableLinkedArrayBufferWriter) &&
+                formatter is ISharpPackReusableBufferFormatter<T> reusable)
             {
-                formatter.Serialize(ref this, ref Unsafe.AsRef(in value));
+                reusable.Serialize(ref Unsafe.As<SharpPackWriter<TBufferWriter>, SharpPackWriter<ReusableLinkedArrayBufferWriter>>(ref this),
+                    ref Unsafe.AsRef(in value));
             }
             else
             {
-                ((ISharpPackFormatter<T>)formatter).Serialize(ref this, ref Unsafe.AsRef(in value));
+                formatter.Serialize(ref this, ref Unsafe.AsRef(in value));
             }
         }
         finally

@@ -3,6 +3,11 @@ using System.Buffers;
 
 namespace SharpPack;
 
+internal interface ISharpPackReusableBufferFormatter<T>
+{
+    void Serialize(ref SharpPackWriter<ReusableLinkedArrayBufferWriter> writer, scoped ref T? value);
+}
+
 [Preserve]
 public interface ISharpPackFormatter<T>
 {
