@@ -86,13 +86,29 @@ if (exactRoundTrip is not
         "The generated exact-size serializer failed under NativeAOT.");
 }
 
+Console.WriteLine("Checking ordinary circular reference handling under NativeAOT.");
+var mutableCircular = new AotMutableCircularNode { Label = "circular-aot" };
+mutableCircular.Self = mutableCircular;
+var mutablePayload = SharpPackSerializer.Serialize(mutableCircular);
+Console.WriteLine("Ordinary circular serialization passed.");
+var mutableCopy = SharpPackSerializer.Deserialize<AotMutableCircularNode>(mutablePayload);
+if (mutableCopy?.Label != "circular-aot" || !ReferenceEquals(mutableCopy, mutableCopy.Self))
+{
+    throw new InvalidOperationException("Ordinary circular reference identity was lost under NativeAOT.");
+}
+Console.WriteLine("Ordinary circular deserialization passed.");
+
 var circular = new AotCircularNode { Label = "circular-aot" };
 circular.Self = circular;
-var circularRoundTrip = SharpPackSerializer.Deserialize<AotCircularNode>(SharpPackSerializer.Serialize(circular));
+Console.WriteLine("Checking required init circular serialization under NativeAOT.");
+var circularPayload = SharpPackSerializer.Serialize(circular);
+Console.WriteLine("Checking required init circular deserialization under NativeAOT.");
+var circularRoundTrip = SharpPackSerializer.Deserialize<AotCircularNode>(circularPayload);
 if (circularRoundTrip?.Label != "circular-aot" || !ReferenceEquals(circularRoundTrip, circularRoundTrip.Self))
 {
     throw new InvalidOperationException("Circular required init members or reference identity were lost under NativeAOT.");
 }
+Console.WriteLine("Required init circular deserialization passed.");
 
 var unmanagedFormatted = new AotUnmanagedFormatted
 {
@@ -444,6 +460,13 @@ public partial class AotCircularNode
 {
     public required string Label { get; init; }
     public AotCircularNode? Self { get; set; }
+}
+
+[SharpPackable(GenerateType.CircularReference, SerializeLayout.Sequential)]
+public partial class AotMutableCircularNode
+{
+    public string? Label { get; set; }
+    public AotMutableCircularNode? Self { get; set; }
 }
 
 [SharpPackable]
