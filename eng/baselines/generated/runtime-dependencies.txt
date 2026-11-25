@@ -176,7 +176,7 @@ legacy-generated | M:SharpPack.SharpPackSerializationException.ThrowInvalidPrope
 legacy-generated | M:SharpPack.SharpPackSerializationException.ThrowInvalidTag(System.UInt16,System.Type) | parameters=[0:None/None/unscoped-ref=False,1:None/None/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
 legacy-generated | M:SharpPack.SharpPackSerializationException.ThrowNotFoundInUnionType(System.Type,System.Type) | parameters=[0:None/None/unscoped-ref=False,1:None/None/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
 legacy-generated | M:SharpPack.SharpPackSerializationException.ThrowSizeOverflow | parameters=[];return=None;receiver=none;readonly=False;unscoped-ref=False
-user | M:SharpPack.SharpPackSerializer.CreateExactWriter(SharpPack.Internal.SharpPackExactArrayBufferWriter@) | parameters=[0:Ref/None/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
+legacy-generated | M:SharpPack.SharpPackSerializer.CreateExactWriter(SharpPack.Internal.SharpPackExactArrayBufferWriter@) | parameters=[0:Ref/None/unscoped-ref=False];return=None;receiver=none;readonly=False;unscoped-ref=False
 user | M:SharpPack.SharpPackSerializer.PreserveContextFormatterFactory``1 | parameters=[];return=None;receiver=none;readonly=False;unscoped-ref=False
 user | M:SharpPack.SharpPackSerializer.PreserveFormatterFactory``1 | parameters=[];return=None;receiver=none;readonly=False;unscoped-ref=False
 legacy-generated | M:SharpPack.SharpPackSerializerContext.HasFormatterOverrideDependency``1 | parameters=[];return=None;receiver=reference;readonly=False;unscoped-ref=False

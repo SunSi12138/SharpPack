@@ -353,7 +353,7 @@ static class GeneratedCodeDependencyBaseline
             if (type.Name is "ISharpPackContextFormatterFactory" or "ISharpPackContextOverrideFormatter" or
                 "ISharpPackExactSizeSerializable" or "IFixedSizeSharpPackable")
                 return "legacy-generated";
-            if (symbol.Name is "WriteUtf8Exact" or "HasFormatterOverrideDependency" or "HasFormatterOverrides" ||
+            if (symbol.Name is "CreateExactWriter" or "WriteUtf8Exact" or "HasFormatterOverrideDependency" or "HasFormatterOverrides" ||
                 (type.Name == "SharpPackSerializationException" && symbol.Name.StartsWith("Throw", StringComparison.Ordinal)))
                 return "legacy-generated";
             if (type.Name is "ISharpPackable" or "ISharpPackFormatter" or "ISharpPackFormatterFactory" or "SharpPackFormatter" or

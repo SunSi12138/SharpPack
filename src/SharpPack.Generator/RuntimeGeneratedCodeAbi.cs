@@ -10,13 +10,17 @@ internal static class RuntimeGeneratedCodeAbi
     const string ContractMetadataName =
         "SharpPack.CompilerServices.SharpPackGeneratedCodeContract";
 
-    // Resolve through the attribute's assembly, rather than the consumer's
-    // compilation: a same-named consumer type must not override the runtime ABI.
     internal static string? GetUnsupportedVersion(Compilation compilation)
     {
-        var attribute = compilation.GetTypeByMetadataName(
-            SharpPackGenerator.SharpPackableAttributeFullName);
-        var contract = attribute?.ContainingAssembly.GetTypeByMetadataName(ContractMetadataName);
+        // Emission binds to global::SharpPack. An alias-only reference or a
+        // same-named consumer type cannot supply the marker for that runtime.
+        var runtime = compilation.References
+            .Where(static reference => reference.Properties.Aliases.IsDefaultOrEmpty ||
+                reference.Properties.Aliases.Contains("global"))
+            .Select(compilation.GetAssemblyOrModuleSymbol)
+            .OfType<IAssemblySymbol>()
+            .FirstOrDefault(static assembly => assembly.Identity.Name == "SharpPack.Core");
+        var contract = runtime?.GetTypeByMetadataName(ContractMetadataName);
         if (contract is null) return "missing";
 
         var members = contract.GetMembers("Version");

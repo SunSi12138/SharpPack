@@ -90,11 +90,13 @@ accepts ABI 1, identified by
 `SharpPack.CompilerServices.SharpPackGeneratedCodeContract.Version` in Core.
 The value versions the generated-code contract, not NuGet or the wire format.
 
-If a project uses SharpPack generator attributes with an incompatible runtime,
-the generator reports one `SHARPPACK043` on a source declaration and skips
+If a project requests generation with an incompatible runtime, the generator
+reports one `SHARPPACK043` on a source declaration and skips
 generation. The diagnostic shows the detected and required ABI. It reads the
-marker from the runtime assembly, not a consumer-defined type with the same
-name. Projects without SharpPack generator attributes need no runtime marker.
+marker from the global SharpPack.Core reference, not from an alias-only reference
+or a consumer-defined type with the same name. Standalone
+`GenerateType.NoGenerate` contracts and inactive TypeScript output do not
+require the marker.
 
 The handshake does not remove the runtime members used by existing generated
 assemblies. Compatibility with an older standalone generator depends on the

@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
 using SharpPack.Generator;
 using System;
 using System.Collections.Immutable;
@@ -25,6 +26,8 @@ public class RuntimeAbiDiagnosticsTest
         [SharpPackable]
         public partial class Second { public int Value { get; set; } }
         """;
+
+    const string TypeScriptModel = "[GenerateTypeScript] public partial class TypeScriptModel { }";
 
     [Fact]
     public void MatchingRuntime_GeneratesAndCompiles()
@@ -66,12 +69,102 @@ public class RuntimeAbiDiagnosticsTest
         AssertMismatch(output, diagnostics, result, "missing", "UnionFormatter");
     }
 
-    [Fact]
-    public void TypeScriptOnly_ReportsTheSameRuntimeMismatch()
+    [Theory]
+    [InlineData(false, "TypeScriptModel")]
+    [InlineData(true, "First")]
+    public void EnabledTypeScript_ReportsOneMismatchWithoutWritingFiles(bool withCSharp, string identifier)
     {
-        const string source = "using SharpPack; [GenerateTypeScript] public partial class Model { }";
+        var directory = Directory.CreateTempSubdirectory("sharppack-abi-");
+        try
+        {
+            var options = new GeneratorDiagnosticsTest.TypeScriptOptionProvider
+            {
+                ["build_property.SharpPackGenerator_TypeScriptOutputDirectory"] = directory.FullName,
+            };
+            var source = (withCSharp ? Models : "using SharpPack;") + "\n" + TypeScriptModel;
+            var (output, diagnostics, result) = Run(CreateRuntime(null), source, options);
+            AssertMismatch(output, diagnostics, result, "missing", identifier);
+            directory.EnumerateFileSystemInfos().Should().BeEmpty();
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InactiveTypeScript_DoesNotRequireRuntimeAbi(bool designTime)
+    {
+        var options = designTime ? new GeneratorDiagnosticsTest.TypeScriptOptionProvider
+        {
+            ["build_property.DesignTimeBuild"] = "true",
+        } : null;
+        AssertInactive(CreateRuntime(null), "using SharpPack; " + TypeScriptModel, options);
+    }
+
+    [Fact]
+    public void StandaloneNoGenerateContract_DoesNotRequireRuntimeAbi()
+    {
+        const string source = """
+            using SharpPack;
+            [SharpPackable(GenerateType.NoGenerate)]
+            public partial interface IContract { }
+            """;
+        AssertInactive(CreateRuntime(null), source);
+    }
+
+    [Fact]
+    public void SameAssemblyUnion_WithNoGenerateModel_StillRequiresRuntimeAbi()
+    {
+        const string source = """
+            using SharpPack;
+            [SharpPackable(GenerateType.NoGenerate)]
+            [SharpPackUnion(0, typeof(Implementation))]
+            public partial interface IUnion { }
+            public sealed class Implementation : IUnion { }
+            """;
         var (output, diagnostics, result) = Run(CreateRuntime(null), source);
-        AssertMismatch(output, diagnostics, result, "missing", "Model");
+        AssertMismatch(output, diagnostics, result, "missing", "IUnion");
+    }
+
+    [Fact]
+    public void ConsumerAttributeAndMarker_CannotSubstituteForTheReferencedRuntime()
+    {
+        const string source = """
+            using SharpPack;
+            public partial interface IUnion { }
+            [SharpPackUnionFormatter(typeof(IUnion))]
+            public partial class UnionFormatter { }
+            namespace SharpPack
+            {
+                public sealed class SharpPackableAttribute : System.Attribute { }
+            }
+            namespace SharpPack.CompilerServices
+            {
+                public static class SharpPackGeneratedCodeContract
+                {
+                    public const int Version = 1;
+                }
+            }
+            """;
+        var (output, diagnostics, result) = Run(CreateRuntime(null), source);
+        AssertMismatch(output, diagnostics, result, "missing", "UnionFormatter");
+    }
+
+    [Fact]
+    public void AliasOnlyRuntime_DoesNotOverrideTheGlobalRuntime()
+    {
+        var alias = (PortableExecutableReference)CreateRuntime(null);
+        var compilation = CreateCompilation(CurrentRuntime(), Models)
+            .WithReferences(FrameworkReferences
+                .Append(alias.WithAliases(ImmutableArray.Create("archived")))
+                .Append(CurrentRuntime()));
+        var driver = NewDriver().RunGeneratorsAndUpdateCompilation(compilation, out var output, out var diagnostics);
+        diagnostics.Should().BeEmpty();
+        driver.GetRunResult().GeneratedTrees.Should().HaveCount(2);
+        output.GetDiagnostics().Where(x => x.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
     }
 
     [Fact]
@@ -161,15 +254,23 @@ public class RuntimeAbiDiagnosticsTest
     }
 
     static (Compilation, ImmutableArray<Diagnostic>, GeneratorDriverRunResult) Run(
-        MetadataReference runtime, string source)
+        MetadataReference runtime, string source, AnalyzerConfigOptionsProvider? options = null)
     {
-        var driver = NewDriver().RunGeneratorsAndUpdateCompilation(
+        var driver = NewDriver(options).RunGeneratorsAndUpdateCompilation(
             CreateCompilation(runtime, source), out var output, out var diagnostics);
         return (output, diagnostics, driver.GetRunResult());
     }
 
-    static GeneratorDriver NewDriver() => CSharpGeneratorDriver.Create(
-        new[] { new SharpPackGenerator().AsSourceGenerator() }, parseOptions: ParseOptions);
+    static void AssertInactive(MetadataReference runtime, string source, AnalyzerConfigOptionsProvider? options = null)
+    {
+        var (output, diagnostics, result) = Run(runtime, source, options);
+        diagnostics.Should().BeEmpty();
+        result.GeneratedTrees.Should().BeEmpty();
+        output.GetDiagnostics().Where(x => x.Severity == DiagnosticSeverity.Error).Should().BeEmpty();
+    }
+
+    static GeneratorDriver NewDriver(AnalyzerConfigOptionsProvider? options = null) => CSharpGeneratorDriver.Create(
+        new[] { new SharpPackGenerator().AsSourceGenerator() }, optionsProvider: options, parseOptions: ParseOptions);
 
     static CSharpCompilation CreateCompilation(MetadataReference? runtime, string source) =>
         CSharpCompilation.Create("AbiConsumer",
@@ -185,7 +286,15 @@ public class RuntimeAbiDiagnosticsTest
         var source = """
             namespace SharpPack
             {
-                public sealed class SharpPackableAttribute : System.Attribute { }
+                public enum GenerateType { Object, VersionTolerant, CircularReference, Collection, NoGenerate }
+                public sealed class SharpPackableAttribute : System.Attribute
+                {
+                    public SharpPackableAttribute(GenerateType type = GenerateType.Object) { }
+                }
+                public sealed class SharpPackUnionAttribute : System.Attribute
+                {
+                    public SharpPackUnionAttribute(ushort tag, System.Type type) { }
+                }
                 public sealed class GenerateTypeScriptAttribute : System.Attribute { }
                 public sealed class SharpPackUnionFormatterAttribute : System.Attribute
                 {
