@@ -40,71 +40,53 @@ static class TypeScriptSourceBaseline
 
     internal static string Create()
     {
-        var directory = Directory.CreateTempSubdirectory("SharpPack TS 样例 ");
-        try
-        {
-            var options = new CSharpParseOptions(LanguageVersion.CSharp14, preprocessorSymbols: ["NET10_0_OR_GREATER"]);
-            var compilation = CSharpCompilation.Create("TypeScriptBaseline",
-                [CSharpSyntaxTree.ParseText(Fixture, options, "TypeScriptModels.cs")],
-                GeneratedSourceBaseline.TrustedPlatformReferences()
-                    .Append(MetadataReference.CreateFromFile(typeof(SharpPackableAttribute).Assembly.Location))
-                    .GroupBy(reference => reference.Display, StringComparer.OrdinalIgnoreCase)
-                    .Select(group => group.First()),
-                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
-            var driver = CSharpGeneratorDriver.Create([new SharpPackGenerator().AsSourceGenerator()], parseOptions: options,
-                optionsProvider: new BaselineOptions(directory.FullName));
-            driver.RunGeneratorsAndUpdateCompilation(compilation, out var generated, out var diagnostics);
-            var errors = diagnostics.Concat(generated.GetDiagnostics()).Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
-            if (errors.Length != 0)
-                throw new InvalidOperationException("TypeScript fixture failed to compile:\n" + string.Join("\n", errors.Select(d => d.ToString())));
+        var options = new CSharpParseOptions(LanguageVersion.CSharp14, preprocessorSymbols: ["NET10_0_OR_GREATER"]);
+        var compilation = CSharpCompilation.Create("TypeScriptBaseline",
+            [CSharpSyntaxTree.ParseText(Fixture, options, "TypeScriptModels.cs")],
+            GeneratedSourceBaseline.TrustedPlatformReferences()
+                .Append(MetadataReference.CreateFromFile(typeof(SharpPackableAttribute).Assembly.Location))
+                .GroupBy(reference => reference.Display, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First()),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, allowUnsafe: true));
+        var driver = CSharpGeneratorDriver.Create([new SharpPackGenerator().AsSourceGenerator()], parseOptions: options,
+            optionsProvider: new BaselineOptions());
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var generated, out var diagnostics);
+        var errors = diagnostics.Concat(generated.GetDiagnostics()).Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
+        if (errors.Length != 0)
+            throw new InvalidOperationException("TypeScript fixture failed to compile:\n" + string.Join("\n", errors.Select(d => d.ToString())));
 
-            string[] expectedNames = ["Fault.ts", "IWireMessage.ts", "Packet.ts", "SharpPackReader.ts", "SharpPackWriter.ts", "Status.ts"];
-            var files = directory.EnumerateFiles().OrderBy(file => file.Name, StringComparer.Ordinal).ToArray();
-            if (!files.Select(file => file.Name).SequenceEqual(expectedNames, StringComparer.Ordinal))
-                throw new InvalidOperationException("Unexpected TypeScript files: " + string.Join(", ", files.Select(file => file.Name)));
+        var source = generated.SyntaxTrees.Single(tree => tree.FilePath.EndsWith(ArtifactSchema.FileName, StringComparison.Ordinal));
+        using var reader = new StringReader(source.ToString());
+        var plan = ArtifactSchema.ReadSource(reader).TypeScript ?? throw new InvalidOperationException("Missing TypeScript plan.");
+        var files = TypeScriptEmitter.RenderFiles(plan).OrderBy(file => file.Name, StringComparer.Ordinal).ToArray();
+        string[] expectedNames = ["Fault.ts", "IWireMessage.ts", "Packet.ts", "SharpPackReader.ts", "SharpPackWriter.ts", "Status.ts"];
+        if (!files.Select(file => file.Name).SequenceEqual(expectedNames, StringComparer.Ordinal))
+            throw new InvalidOperationException("Unexpected TypeScript files: " + string.Join(", ", files.Select(file => file.Name)));
 
-            var utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
-            var snapshot = new StringBuilder("# Representative TypeScript output\n");
-            foreach (var file in files)
-            {
-                var bytes = File.ReadAllBytes(file.FullName);
-                var runtime = file.Name switch
-                {
-                    "SharpPackReader.ts" => TypeScriptRuntime.SharpPackReader,
-                    "SharpPackWriter.ts" => TypeScriptRuntime.SharpPackWriter,
-                    _ => null,
-                };
-                if (runtime is not null)
-                {
-                    if (!bytes.AsSpan().SequenceEqual(utf8.GetBytes(runtime)))
-                        throw new InvalidOperationException($"{file.Name} does not match the shipped UTF-8 runtime.");
-                    continue;
-                }
-                snapshot.AppendLine().Append("===== ").Append(file.Name).AppendLine(" =====");
-                snapshot.AppendLine(utf8.GetString(bytes).TrimEnd());
-            }
-            return snapshot.ToString();
-        }
-        finally
+        var snapshot = new StringBuilder("# Representative TypeScript output\n");
+        foreach (var (name, contents, isRuntime) in files)
         {
-            foreach (var file in directory.EnumerateFiles()) file.Delete();
-            directory.Delete();
+            if (isRuntime) continue; // The packaged-consumer gate checks the files on disk.
+            snapshot.AppendLine().Append("===== ").Append(name).AppendLine(" =====");
+            snapshot.AppendLine(contents.TrimEnd());
         }
+        return snapshot.ToString();
     }
 
-    sealed class BaselineOptions(string directory) : AnalyzerConfigOptionsProvider
+    sealed class BaselineOptions : AnalyzerConfigOptionsProvider
     {
-        public override AnalyzerConfigOptions GlobalOptions { get; } = new Properties(directory);
+        public override AnalyzerConfigOptions GlobalOptions { get; } = new Properties();
         public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => GlobalOptions;
         public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => GlobalOptions;
 
-        sealed class Properties(string directory) : AnalyzerConfigOptions
+        sealed class Properties : AnalyzerConfigOptions
         {
             public override bool TryGetValue(string key, [NotNullWhen(true)] out string? value)
             {
                 value = key switch
                 {
-                    "build_property.SharpPackGenerator_TypeScriptOutputDirectory" => directory,
+                    "build_property.SharpPackGenerator_ArtifactMode" => "plan",
+                    "build_property.SharpPackGenerator_TypeScriptOutputDirectory" => "typescript",
                     "build_property.SharpPackGenerator_TypeScriptImportExtension" => ".mjs",
                     "build_property.SharpPackGenerator_TypeScriptEnableNullableTypes" => "true",
                     _ => null,

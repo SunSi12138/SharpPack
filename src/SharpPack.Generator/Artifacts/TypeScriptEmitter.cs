@@ -4,7 +4,13 @@ namespace SharpPack.Generator;
 
 internal static class TypeScriptEmitter
 {
-    internal static string EmitModelFile(TypeScriptModelPlan model, string importExtension)
+    internal static IEnumerable<(string Name, string Source, bool IsRuntime)> RenderFiles(TypeScriptArtifactPlan plan)
+        => plan.Models.Select(model => (model.Name + ".ts", EmitModelFile(model, plan.ImportExtension), false))
+            .Concat(plan.Enums.Select(static model => (model.Name + ".ts", EmitEnumFile(model), false)))
+            .Append(("SharpPackWriter.ts", TypeScriptRuntime.SharpPackWriter, true))
+            .Append(("SharpPackReader.ts", TypeScriptRuntime.SharpPackReader, true));
+
+    static string EmitModelFile(TypeScriptModelPlan model, string importExtension)
     {
         var writer = new StringBuilder();
         writer.AppendLine($$"""
@@ -22,7 +28,7 @@ import { SharpPackReader } from "./SharpPackReader{{importExtension}}";
         return writer.ToString();
     }
 
-    internal static string EmitEnumFile(TypeScriptEnumPlan model)
+    static string EmitEnumFile(TypeScriptEnumPlan model)
     {
         var fields = new StringBuilder();
         foreach (var field in model.Fields)
@@ -35,12 +41,6 @@ export const enum {{model.Name}} {
 {{fields.ToString()}}
 }
 """;
-    }
-
-    internal static IEnumerable<(string Name, string Source)> RuntimeFiles()
-    {
-        yield return ("SharpPackWriter.ts", TypeScriptRuntime.SharpPackWriter);
-        yield return ("SharpPackReader.ts", TypeScriptRuntime.SharpPackReader);
     }
 
     internal static void EmitObject(StringBuilder sb, string typeName, string? unionBase, TypeScriptMemberShape[] tsMembers)

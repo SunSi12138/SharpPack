@@ -20,14 +20,8 @@ try
     var outputs = new Dictionary<string, List<ArtifactFile>>(ArtifactStore.PathComparer);
 
     if (Output("typescript") is { } scripts && plan.TypeScript is { } script)
-    {
-        foreach (var model in script.Models)
-            scripts.Add(new(model.Name + ".ts", TypeScriptEmitter.EmitModelFile(model, script.ImportExtension)));
-        foreach (var model in script.Enums)
-            scripts.Add(new(model.Name + ".ts", TypeScriptEmitter.EmitEnumFile(model)));
-        foreach (var (name, source) in TypeScriptEmitter.RuntimeFiles())
-            scripts.Add(new(name, source, PreserveUnowned: true));
-    }
+        foreach (var (name, source, isRuntime) in TypeScriptEmitter.RenderFiles(script))
+            scripts.Add(new(name, source, PreserveUnowned: isRuntime));
 
     if (Output("serialization-info") is { } info)
         foreach (var file in plan.SerializationInfo) info.Add(new(file.FileName, file.Text));

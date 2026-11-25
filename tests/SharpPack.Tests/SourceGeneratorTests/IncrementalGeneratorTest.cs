@@ -6,7 +6,6 @@ using SharpPack.Generator;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
-using System.Text;
 
 namespace SharpPack.Tests.SourceGeneratorTests;
 
@@ -100,34 +99,25 @@ public class IncrementalGeneratorTest
     }
 
     [Fact]
-    public void SerializationInfoWritesAndRefreshesTheLegacyFileWithoutRenderingCSharpAgain()
+    public void SerializationInfoPlanDoesNotInvalidateCachedCSharp()
     {
         var model = Parse("[SharpPackable] public partial class Model { public int Size; }", "Model.cs");
         var compilation = CSharpGeneratorRunner.CreateCompilation(model);
         var driver = CreateDriver();
         var first = Run(ref driver, compilation);
-        var directory = Directory.CreateTempSubdirectory("sharppack-info-");
-        var file = Path.Combine(directory.FullName, "Model.txt");
-        try
-        {
-            driver = driver.WithUpdatedAnalyzerConfigOptions(new SerializationInfoOptions(directory.FullName));
-            var after = Run(ref driver, compilation);
+        driver = driver.WithUpdatedAnalyzerConfigOptions(new SerializationInfoOptions());
+        var after = Run(ref driver, compilation);
 
-            AssertStage(after, "CSharpEmission", 1, IncrementalStepRunReason.Cached);
-            Assert.Equal(Sources(first), Sources(after));
-            var expected = string.Join(Environment.NewLine, "GenerateType Object Model", "---", "int Size", "");
-            Assert.Equal(Encoding.UTF8.GetBytes(expected), File.ReadAllBytes(file));
+        AssertStage(after, "CSharpEmission", 1, IncrementalStepRunReason.Cached);
+        Assert.Equal(Sources(first), Sources(after).Where(source => source.Hint != ArtifactSchema.FileName).ToArray());
+        using var reader = new StringReader(Assert.Single(Sources(after), source => source.Hint == ArtifactSchema.FileName).Text);
+        var info = Assert.Single(ArtifactSchema.ReadSource(reader).SerializationInfo);
+        Assert.Equal("Model.txt", info.FileName);
+        Assert.Equal(string.Join(Environment.NewLine, "GenerateType Object Model", "---", "int Size", ""), info.Text);
 
-            File.Delete(file);
-            var afterEdit = Run(ref driver, compilation.AddSyntaxTrees(Parse("internal class Unrelated { }", "Unrelated.cs")));
-            AssertStage(afterEdit, "CSharpEmission", 1, IncrementalStepRunReason.Cached);
-            Assert.Equal(Encoding.UTF8.GetBytes(expected), File.ReadAllBytes(file));
-        }
-        finally
-        {
-            File.Delete(file);
-            directory.Delete();
-        }
+        var afterEdit = Run(ref driver, compilation.AddSyntaxTrees(Parse("internal class Unrelated { }", "Unrelated.cs")));
+        AssertStage(afterEdit, "CSharpEmission", 1, IncrementalStepRunReason.Cached);
+        Assert.Equal(Sources(after), Sources(afterEdit));
     }
 
     static SyntaxTree Parse(string source, string path) => CSharpSyntaxTree.ParseText(source, ParseOptions, path);
@@ -156,17 +146,22 @@ public class IncrementalGeneratorTest
         Assert.All(outputs, output => Assert.Equal(reason, output.Reason));
     }
 
-    sealed class SerializationInfoOptions(string directory) : AnalyzerConfigOptionsProvider
+    sealed class SerializationInfoOptions : AnalyzerConfigOptionsProvider
     {
-        public override AnalyzerConfigOptions GlobalOptions { get; } = new Properties(directory);
+        public override AnalyzerConfigOptions GlobalOptions { get; } = new Properties();
         public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => GlobalOptions;
         public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => GlobalOptions;
 
-        sealed class Properties(string directory) : AnalyzerConfigOptions
+        sealed class Properties : AnalyzerConfigOptions
         {
             public override bool TryGetValue(string key, [NotNullWhen(true)] out string? value)
             {
-                value = key == "build_property.SharpPackGenerator_SerializationInfoOutputDirectory" ? directory : null;
+                value = key switch
+                {
+                    "build_property.SharpPackGenerator_ArtifactMode" => "plan",
+                    "build_property.SharpPackGenerator_SerializationInfoOutputDirectory" => "serialization-info",
+                    _ => null,
+                };
                 return value is not null;
             }
         }
