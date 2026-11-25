@@ -3,8 +3,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
-using System.Diagnostics;
-using System.Text;
 
 namespace SharpPack.Generator;
 
@@ -70,33 +68,27 @@ public partial class SharpPackGenerator : IIncrementalGenerator
         var tooling = context.AnalyzerConfigOptionsProvider.Select(static (config, _) =>
         {
             var options = config.GlobalOptions;
-            options.TryGetValue("build_property.SharpPackGenerator_SerializationInfoOutputDirectory", out var logDirectory);
-            return new ArtifactOptions(GetArtifactMode(options), logDirectory);
+            var emit = EmitsArtifactPlan(options);
+            return new ArtifactOptions(emit, emit &&
+                options.TryGetValue("build_property.SharpPackGenerator_SerializationInfoOutputDirectory", out var logDirectory) &&
+                !string.IsNullOrEmpty(logDirectory));
         });
         var info = RegisterSharpPackable(context,
             CompatibleDeclarations(models.Select(static (model, _) => model.Declaration), unsupportedAbi),
             CompatibleDeclarations(unions, unsupportedAbi), tooling);
-        var scripts = RegisterTypeScript(context, CompatibleDeclarations(typeScript, unsupportedAbi), tooling);
+        var scripts = RegisterTypeScript(context, CompatibleDeclarations(typeScript, unsupportedAbi));
 
-        var artifacts = scripts.Combine(info).Combine(tooling)
-            .SelectMany(static (input, _) => input.Right.Mode == ArtifactMode.Plan
+        var emitArtifacts = tooling.Combine(unsupportedAbi).Select(static (input, _) => input.Left.EmitPlan && input.Right is null);
+        var artifacts = scripts.Combine(info).Combine(emitArtifacts)
+            .SelectMany(static (input, _) => input.Right
                 ? ImmutableArray.Create(ArtifactSchema.WriteSource(new(input.Left.Left, input.Left.Right)))
                 : ImmutableArray<string>.Empty);
         context.RegisterSourceOutput(artifacts, static (output, source) => output.AddSource(ArtifactSchema.FileName, source));
     }
 
-    static ArtifactMode GetArtifactMode(AnalyzerConfigOptions options)
-    {
-        return options.TryGetValue("build_property.SharpPackGenerator_ArtifactMode", out var mode) ? mode switch
-        {
-            "plan" => IsDesignTimeBuild(options) ? ArtifactMode.None : ArtifactMode.Plan,
-            "none" => ArtifactMode.None,
-            _ => ArtifactMode.Legacy,
-        } : ArtifactMode.Legacy;
-    }
-
-    static bool IsDesignTimeBuild(AnalyzerConfigOptions options)
-        => options.TryGetValue("build_property.DesignTimeBuild", out var design) && string.Equals(design, "true", StringComparison.OrdinalIgnoreCase);
+    static bool EmitsArtifactPlan(AnalyzerConfigOptions options)
+        => options.TryGetValue("build_property.SharpPackGenerator_ArtifactMode", out var mode) && mode == "plan" &&
+           !(options.TryGetValue("build_property.DesignTimeBuild", out var design) && string.Equals(design, "true", StringComparison.OrdinalIgnoreCase));
 
     static bool HasModelGenerationIntent(GeneratorAttributeSyntaxContext context)
     {
@@ -196,15 +188,8 @@ public partial class SharpPackGenerator : IIncrementalGenerator
             .WithTrackingName("SharpPack.CSharpEmission");
         context.RegisterSourceOutput(sources, AddGeneratedSource);
 
-        // Legacy files are side effects: allow a later compilation to retry
-        // a failed write or recreate a missing file without rendering C#.
-        var logFiles = shapes.Where(CSharpEmitter.HasSerializationInfo).Combine(tooling)
-            .Where(static input => input.Right.Mode == ArtifactMode.Legacy && !string.IsNullOrEmpty(input.Right.LogDirectory))
-            .Combine(context.CompilationProvider);
-        context.RegisterSourceOutput(logFiles, static (_, input) => WriteSerializationInfo(input.Left.Left, input.Left.Right.LogDirectory!));
-
         return shapes.Where(CSharpEmitter.HasSerializationInfo).Combine(tooling)
-            .Where(static input => input.Right.Mode == ArtifactMode.Plan && !string.IsNullOrEmpty(input.Right.LogDirectory))
+            .Where(static input => input.Right.IncludeSerializationInfo)
             .Select(static (input, _) => new SerializationInfoFile(
                 $"{CSharpEmitter.ModelFileStem(input.Left)}.txt", CSharpEmitter.EmitSerializationInfo(input.Left)));
     }
@@ -212,28 +197,13 @@ public partial class SharpPackGenerator : IIncrementalGenerator
     static void AddGeneratedSource(SourceProductionContext output, GeneratedSource source)
         => output.AddSource(source.HintName, source.Text);
 
-    static void WriteSerializationInfo(TypeShape shape, string outputDirectory)
-    {
-        try
-        {
-            if (!Directory.Exists(outputDirectory))
-                Directory.CreateDirectory(outputDirectory);
-            var file = Path.Combine(outputDirectory, $"{CSharpEmitter.ModelFileStem(shape)}.txt");
-            File.WriteAllText(file, CSharpEmitter.EmitSerializationInfo(shape), new UTF8Encoding(false));
-        }
-        catch (Exception ex)
-        {
-            Trace.WriteLine(ex.ToString());
-        }
-    }
-
     static IncrementalValueProvider<TypeScriptGenerateOptions?> GetTypeScriptOptions(
         IncrementalGeneratorInitializationContext context)
         => context.AnalyzerConfigOptionsProvider
             .Select(static (configOptions, _) =>
             {
                 var options = configOptions.GlobalOptions;
-                if (IsDesignTimeBuild(options) || GetArtifactMode(options) == ArtifactMode.None ||
+                if (!EmitsArtifactPlan(options) ||
                     !options.TryGetValue("build_property.SharpPackGenerator_TypeScriptOutputDirectory", out var path) || string.IsNullOrEmpty(path))
                 {
                     return null;
@@ -253,36 +223,26 @@ public partial class SharpPackGenerator : IIncrementalGenerator
 
     static IncrementalValueProvider<TypeScriptArtifactPlan?> RegisterTypeScript(
         IncrementalGeneratorInitializationContext context,
-        IncrementalValuesProvider<(TypeDeclarationSyntax Declaration, TypeScriptGenerateOptions Options)> typeScript,
-        IncrementalValueProvider<ArtifactOptions> tooling)
+        IncrementalValuesProvider<(TypeDeclarationSyntax Declaration, TypeScriptGenerateOptions Options)> typeScript)
     {
         var results = typeScript.Collect().Combine(context.CompilationProvider)
             .Select(static (input, token) =>
             {
-                if (input.Left.IsEmpty) return new TypeScriptResult(null, null, ImmutableArray<Diagnostic>.Empty);
+                if (input.Left.IsEmpty) return new TypeScriptResult(null, ImmutableArray<Diagnostic>.Empty);
                 var options = input.Left[0].Options;
                 var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
                 var plan = PlanTypeScript(input.Left.Select(static item => item.Declaration), input.Right, options, token, diagnostics.Add);
-                return new TypeScriptResult(plan, options.OutputDirectory, diagnostics.ToImmutable());
+                return new TypeScriptResult(plan, diagnostics.ToImmutable());
             });
 
         context.RegisterSourceOutput(results, static (output, result) =>
         {
             foreach (var diagnostic in result.Diagnostics) output.ReportDiagnostic(diagnostic);
         });
-        var legacy = results.Combine(tooling).Combine(context.CompilationProvider);
-        context.RegisterSourceOutput(legacy, static (_, input) =>
-        {
-            var (result, options) = input.Left;
-            if (options.Mode == ArtifactMode.Legacy && result.Plan is { } plan)
-                WriteLegacyTypeScript(plan, result.OutputDirectory!);
-        });
         return results.Select(static (result, _) => result.Plan);
     }
 
-    readonly record struct TypeScriptResult(TypeScriptArtifactPlan? Plan, string? OutputDirectory, ImmutableArray<Diagnostic> Diagnostics);
+    readonly record struct TypeScriptResult(TypeScriptArtifactPlan? Plan, ImmutableArray<Diagnostic> Diagnostics);
 
-    enum ArtifactMode { Legacy, Plan, None }
-
-    readonly record struct ArtifactOptions(ArtifactMode Mode, string? LogDirectory);
+    readonly record struct ArtifactOptions(bool EmitPlan, bool IncludeSerializationInfo);
 }

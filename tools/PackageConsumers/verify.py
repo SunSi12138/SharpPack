@@ -207,9 +207,7 @@ def verify_artifact_tooling(path, feed, version, env):
         "TypeScriptConvertPropertyName": "false",
         "TypeScriptEnableNullableTypes": "true",
     }
-    visible = ";".join(f"SharpPackGenerator_{name}" for name in options)
-    project(path, package_references({AGGREGATE: version}) +
-            f'''<CompilerVisibleProperty Include="{visible}" Condition="'$(SharpPackToolingEnabled)' == 'false'" />''',
+    project(path, package_references({AGGREGATE: version}),
             "".join(f"<SharpPackGenerator_{name}>{value}</SharpPackGenerator_{name}>"
                     for name, value in options.items()), targets="""
     <Target Name="DisableFixturePlan" AfterTargets="_SharpPackPrepareArtifacts" Condition="'$(DisableFixturePlan)' == 'true'">
@@ -233,9 +231,9 @@ namespace ArtifactFixture;
     run(["dotnet", "restore", "--configfile", str(config)], path, local_env)
     assets(path, {name: version for name in (CORE, GENERATOR, AGGREGATE)})
 
-    def build(output, *properties, tooling=True, error=None):
+    def build(output, *properties, error=None):
         log = run(["dotnet", "build", "-c", "Release", "--no-restore", "--nologo",
-                   f"-p:SharpPackToolingEnabled={str(tooling).lower()}", f"-p:ArtifactOutput={output}", *properties],
+                   f"-p:ArtifactOutput={output}", *properties],
                   path, local_env, expected_success=error is None)
         if error is not None and error not in log:
             raise RuntimeError(f"Expected artifact build failure '{error}':\n{log}")
@@ -243,16 +241,20 @@ namespace ArtifactFixture;
     def files(output):
         return {item.name: item.read_bytes() for item in output.iterdir() if not item.name.startswith(".")}
 
-    legacy = path / "Legacy 输出"
+    disabled = path / "Disabled 输出"
+    build(disabled, "-p:SharpPackToolingEnabled=false")
+    if disabled.exists():
+        raise RuntimeError("An ordinary C# build with artifact tooling disabled wrote artifacts")
+
     output = path / "Build 输出"
-    build(legacy, tooling=False)
     build(output)
-    baseline = files(legacy)
+    baseline = files(output)
     expected = {"Delivery.ts", "DeliveryState.ts", "INotice.ts", "Edited.ts", "Retired.ts",
                 "SharpPackReader.ts", "SharpPackWriter.ts", "ArtifactFixture.Delivery.txt",
                 "ArtifactFixture.Edited.txt", "ArtifactFixture.Retired.txt"}
-    if baseline.keys() != expected or files(output) != baseline or b"SharpPackReader.mjs" not in baseline["Delivery.ts"]:
-        raise RuntimeError(f"Legacy and packaged tooling artifacts differ: {baseline.keys()} / {files(output).keys()}")
+    if (baseline.keys() != expected or b"SharpPackReader.mjs" not in baseline["Delivery.ts"]
+            or any(not contents or contents.startswith(b"\xef\xbb\xbf") for contents in baseline.values())):
+        raise RuntimeError(f"Default tooling produced unexpected files or encoding: {baseline.keys()}")
     run(["dotnet", str(path / "bin/Release/net10.0/Consumer.dll")], path, local_env)
 
     journal = output / ".sharppack-artifacts.json"
@@ -277,6 +279,11 @@ namespace ArtifactFixture;
     if plan.exists() or files(output) != recovered:
         raise RuntimeError("The build used a stale plan from an earlier compilation")
 
+    # Copy only generated files, not ownership state, to simulate an existing output directory.
+    legacy = path / "Legacy 输出"
+    legacy.mkdir()
+    for name, contents in baseline.items():
+        (legacy / name).write_bytes(contents)
     build(legacy, error="is not owned by SharpPack")
     build(legacy, "-p:SharpPackToolingAdoptExisting=true")
     if files(legacy) != baseline:
@@ -302,7 +309,7 @@ namespace ArtifactFixture;
     build(output, error="error CS1029")
     if files(output) != retained or journal.read_bytes() != previous_manifest:
         raise RuntimeError("A failed compilation changed tooling artifacts")
-    print("Artifact tooling: byte parity, reproducible rebuilds, ownership and recovery verified", flush=True)
+    print("Default artifact tooling: output, reproducible rebuilds, ownership and recovery verified", flush=True)
 
 
 def verify_multitargeted_artifacts(path, feed, version, env):
@@ -313,7 +320,6 @@ def verify_multitargeted_artifacts(path, feed, version, env):
     <OutputType>Library</OutputType>
     """, targets="""
     <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0' and '$(DisableFixtureArtifacts)' != 'true'">
-      <SharpPackToolingEnabled>true</SharpPackToolingEnabled>
       <SharpPackGenerator_TypeScriptOutputDirectory>Generated 输出</SharpPackGenerator_TypeScriptOutputDirectory>
     </PropertyGroup>
     """)

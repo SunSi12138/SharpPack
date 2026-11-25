@@ -1,17 +1,12 @@
 <Project>
     <PropertyGroup>
-        <SharpPackToolingEnabled Condition="'$(SharpPackToolingEnabled)' == ''">false</SharpPackToolingEnabled>
+        <SharpPackToolingEnabled Condition="'$(SharpPackToolingEnabled)' == ''">true</SharpPackToolingEnabled>
         <_SharpPackToolingPath Condition="'$(_SharpPackToolingPath)' == ''">$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', 'tools', 'net10.0', 'SharpPack.Tooling.dll'))</_SharpPackToolingPath>
         <SharpPackToolingTargetFramework Condition="'$(SharpPackToolingTargetFramework)' == '' and '$(TargetFrameworks)' != ''">$(TargetFrameworks.Split(';')[0])</SharpPackToolingTargetFramework>
-        <SharpPackGenerator_ArtifactMode Condition="'$(SharpPackToolingEnabled)' == 'true'">none</SharpPackGenerator_ArtifactMode>
         <_SharpPackArtifactsConfigured Condition="'$(SharpPackToolingEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'
                    and '$(SkipCompilerExecution)' != 'true'
                    and ('$(SharpPackGenerator_TypeScriptOutputDirectory)' != '' or '$(SharpPackGenerator_SerializationInfoOutputDirectory)' != '')">true</_SharpPackArtifactsConfigured>
     </PropertyGroup>
-    <ItemGroup Condition="'$(SharpPackToolingEnabled)' == 'true'">
-        <CompilerVisibleProperty Include="SharpPackGenerator_ArtifactMode;DesignTimeBuild" Exclude="@(CompilerVisibleProperty)" />
-    </ItemGroup>
-
     <Target Name="_SharpPackPrepareArtifacts"
             BeforeTargets="GenerateMSBuildEditorConfigFileShouldRun;CreateCompilerGeneratedFilesOutputPath;CoreCompile"
             Condition="'$(_SharpPackArtifactsConfigured)' == 'true' and '$(BuildingProject)' == 'true' and '$(TargetFramework)' != ''
@@ -24,7 +19,7 @@
             <_SharpPackArtifactOptions>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'SharpPack.Tooling.options'))</_SharpPackArtifactOptions>
         </PropertyGroup>
         <ItemGroup>
-            <CompilerVisibleProperty Include="SharpPackGenerator_TypeScriptOutputDirectory;SharpPackGenerator_SerializationInfoOutputDirectory"
+            <CompilerVisibleProperty Include="SharpPackGenerator_ArtifactMode;DesignTimeBuild;SharpPackGenerator_TypeScriptOutputDirectory;SharpPackGenerator_SerializationInfoOutputDirectory"
                                      Exclude="@(CompilerVisibleProperty)" />
             <CompilerVisibleProperty Include="SharpPackGenerator_TypeScriptImportExtension" Exclude="@(CompilerVisibleProperty)" Condition="'$(SharpPackGenerator_TypeScriptImportExtension)' != ''" />
             <CompilerVisibleProperty Include="SharpPackGenerator_TypeScriptConvertPropertyName" Exclude="@(CompilerVisibleProperty)" Condition="'$(SharpPackGenerator_TypeScriptConvertPropertyName)' != ''" />

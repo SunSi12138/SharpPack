@@ -436,17 +436,13 @@ version because it uses Core internals.
 
 TypeScript
 ---
-SharpPack supports TypeScript code generation. It generates class and serialization code from C#, In other words, you can share types with the Browser without using OpenAPI, proto, etc.
-
-Code generation is integrated with Source Generator, the following options(`SharpPackGenerator_TypeScriptOutputDirectory`) set the output directory for TypeScript code. Runtime code is output at the same time, so no additional dependencies are required.
+Share C# types with a browser by setting the TypeScript output directory in
+your project file. A successful `dotnet build` writes the model and TypeScript
+runtime files there; no additional TypeScript package is needed.
 
 ```xml
-<!-- output sharppack TypeScript code to directory -->
-<ItemGroup>
-    <CompilerVisibleProperty Include="SharpPackGenerator_TypeScriptOutputDirectory" />
-</ItemGroup>
 <PropertyGroup>
-    <SharpPackGenerator_TypeScriptOutputDirectory>$(MSBuildProjectDirectory)\wwwroot\js\sharppack</SharpPackGenerator_TypeScriptOutputDirectory>
+    <SharpPackGenerator_TypeScriptOutputDirectory>$(MSBuildProjectDirectory)/wwwroot/js/sharppack</SharpPackGenerator_TypeScriptOutputDirectory>
 </PropertyGroup>
 ```
 
@@ -585,43 +581,35 @@ There are a few restrictions on the types that can be generated. Among the primi
 | `[SharpPackable]` | `class` | Supports class only
 | `[SharpPackUnion]` | `abstract class` |
 
-`[GenerateTypeScript]` can only be applied to classes and is currently not supported by struct.
+`[GenerateTypeScript]` supports classes, record classes, and union interfaces,
+not structs.
 
 ### Configure import file extension and member name casing
 
-In default, SharpPack generates file extension as `.js` like `import { SharpPackWriter } from "./SharpPackWriter.js";`. If you want to change other extension or empty, use `SharpPackGenerator_TypeScriptImportExtension` to configure it.
-Also the member name is automatically converted to camelCase. If you want to use original name, use `SharpPackGenerator_TypeScriptConvertPropertyName` to `false`.
+Imports use `.js` and member names use camelCase by default. Change these
+settings to match your TypeScript project:
 
 ```xml
-<ItemGroup>
-    <CompilerVisibleProperty Include="SharpPackGenerator_TypeScriptOutputDirectory" />
-    <CompilerVisibleProperty Include="SharpPackGenerator_TypeScriptImportExtension" />
-    <CompilerVisibleProperty Include="SharpPackGenerator_TypeScriptConvertPropertyName" />
-    <CompilerVisibleProperty Include="SharpPackGenerator_TypeScriptEnableNullableTypes" />
-</ItemGroup>
 <PropertyGroup>
-    <SharpPackGenerator_TypeScriptOutputDirectory>$(MSBuildProjectDirectory)\wwwroot\js\sharppack</SharpPackGenerator_TypeScriptOutputDirectory>
-    <!-- allows empty -->
-    <SharpPackGenerator_TypeScriptImportExtension></SharpPackGenerator_TypeScriptImportExtension>
-    <!-- default is true -->
+    <SharpPackGenerator_TypeScriptImportExtension>.mjs</SharpPackGenerator_TypeScriptImportExtension>
     <SharpPackGenerator_TypeScriptConvertPropertyName>false</SharpPackGenerator_TypeScriptConvertPropertyName>
-    <!-- default is false -->
     <SharpPackGenerator_TypeScriptEnableNullableTypes>true</SharpPackGenerator_TypeScriptEnableNullableTypes>
 </PropertyGroup>
 ```
 
-`SharpPackGenerator_TypeScriptEnableNullableTypes` allows C# nullable annotations to be reflected in TypeScript code. The default is false, making everything nullable.
+`SharpPackGenerator_TypeScriptEnableNullableTypes` copies C# nullable reference
+annotations into TypeScript; otherwise generated reference types allow null.
+For extensionless imports, leave the extension property empty and explicitly
+include it as a `CompilerVisibleProperty`. Without that item, an omitted or
+empty property uses `.js`.
 
-### Generate project artifacts after compilation
+### Manage generated files and serialization logs
 
-Set `SharpPackToolingEnabled` to let `dotnet build` write TypeScript and optional
-serialization-info files after a successful compilation. Keep your existing
-output directories and TypeScript options.
+To also write a text description of the serialization layout, configure the
+serialization-info output directory:
 
 ```xml
 <PropertyGroup>
-    <SharpPackToolingEnabled>true</SharpPackToolingEnabled>
-    <SharpPackGenerator_TypeScriptOutputDirectory>$(MSBuildProjectDirectory)/wwwroot/js/sharppack</SharpPackGenerator_TypeScriptOutputDirectory>
     <SharpPackGenerator_SerializationInfoOutputDirectory>$(BaseIntermediateOutputPath)SharpPackLogs</SharpPackGenerator_SerializationInfoOutputDirectory>
 </PropertyGroup>
 ```
@@ -633,6 +621,8 @@ no longer needs. It leaves unrelated files and customized TypeScript runtime
 files alone. IDE design-time builds do not write artifacts. A multi-targeted
 build writes artifacts only after all frameworks succeed. The first framework
 supplies the artifacts; set `SharpPackToolingTargetFramework` to pick another.
+Set `SharpPackToolingEnabled=false` to turn off both artifact outputs without
+disabling C# formatter generation.
 
 For a directory created by the legacy generator, build into a new directory or
 run one build with `-p:SharpPackToolingAdoptExisting=true`. Adoption claims only

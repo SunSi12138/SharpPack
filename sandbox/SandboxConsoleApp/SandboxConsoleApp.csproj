@@ -20,12 +20,10 @@
         <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
     </ItemGroup>
 
-    <!-- output memoerypack serialization info to directory -->
-    <ItemGroup>
-        <CompilerVisibleProperty Include="SharpPackGenerator_SerializationInfoOutputDirectory" />
-    </ItemGroup>
     <PropertyGroup>
         <SharpPackGenerator_SerializationInfoOutputDirectory>$(MSBuildProjectDirectory)\SharpPackLogs</SharpPackGenerator_SerializationInfoOutputDirectory>
+        <SharpPackToolingAdoptExisting>true</SharpPackToolingAdoptExisting>
+        <_SharpPackToolingPath>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '..', '..', 'src', 'SharpPack.Tooling', 'bin', '$(Configuration)', 'net10.0', 'SharpPack.Tooling.dll'))</_SharpPackToolingPath>
     </PropertyGroup>
 
 
@@ -36,6 +34,8 @@
             <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         </ProjectReference>
         <ProjectReference Include="..\..\src\SharpPack.Streaming\SharpPack.Streaming.csproj" />
+        <ProjectReference Include="..\..\src\SharpPack.Tooling\SharpPack.Tooling.csproj" ReferenceOutputAssembly="false" />
     </ItemGroup>
+    <Import Project="..\..\src\SharpPack.Generator\build\SharpPack.Generator.targets" />
 
 </Project>
