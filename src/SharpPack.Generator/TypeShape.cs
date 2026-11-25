@@ -25,7 +25,8 @@ internal sealed record TypeShape(
     CollectionShape? Collection,
     AotDependencyFacts AotDependencies,
     CircularReadShape? CircularRead,
-    GeneratedNameFacts NameFacts)
+    GeneratedNameFacts NameFacts,
+    string WriterTypeParameter)
 {
     internal static TypeShape Create(
         INamedTypeSymbol declaration, TypeMeta model, ReferenceSymbols references, bool isExternalFormatter = false)
@@ -57,14 +58,15 @@ internal sealed record TypeShape(
                     .Concat(CallbacksFor(CallbackPhase.Serialized, model.OnSerialized))
                     .Concat(CallbacksFor(CallbackPhase.Deserializing, model.OnDeserializing))
                     .Concat(CallbacksFor(CallbackPhase.Deserialized, model.OnDeserialized))),
-            isObject ? PartialTypeShape.CaptureContainers(target) : default,
+            isExternalFormatter ? default : PartialTypeShape.CaptureContainers(target),
             model.IsUnion || isExternalFormatter
                 ? UnionShape.Capture(model, references, isExternalFormatter ? declaration : null) : null,
             !isExternalFormatter && !model.IsUnion && model.GenerateType == GenerateType.Collection
                 ? CollectionShape.Capture(target, references) : null,
             isObject ? AotDependencyFacts.Capture(model.Members, references) : default,
             circularRead,
-            isExternalFormatter ? default : GeneratedNameFacts.Capture(target, model.Members, circularRead is not null));
+            isExternalFormatter ? default : GeneratedNameFacts.Capture(target, model.Members, circularRead is not null),
+            GeneratedNameFacts.ChooseWriterTypeParameter(declaration));
 
         static IEnumerable<CallbackShape> CallbacksFor(CallbackPhase phase, IEnumerable<MethodMeta> callbacks)
             => callbacks.Select(callback => new CallbackShape(phase, callback.Name, callback.IsStatic, callback.IsValueType,

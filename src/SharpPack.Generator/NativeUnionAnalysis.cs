@@ -97,7 +97,8 @@ internal static class NativeUnionAnalysis
             Collection: null,
             AotDependencies: new(new EquatableArray<AotFactoryRoot>(factories), new EquatableArray<string>(formatters)),
             CircularRead: null,
-            NameFacts: GeneratedNameFacts.CaptureForNativeUnion(symbol));
+            NameFacts: GeneratedNameFacts.CaptureForNativeUnion(symbol),
+            WriterTypeParameter: GeneratedNameFacts.ChooseWriterTypeParameter(symbol));
 
         TypeShape? Error(string reason)
         {

@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 
 namespace SharpPack.Generator;
 
@@ -7,7 +8,8 @@ internal sealed record PartialTypeShape(
     bool IsNativeUnion)
 {
     internal static PartialTypeShape Capture(INamedTypeSymbol type)
-        => new(type.Name, type.TypeKind, type.IsRecord, type.IsValueType, TypeParameterShape.CaptureAll(type),
+        => new(SyntaxFacts.GetKeywordKind(type.Name) == SyntaxKind.None ? type.Name : "@" + type.Name,
+            type.TypeKind, type.IsRecord, type.IsValueType, TypeParameterShape.CaptureAll(type),
             NativeUnionAnalysis.IsSourceUnion(type));
 
     internal static EquatableArray<PartialTypeShape> CaptureContainers(INamedTypeSymbol type, bool useOriginalDefinitions = false)
@@ -85,15 +87,46 @@ internal sealed record UnionShape(
                 ? externalFormatter.TypeParameters : target.TypeParameters).Cast<ITypeSymbol>().ToArray()
             : target.TypeArguments.ToArray();
 
-        return new(ConstructName(target),
+        return new(externalFormatter is null ? target.FullyQualifiedToString() : Bind(target, targetArguments).FullyQualifiedToString(),
             new EquatableArray<UnionCaseShape>(model.UnionTags.Select(item => new UnionCaseShape(
-                item.Tag, ConstructName(item.Type),
+                item.Tag, (externalFormatter is null ? BindSourceCase(item.Type, target) : Bind(item.Type, targetArguments)).FullyQualifiedToString(),
                 item.Type.TryGetSharpPackableType(references, out var kind, out _) &&
                     kind is GenerateType.Object or GenerateType.VersionTolerant or GenerateType.CircularReference,
                 item.Type.Name))),
             externalFormatter is null ? null : ExternalUnionFormatterShape.Capture(externalFormatter));
+    }
 
-        string ConstructName(INamedTypeSymbol type) => Bind(type, targetArguments).FullyQualifiedToString();
+    // Source unions can refer to open cases whose generic parameters belong
+    // partly or entirely to containing types. Keep the positional convention,
+    // outermost first, and validate the resulting closed-in-scope relation.
+    internal static INamedTypeSymbol BindSourceCase(INamedTypeSymbol type, INamedTypeSymbol target)
+    {
+        if (!type.IsUnboundGenericType) return type;
+
+        var arguments = TypeArgumentsInScope(target).ToArray();
+        var definition = type.OriginalDefinition;
+        if (arguments.Length != TypeArgumentsInScope(definition).Count()) return type;
+        var position = 0;
+        return Construct(definition);
+
+        INamedTypeSymbol Construct(INamedTypeSymbol current)
+        {
+            if (current.ContainingType is { } containing)
+            {
+                var container = Construct(containing);
+                current = container.GetTypeMembers(current.Name, current.Arity)[0];
+            }
+            if (current.Arity == 0) return current;
+
+            var ownArguments = arguments.Skip(position).Take(current.Arity).ToArray();
+            position += ownArguments.Length;
+            return current.Construct(ownArguments);
+        }
+
+        static IEnumerable<ITypeSymbol> TypeArgumentsInScope(INamedTypeSymbol current)
+            => current.ContainingType is { } containing
+                ? TypeArgumentsInScope(containing).Concat(current.TypeArguments)
+                : current.TypeArguments;
     }
 
     internal static INamedTypeSymbol Bind(INamedTypeSymbol type, ITypeSymbol[] targetArguments)
