@@ -55,8 +55,11 @@ dotnet add package SharpPack --version 1.1.0
 Versioned packages and symbols are also attached to
 [GitHub Releases](https://github.com/SunSi12138/SharpPack/releases).
 
-The runtime packages target `net10.0`. For source generation, use a C# 14
-compiler (.NET 10 SDK or Visual Studio 2026 / Roslyn 5.0 or newer).
+Published 1.x runtime packages target `net10.0`. The 2.0 build supports
+.NET 10 and .NET 11; `SharpPack.Core` carries a runtime asset for each.
+For source generation on .NET 10, use a C# 14 compiler (.NET 10 SDK or
+Visual Studio 2026 / Roslyn 5.0 or newer). Building this repository
+requires the .NET 11 SDK; running its .NET 10 checks also needs .NET 10.
 `SharpPack.Generator` targets `netstandard2.0` to load in the compiler host;
 that is not a runtime target for serialized applications.
 
@@ -189,6 +192,10 @@ These types can be serialized by default:
 * Unmanaged types (Any `enum`, Any user-defined `struct` which doesn't contain reference types)
 * `string`, `decimal`, `Half`, `Int128`, `UInt128`, `Guid`, `Rune`, `BigInteger`
 * `TimeSpan`,  `DateTime`, `DateTimeOffset`, `TimeOnly`, `DateOnly`, `TimeZoneInfo`
+* On .NET 11 with SharpPack 2.0: `BFloat16`, `Decimal32`, `Decimal64`, and
+  `Decimal128`. Like other unmanaged scalars, they preserve the runtime
+  representation (2, 4, 8, and 16 bytes respectively), including signed
+  zero and NaN encodings.
 * `Complex`, `Plane`, `Quaternion` `Matrix3x2`, `Matrix4x4`, `Vector2`, `Vector3`, `Vector4`
 * `Uri`, `Version`, `StringBuilder`, `Type`, `BitArray`, `CultureInfo`
 * `T[]`, `T[,]`, `T[,,]`, `T[,,,]`, `Memory<>`, `ReadOnlyMemory<>`, `ArraySegment<>`, `ReadOnlySequence<>`
