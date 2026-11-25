@@ -22,7 +22,8 @@
 
     <ItemGroup>
         <!-- https://learn.microsoft.com/en-us/visualstudio/extensibility/roslyn-version-support?view=vs-2022 -->
-        <!-- require to support SyntaxValueProvider.ForAttributeWithMetadataName(Roslyn 4.3.0, VS2022 17.3) -->
+        <!-- Roslyn 4.3 is the generator's API reference, not the consumer compiler floor.
+             Supported .NET 10/C# 14 hosts are verified by the packaged-consumer gate. -->
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.3.0" PrivateAssets="all" />
         <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.3">
             <PrivateAssets>all</PrivateAssets>
