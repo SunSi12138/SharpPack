@@ -372,4 +372,12 @@ internal static class DiagnosticDescriptors
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    internal static readonly DiagnosticDescriptor CircularMemberCannotBeInitialized = new(
+        id: "SHARPPACK047",
+        title: "Circular-reference member cannot be initialized",
+        messageFormat: "Circular-reference type '{0}' cannot initialize member '{1}': {2}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }

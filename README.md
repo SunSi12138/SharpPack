@@ -289,6 +289,8 @@ SharpPack supports both parameterized and parameterless constructors. The select
 * If there are multiple constructors, then the `[SharpPackConstructor]` attribute must be applied to the desired constructor (the generator will not automatically choose one), otherwise the generator will emit an error.
 * If using a parameterized constructor, all parameter names must match corresponding member names (case-insensitive).
 
+`GenerateType.CircularReference` requires a parameterless constructor. It deserializes accessible `init` and `required` members while preserving shared references. A model with serialized `init` members replaces the destination instance on a `ref` read; a model with writable `required` members and no serialized `init` members can still reuse the destination. Missing wire slots keep the values supplied by the constructor or by the reused instance.
+
 ```csharp
 [SharpPackable]
 public partial class Person

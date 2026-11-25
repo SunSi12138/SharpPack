@@ -192,6 +192,7 @@ using SharpPack;
         var serializeBody = "";
         var deserializeBody = "";
         var formatterOverrideMethods = "";
+        var circularReadConstructor = "";
         var contextFormatterTypeName = plan.Names.ContextFormatterType;
         if (shape.IsUnmanaged)
         {
@@ -208,6 +209,8 @@ using SharpPack;
             serializeBody = EmitSerializeBody(wireMembers);
             deserializeBody = EmitDeserializeBody(wireMembers, honorFormatterOverrides: false);
             formatterOverrideMethods = EmitFormatterOverrideMethods(wireMembers);
+            if (shape.CircularRead is { } circularRead)
+                circularReadConstructor = EmitCircularReadConstructor(wireMembers, circularRead);
         }
 
         var classOrStructOrRecord = (shape.IsRecord, IsValueType) switch
@@ -324,7 +327,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 {{fixedSizeMethod}}
 {{exactSizeMethod}}
 {{contextFactoryMethod}}
-{{formatterOverrideMethods}}
+{{formatterOverrideMethods}}{{circularReadConstructor}}
 
     [global::SharpPack.CompilerServices.Preserve]
     {{staticSharpPackableMethod}}{{serializeMethodSignarture}} writer, {{scopedRef}} {{TypeName}}{{nullable}} value) {{constraint}}
@@ -419,7 +422,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 """;
         }
 
-        return $$"""
+        var readHeader = $$"""
         if (!reader.TryReadObjectHeader(out var count))
         {
             value = default!;
@@ -427,6 +430,12 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         }
 {{circularReferenceBody}}
 {{readBeginBody}}
+""";
+        if (Shape.CircularRead is { } circularRead)
+            return readHeader + Environment.NewLine + EmitCircularReadBody(members, circularRead, honorFormatterOverrides);
+
+        return $$"""
+{{readHeader}}
 {{circularReferenceBody2}}
 {{members.Where(x => x.Kind != MemberKind.Blank).Select(x => $"        {x.TypeName} __{x.Name};").NewLine()}}
 

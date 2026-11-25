@@ -24,6 +24,7 @@ internal sealed record TypeShape(
     UnionShape? Union,
     CollectionShape? Collection,
     AotDependencyFacts AotDependencies,
+    CircularReadShape? CircularRead,
     GeneratedNameFacts NameFacts)
 {
     internal static TypeShape Create(
@@ -31,6 +32,7 @@ internal sealed record TypeShape(
     {
         var target = model.Symbol;
         var isObject = !isExternalFormatter && !model.IsUnion && model.GenerateType != GenerateType.Collection;
+        var circularRead = isObject ? model.DescribeCircularRead() : null;
         return new TypeShape(
             declaration.FullyQualifiedToString(),
             target.FullyQualifiedToString(),
@@ -61,13 +63,19 @@ internal sealed record TypeShape(
             !isExternalFormatter && !model.IsUnion && model.GenerateType == GenerateType.Collection
                 ? CollectionShape.Capture(target, references) : null,
             isObject ? AotDependencyFacts.Capture(model.Members, references) : default,
-            isExternalFormatter ? default : GeneratedNameFacts.Capture(target, model.Members));
+            circularRead,
+            isExternalFormatter ? default : GeneratedNameFacts.Capture(target, model.Members, circularRead is not null));
 
         static IEnumerable<CallbackShape> CallbacksFor(CallbackPhase phase, IEnumerable<MethodMeta> callbacks)
             => callbacks.Select(callback => new CallbackShape(phase, callback.Name, callback.IsStatic, callback.IsValueType,
                 callback.UseReaderArgument || callback.UseWriterArgument));
     }
 }
+
+internal readonly record struct CircularReadShape(
+    bool NeedsImplicitConstructor,
+    bool SetsRequiredMembers,
+    bool ReplacesExistingValue);
 
 internal sealed record MemberShape(
     string Name,

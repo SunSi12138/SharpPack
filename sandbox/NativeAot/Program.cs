@@ -86,6 +86,14 @@ if (exactRoundTrip is not
         "The generated exact-size serializer failed under NativeAOT.");
 }
 
+var circular = new AotCircularNode { Label = "circular-aot" };
+circular.Self = circular;
+var circularRoundTrip = SharpPackSerializer.Deserialize<AotCircularNode>(SharpPackSerializer.Serialize(circular));
+if (circularRoundTrip?.Label != "circular-aot" || !ReferenceEquals(circularRoundTrip, circularRoundTrip.Self))
+{
+    throw new InvalidOperationException("Circular required init members or reference identity were lost under NativeAOT.");
+}
+
 var unmanagedFormatted = new AotUnmanagedFormatted
 {
     Value = 30_000,
@@ -429,6 +437,13 @@ public partial class AotExactSizeModel
     public int Id { get; set; }
     public string? Name { get; set; }
     public byte[]? Payload { get; set; }
+}
+
+[SharpPackable(GenerateType.CircularReference, SerializeLayout.Sequential)]
+public partial class AotCircularNode
+{
+    public required string Label { get; init; }
+    public AotCircularNode? Self { get; set; }
 }
 
 [SharpPackable]
