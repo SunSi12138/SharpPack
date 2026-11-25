@@ -51,7 +51,21 @@ internal sealed record CollectionShape(CollectionKind Kind, EquatableArray<strin
 
 internal sealed record UnionCaseShape(ushort Tag, string TypeName, bool UsePackablePath);
 
-internal sealed record ExternalUnionFormatterShape(string Name, EquatableArray<TypeParameterShape> TypeParameters);
+internal sealed record ExternalUnionFormatterShape(
+    string Name, string Namespace, string QualifiedName, EquatableArray<TypeParameterShape> TypeParameters)
+{
+    internal static ExternalUnionFormatterShape Capture(INamedTypeSymbol formatter)
+        => new(formatter.Name,
+            formatter.ContainingNamespace.IsGlobalNamespace ? "" : formatter.ContainingNamespace.ToDisplayString(),
+            QualifyName(formatter), TypeParameterShape.CaptureAll(formatter));
+
+    internal static string QualifyName(INamedTypeSymbol formatter)
+    {
+        var ns = formatter.ContainingNamespace;
+        var prefix = ns.IsGlobalNamespace ? "global::" : ns.FullyQualifiedToString() + ".";
+        return prefix + formatter.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+    }
+}
 
 internal sealed record UnionShape(
     string TypeName, EquatableArray<UnionCaseShape> Cases, ExternalUnionFormatterShape? ExternalFormatter)
@@ -59,15 +73,18 @@ internal sealed record UnionShape(
     internal static UnionShape Capture(TypeMeta model, ReferenceSymbols references, INamedTypeSymbol? externalFormatter)
     {
         var target = model.Symbol;
+        var arguments = target.IsUnboundGenericType && externalFormatter is not null && target.Arity == externalFormatter.Arity
+            ? externalFormatter.TypeParameters.Cast<ITypeSymbol>()
+            : target.TypeArguments;
         var targetArguments = target.IsGenericType
-            ? string.Join(", ", target.TypeArguments.Select(static argument => argument.FullyQualifiedToString())) : null;
+            ? string.Join(", ", arguments.Select(static argument => argument.FullyQualifiedToString())) : null;
 
         return new(ConstructName(target),
             new EquatableArray<UnionCaseShape>(model.UnionTags.Select(item => new UnionCaseShape(
                 item.Tag, ConstructName(item.Type),
                 item.Type.TryGetSharpPackableType(references, out var kind, out _) &&
                     kind is GenerateType.Object or GenerateType.VersionTolerant or GenerateType.CircularReference))),
-            externalFormatter is null ? null : new(externalFormatter.Name, TypeParameterShape.CaptureAll(externalFormatter)));
+            externalFormatter is null ? null : ExternalUnionFormatterShape.Capture(externalFormatter));
 
         string ConstructName(INamedTypeSymbol type)
         {

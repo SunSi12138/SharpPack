@@ -48,6 +48,16 @@ independently of the builder. A built context is safe to share between
 concurrent RPC calls. Different contexts may register different formatters for
 the same closed `T` without affecting each other.
 
+### Register an external union formatter
+
+When a formatter declared with `[SharpPackUnionFormatter]` lives in a separate
+assembly from its union contract, register it on the context builder with the
+generated `Register<FormatterName>` extension, such as `.RegisterMessageFormatter()`.
+Import the **union contract's namespace** to bring that extension into scope.
+The formatter itself stays in the namespace where it was declared. For an open
+generic union, the formatter's type parameters bind to the contract by position;
+their names can differ.
+
 ### Register a Brotli formatter
 
 To compress a type whenever its formatter is selected in a context, wrap its

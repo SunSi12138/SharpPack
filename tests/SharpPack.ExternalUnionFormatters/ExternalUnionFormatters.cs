@@ -11,5 +11,5 @@ public partial class ExternalUnionFormatter;
 [SharpPackUnionFormatter(typeof(IExternalGenericUnion<>))]
 [SharpPackUnion(21, typeof(ExternalGenericUnionA<>))]
 [SharpPackUnion(22, typeof(ExternalGenericUnionB<>))]
-public partial class ExternalGenericUnionFormatter<T>
-    where T : class?;
+public partial class ExternalGenericUnionFormatter<TValue>
+    where TValue : class?;

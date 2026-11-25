@@ -177,15 +177,10 @@ partial class SharpPackGenerator
         INamedTypeSymbol target,
         ExternalUnionFactoryEntry entry)
     {
-        if (entry.Formatter.TypeParameters.Length == 0)
-        {
-            return entry.Formatter.Name;
-        }
-
-        var typeArguments = string.Join(
-            ", ",
-            target.TypeParameters.Select(static parameter => parameter.Name));
-        return $"{entry.Formatter.Name}<{typeArguments}>";
+        var formatter = entry.Formatter;
+        if (formatter.Arity != 0)
+            formatter = formatter.Construct(target.TypeParameters.Cast<ITypeSymbol>().ToArray());
+        return ExternalUnionFormatterShape.QualifyName(formatter);
     }
 
     readonly record struct ExternalUnionFactoryEntry(INamedTypeSymbol Formatter, INamedTypeSymbol Union);
