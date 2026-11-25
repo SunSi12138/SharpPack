@@ -143,7 +143,7 @@ public class TypeShapeTest
         Assert.Empty(default(EquatableArray<string>));
     }
 
-    static TypeShape Analyze(string text, string name, string unrelated = "")
+    internal static TypeShape Analyze(string text, string name, string unrelated = "")
     {
         var options = new CSharpParseOptions(LanguageVersion.CSharp14);
         var tree = CSharpSyntaxTree.ParseText(text, options, "Models.cs");
