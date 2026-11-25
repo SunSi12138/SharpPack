@@ -32,7 +32,6 @@ internal sealed partial class CSharpEmitter
         code.AppendLine($$"""
 partial union {{Shape.ShortName}} : {{packable}}, {{factory}}
 {
-    static partial void StaticConstructor();
 {{EmitSelfFactoryRoots(selfFactoryRoot, includeContextFactory: false)}}
     [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<{{type}}> {{factory}}.CreateFormatter()

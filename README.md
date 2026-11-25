@@ -353,7 +353,8 @@ Reading restored = SharpPackSerializer.Deserialize<Reading>(bytes);
 ```
 
 The tag is part of the binary schema; reordering cases does not change it.
-Cases need distinct concrete runtime types and supported formatters. A
+Cases need distinct concrete runtime types and supported formatters. A reference
+case is serialized only when its value has the exact declared runtime type. A
 nullable value case uses its underlying type when boxed, so `int` and `int?`
 cannot both be cases in the same union. Empty contents, including a null case
 value, use the empty union representation. Existing interface and abstract

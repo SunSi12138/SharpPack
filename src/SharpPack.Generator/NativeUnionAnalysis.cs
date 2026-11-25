@@ -24,7 +24,7 @@ internal static class NativeUnionAnalysis
     }
 
     internal static TypeShape? Analyze(TypeDeclarationSyntax syntax, INamedTypeSymbol symbol, ReferenceSymbols references,
-        Action<Diagnostic> report)
+        CancellationToken cancellationToken, Action<Diagnostic> report)
     {
         symbol.TryGetSharpPackableType(references, out var mode, out var layout);
         if (mode == GenerateType.NoGenerate) return null;
@@ -37,6 +37,9 @@ internal static class NativeUnionAnalysis
         var tags = new HashSet<ushort>();
         var runtimeTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
         var cases = new List<UnionCaseShape>(mappings.Length);
+        var graph = new SidecarGraph(references.Compilation, []);
+        var factories = new List<AotFactoryRoot>();
+        var formatters = new List<string>();
         foreach (var (tag, caseType) in mappings)
         {
             if (!tags.Add(tag)) return Error($"wire tag {tag} is duplicated");
@@ -45,11 +48,26 @@ internal static class NativeUnionAnalysis
 
             var boxed = caseType is INamedTypeSymbol
                 { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable ? nullable.TypeArguments[0] : caseType;
-            if (boxed.TypeKind == TypeKind.Interface || boxed.IsAbstract ||
-                MemberMeta.ParseMemberKind(null, boxed, references) is MemberKind.NonSerializable or MemberKind.RefLike)
+            if (boxed.TypeKind == TypeKind.Interface || boxed.IsAbstract)
                 return Error($"case '{caseType}' needs a supported concrete formatter type");
             if (!runtimeTypes.Add(boxed))
                 return Error($"case '{caseType}' has the same boxed type as another case");
+
+            // Use the same type graph for validation and NativeAOT roots. A
+            // native union calls the regular resolver, so it cannot use
+            // formatter code that only an explicit sidecar can generate.
+            var (nodes, failure) = graph.Walk(caseType, cancellationToken);
+            if (failure is not null)
+                return Error($"case '{caseType}' at '{failure.Path}': {failure.Reason}");
+            foreach (var node in nodes)
+            {
+                if (node.Sidecar is not null)
+                    return Error($"case dependency '{node.Type}' needs a built-in or type-owned formatter");
+                if (node.BuiltInFormatter is { } formatter)
+                    formatters.Add(formatter);
+                if (node.Factory != TypeOwnedFactory.None)
+                    factories.Add(new(node.Type.FullyQualifiedToString(), node.Factory == TypeOwnedFactory.Context));
+            }
 
             cases.Add(new(tag, caseType.FullyQualifiedToString(), UsePackablePath: false, caseType.Name, boxed.FullyQualifiedToString()));
         }
@@ -64,8 +82,9 @@ internal static class NativeUnionAnalysis
             Members: default, ConstructorParameters: default, Callbacks: default,
             ContainingTypes: PartialTypeShape.CaptureContainers(symbol),
             Union: new(qualifiedName, new EquatableArray<UnionCaseShape>(cases), ExternalFormatter: null, IsNative: true),
-            Collection: null, AotDependencies: AotDependencyFacts.Capture(mappings.Select(static entry => entry.Type), references),
-            NameFacts: GeneratedNameFacts.Capture(symbol, []));
+            Collection: null,
+            AotDependencies: new(new EquatableArray<AotFactoryRoot>(factories), new EquatableArray<string>(formatters)),
+            NameFacts: GeneratedNameFacts.CaptureForNativeUnion(symbol));
 
         TypeShape? Error(string reason)
         {

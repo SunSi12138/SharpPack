@@ -50,6 +50,12 @@ internal static class Net11
         if (!overridden.AsSpan().SequenceEqual(new byte[] { 7, 43, 0, 0, 0 }) ||
             SharpPackSerializer.Deserialize<Net11Reading>(overridden, overrideContext).Value is not 42)
             throw new InvalidOperationException("The native union did not honor its case's context formatter.");
+
+        Net11ScalarCase state = new(Net11State.Ready);
+        Net11ScalarCase stamp = new(new Net11Stamp(83));
+        if (SharpPackSerializer.Deserialize<Net11ScalarCase>(SharpPackSerializer.Serialize(state)).Value is not Net11State.Ready ||
+            SharpPackSerializer.Deserialize<Net11ScalarCase>(SharpPackSerializer.Serialize(stamp, context), context).Value is not Net11Stamp { Id: 83 })
+            throw new InvalidOperationException("A user-defined enum or unmanaged union case did not round trip.");
     }
 
     static void Check<T>(SharpPackSerializerContext context, T finite, T negativeZero, T nan, T infinity,
@@ -131,4 +137,13 @@ internal partial union Net11Token(Net11Token.Word, bool)
     {
         public string? Text { get; set; }
     }
+}
+
+internal enum Net11State : byte { Ready = 5 }
+internal readonly record struct Net11Stamp(int Id);
+
+[SharpPackable, SharpPackUnion(19, typeof(Net11State)), SharpPackUnion(27, typeof(Net11Stamp))]
+internal partial union Net11ScalarCase(Net11State, Net11Stamp)
+{
+    static Net11ScalarCase() { }
 }

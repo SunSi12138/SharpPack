@@ -11,6 +11,11 @@ internal readonly record struct GeneratedNameFacts(
 {
     internal const string SelfRootStem = "__SharpPackPreserveSelfFactoryRoots";
 
+    // A native union may already have a static constructor. Preserve its factory
+    // with a separate field initializer, without emitting another constructor.
+    internal static GeneratedNameFacts CaptureForNativeUnion(INamedTypeSymbol type)
+        => default(GeneratedNameFacts) with { SelfRootIdentifiers = CaptureFactoryIdentifiers(type, SelfRootStem) };
+
     internal static GeneratedNameFacts Capture(INamedTypeSymbol type, MemberMeta[] members)
     {
         var memberNames = type.GetAllMembers().Select(static member => member.Name)
