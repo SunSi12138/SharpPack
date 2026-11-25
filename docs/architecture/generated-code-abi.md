@@ -82,6 +82,25 @@ Snapshot text is a detector rather than a promise of forever-identical source.
 An intentional update must state whether it changes ABI, wire bytes, allocation
 behavior, or only implementation text.
 
+## Version handshake
+
+Keep `SharpPack.Core` and `SharpPack.Generator` aligned when using the split
+packages. The aggregate `SharpPack` package supplies both. This generator
+accepts ABI 1, identified by
+`SharpPack.CompilerServices.SharpPackGeneratedCodeContract.Version` in Core.
+The value versions the generated-code contract, not NuGet or the wire format.
+
+If a project uses SharpPack generator attributes with an incompatible runtime,
+the generator reports one `SHARPPACK043` on a source declaration and skips
+generation. The diagnostic shows the detected and required ABI. It reads the
+marker from the runtime assembly, not a consumer-defined type with the same
+name. Projects without SharpPack generator attributes need no runtime marker.
+
+The handshake does not remove the runtime members used by existing generated
+assemblies. Compatibility with an older standalone generator depends on the
+specific package pair and deployment mode; trimmed deployments must also
+follow the AOT migration below.
+
 ## Deserialize-only NativeAOT roots
 
 Generic deserialization retains `NonPublicConstructors`, including generated

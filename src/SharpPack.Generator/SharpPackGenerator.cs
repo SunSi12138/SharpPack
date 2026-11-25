@@ -37,13 +37,71 @@ public partial class SharpPackGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        // no need RegisterPostInitializationOutput
+        var unsupportedAbi = context.CompilationProvider
+            .Select(static (compilation, _) => RuntimeGeneratedCodeAbi.GetUnsupportedVersion(compilation))
+            .WithTrackingName("SharpPack.RuntimeAbi");
 
-        RegisterSharpPackable(context);
-        RegisterTypeScript(context);
+        var models = context.SyntaxProvider.ForAttributeWithMetadataName(
+                SharpPackableAttributeFullName,
+                static (node, _) => node is ClassDeclarationSyntax or StructDeclarationSyntax or RecordDeclarationSyntax or InterfaceDeclarationSyntax,
+                static (context, _) => (TypeDeclarationSyntax)context.TargetNode)
+            .WithTrackingName("SharpPack.SharpPackable.1_ForAttributeSharpPackableAttribute");
+        var unions = context.SyntaxProvider.ForAttributeWithMetadataName(
+                SharpPackUnionFormatterAttributeFullName,
+                static (node, _) => node is ClassDeclarationSyntax,
+                static (context, _) => (TypeDeclarationSyntax)context.TargetNode)
+            .WithTrackingName("SharpPack.SharpPackable.1_ForAttributeSharpPackUnion");
+        var typeScript = context.SyntaxProvider.ForAttributeWithMetadataName(
+            GenerateTypeScriptAttributeFullName,
+            static (node, _) => node is ClassDeclarationSyntax or RecordDeclarationSyntax or InterfaceDeclarationSyntax,
+            static (context, _) => (TypeDeclarationSyntax)context.TargetNode);
+
+        ReportRuntimeAbiMismatch(context, models, unions, typeScript, unsupportedAbi);
+        RegisterSharpPackable(context, CompatibleDeclarations(models, unsupportedAbi), CompatibleDeclarations(unions, unsupportedAbi));
+        RegisterTypeScript(context, CompatibleDeclarations(typeScript, unsupportedAbi));
     }
 
-    void RegisterSharpPackable(IncrementalGeneratorInitializationContext context)
+    static IncrementalValuesProvider<TypeDeclarationSyntax> CompatibleDeclarations(
+        IncrementalValuesProvider<TypeDeclarationSyntax> declarations, IncrementalValueProvider<string?> unsupportedAbi)
+        => declarations.Combine(unsupportedAbi)
+            .Where(static pair => pair.Right is null)
+            .Select(static (pair, _) => pair.Left);
+
+    static void ReportRuntimeAbiMismatch(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValuesProvider<TypeDeclarationSyntax> models,
+        IncrementalValuesProvider<TypeDeclarationSyntax> unions,
+        IncrementalValuesProvider<TypeDeclarationSyntax> typeScript,
+        IncrementalValueProvider<string?> unsupportedAbi)
+    {
+        IncrementalValuesProvider<(TypeDeclarationSyntax Left, string? Right)> Incompatible(
+            IncrementalValuesProvider<TypeDeclarationSyntax> declarations)
+            => declarations.Combine(unsupportedAbi).Where(static pair => pair.Right is not null);
+
+        var uses = Incompatible(models).Collect().Combine(Incompatible(unions).Collect())
+            .Combine(Incompatible(typeScript).Collect());
+        context.RegisterSourceOutput(uses, static (output, declarations) =>
+        {
+            var first = declarations.Left.Left.Concat(declarations.Left.Right).Concat(declarations.Right)
+                .OrderBy(static item => item.Left.SyntaxTree.FilePath, StringComparer.Ordinal)
+                .ThenBy(static item => item.Left.SpanStart)
+                .FirstOrDefault();
+            if (first.Left is not null)
+            {
+                output.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.IncompatibleRuntimeAbi,
+                    first.Left.Identifier.GetLocation(),
+                    first.Right,
+                    RuntimeGeneratedCodeAbi.MinimumVersion,
+                    RuntimeGeneratedCodeAbi.MaximumVersion));
+            }
+        });
+    }
+
+    void RegisterSharpPackable(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValuesProvider<TypeDeclarationSyntax> models,
+        IncrementalValuesProvider<TypeDeclarationSyntax> unions)
     {
         // return dir of info output or null .
         var logProvider = context.AnalyzerConfigOptionsProvider
@@ -67,36 +125,8 @@ public partial class SharpPackGenerator : IIncrementalGenerator
             })
             .WithTrackingName("SharpPack.SharpPackable.0_ParseOptionsProvider");
 
-        var typeDeclarations = context.SyntaxProvider.ForAttributeWithMetadataName(
-                SharpPackableAttributeFullName,
-                predicate: static (node, token) =>
-                {
-                    // search [SharpPackable] class or struct or interface or record
-                    return (node is ClassDeclarationSyntax
-                                 or StructDeclarationSyntax
-                                 or RecordDeclarationSyntax
-                                 or InterfaceDeclarationSyntax);
-                },
-                transform: static (context, token) =>
-                {
-                    return (TypeDeclarationSyntax)context.TargetNode;
-                })
-                .WithTrackingName("SharpPack.SharpPackable.1_ForAttributeSharpPackableAttribute");
-
-        var typeDeclarations2 = context.SyntaxProvider.ForAttributeWithMetadataName(
-                SharpPackUnionFormatterAttributeFullName,
-                predicate: static (node, token) =>
-                {
-                    return (node is ClassDeclarationSyntax);
-                },
-                transform: static (context, token) =>
-                {
-                    return (TypeDeclarationSyntax)context.TargetNode;
-                })
-                .WithTrackingName("SharpPack.SharpPackable.1_ForAttributeSharpPackUnion");
-
         {
-            var source = typeDeclarations
+            var source = models
                 .Combine(context.CompilationProvider)
                 .Combine(logProvider)
                 .Combine(parseOptions)
@@ -112,7 +142,7 @@ public partial class SharpPackGenerator : IIncrementalGenerator
             });
         }
         {
-            var source = typeDeclarations2
+            var source = unions
                 .Combine(context.CompilationProvider)
                 .Combine(logProvider)
                 .Combine(parseOptions)
@@ -128,7 +158,7 @@ public partial class SharpPackGenerator : IIncrementalGenerator
             });
         }
         {
-            var source = typeDeclarations2
+            var source = unions
                 .Collect()
                 .Combine(context.CompilationProvider)
                 .Combine(parseOptions)
@@ -149,7 +179,9 @@ public partial class SharpPackGenerator : IIncrementalGenerator
         }
     }
 
-    void RegisterTypeScript(IncrementalGeneratorInitializationContext context)
+    void RegisterTypeScript(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValuesProvider<TypeDeclarationSyntax> typeScriptDeclarations)
     {
         var typeScriptEnabled = context.AnalyzerConfigOptionsProvider
             .Select((configOptions, token) =>
@@ -192,19 +224,6 @@ public partial class SharpPackGenerator : IIncrementalGenerator
                     IsDesignTimeBuild = isDesignTimeBuild
                 };
             });
-
-        var typeScriptDeclarations = context.SyntaxProvider.ForAttributeWithMetadataName(
-                GenerateTypeScriptAttributeFullName,
-                predicate: static (node, token) =>
-                {
-                    return (node is ClassDeclarationSyntax
-                                 or RecordDeclarationSyntax
-                                 or InterfaceDeclarationSyntax);
-                },
-                transform: static (context, token) =>
-                {
-                    return (TypeDeclarationSyntax)context.TargetNode;
-                });
 
         var typeScriptGenerateSource = typeScriptDeclarations
             .Combine(context.CompilationProvider)
