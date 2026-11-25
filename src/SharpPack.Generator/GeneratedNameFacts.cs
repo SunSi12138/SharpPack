@@ -11,6 +11,22 @@ internal readonly record struct GeneratedNameFacts(
 {
     internal const string SelfRootStem = "__SharpPackPreserveSelfFactoryRoots";
 
+    internal static string ChooseWriterTypeParameter(INamedTypeSymbol type)
+    {
+        var name = "TBufferWriter";
+        while (IsInScope(type, name))
+            name += "_";
+        return name;
+
+        static bool IsInScope(INamedTypeSymbol type, string name)
+        {
+            for (INamedTypeSymbol? current = type; current is not null; current = current.ContainingType)
+                if (current.TypeParameters.Any(parameter => parameter.Name == name))
+                    return true;
+            return false;
+        }
+    }
+
     // A native union may already have a static constructor. Preserve its factory
     // with a separate field initializer, without emitting another constructor.
     internal static GeneratedNameFacts CaptureForNativeUnion(INamedTypeSymbol type)

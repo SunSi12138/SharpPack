@@ -96,7 +96,8 @@ internal static class NativeUnionAnalysis
             Union: new(qualifiedName, new EquatableArray<UnionCaseShape>(cases), ExternalFormatter: null, IsNative: true),
             Collection: null,
             AotDependencies: new(new EquatableArray<AotFactoryRoot>(factories), new EquatableArray<string>(formatters)),
-            NameFacts: GeneratedNameFacts.CaptureForNativeUnion(symbol));
+            NameFacts: GeneratedNameFacts.CaptureForNativeUnion(symbol),
+            WriterTypeParameter: GeneratedNameFacts.ChooseWriterTypeParameter(symbol));
 
         TypeShape? Error(string reason)
         {
