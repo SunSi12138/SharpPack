@@ -612,6 +612,33 @@ Also the member name is automatically converted to camelCase. If you want to use
 
 `SharpPackGenerator_TypeScriptEnableNullableTypes` allows C# nullable annotations to be reflected in TypeScript code. The default is false, making everything nullable.
 
+### Generate project artifacts after compilation
+
+Set `SharpPackToolingEnabled` to let `dotnet build` write TypeScript and optional
+serialization-info files after a successful compilation. Keep your existing
+output directories and TypeScript options.
+
+```xml
+<PropertyGroup>
+    <SharpPackToolingEnabled>true</SharpPackToolingEnabled>
+    <SharpPackGenerator_TypeScriptOutputDirectory>$(MSBuildProjectDirectory)/wwwroot/js/sharppack</SharpPackGenerator_TypeScriptOutputDirectory>
+    <SharpPackGenerator_SerializationInfoOutputDirectory>$(BaseIntermediateOutputPath)SharpPackLogs</SharpPackGenerator_SerializationInfoOutputDirectory>
+</PropertyGroup>
+```
+
+Use one output directory per project (the two SharpPack outputs in the same
+project may share a directory). SharpPack keeps an ownership file next to the
+generated files and removes only unchanged files it previously generated and
+no longer needs. It leaves unrelated files and customized TypeScript runtime
+files alone. IDE design-time builds do not write artifacts. A multi-targeted
+build writes artifacts only after all frameworks succeed. The first framework
+supplies the artifacts; set `SharpPackToolingTargetFramework` to pick another.
+
+For a directory created by the legacy generator, build into a new directory or
+run one build with `-p:SharpPackToolingAdoptExisting=true`. Adoption claims only
+files that exactly match the current output. Move any edited model or log file
+out of the directory before retrying a build that reports a conflict.
+
 Streaming Serialization
 ---
 `SharpPack.Streaming` provides `SharpPackStreamingSerializer` for collection streaming and framed item transports.

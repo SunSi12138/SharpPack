@@ -241,6 +241,81 @@ public partial class Hoge
     }
 
 
+    [Fact]
+    public void CompilerArtifactPlanRendersTheLegacyOutputsWithoutWritingThem()
+    {
+        const string source = """
+            [SharpPackable, GenerateTypeScript, SharpPackUnion(19, typeof(Update))]
+            public partial interface IEvent;
+
+            [SharpPackable, GenerateTypeScript]
+            public partial class Update : IEvent
+            {
+                public string? Description { get; set; }
+                public State Status { get; set; }
+            }
+
+            public enum State : byte { Active = 1, Closed = 4 }
+            """;
+
+        var root = Directory.CreateTempSubdirectory("SharpPack artifact plan 测试 ");
+        var legacyDirectory = Path.Combine(root.FullName, "legacy");
+        var toolDirectory = Path.Combine(root.FullName, "tool");
+        try
+        {
+            var (_, legacyDiagnostics) = CSharpGeneratorRunner.RunGenerator(source, options: Options(legacyDirectory));
+            Assert.Empty(legacyDiagnostics);
+
+            var tooling = Options(toolDirectory);
+            tooling["build_property.SharpPackGenerator_ArtifactMode"] = "plan";
+            var (compilation, diagnostics) = CSharpGeneratorRunner.RunGenerator(source, options: tooling);
+            Assert.Empty(diagnostics);
+            Assert.False(Directory.Exists(toolDirectory));
+
+            var schema = Assert.Single(compilation.SyntaxTrees, tree => tree.FilePath.EndsWith(ArtifactSchema.FileName, StringComparison.Ordinal));
+            var text = schema.ToString();
+            using var reader = new StringReader(text);
+            var plan = ArtifactSchema.ReadSource(reader);
+            Assert.Equal(text, ArtifactSchema.WriteSource(plan));
+            var script = Assert.IsType<TypeScriptArtifactPlan>(plan.TypeScript);
+            var files = script.Models.Select(model => (model.Name + ".ts", TypeScriptEmitter.EmitModelFile(model, script.ImportExtension)))
+                .Concat(script.Enums.Select(model => (model.Name + ".ts", TypeScriptEmitter.EmitEnumFile(model))))
+                .Concat(TypeScriptEmitter.RuntimeFiles())
+                .Concat(plan.SerializationInfo.Select(model => (model.FileName, model.Text)))
+                .OrderBy(file => file.Item1, StringComparer.Ordinal).ToArray();
+
+            Assert.Equal(Directory.GetFiles(legacyDirectory).Select(Path.GetFileName).OrderBy(name => name, StringComparer.Ordinal),
+                files.Select(file => file.Item1));
+            foreach (var (name, contents) in files)
+                Assert.Equal(Encoding.UTF8.GetBytes(contents), File.ReadAllBytes(Path.Combine(legacyDirectory, name)));
+
+            foreach (var (mode, designTime) in new[] { ("plan", "true"), ("none", "false") })
+            {
+                tooling["build_property.SharpPackGenerator_ArtifactMode"] = mode;
+                tooling["build_property.DesignTimeBuild"] = designTime;
+                var (disabled, _) = CSharpGeneratorRunner.RunGenerator(source, options: tooling);
+                Assert.DoesNotContain(disabled.SyntaxTrees, tree => tree.FilePath.EndsWith(ArtifactSchema.FileName, StringComparison.Ordinal));
+                Assert.False(Directory.Exists(toolDirectory));
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(legacyDirectory))
+            {
+                foreach (var file in Directory.GetFiles(legacyDirectory)) File.Delete(file);
+                Directory.Delete(legacyDirectory);
+            }
+            root.Delete();
+        }
+
+        static TypeScriptOptionProvider Options(string path) => new()
+        {
+            ["build_property.SharpPackGenerator_TypeScriptOutputDirectory"] = path,
+            ["build_property.SharpPackGenerator_TypeScriptImportExtension"] = ".mjs",
+            ["build_property.SharpPackGenerator_SerializationInfoOutputDirectory"] = path,
+        };
+    }
+
     internal sealed class TypeScriptOptionProvider : AnalyzerConfigOptionsProvider
     {
         readonly Dictionary<string, string> _values = new();

@@ -1,0 +1,109 @@
+<Project>
+    <PropertyGroup>
+        <SharpPackToolingEnabled Condition="'$(SharpPackToolingEnabled)' == ''">false</SharpPackToolingEnabled>
+        <_SharpPackToolingPath Condition="'$(_SharpPackToolingPath)' == ''">$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', 'tools', 'net10.0', 'SharpPack.Tooling.dll'))</_SharpPackToolingPath>
+        <SharpPackToolingTargetFramework Condition="'$(SharpPackToolingTargetFramework)' == '' and '$(TargetFrameworks)' != ''">$(TargetFrameworks.Split(';')[0])</SharpPackToolingTargetFramework>
+        <SharpPackGenerator_ArtifactMode Condition="'$(SharpPackToolingEnabled)' == 'true'">none</SharpPackGenerator_ArtifactMode>
+        <_SharpPackArtifactsConfigured Condition="'$(SharpPackToolingEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'
+                   and '$(SkipCompilerExecution)' != 'true'
+                   and ('$(SharpPackGenerator_TypeScriptOutputDirectory)' != '' or '$(SharpPackGenerator_SerializationInfoOutputDirectory)' != '')">true</_SharpPackArtifactsConfigured>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(SharpPackToolingEnabled)' == 'true'">
+        <CompilerVisibleProperty Include="SharpPackGenerator_ArtifactMode;DesignTimeBuild" Exclude="@(CompilerVisibleProperty)" />
+    </ItemGroup>
+
+    <Target Name="_SharpPackPrepareArtifacts"
+            BeforeTargets="GenerateMSBuildEditorConfigFileShouldRun;CreateCompilerGeneratedFilesOutputPath;CoreCompile"
+            Condition="'$(_SharpPackArtifactsConfigured)' == 'true' and '$(BuildingProject)' == 'true' and '$(TargetFramework)' != ''
+                   and ('$(SharpPackToolingTargetFramework)' == '' or '$(TargetFramework)' == '$(SharpPackToolingTargetFramework)')">
+        <PropertyGroup>
+            <SharpPackGenerator_ArtifactMode>plan</SharpPackGenerator_ArtifactMode>
+            <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+            <CompilerGeneratedFilesOutputPath Condition="'$(CompilerGeneratedFilesOutputPath)' == ''">$(IntermediateOutputPath)generated</CompilerGeneratedFilesOutputPath>
+            <_SharpPackArtifactSource>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(CompilerGeneratedFilesOutputPath)', 'SharpPack.Generator', 'SharpPack.Generator.SharpPackGenerator', 'SharpPack.ToolingArtifacts.g.cs'))</_SharpPackArtifactSource>
+            <_SharpPackArtifactOptions>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'SharpPack.Tooling.options'))</_SharpPackArtifactOptions>
+        </PropertyGroup>
+        <ItemGroup>
+            <CompilerVisibleProperty Include="SharpPackGenerator_TypeScriptOutputDirectory;SharpPackGenerator_SerializationInfoOutputDirectory"
+                                     Exclude="@(CompilerVisibleProperty)" />
+            <CompilerVisibleProperty Include="SharpPackGenerator_TypeScriptImportExtension" Exclude="@(CompilerVisibleProperty)" Condition="'$(SharpPackGenerator_TypeScriptImportExtension)' != ''" />
+            <CompilerVisibleProperty Include="SharpPackGenerator_TypeScriptConvertPropertyName" Exclude="@(CompilerVisibleProperty)" Condition="'$(SharpPackGenerator_TypeScriptConvertPropertyName)' != ''" />
+            <CompilerVisibleProperty Include="SharpPackGenerator_TypeScriptEnableNullableTypes" Exclude="@(CompilerVisibleProperty)" Condition="'$(SharpPackGenerator_TypeScriptEnableNullableTypes)' != ''" />
+            <CustomAdditionalCompileOutputs Include="$(_SharpPackArtifactSource)" />
+            <FileWrites Include="$(_SharpPackArtifactSource);$(_SharpPackArtifactOptions)" />
+        </ItemGroup>
+        <MakeDir Directories="$(CompilerGeneratedFilesOutputPath)" />
+    </Target>
+
+    <Target Name="_SharpPackObserveArtifactPlan" BeforeTargets="CoreCompile" DependsOnTargets="_SharpPackPrepareArtifacts"
+            Condition="'$(_SharpPackArtifactSource)' != ''">
+        <Error Condition="'@(Analyzer->AnyHaveMetadataValue('Filename', 'SharpPack.Generator'))' != 'true'"
+               Text="SharpPack artifact tooling needs the matching SharpPack analyzer in this build." />
+        <ItemGroup>
+            <_SharpPackPlanBeforeCompile Include="$(_SharpPackArtifactSource)" />
+        </ItemGroup>
+        <PropertyGroup>
+            <_SharpPackPreviousPlanTime>@(_SharpPackPlanBeforeCompile->'%(ModifiedTime)')</_SharpPackPreviousPlanTime>
+            <!-- Called inside CoreCompile only when Csc actually executes, not for an up-to-date build. -->
+            <TargetsTriggeredByCompilation>$(TargetsTriggeredByCompilation);_SharpPackRequireFreshArtifactPlan</TargetsTriggeredByCompilation>
+        </PropertyGroup>
+    </Target>
+
+    <Target Name="_SharpPackRequireFreshArtifactPlan">
+        <ItemGroup>
+            <_SharpPackPlanAfterCompile Include="$(_SharpPackArtifactSource)" />
+        </ItemGroup>
+        <PropertyGroup>
+            <_SharpPackPlanUnchanged Condition="!Exists('$(_SharpPackArtifactSource)') or '@(_SharpPackPlanAfterCompile->'%(ModifiedTime)')' == '$(_SharpPackPreviousPlanTime)'">true</_SharpPackPlanUnchanged>
+        </PropertyGroup>
+        <Delete Files="$(_SharpPackArtifactSource)" Condition="'$(_SharpPackPlanUnchanged)' == 'true'" />
+        <Error Condition="'$(_SharpPackPlanUnchanged)' == 'true'" Text="The SharpPack analyzer did not write a fresh artifact plan during compilation. Ensure the matching analyzer runs during this build." />
+    </Target>
+
+    <!-- The SDK's DispatchToInnerBuilds passes AdditionalProperties to each framework.
+         Keep its target list unchanged: a sibling may not reference SharpPack.
+         Key the marker to this project so project references do not inherit the deferral. -->
+    <Target Name="_SharpPackDeferInnerArtifactWrites" BeforeTargets="DispatchToInnerBuilds"
+            Condition="'$(IsCrossTargetingBuild)' == 'true' and '$(InnerTargets)' == 'Build'
+                   and '$(DesignTimeBuild)' != 'true' and '$(SkipCompilerExecution)' != 'true'">
+        <PropertyGroup>
+            <_SharpPackDeferralParameter>_SharpPackOuterArtifactOwner=$([MSBuild]::Escape($(MSBuildProjectFullPath)))</_SharpPackDeferralParameter>
+        </PropertyGroup>
+        <ItemGroup>
+            <_InnerBuildProjects>
+                <AdditionalProperties>%(_InnerBuildProjects.AdditionalProperties);$(_SharpPackDeferralParameter)</AdditionalProperties>
+            </_InnerBuildProjects>
+        </ItemGroup>
+    </Target>
+    <Target Name="_SharpPackWriteOuterArtifacts" AfterTargets="Build"
+            Condition="'$(_SharpPackDeferralParameter)' != ''">
+        <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="_SharpPackWriteArtifacts"
+                 Properties="TargetFramework=$(SharpPackToolingTargetFramework);$(_SharpPackDeferralParameter)"
+                 SkipNonexistentTargets="true" />
+    </Target>
+    <Target Name="_SharpPackWriteInnerArtifacts" AfterTargets="Build" DependsOnTargets="_SharpPackWriteArtifacts"
+            Condition="'$(_SharpPackArtifactSource)' != '' and '$(_SharpPackOuterArtifactOwner)' != '$(MSBuildProjectFullPath)'" />
+
+    <Target Name="_SharpPackWriteArtifacts" Condition="'$(_SharpPackArtifactSource)' != ''">
+        <Error Condition="!Exists('$(_SharpPackArtifactSource)')" Text="SharpPack artifact plan is missing. Ensure the matching SharpPack analyzer runs during this build." />
+        <Error Condition="!Exists('$(_SharpPackToolingPath)')" Text="SharpPack tooling is missing. Restore the matching SharpPack.Generator package." />
+        <PropertyGroup>
+            <_SharpPackDotNet Condition="'$(DotNetHostPath)' == ''">dotnet</_SharpPackDotNet>
+            <_SharpPackDotNet Condition="'$(DotNetHostPath)' != ''">$(DotNetHostPath)</_SharpPackDotNet>
+            <_SharpPackRunTool Condition="$([MSBuild]::IsOSPlatform('Windows'))">&quot;%SHARPPACK_DOTNET%&quot; &quot;%SHARPPACK_TOOL%&quot; &quot;%SHARPPACK_OPTIONS%&quot;</_SharpPackRunTool>
+            <_SharpPackRunTool Condition="!$([MSBuild]::IsOSPlatform('Windows'))">&quot;$SHARPPACK_DOTNET&quot; &quot;$SHARPPACK_TOOL&quot; &quot;$SHARPPACK_OPTIONS&quot;</_SharpPackRunTool>
+        </PropertyGroup>
+        <ItemGroup>
+            <_SharpPackToolOption Include="plan=$([MSBuild]::Escape($(_SharpPackArtifactSource)))" />
+            <_SharpPackToolOption Include="project=$([MSBuild]::Escape($(MSBuildProjectFullPath)))" />
+            <_SharpPackToolOption Include="typescript=$([MSBuild]::Escape($(SharpPackGenerator_TypeScriptOutputDirectory)))" />
+            <_SharpPackToolOption Include="serialization-info=$([MSBuild]::Escape($(SharpPackGenerator_SerializationInfoOutputDirectory)))" />
+            <_SharpPackToolOption Include="adopt=$(SharpPackToolingAdoptExisting)" />
+            <_SharpPackToolEnvironment Include="SHARPPACK_DOTNET=$([MSBuild]::Escape($(_SharpPackDotNet)))" />
+            <_SharpPackToolEnvironment Include="SHARPPACK_TOOL=$([MSBuild]::Escape($(_SharpPackToolingPath)))" />
+            <_SharpPackToolEnvironment Include="SHARPPACK_OPTIONS=$([MSBuild]::Escape($(_SharpPackArtifactOptions)))" />
+        </ItemGroup>
+        <WriteLinesToFile File="$(_SharpPackArtifactOptions)" Lines="@(_SharpPackToolOption)" Overwrite="true" WriteOnlyWhenDifferent="true" Encoding="UTF-8" />
+        <Exec Command="$(_SharpPackRunTool)" EnvironmentVariables="@(_SharpPackToolEnvironment)" WorkingDirectory="$(MSBuildProjectDirectory)" />
+    </Target>
+</Project>
