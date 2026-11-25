@@ -51,7 +51,7 @@ jobs:
               sudo apt-get install -y -qq --no-install-recommends gdb
             fi
             if command -v gdb >/dev/null; then
-              gdb -q -batch -ex 'set debuginfod enabled off' -ex run -ex 'bt 16' --args "$exe"
+              gdb -q -batch -ex 'set debuginfod enabled off' -ex run -ex 'bt 16' -ex 'frame 1' -ex 'x/24i $pc-76' --args "$exe"
             fi
             exit 1
           fi

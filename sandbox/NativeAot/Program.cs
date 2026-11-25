@@ -470,6 +470,9 @@ public partial class AotMutableCircularNode
 {
     public string? Label { get; set; }
     public AotMutableCircularNode? Self { get; set; }
+
+    [SharpPackOnSerializing]
+    static void TraceGeneratedSerialize() => Console.WriteLine("Entered the generated circular writer.");
 }
 
 [SharpPackable]
