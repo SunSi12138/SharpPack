@@ -63,6 +63,35 @@ public class SerializationPlanTest
     }
 
     [Fact]
+    public void AotRootsSeparateTypedFactoriesFromClosedFormatterInstances()
+    {
+        const string source = """
+            using SharpPack;
+            [SharpPackable] public partial class Envelope
+            {
+                public List<Leaf[]>? Entries;
+                public Leaf? Direct;
+                public IKind? Kind;
+            }
+            [SharpPackable] public partial class Leaf { public int Id; }
+            [SharpPackable, SharpPackUnion(0, typeof(Item))]
+            public partial interface IKind { }
+            [SharpPackable] public partial class Item : IKind { }
+            """;
+        var plan = SerializationPlanner.Plan(TypeShapeTest.Analyze(source, "Envelope"));
+        Assert.Equal(new[]
+        {
+            new AotFactoryRoot("global::IKind", false),
+            new AotFactoryRoot("global::Leaf", true),
+        }, plan.AotRoots.Factories.ToArray());
+        Assert.Equal(new[]
+        {
+            "global::SharpPack.Formatters.ArrayFormatter<global::Leaf>",
+            "global::SharpPack.Formatters.ListFormatter<global::Leaf[]>",
+        }, plan.AotRoots.ClosedFormatters.ToArray());
+    }
+
+    [Fact]
     public void ContextDependencySetTraversesArraysAndKnownGenericsOnlyOnce()
     {
         const string source = """

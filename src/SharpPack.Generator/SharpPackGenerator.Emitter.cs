@@ -307,7 +307,7 @@ public partial class TypeMeta
 """;
         var selfFactoryRoot = GetSelfFactoryRootName();
         var selfFactoryRootRead = EmitFactoryRootRead(selfFactoryRoot);
-        var aotFormatterRoots = EmitAotFormatterRoots("        ");
+        var aotFormatterRoots = EmitAotFormatterRoots(plan.AotRoots, "        ");
         var aotRootMethodName = "__SharpPackEnsureAotFormatterRoots";
         while (Symbol.GetAllMembers().Any(
                    member => member.Name == aotRootMethodName) ||
@@ -688,29 +688,20 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
     // The deserialization API retains model static constructors. Those roots
     // and the first factory creation retain typed dependencies without relying
     // on Roslyn's private explicit-interface metadata spelling.
-    string EmitAotFormatterRoots(string indent)
+    static string EmitAotFormatterRoots(AotRootSet roots, string indent)
     {
-        var formatterTypes = new SortedSet<string>(StringComparer.Ordinal);
-        var factoryTypes = new SortedDictionary<string, bool>(StringComparer.Ordinal);
-        var contextFactory = reference.Compilation.GetTypeByMetadataName("SharpPack.ISharpPackContextFormatterFactory`1");
-
-        foreach (var member in Members)
-        {
-            AddFormatterTypes(member.MemberType);
-        }
-
         var sb = new StringBuilder();
         // Factory methods are needed by trimmed JIT as well as NativeAOT.
-        foreach (var entry in factoryTypes)
+        foreach (var entry in roots.Factories)
         {
-            sb.AppendLine(EmitFactoryPreservation(indent, entry.Key, entry.Value));
+            sb.AppendLine(EmitFactoryPreservation(indent, entry.TypeName, entry.HasContextFactory));
         }
-        if (formatterTypes.Count != 0)
+        if (roots.ClosedFormatters.Length != 0)
         {
             sb.AppendLine(
                 $"{indent}if (!global::System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)");
             sb.AppendLine($"{indent}{{");
-            foreach (var formatterType in formatterTypes)
+            foreach (var formatterType in roots.ClosedFormatters)
             {
                 sb.AppendLine(
                     $"{indent}    global::System.GC.KeepAlive(new {formatterType}());");
@@ -718,42 +709,6 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
             sb.AppendLine($"{indent}}}");
         }
         return sb.ToString().TrimEnd('\r', '\n');
-
-        void AddFormatterTypes(ITypeSymbol type)
-        {
-            if (reference.KnownTypes.GetNonDefaultFormatterName(type) is { } formatter)
-            {
-                formatterTypes.Add(formatter);
-            }
-
-            if (type is INamedTypeSymbol model &&
-                type.TryGetSharpPackableType(reference, out var generateType, out _) &&
-                generateType != GenerateType.NoGenerate)
-            {
-                // This compilation can add a factory to a source model; for
-                // referenced assemblies, check the interface actually shipped.
-                var willGenerateContextFactory =
-                    SymbolEqualityComparer.Default.Equals(type.ContainingAssembly, reference.Compilation.Assembly) &&
-                    generateType is (GenerateType.Object or GenerateType.VersionTolerant or GenerateType.CircularReference) &&
-                    !type.ContainsAttribute(reference.SharpPackUnionAttribute);
-                var hasContextFactory = model.AllInterfaces.Any(i =>
-                    SymbolEqualityComparer.Default.Equals(i.OriginalDefinition, contextFactory) &&
-                    SymbolEqualityComparer.Default.Equals(i.TypeArguments[0], type));
-                factoryTypes[type.FullyQualifiedToString()] = willGenerateContextFactory || hasContextFactory;
-            }
-
-            if (type is IArrayTypeSymbol array)
-            {
-                AddFormatterTypes(array.ElementType);
-            }
-            else if (type is INamedTypeSymbol named)
-            {
-                foreach (var argument in named.TypeArguments)
-                {
-                    AddFormatterTypes(argument);
-                }
-            }
-        }
     }
 
     string EmitSerializeBody(MemberMeta[] members, SerializationPlan plan)

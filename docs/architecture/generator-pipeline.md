@@ -33,6 +33,11 @@ the effective slots need an override formatter. Analysis follows arrays and
 known generic formatter types once and does not traverse a member with an
 explicit custom formatter.
 
-Remaining per-member operations, AOT roots and other wire strategies move to
-the plan next. An unchanged shape can skip planning and emission only after it
-captures every input those stages actually use.
+The AOT root set separates typed factories from closed formatter instances.
+Analysis records which model factories can provide context; the planner sorts
+and deduplicates the dependencies. The emitter preserves typed factories for
+trimming and keeps closed formatter instances only without dynamic code.
+
+Remaining per-member operations, generated root names and other wire strategies
+move to the plan next. An unchanged shape can skip planning and emission only
+after it captures every input those stages actually use.

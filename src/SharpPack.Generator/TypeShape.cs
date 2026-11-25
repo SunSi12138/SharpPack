@@ -20,7 +20,8 @@ internal sealed record TypeShape(
     EquatableArray<MemberShape> Members,
     EquatableArray<ParameterShape> ConstructorParameters,
     EquatableArray<CallbackShape> Callbacks,
-    EquatableArray<UnionCaseShape> UnionCases)
+    EquatableArray<UnionCaseShape> UnionCases,
+    AotDependencyFacts AotDependencies)
 {
     internal static TypeShape Create(INamedTypeSymbol declaration, TypeMeta model, ReferenceSymbols references)
     {
@@ -51,7 +52,10 @@ internal sealed record TypeShape(
                     .Concat(CallbacksFor(CallbackPhase.Deserializing, model.OnDeserializing))
                     .Concat(CallbacksFor(CallbackPhase.Deserialized, model.OnDeserialized))),
             new EquatableArray<UnionCaseShape>(model.UnionTags.Select(static item =>
-                new UnionCaseShape(item.Tag, item.Type.FullyQualifiedToString()))));
+                new UnionCaseShape(item.Tag, item.Type.FullyQualifiedToString()))),
+            model.IsUnion || model.GenerateType == GenerateType.Collection
+                ? default
+                : AotDependencyFacts.Capture(model.Members, references));
 
         static IEnumerable<CallbackShape> CallbacksFor(CallbackPhase phase, IEnumerable<MethodMeta> callbacks)
             => callbacks.Select(callback => new CallbackShape(phase, callback.Name, callback.IsStatic, callback.IsValueType,
