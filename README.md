@@ -294,7 +294,11 @@ SharpPack supports both parameterized and parameterless constructors. The select
 * If there is no explicit constructor (including private), use a parameterless one.
 * If there is one parameterless/parameterized constructor (including private), use it.
 * If there are multiple constructors, then the `[SharpPackConstructor]` attribute must be applied to the desired constructor (the generator will not automatically choose one), otherwise the generator will emit an error.
-* If using a parameterized constructor, all parameter names must match corresponding member names (case-insensitive).
+* Each parameter must match one serialized member. Exact names are preferred; case-insensitive matching and the `_` backing-field prefix are supported. Ambiguous matches are errors.
+
+A property explicitly marked `[SharpPackInclude]` needs an accessible setter or
+a matching constructor parameter. An ordinary computed property can still be
+serialized without being populated on a read.
 
 ```csharp
 [SharpPackable]

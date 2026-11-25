@@ -14,6 +14,7 @@ public class ContextWireSlotTest
         Assert.Equal(SharpPackSerializer.Serialize(value), payload);
         Assert.Equal("kept", decoded.Value);
         Assert.Equal(0, decoded.Ignored);
+        Assert.Equal(1, decoded.Computed);
         Assert.Equal(0, formatter.Calls);
     }
 
@@ -41,4 +42,5 @@ public partial class ContextWireSlotModel
 {
     [SharpPackOrder(0), Utf8StringFormatter] public string? Value;
     [SharpPackOrder(0)] public int Ignored;
+    [SharpPackOrder(0), SharpPackInclude] public int Computed => Ignored + 1;
 }
