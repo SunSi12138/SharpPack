@@ -6,9 +6,7 @@ namespace SharpPack.Generator;
 
 partial class SharpPackGenerator
 {
-    // The legacy emitter still needs TypeMeta for the decisions that have not
-    // migrated yet. As each moves to planning, it takes its inputs from Shape.
-    internal static (TypeShape Shape, TypeMeta Metadata, INamedTypeSymbol? ExternalFormatter)? AnalyzeModel(
+    internal static TypeShape? AnalyzeModel(
         TypeDeclarationSyntax syntax, Compilation compilation, IGeneratorContext context)
     {
         var symbol = compilation.GetSemanticModel(syntax.SyntaxTree).GetDeclaredSymbol(syntax, context.CancellationToken);
@@ -43,8 +41,7 @@ partial class SharpPackGenerator
         if (!metadata.Validate(syntax, context, unionFormatter: union is not null))
             return null;
 
-        return (TypeShape.Create(symbol, metadata, references, captureModelNames: union is null),
-            metadata, union is null ? null : symbol);
+        return TypeShape.Create(symbol, metadata, references, isExternalFormatter: union is not null);
 
         static bool IsPartial(TypeDeclarationSyntax declaration)
             => declaration.Modifiers.Any(static modifier => modifier.IsKind(SyntaxKind.PartialKeyword));

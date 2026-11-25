@@ -34,10 +34,15 @@ internal sealed record SerializationPlan(
     RootFastPath RootFastPath,
     EquatableArray<WireSlot> WireSlots,
     EquatableArray<ScalarBatch> ScalarBatches,
+    EquatableArray<int> ConstructorArgumentSlots,
     ObjectWriteStrategy ObjectWriteStrategy,
     ContextDependencySet ContextDependencies,
     AotRootSet AotRoots,
-    GeneratedNames Names);
+    GeneratedNames Names)
+{
+    internal bool IsVersioned => ObjectWriteStrategy != ObjectWriteStrategy.Plain;
+    internal bool TracksReferences => IsVersioned && Shape.GenerateType == GenerateType.CircularReference;
+}
 
 internal static class SerializationPlanner
 {
@@ -47,7 +52,7 @@ internal static class SerializationPlanner
     {
         var slots = PlanWireSlots(shape);
         var kinds = slots.Select(slot => slot.DeclaredMemberIndex is int i ? shape.Members[i].Kind : MemberKind.Blank).ToArray();
-        return new(shape, ChooseRootFastPath(shape), slots, PlanScalarBatches(kinds),
+        return new(shape, ChooseRootFastPath(shape), slots, PlanScalarBatches(kinds), PlanConstructorArguments(shape, slots),
             ChooseObjectWriteStrategy(shape, kinds), PlanContextDependencies(shape, slots),
             PlanAotRoots(shape.AotDependencies), PlanNames(shape.NameFacts));
     }
@@ -94,7 +99,7 @@ internal static class SerializationPlanner
 
     static RootFastPath ChooseRootFastPath(TypeShape shape)
     {
-        if (shape.GenerateType != GenerateType.Object || shape.IsUnion ||
+        if (shape.GenerateType != GenerateType.Object || shape.Union is not null ||
             shape.IsValueType || shape.Callbacks.Length != 0)
         {
             return RootFastPath.General;
@@ -114,7 +119,7 @@ internal static class SerializationPlanner
 
     static EquatableArray<WireSlot> PlanWireSlots(TypeShape shape)
     {
-        if (shape.IsUnion || shape.IsUnmanaged || shape.GenerateType == GenerateType.Collection)
+        if (shape.Union is not null || shape.IsUnmanaged || shape.Collection is not null)
             return default;
 
         var members = shape.Members;
@@ -142,9 +147,29 @@ internal static class SerializationPlanner
         return new EquatableArray<WireSlot>(slots);
     }
 
+    static EquatableArray<int> PlanConstructorArguments(TypeShape shape, EquatableArray<WireSlot> slots)
+    {
+        if (shape.ConstructorParameters.Length == 0 || slots.Length == 0) return default;
+
+        var parameterSlots = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var slot in slots)
+        {
+            if (slot.DeclaredMemberIndex is int index && shape.Members[index].ConstructorParameter is { } parameter)
+                parameterSlots.Add(parameter, slot.Position);
+        }
+
+        var arguments = new List<int>(shape.ConstructorParameters.Length);
+        foreach (var parameter in shape.ConstructorParameters)
+        {
+            if (parameterSlots.TryGetValue(parameter.Name, out var position))
+                arguments.Add(position);
+        }
+        return new(arguments);
+    }
+
     static ObjectWriteStrategy ChooseObjectWriteStrategy(TypeShape shape, MemberKind[] kinds)
     {
-        if (shape.IsUnmanaged || shape.GenerateType is not (GenerateType.VersionTolerant or GenerateType.CircularReference))
+        if (shape.Union is not null || shape.IsUnmanaged || shape.GenerateType is not (GenerateType.VersionTolerant or GenerateType.CircularReference))
             return ObjectWriteStrategy.Plain;
 
         return kinds.All(static kind => IsFixedWidthScalar(kind) ||

@@ -11,24 +11,26 @@ internal sealed record TypeShape(
     TypeKind TargetKind,
     string Namespace,
     string ShortName,
+    string SimpleName,
     GenerateType GenerateType,
     SerializeLayout Layout,
     bool IsValueType,
     bool IsUnmanaged,
     bool IsRecord,
-    bool IsUnion,
     EquatableArray<MemberShape> Members,
     EquatableArray<ParameterShape> ConstructorParameters,
     EquatableArray<CallbackShape> Callbacks,
-    EquatableArray<UnionCaseShape> UnionCases,
+    EquatableArray<PartialTypeShape> ContainingTypes,
+    UnionShape? Union,
+    CollectionShape? Collection,
     AotDependencyFacts AotDependencies,
     GeneratedNameFacts NameFacts)
 {
     internal static TypeShape Create(
-        INamedTypeSymbol declaration, TypeMeta model, ReferenceSymbols references, bool captureModelNames = true)
+        INamedTypeSymbol declaration, TypeMeta model, ReferenceSymbols references, bool isExternalFormatter = false)
     {
         var target = model.Symbol;
-        var captureContextDependencies = !model.IsUnmanagedType && !model.IsUnion && model.GenerateType != GenerateType.Collection;
+        var isObject = !isExternalFormatter && !model.IsUnion && model.GenerateType != GenerateType.Collection;
         return new TypeShape(
             declaration.FullyQualifiedToString(),
             target.FullyQualifiedToString(),
@@ -36,14 +38,14 @@ internal sealed record TypeShape(
             target.TypeKind,
             target.ContainingNamespace.IsGlobalNamespace ? "" : target.ContainingNamespace.ToDisplayString(),
             model.TypeName,
+            target.Name,
             model.GenerateType,
             model.SerializeLayout,
             model.IsValueType,
             model.IsUnmanagedType,
             model.IsRecord,
-            model.IsUnion,
             new EquatableArray<MemberShape>(model.Members.Select(member =>
-                MemberShape.Create(member, references, captureContextDependencies))),
+                MemberShape.Create(member, isObject && !model.IsUnmanagedType ? references : null))),
             model.Constructor is { } constructor
                 ? new EquatableArray<ParameterShape>(constructor.Parameters.Select(static parameter =>
                     new ParameterShape(parameter.Name, parameter.Type.FullyQualifiedToString())))
@@ -53,12 +55,13 @@ internal sealed record TypeShape(
                     .Concat(CallbacksFor(CallbackPhase.Serialized, model.OnSerialized))
                     .Concat(CallbacksFor(CallbackPhase.Deserializing, model.OnDeserializing))
                     .Concat(CallbacksFor(CallbackPhase.Deserialized, model.OnDeserialized))),
-            new EquatableArray<UnionCaseShape>(model.UnionTags.Select(static item =>
-                new UnionCaseShape(item.Tag, item.Type.FullyQualifiedToString()))),
-            model.IsUnion || model.GenerateType == GenerateType.Collection
-                ? default
-                : AotDependencyFacts.Capture(model.Members, references),
-            captureModelNames ? GeneratedNameFacts.Capture(target, model.Members) : default);
+            isObject ? PartialTypeShape.CaptureContainers(target) : default,
+            model.IsUnion || isExternalFormatter
+                ? UnionShape.Capture(model, references, isExternalFormatter ? declaration : null) : null,
+            !isExternalFormatter && !model.IsUnion && model.GenerateType == GenerateType.Collection
+                ? CollectionShape.Capture(target, references) : null,
+            isObject ? AotDependencyFacts.Capture(model.Members, references) : default,
+            isExternalFormatter ? default : GeneratedNameFacts.Capture(target, model.Members));
 
         static IEnumerable<CallbackShape> CallbacksFor(CallbackPhase phase, IEnumerable<MethodMeta> callbacks)
             => callbacks.Select(callback => new CallbackShape(phase, callback.Name, callback.IsStatic, callback.IsValueType,
@@ -69,19 +72,25 @@ internal sealed record TypeShape(
 internal sealed record MemberShape(
     string Name,
     string TypeName,
+    string? ElementTypeName,
     MemberKind Kind,
     int Order,
     bool HasExplicitOrder,
     bool IsAssignable,
+    bool IsSettable,
     bool HasExactSizeSafeAccessor,
     bool SuppressDefaultInitialization,
     string? ConstructorParameter,
     CustomFormatterShape? CustomFormatter,
     EquatableArray<string> ContextDependencyTypes)
 {
-    internal static MemberShape Create(MemberMeta member, ReferenceSymbols references, bool captureContextDependencies)
-        => new(member.Name, member.MemberType.FullyQualifiedToString(), member.Kind, member.Order,
-            member.HasExplicitOrder, member.IsAssignable, member.HasExactSizeSafeAccessor,
+    internal static MemberShape Blank(int order)
+        => new("", "", null, MemberKind.Blank, order, false, false, false, false, false, null, null, default);
+
+    internal static MemberShape Create(MemberMeta member, ReferenceSymbols? contextReferences = null)
+        => member.Kind == MemberKind.Blank ? Blank(member.Order) :
+        new(member.Name, member.MemberType.FullyQualifiedToString(), ElementType(member), member.Kind, member.Order,
+            member.HasExplicitOrder, member.IsAssignable, member.IsSettable, member.HasExactSizeSafeAccessor,
             member.SuppressDefaultInitialization, member.ConstructorParameterName,
             member.CustomFormatterAttribute is { } attribute
                 ? new CustomFormatterShape(
@@ -91,9 +100,18 @@ internal sealed record MemberShape(
                     new EquatableArray<NamedAttributeValueShape>(attribute.NamedArguments.Select(static pair =>
                         new NamedAttributeValueShape(pair.Key, AttributeValueShape.Create(pair.Value)))))
                 : null,
-            captureContextDependencies && member.Kind != MemberKind.CustomFormatter
-                ? ContextTypes(member.MemberType, references)
+            contextReferences is not null && member.Kind != MemberKind.CustomFormatter
+                ? ContextTypes(member.MemberType, contextReferences)
                 : default);
+
+    static string? ElementType(MemberMeta member) => member.Kind switch
+    {
+        MemberKind.UnmanagedArray or MemberKind.SharpPackableArray or MemberKind.Array =>
+            ((IArrayTypeSymbol)member.MemberType).ElementType.FullyQualifiedToString(),
+        MemberKind.SharpPackableList or MemberKind.SharpPackableUnmanagedList =>
+            ((INamedTypeSymbol)member.MemberType).TypeArguments[0].FullyQualifiedToString(),
+        _ => null,
+    };
 
     static EquatableArray<string> ContextTypes(ITypeSymbol type, ReferenceSymbols references)
     {
@@ -122,8 +140,6 @@ internal sealed record ParameterShape(string Name, string TypeName);
 internal enum CallbackPhase { Serializing, Serialized, Deserializing, Deserialized }
 
 internal sealed record CallbackShape(CallbackPhase Phase, string Name, bool IsStatic, bool IsValueType, bool PassArguments);
-
-internal sealed record UnionCaseShape(ushort Tag, string TypeName);
 
 internal sealed record CustomFormatterShape(
     string FormatterType, string AttributeType,
