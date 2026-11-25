@@ -43,7 +43,7 @@ partial class SharpPackGenerator
         if (!metadata.Validate(syntax, context, unionFormatter: union is not null))
             return null;
 
-        return (TypeShape.Create(symbol, metadata), metadata, union is null ? null : symbol);
+        return (TypeShape.Create(symbol, metadata, references), metadata, union is null ? null : symbol);
 
         static bool IsPartial(TypeDeclarationSyntax declaration)
             => declaration.Modifiers.Any(static modifier => modifier.IsKind(SyntaxKind.PartialKeyword));

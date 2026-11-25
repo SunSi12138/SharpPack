@@ -63,6 +63,37 @@ public class SerializationPlanTest
     }
 
     [Fact]
+    public void ContextDependencySetTraversesArraysAndKnownGenericsOnlyOnce()
+    {
+        const string source = """
+            using SharpPack;
+            [SharpPackable] public partial class Model
+            {
+                public List<Child[]>? Sequence;
+                public Child? Direct;
+                [Utf8StringFormatter] public string? Custom;
+            }
+            [SharpPackable] public partial class Child { public int Number; }
+            [SharpPackable] public partial class CustomOnly
+            {
+                [Utf8StringFormatter] public string? Text;
+            }
+            """;
+        var plan = SerializationPlanner.Plan(TypeShapeTest.Analyze(source, "Model"));
+        Assert.Equal(new[]
+        {
+            "global::System.Collections.Generic.List<global::Child[]>",
+            "global::Child[]",
+            "global::Child",
+        }, plan.ContextDependencies.FactoryLookupTypes.ToArray());
+        Assert.True(plan.ContextDependencies.HasOverridableWireMembers);
+
+        var custom = SerializationPlanner.Plan(TypeShapeTest.Analyze(source, "CustomOnly")).ContextDependencies;
+        Assert.Empty(custom.FactoryLookupTypes);
+        Assert.False(custom.HasOverridableWireMembers);
+    }
+
+    [Fact]
     public void ScalarBatchesStopAtTheRuntimeOverloadArityAndMemberBoundaries()
     {
         var kinds = Enumerable.Repeat(MemberKind.Unmanaged, 16)
