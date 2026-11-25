@@ -5,12 +5,18 @@ the same pack command as both release workflows. It exercises a stable version
 on Linux x64 and a prerelease version on Linux ARM64; neither job publishes.
 
 The verifier checks the four nupkgs and two snupkgs in the supplied directory,
-then uses those files directly. Temporary consumers use the producer's .NET 10
-SDK and C# 14 with an empty package cache and no project references. Aggregate,
-split and Streaming consumers restore from the local feed and run a generated
-round trip. The aggregate and split consumers also publish and run under
-NativeAOT; source mapping restricts SharpPack packages to the local feed while
-allowing .NET tool and runtime packs from NuGet.org.
+then uses those files directly. It runs real .NET 10/C# 14 and .NET 11/C# 15
+consumers with empty package caches and no project references. Aggregate,
+split and Streaming consumers verify selection of the matching Core asset
+and run generated round trips on both frameworks. The aggregate also runs
+under NativeAOT on both, as does the split consumer on .NET 10. Source mapping
+restricts SharpPack packages to the local feed while allowing .NET tool and
+runtime packs from NuGet.org.
+
+The .NET 11 consumers exercise the new numeric scalars, nullable values,
+arrays, and generated dictionary keys. Artifact generation runs on both
+frameworks; the .NET 10 tooling executable can roll forward to .NET 11
+when .NET 10 is absent.
 
 On x64, `--compatibility` adds independent Roslyn 5.0 and 5.6 processes that load
 the packaged generator, emit identical source, and report the same ABI error
