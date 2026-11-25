@@ -25,7 +25,7 @@ internal sealed record TypeParameterShape(
 {
     internal static EquatableArray<TypeParameterShape> CaptureAll(INamedTypeSymbol type)
         => new(type.TypeParameters.Select(static parameter => new TypeParameterShape(
-            parameter.Name,
+            parameter.FullyQualifiedToString(),
             parameter switch
             {
                 { HasUnmanagedTypeConstraint: true } => PrimaryTypeConstraint.Unmanaged,
@@ -73,11 +73,10 @@ internal sealed record UnionShape(
     internal static UnionShape Capture(TypeMeta model, ReferenceSymbols references, INamedTypeSymbol? externalFormatter)
     {
         var target = model.Symbol;
-        var arguments = target.IsUnboundGenericType && externalFormatter is not null && target.Arity == externalFormatter.Arity
-            ? externalFormatter.TypeParameters.Cast<ITypeSymbol>()
-            : target.TypeArguments;
-        var targetArguments = target.IsGenericType
-            ? string.Join(", ", arguments.Select(static argument => argument.FullyQualifiedToString())) : null;
+        var targetArguments = target.IsUnboundGenericType
+            ? (externalFormatter is not null && target.Arity == externalFormatter.Arity
+                ? externalFormatter.TypeParameters : target.TypeParameters).Cast<ITypeSymbol>().ToArray()
+            : target.TypeArguments.ToArray();
 
         return new(ConstructName(target),
             new EquatableArray<UnionCaseShape>(model.UnionTags.Select(item => new UnionCaseShape(
@@ -87,10 +86,7 @@ internal sealed record UnionShape(
             externalFormatter is null ? null : ExternalUnionFormatterShape.Capture(externalFormatter));
 
         string ConstructName(INamedTypeSymbol type)
-        {
-            var name = type.FullyQualifiedToString();
-            return type.IsGenericType && targetArguments is not null
-                ? name.Replace("<>", "<" + targetArguments + ">") : name;
-        }
+            => (type.IsUnboundGenericType && type.Arity != 0 && type.Arity == targetArguments.Length
+                ? type.ConstructedFrom.Construct(targetArguments) : type).FullyQualifiedToString();
     }
 }

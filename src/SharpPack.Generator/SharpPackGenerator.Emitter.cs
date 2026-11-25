@@ -1122,16 +1122,15 @@ partial {{classOrInterfaceOrRecord}} {{TypeName}} : {{contextFactoryInterface}}
 
     string EmitUnionFormatterTemplate(UnionShape union, ExternalUnionFormatterShape formatter, bool includeRegistration)
     {
-        const string scopedRef = "scoped ref";
-        const string serializeMethodSignarture =
-            "Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter>";
-
+        var writerTypeParameter = "TBufferWriter";
+        while (formatter.TypeParameters.Any(parameter => parameter.Name == writerTypeParameter))
+            writerTypeParameter += "_";
         var symbolFullQualified = union.TypeName;
         var constraints = EmitTypeParameterConstraints(formatter.TypeParameters);
         var declaration = $$"""
 [global::SharpPack.CompilerServices.Preserve]
 partial class {{TypeName}} :
-    SharpPackFormatter<{{symbolFullQualified}}>,
+    global::SharpPack.SharpPackFormatter<{{symbolFullQualified}}>,
     global::SharpPack.ISharpPackFormatterFactory<{{symbolFullQualified}}>
 {{constraints}}
 {
@@ -1144,7 +1143,7 @@ partial class {{TypeName}} :
 {{EmitUnionTypeToTagField(union.Cases)}}
 
         [global::SharpPack.CompilerServices.Preserve]
-        public override void {{serializeMethodSignarture}} writer, {{scopedRef}} {{symbolFullQualified}}? value)
+        public override void Serialize<{{writerTypeParameter}}>(ref global::SharpPack.SharpPackWriter<{{writerTypeParameter}}> writer, scoped ref {{symbolFullQualified}}? value)
         {
 {{EmitCallbacks(Shape, CallbackPhase.Serializing, "            ")}}
 {{EmitUnionSerializeBody(union)}}
@@ -1152,7 +1151,7 @@ partial class {{TypeName}} :
         }
 
         [global::SharpPack.CompilerServices.Preserve]
-        public override void Deserialize(ref SharpPackReader reader, {{scopedRef}} {{symbolFullQualified}}? value)
+        public override void Deserialize(ref global::SharpPack.SharpPackReader reader, scoped ref {{symbolFullQualified}}? value)
         {
 {{EmitCallbacks(Shape, CallbackPhase.Deserializing, "            ")}}
 {{EmitUnionDeserializeBody(union)}}
@@ -1245,7 +1244,7 @@ public static class {{formatter.Name}}SharpPackContextExtensions
         var elements = cases.Select(x => $"            {{ typeof({x.TypeName}), {x.Tag} }},").NewLine();
 
         return $$"""
-        static readonly System.Collections.Generic.Dictionary<Type, ushort> __typeToTag = new({{cases.Length}})
+        static readonly global::System.Collections.Generic.Dictionary<global::System.Type, ushort> __typeToTag = new({{cases.Length}})
         {
 {{elements}}
         };
@@ -1260,7 +1259,7 @@ public static class {{formatter.Name}}SharpPackContextExtensions
             .Select(x =>
             {
                 var method = x.UsePackablePath ? "WritePackable" : "WriteValue";
-                return $"                    case {x.Tag}: writer.{method}(System.Runtime.CompilerServices.Unsafe.As<{symbolFullQualified}?, {x.TypeName}>(ref value)); break;";
+                return $"                    case {x.Tag}: writer.{method}(global::System.Runtime.CompilerServices.Unsafe.As<{symbolFullQualified}?, {x.TypeName}>(ref value)); break;";
             })
             .NewLine();
 
@@ -1285,7 +1284,7 @@ public static class {{formatter.Name}}SharpPackContextExtensions
             }
             else
             {
-                SharpPackSerializationException.ThrowNotFoundInUnionType(value.GetType(), typeof({{symbolFullQualified}}));
+                global::SharpPack.SharpPackSerializationException.ThrowNotFoundInUnionType(value.GetType(), typeof({{symbolFullQualified}}));
             }
 """;
     }
@@ -1308,7 +1307,7 @@ public static class {{formatter.Name}}SharpPackContextExtensions
                 case {{x.Tag}}:
                     if (value is {{tagTypeFullQualified}})
                     {
-                        reader.{{method}}(ref System.Runtime.CompilerServices.Unsafe.As<{{symbolFullQualified}}?, {{tagTypeFullQualified}}>(ref value));
+                        reader.{{method}}(ref global::System.Runtime.CompilerServices.Unsafe.As<{{symbolFullQualified}}?, {{tagTypeFullQualified}}>(ref value));
                     }
                     else
                     {
@@ -1331,7 +1330,7 @@ public static class {{formatter.Name}}SharpPackContextExtensions
             {
 {{readBody}}
                 default:
-                    SharpPackSerializationException.ThrowInvalidTag(tag, typeof({{symbolFullQualified}}));
+                    global::SharpPack.SharpPackSerializationException.ThrowInvalidTag(tag, typeof({{symbolFullQualified}}));
                     break;
             }
 """;

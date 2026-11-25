@@ -55,8 +55,8 @@ assembly from its union contract, register it on the context builder with the
 generated `Register<FormatterName>` extension, such as `.RegisterMessageFormatter()`.
 Import the **union contract's namespace** to bring that extension into scope.
 The formatter itself stays in the namespace where it was declared. For an open
-generic union, the formatter's type parameters bind to the contract by position;
-their names can differ.
+generic union, give the formatter the same number of type parameters as the
+contract. They bind by position and can have different names.
 
 ### Register a Brotli formatter
 
