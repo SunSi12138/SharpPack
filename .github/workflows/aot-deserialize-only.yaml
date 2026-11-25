@@ -40,9 +40,16 @@ jobs:
       - name: Check the original direct Type deserialization sample
         run: |
           set -o pipefail
-          dotnet publish sandbox/NativeAot -c Release -o "$RUNNER_TEMP/original-aot" 2>&1 | tee "$RUNNER_TEMP/original-aot-publish.txt"
+          dotnet publish sandbox/NativeAot -c Release -p:StripSymbols=false -o "$RUNNER_TEMP/original-aot" 2>&1 | tee "$RUNNER_TEMP/original-aot-publish.txt"
           if grep -q 'IL2111' "$RUNNER_TEMP/original-aot-publish.txt"; then exit 1; fi
-          "$RUNNER_TEMP/original-aot/NativeAot"
+          ulimit -c 0
+          exe="$RUNNER_TEMP/original-aot/NativeAot"
+          if ! "$exe"; then
+            if command -v gdb >/dev/null; then
+              gdb -q -batch -ex 'set debuginfod enabled off' -ex run -ex 'bt 16' --args "$exe"
+            fi
+            exit 1
+          fi
       - name: Check application-owned roots in NativeAOT
         run: |
           dotnet publish sandbox/HandwrittenFactoryAot -c Release -o "$RUNNER_TEMP/handwritten-aot"

@@ -88,6 +88,9 @@ if (exactRoundTrip is not
 
 Console.WriteLine("Checking ordinary circular reference handling under NativeAOT.");
 var mutableCircular = new AotMutableCircularNode { Label = "circular-aot" };
+Console.WriteLine("Ordinary circular model constructed.");
+_ = SharpPackSerializer.Serialize(mutableCircular);
+Console.WriteLine("Ordinary circular leaf serialized.");
 mutableCircular.Self = mutableCircular;
 var mutablePayload = SharpPackSerializer.Serialize(mutableCircular);
 Console.WriteLine("Ordinary circular serialization passed.");
