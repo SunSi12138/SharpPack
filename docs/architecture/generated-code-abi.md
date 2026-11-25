@@ -118,7 +118,7 @@ The existing exact and pooled buffer types retain their signatures and emitted
 call paths; the handshake does not require a runtime wrapper or a buffer rewrite.
 Other `SharpPack.Internal` references fail the inventory check.
 
-`Generated ABI packages` builds isolated package consumers for the current
+`Packaged consumers` builds isolated package consumers for the current
 aggregate package and split Core/Generator packages, then publishes and runs
 them under NativeAOT. It also builds the generator from the `v1.1.0` source tag
 against the current runtime for an untrimmed round trip, and expects

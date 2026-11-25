@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>$id$</id>
+    <version>$version$</version>
+    <authors>$authors$</authors>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <license type="expression">MIT</license>
+    <icon>Icon.png</icon>
+    <readme>README.md</readme>
+    <projectUrl>$projectUrl$</projectUrl>
+    <description>$description$</description>
+    <copyright>$copyright$</copyright>
+    <tags>$tags$</tags>
+    <repository type="$repositoryType$" url="$repositoryUrl$" commit="$commit$" branch="$branch$" />
+    <dependencies>
+      <group targetFramework="net10.0">
+        <dependency id="SharpPack.Core" version="[$version$]" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="$output$SharpPack.Streaming.dll" target="lib/net10.0" />
+    <file src="$output$SharpPack.Streaming.xml" target="lib/net10.0" />
+    <file src="$output$SharpPack.Streaming.pdb" exclude="$symbolExclusion$" target="lib/net10.0" />
+    <file src="$root$README.md" target="README.md" />
+    <file src="$root$Icon.png" target="Icon.png" />
+    <file src="$root$NOTICE" target="NOTICE" />
+  </files>
+</package>
