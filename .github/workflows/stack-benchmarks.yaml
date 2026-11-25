@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/stack-benchmarks.yaml'
       - 'sandbox/Benchmark/Benchmarks/StackFormatterBenchmark.cs'
+      - 'src/SharpPack.Core/Formatters/CollectionFormatters.cs'
 
 permissions:
   contents: read
@@ -30,11 +31,15 @@ jobs:
           base="$RUNNER_TEMP/stack-baseline"
           git worktree add --detach "$base" "$BASE"
           cp "$case_file" "$base/$case_file"
-          measure() {
-            dotnet run --project "$1/sandbox/Benchmark" -c Release -- \
+          measure() (
+            cd "$1"
+            layout=public
+            if grep -q 'class StackView<' src/SharpPack.Core/Internal/CollectionsMarshalEx.cs; then layout=private; fi
+            echo "Measuring $2 ($layout Stack layout)"
+            SHARPPACK_STACK_BENCHMARK_LAYOUT="$layout" dotnet run --project sandbox/Benchmark -c Release -- \
               --filter '*StackFormatterBenchmark*' --job Short --exporters json \
               --artifacts "$RUNNER_TEMP/stack-$2" --stopOnFirstError
-          }
+          )
           measure "$base" base
           measure "$GITHUB_WORKSPACE" candidate
           python3 - <<'PY'

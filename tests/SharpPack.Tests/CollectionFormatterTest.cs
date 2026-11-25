@@ -167,6 +167,33 @@ public class CollectionFormatterTest
     }
 
     [Fact]
+    public void StackItemOverrideWritesInPushOrderWithoutReplacingOriginalSlots()
+    {
+        var stack = new Stack<int>([1, 2, 3]);
+        var context = new SharpPackSerializerContextBuilder().Register(new StackItemOffsetFormatter()).Build();
+
+        var bytes = SharpPackSerializer.Serialize(stack, context);
+        Assert.Equal(SharpPackSerializer.Serialize(new[] { 11, 12, 13 }), bytes);
+        Assert.Equal(new[] { 3, 2, 1 }, stack);
+        Assert.Equal(new[] { 3, 2, 1 }, SharpPackSerializer.Deserialize<Stack<int>>(bytes, context));
+    }
+
+    sealed class StackItemOffsetFormatter : SharpPackFormatter<int>
+    {
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref int value)
+        {
+            value += 10;
+            writer.WriteUnmanaged(value);
+        }
+
+        public override void Deserialize(ref SharpPackReader reader, scoped ref int value)
+        {
+            reader.ReadUnmanaged(out value);
+            value -= 10;
+        }
+    }
+
+    [Fact]
     public void Queue()
     {
         var q = new Queue<int>();
