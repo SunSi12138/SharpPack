@@ -28,10 +28,10 @@ and chooses inline or buffered length encoding for versioned writes.
 Context-aware writers still use the existing buffered path because an override
 can change the encoded length.
 
-The context dependency set records the ordered factory lookups and whether
-the effective slots need an override formatter. Analysis follows arrays and
-known generic formatter types once and does not traverse a member with an
-explicit custom formatter.
+The context dependency set records the ordered factory lookups for the
+effective wire slots. If the set is empty, no override formatter is emitted.
+Analysis follows arrays and known generic formatter types and does not
+traverse a member with an explicit custom formatter.
 
 The AOT root set separates typed factories from closed formatter instances.
 Analysis records which model factories can provide context; the planner sorts

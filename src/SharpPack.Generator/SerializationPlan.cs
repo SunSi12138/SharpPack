@@ -13,9 +13,10 @@ internal readonly record struct ScalarBatch(int Count, bool UseDangerous);
 
 internal enum ObjectWriteStrategy { Plain, VersionedInlineLengths, VersionedBufferedLengths }
 
-internal sealed record ContextDependencySet(
-    EquatableArray<string> FactoryLookupTypes,
-    bool HasOverridableWireMembers);
+internal sealed record ContextDependencySet(EquatableArray<string> FactoryLookupTypes)
+{
+    internal bool HasOverridableWireMembers => FactoryLookupTypes.Length != 0;
+}
 
 internal sealed record AotRootSet(
     EquatableArray<AotFactoryRoot> Factories,
@@ -55,10 +56,9 @@ internal static class SerializationPlanner
 
     static ContextDependencySet PlanContextDependencies(TypeShape shape, EquatableArray<WireSlot> slots)
         => new(
-            new EquatableArray<string>(shape.Members.SelectMany(static member => member.ContextDependencyTypes)
-                .Distinct(StringComparer.Ordinal)),
-            slots.Any(slot => slot.DeclaredMemberIndex is int index &&
-                shape.Members[index].ContextDependencyTypes.Length != 0));
+            new EquatableArray<string>(slots.SelectMany(slot => slot.DeclaredMemberIndex is int index
+                ? shape.Members[index].ContextDependencyTypes : default)
+                .Distinct(StringComparer.Ordinal)));
 
     static RootFastPath ChooseRootFastPath(TypeShape shape)
     {
