@@ -114,6 +114,7 @@ def nuget_config(path, feed=None, network=False):
     config = ET.Element("configuration")
     sources = ET.SubElement(config, "packageSources")
     ET.SubElement(sources, "clear")
+    ET.SubElement(ET.SubElement(config, "fallbackPackageFolders"), "clear")
     if feed is not None:
         ET.SubElement(sources, "add", key="artifact", value=str(feed))
     if network:
@@ -148,7 +149,10 @@ def package_references(versions):
 
 
 def assets(path, expected):
-    libraries = json.loads((path / "obj/project.assets.json").read_text())["libraries"]
+    lock = json.loads((path / "obj/project.assets.json").read_text())
+    if {Path(root).resolve() for root in lock["packageFolders"]} != {(path / "packages").resolve()}:
+        raise RuntimeError(f"{path.name} used a package folder outside its isolated cache")
+    libraries = lock["libraries"]
     packages = (key.split("/", 1) for key in libraries if key.startswith("SharpPack"))
     resolved = {(name, normalized_version(version)) for name, version in packages}
     if any(item["type"] != "package" for item in libraries.values()) or resolved != set(expected.items()):
@@ -292,6 +296,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="sharppack-package-") as directory:
         work = Path(directory)
         env = os.environ.copy()
+        env.pop("NUGET_FALLBACK_PACKAGES", None)
         sdk = run(["dotnet", "--version"], ROOT, env).strip()
         if not re.fullmatch(r"10\.0\.\d{3}", sdk):
             raise RuntimeError(f"Expected the repository .NET 10 SDK, got {sdk}")
