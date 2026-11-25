@@ -151,7 +151,7 @@ internal static class SerializationPlanner
     {
         if (shape.ConstructorParameters.Length == 0 || slots.Length == 0) return default;
 
-        var parameterSlots = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var parameterSlots = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var slot in slots)
         {
             if (slot.DeclaredMemberIndex is int index && shape.Members[index].ConstructorParameter is { } parameter)

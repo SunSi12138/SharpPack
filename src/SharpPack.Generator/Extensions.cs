@@ -250,11 +250,8 @@ internal static class Extensions
 
         return constructorParameter != null;
 
-        static IParameterSymbol? GetConstructorParameter(IMethodSymbol constructor, string name) => constructor.Parameters.FirstOrDefault(x => x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        static IParameterSymbol? GetConstructorParameter(IMethodSymbol constructor, string name)
+            => constructor.Parameters.FirstOrDefault(parameter => parameter.Name == name)
+                ?? constructor.Parameters.FirstOrDefault(parameter => parameter.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
     }
-
-    public static bool ContainsConstructorParameter(this IEnumerable<MemberMeta> members, IParameterSymbol constructorParameter) =>
-        members.Any(x =>
-            x.IsConstructorParameter &&
-            string.Equals(constructorParameter.Name, x.ConstructorParameterName, StringComparison.OrdinalIgnoreCase));
 }

@@ -367,13 +367,22 @@ public partial class TypeMeta
             // check ctor members
             if (this.Constructor != null)
             {
+                var constructorMembers = GenerateType == GenerateType.VersionTolerant
+                    ? Members.DistinctBy(static member => member.Order)
+                    : Members;
                 foreach (var parameter in Constructor.Parameters)
                 {
-                    if (!Members.ContainsConstructorParameter(parameter))
+                    var matches = constructorMembers.Where(member => member.ConstructorParameterName == parameter.Name).ToArray();
+                    var location = Constructor.Locations.FirstOrDefault() ?? syntax.Identifier.GetLocation();
+                    if (matches.Length == 0)
                     {
-                        var location = Constructor.Locations.FirstOrDefault() ?? syntax.Identifier.GetLocation();
-
                         reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.ConstructorHasNoMatchedParameter, location, Symbol.Name, parameter.Name));
+                        noError = false;
+                    }
+                    else if (matches.Length > 1)
+                    {
+                        reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.AmbiguousConstructorParameter, location,
+                            Symbol.Name, parameter.Name, string.Join(", ", matches.Select(static member => member.Name))));
                         noError = false;
                     }
                 }
@@ -384,6 +393,16 @@ public partial class TypeMeta
                 if (item.IsField && ((IFieldSymbol)item.Symbol).IsReadOnly && !item.IsConstructorParameter)
                 {
                     reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.ReadOnlyFieldMustBeConstructorMember, item.GetLocation(syntax), Symbol.Name, item.Name));
+                    noError = false;
+                }
+                else if (!item.IsConstructorParameter && item.Symbol is IPropertySymbol property &&
+                    property.ContainsAttribute(reference.SharpPackIncludeAttribute) &&
+                    reference.Compilation.IsSymbolAccessibleWithin(property, Symbol, throughType: Symbol) &&
+                    (property.SetMethod is not { } setter ||
+                     !reference.Compilation.IsSymbolAccessibleWithin(setter, Symbol, throughType: Symbol)))
+                {
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.IncludedPropertyCannotBePopulated,
+                        item.GetLocation(syntax), Symbol.Name, item.Name));
                     noError = false;
                 }
                 else if (item is { SuppressDefaultInitialization: true, IsAssignable: false })
