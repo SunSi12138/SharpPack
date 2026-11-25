@@ -100,8 +100,12 @@ def validate_package_payload(name, payload, metadata):
         expected_runtime.add(f"lib/net10.0/{name}.dll")
         required |= expected_runtime | {f"lib/net10.0/{name}.xml"}
     if name == GENERATOR:
-        if f"analyzers/dotnet/cs/{name}.dll" not in assemblies or not all(
-                item.startswith("analyzers/dotnet/cs/") for item in assemblies):
+        tool = "tools/net10.0/SharpPack.Tooling"
+        required |= {f"buildTransitive/{name}.targets", f"{tool}.dll",
+                     f"{tool}.deps.json", f"{tool}.runtimeconfig.json"}
+        analyzers = assemblies - {f"{tool}.dll"}
+        if f"analyzers/dotnet/cs/{name}.dll" not in analyzers or not all(
+                item.startswith("analyzers/dotnet/cs/") for item in analyzers):
             raise RuntimeError("Generator does not have the expected analyzer placement")
     elif assemblies != expected_runtime:
         raise RuntimeError(f"{name} contains unexpected runtime assemblies")
@@ -192,6 +196,102 @@ def consumer(path, feed, references, expected, env, architecture, *, aot=False, 
             run(["dotnet", "run", "-c", "Release", "--no-restore", "--", architecture], path, local_env)
     print(f"{path.name}: {'SHARPPACK043 as expected' if mismatch else 'packaged round trip passed'}", flush=True)
     return cache
+
+
+def verify_artifact_tooling(path, feed, version, env):
+    options = {
+        "TypeScriptOutputDirectory": "$(ArtifactOutput)",
+        "SerializationInfoOutputDirectory": "$(ArtifactOutput)",
+        "TypeScriptImportExtension": ".mjs",
+        "TypeScriptConvertPropertyName": "false",
+        "TypeScriptEnableNullableTypes": "true",
+    }
+    visible = ";".join(f"SharpPackGenerator_{name}" for name in options)
+    project(path, package_references({AGGREGATE: version}) +
+            f'''<CompilerVisibleProperty Include="{visible}" Condition="'$(SharpPackToolingEnabled)' == 'false'" />''',
+            "".join(f"<SharpPackGenerator_{name}>{value}</SharpPackGenerator_{name}>"
+                    for name, value in options.items()))
+    shutil.copyfile(HERE / "ArtifactModel.cs", path / "Model.cs")
+    (path / "Program.cs").write_text("""using SharpPack;
+var value = new ArtifactFixture.Delivery { DeliveryNote = "sent" };
+if (SharpPackSerializer.Deserialize<ArtifactFixture.Delivery>(SharpPackSerializer.Serialize(value))?.DeliveryNote != "sent")
+    throw new InvalidOperationException();
+""")
+    extra = path / "Extra.cs"
+    extra.write_text("""using SharpPack;
+namespace ArtifactFixture;
+[SharpPackable, GenerateTypeScript] public partial class Retired { public int Count { get; set; } }
+[SharpPackable, GenerateTypeScript] public partial class Edited { public int Count { get; set; } }
+""")
+    local_env = dict(env, NUGET_PACKAGES=str(path / "packages"))
+    config = nuget_config(path / "NuGet.Config", feed)
+    run(["dotnet", "restore", "--configfile", str(config)], path, local_env)
+    assets(path, {name: version for name in (CORE, GENERATOR, AGGREGATE)})
+
+    def build(output, *properties, tooling=True, error=None):
+        log = run(["dotnet", "build", "-c", "Release", "--no-restore", "--nologo",
+                   f"-p:SharpPackToolingEnabled={str(tooling).lower()}", f"-p:ArtifactOutput={output}", *properties],
+                  path, local_env, expected_success=error is None)
+        if error is not None and error not in log:
+            raise RuntimeError(f"Expected artifact build failure '{error}':\n{log}")
+
+    def files(output):
+        return {item.name: item.read_bytes() for item in output.iterdir() if not item.name.startswith(".")}
+
+    legacy = path / "Legacy 输出"
+    output = path / "Build 输出"
+    build(legacy, tooling=False)
+    build(output)
+    baseline = files(legacy)
+    expected = {"Delivery.ts", "DeliveryState.ts", "INotice.ts", "Edited.ts", "Retired.ts",
+                "SharpPackReader.ts", "SharpPackWriter.ts", "ArtifactFixture.Delivery.txt",
+                "ArtifactFixture.Edited.txt", "ArtifactFixture.Retired.txt"}
+    if baseline.keys() != expected or files(output) != baseline or b"SharpPackReader.mjs" not in baseline["Delivery.ts"]:
+        raise RuntimeError(f"Legacy and packaged tooling artifacts differ: {baseline.keys()} / {files(output).keys()}")
+    run(["dotnet", str(path / "bin/Release/net10.0/Consumer.dll")], path, local_env)
+
+    journal = output / ".sharppack-artifacts.json"
+    timestamps = {item.name: item.stat().st_mtime_ns for item in output.iterdir()}
+    build(output)
+    if files(output) != baseline or timestamps != {item.name: item.stat().st_mtime_ns for item in output.iterdir()}:
+        raise RuntimeError("An unchanged build rewrote its generated artifacts")
+
+    plan, = (path / "obj").rglob("SharpPack.ToolingArtifacts.g.cs")
+    plan.unlink()
+    (output / "Delivery.ts").unlink()
+    manifest = json.loads(journal.read_text(encoding="utf-8"))
+    journal.write_text(json.dumps(dict(manifest, Pending=manifest["Committed"])), encoding="utf-8")
+    build(output)
+    if not plan.is_file() or json.loads(journal.read_text(encoding="utf-8"))["Pending"] is not None or files(output) != baseline:
+        raise RuntimeError("A missing plan or interrupted artifact write did not recover")
+
+    build(legacy, error="is not owned by SharpPack")
+    build(legacy, "-p:SharpPackToolingAdoptExisting=true")
+    if files(legacy) != baseline:
+        raise RuntimeError("Explicit adoption changed matching legacy output")
+
+    (output / "Edited.ts").write_bytes(b"// edited by the user\n")
+    (output / "SharpPackReader.ts").write_bytes(b"// custom runtime\n")
+    (output / "Unrelated.ts").write_bytes(b"// never owned by SharpPack\n")
+    extra.unlink()
+    build(output)
+    retained = files(output)
+    if ({"Retired.ts", "ArtifactFixture.Retired.txt", "ArtifactFixture.Edited.txt"} & retained.keys()
+            or retained.get("Edited.ts") != b"// edited by the user\n"
+            or retained.get("SharpPackReader.ts") != b"// custom runtime\n"
+            or retained.get("Unrelated.ts") != b"// never owned by SharpPack\n"):
+        raise RuntimeError("Stale cleanup did not honor file ownership and edits")
+
+    design = path / "Design time 输出"
+    build(design, "-p:DesignTimeBuild=true", "-p:SkipCompilerExecution=true")
+    if design.exists():
+        raise RuntimeError("A design-time build wrote tooling artifacts")
+    previous_manifest = journal.read_bytes()
+    extra.write_text("#error Artifact fixture intentionally does not compile\n")
+    build(output, error="error CS1029")
+    if files(output) != retained or journal.read_bytes() != previous_manifest:
+        raise RuntimeError("A failed compilation changed tooling artifacts")
+    print("Artifact tooling: byte parity, reproducible rebuilds, ownership and recovery verified", flush=True)
 
 
 def pack(name, version, feed, env, *, source=ROOT, existing_build=False):
@@ -316,6 +416,7 @@ def main():
                 current_cache = cache
             if name != "streaming":
                 consumer(work / f"{name}-aot", feed, refs, runtime | refs, env, args.architecture, aot=True)
+        verify_artifact_tooling(work / "artifact-tooling", feed, version, env)
         if args.compatibility:
             verify_compatibility(work, packages, current_cache, version, env, args.architecture)
 

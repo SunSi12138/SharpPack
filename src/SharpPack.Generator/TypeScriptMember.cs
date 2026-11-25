@@ -29,9 +29,6 @@ internal class NotSupportedTypeException : Exception
     }
 }
 
-internal sealed record TypeScriptMemberShape(
-    string MemberName, string TypeName, string DefaultValue, string WriteMethodTemplate, string ReadMethodTemplate);
-
 public class TypeScriptMember
 {
     public MemberMeta Member { get; }

@@ -50,7 +50,7 @@ public partial class TypeMeta
     }
 
     public void EmitTypeScriptUnion(StringBuilder sb, string importExt)
-        => TypeScriptEmitter.EmitUnion(sb, TypeName, UnionShape.Capture(this, reference, externalFormatter: null).Cases, importExt);
+        => TypeScriptEmitter.EmitUnion(sb, TypeName, UnionShape.Capture(this, reference, externalFormatter: null).ProjectTypeScriptCases(), importExt);
 
     public string EmitTypeScriptMembers(TypeScriptMember[] members)
         => TypeScriptEmitter.EmitTypeScriptMembers(TypeScriptMembers(members));

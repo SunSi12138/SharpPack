@@ -70,6 +70,9 @@ internal sealed record ExternalUnionFormatterShape(
 internal sealed record UnionShape(
     string TypeName, EquatableArray<UnionCaseShape> Cases, ExternalUnionFormatterShape? ExternalFormatter)
 {
+    internal EquatableArray<TypeScriptUnionCase> ProjectTypeScriptCases()
+        => new(Cases.Select(static item => new TypeScriptUnionCase(item.Tag, item.SimpleName)));
+
     internal static UnionShape Capture(TypeMeta model, ReferenceSymbols references, INamedTypeSymbol? externalFormatter)
     {
         var target = model.Symbol;

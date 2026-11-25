@@ -27,6 +27,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ClassLibrary", "sandbox\Cla
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NativeAot", "sandbox\NativeAot\NativeAot.csproj", "{6E18AECF-34B2-48F9-9694-54150FB156EB}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SharpPack.Tooling", "src\SharpPack.Tooling\SharpPack.Tooling.csproj", "{12E09EBD-5E6A-4530-9B7F-B469AC241C8B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -88,6 +90,12 @@ Global
 		{6E18AECF-34B2-48F9-9694-54150FB156EB}.Release|Any CPU.Build.0 = Release|Any CPU
 		{6E18AECF-34B2-48F9-9694-54150FB156EB}.WinBenchmark|Any CPU.ActiveCfg = Debug|Any CPU
 		{6E18AECF-34B2-48F9-9694-54150FB156EB}.WinBenchmark|Any CPU.Build.0 = Debug|Any CPU
+		{12E09EBD-5E6A-4530-9B7F-B469AC241C8B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{12E09EBD-5E6A-4530-9B7F-B469AC241C8B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{12E09EBD-5E6A-4530-9B7F-B469AC241C8B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{12E09EBD-5E6A-4530-9B7F-B469AC241C8B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{12E09EBD-5E6A-4530-9B7F-B469AC241C8B}.WinBenchmark|Any CPU.ActiveCfg = Release|Any CPU
+		{12E09EBD-5E6A-4530-9B7F-B469AC241C8B}.WinBenchmark|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -102,6 +110,7 @@ Global
 		{31F067EA-3E16-47DD-A6E6-9AFDDD82E22F} = {796FB992-A35C-405B-82A7-4C90C5673174}
 		{0ADCE3AF-C900-4FCB-938B-654211EDD6BE} = {796FB992-A35C-405B-82A7-4C90C5673174}
 		{6E18AECF-34B2-48F9-9694-54150FB156EB} = {796FB992-A35C-405B-82A7-4C90C5673174}
+		{12E09EBD-5E6A-4530-9B7F-B469AC241C8B} = {81B295E0-EEDE-4D5B-B4AC-1202D5E6B3CF}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {01ADF7A3-0758-4A3C-9A18-AEF0F30B6E1B}

@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Package the existing Release builds; callers build all four projects at this version.
+# Package the existing Release builds; the generator also bundles a private .NET tool.
 version=$1
 output=$2
+dotnet build src/SharpPack.Tooling/SharpPack.Tooling.csproj -c Release -p:Version="$version"
 for name in SharpPack.Core SharpPack.Generator SharpPack.Streaming SharpPack; do
     symbols=()
     case "$name" in
