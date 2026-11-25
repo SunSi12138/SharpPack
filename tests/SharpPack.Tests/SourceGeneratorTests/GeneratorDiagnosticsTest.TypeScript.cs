@@ -31,19 +31,26 @@ public partial class GeneratorDiagnosticsTest
         }
     }
 
-    string CompileAndRead(string code, string fileName, bool enableNullableTypes = true)
+    string CompileAndRead(string code, string fileName, bool enableNullableTypes = true, bool convertPropertyName = true)
     {
-        var outputDir = Path.GetTempPath();
+        var directory = Directory.CreateTempSubdirectory("sharppack-ts-");
         var optionProvider = new TypeScriptOptionProvider();
 
-        optionProvider["build_property.SharpPackGenerator_TypeScriptOutputDirectory"] = outputDir;
+        optionProvider["build_property.SharpPackGenerator_TypeScriptOutputDirectory"] = directory.FullName;
         optionProvider["build_property.SharpPackGenerator_TypeScriptEnableNullableTypes"] = enableNullableTypes ? "true" : "false";
+        optionProvider["build_property.SharpPackGenerator_TypeScriptConvertPropertyName"] = convertPropertyName ? "true" : "false";
 
-        CSharpGeneratorRunner.RunGenerator(code, options: optionProvider);
-
-        var outputFilePath = Path.Combine(outputDir, fileName);
-
-        return File.ReadAllText(outputFilePath);
+        try
+        {
+            var (_, diagnostics) = CSharpGeneratorRunner.RunGenerator(code, options: optionProvider);
+            Assert.Empty(diagnostics);
+            return File.ReadAllText(Path.Combine(directory.FullName, fileName));
+        }
+        finally
+        {
+            foreach (var file in directory.EnumerateFiles()) file.Delete();
+            directory.Delete();
+        }
     }
 
     [Fact]
@@ -216,6 +223,21 @@ public partial class Hoge
                     this.middleName = null;
                     this.lastName = "";
             """);
+    }
+
+    [Fact]
+    public void GenerateTypeScriptCanPreservePropertyNames()
+    {
+        var code = CompileAndRead("""
+            [SharpPackable, GenerateTypeScript] public partial class Counters
+            {
+                public int URLCount { get; set; }
+            }
+            """, "Counters.ts", convertPropertyName: false);
+
+        Assert.Contains("URLCount: number;", code);
+        Assert.Contains("writer.writeInt32(value.URLCount);", code);
+        Assert.Contains("value.URLCount = reader.readInt32();", code);
     }
 
 

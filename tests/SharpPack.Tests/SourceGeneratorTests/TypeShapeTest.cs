@@ -135,7 +135,7 @@ public class TypeShapeTest
         var formatter = Assert.IsType<ExternalUnionFormatterShape>(union.ExternalFormatter);
         Assert.Equal(("MessageFormatter", "Serialization", "global::Serialization.MessageFormatter"),
             (formatter.Name, formatter.Namespace, formatter.QualifiedName));
-        Assert.Equal(new UnionCaseShape(19, "global::Models.Message", UsePackablePath: true), Assert.Single(union.Cases));
+        Assert.Equal(new UnionCaseShape(19, "global::Models.Message", UsePackablePath: true, SimpleName: "Message"), Assert.Single(union.Cases));
     }
 
     [Fact]

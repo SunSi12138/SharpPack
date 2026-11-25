@@ -117,7 +117,7 @@ internal static class SerializationPlanner
         return RootFastPath.General;
     }
 
-    static EquatableArray<WireSlot> PlanWireSlots(TypeShape shape)
+    internal static EquatableArray<WireSlot> PlanWireSlots(TypeShape shape)
     {
         if (shape.Union is not null || shape.IsUnmanaged || shape.Collection is not null)
             return default;
