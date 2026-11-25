@@ -13,11 +13,6 @@ if (!System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)
     GC.KeepAlive(new ListFormatter<
         AotUnmanagedWrapper<AotUnmanagedFormatted>>());
 
-    // Diagnostic: explicitly close the formatter methods used by the default writer.
-    GC.KeepAlive(new AotCircularWriter<AotMutableCircularNode>(
-        new SharpPackableFormatter<AotMutableCircularNode>().Serialize));
-    GC.KeepAlive(new AotCircularWriter<AotCircularNode>(
-        new SharpPackableFormatter<AotCircularNode>().Serialize));
 }
 
 var value = new AotSharpPackModel
@@ -658,6 +653,3 @@ public partial class AotClosedExternalUnionItem<T>
 [SharpPackUnionFormatter(typeof(IAotClosedExternalUnion<string>))]
 [SharpPackUnion(4, typeof(AotClosedExternalUnionItem<string>))]
 public partial class AotClosedExternalUnionFormatter;
-
-internal delegate void AotCircularWriter<T>(
-    ref SharpPackWriter<SharpPack.Internal.ReusableLinkedArrayBufferWriter> writer, scoped ref T? value);
