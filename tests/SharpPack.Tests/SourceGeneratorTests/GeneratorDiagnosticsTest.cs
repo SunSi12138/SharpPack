@@ -740,5 +740,13 @@ public partial struct Tester
             }
             [SharpPackable] public partial class Child : Parent;
             """);
+
+        Compile(50, """
+            [SharpPackable(GenerateType.CircularReference)]
+            public partial class Circular
+            {
+                [SharpPackInclude, SharpPackOrder(0)] public string? Value { get; init; }
+            }
+            """);
     }
 }

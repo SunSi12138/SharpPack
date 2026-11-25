@@ -392,7 +392,7 @@ internal static class DiagnosticDescriptors
     internal static readonly DiagnosticDescriptor IncludedPropertyCannotBePopulated = new(
         id: "SHARPPACK050",
         title: "Included property cannot be populated",
-        messageFormat: "Included property '{1}' on '{0}' needs an accessible setter or a matching constructor parameter.",
+        messageFormat: "Included property '{1}' on '{0}' needs a setter usable during deserialization or a matching constructor parameter.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);

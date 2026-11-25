@@ -364,15 +364,16 @@ public partial class TypeMeta
         }
         else
         {
+            var wireMembers = GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference
+                ? Members.DistinctBy(static member => member.Order).ToArray()
+                : Members;
+
             // check ctor members
             if (this.Constructor != null)
             {
-                var constructorMembers = GenerateType == GenerateType.VersionTolerant
-                    ? Members.DistinctBy(static member => member.Order)
-                    : Members;
                 foreach (var parameter in Constructor.Parameters)
                 {
-                    var matches = constructorMembers.Where(member => member.ConstructorParameterName == parameter.Name).ToArray();
+                    var matches = Extensions.FindConstructorBindings(wireMembers, static member => member.ConstructorParameterName, parameter.Name);
                     var location = Constructor.Locations.FirstOrDefault() ?? syntax.Identifier.GetLocation();
                     if (matches.Length == 0)
                     {
@@ -395,19 +396,24 @@ public partial class TypeMeta
                     reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.ReadOnlyFieldMustBeConstructorMember, item.GetLocation(syntax), Symbol.Name, item.Name));
                     noError = false;
                 }
-                else if (!item.IsConstructorParameter && item.Symbol is IPropertySymbol property &&
+                else if (item is { SuppressDefaultInitialization: true, IsAssignable: false })
+                {
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.SuppressDefaultInitializationMustBeSettable, item.GetLocation(syntax), Symbol.Name, item.Name));
+                    noError = false;
+                }
+            }
+
+            foreach (var item in wireMembers)
+            {
+                if (!item.IsConstructorParameter && item.Symbol is IPropertySymbol property &&
                     property.ContainsAttribute(reference.SharpPackIncludeAttribute) &&
                     reference.Compilation.IsSymbolAccessibleWithin(property, Symbol, throughType: Symbol) &&
                     (property.SetMethod is not { } setter ||
+                     GenerateType is GenerateType.CircularReference && !item.IsAssignable ||
                      !reference.Compilation.IsSymbolAccessibleWithin(setter, Symbol, throughType: Symbol)))
                 {
                     reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.IncludedPropertyCannotBePopulated,
                         item.GetLocation(syntax), Symbol.Name, item.Name));
-                    noError = false;
-                }
-                else if (item is { SuppressDefaultInitialization: true, IsAssignable: false })
-                {
-                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.SuppressDefaultInitializationMustBeSettable, item.GetLocation(syntax), Symbol.Name, item.Name));
                     noError = false;
                 }
             }

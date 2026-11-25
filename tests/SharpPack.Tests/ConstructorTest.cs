@@ -25,6 +25,16 @@ public class ConstructorTest
         result.GetLowercaseValue().Should().Be(17);
         result.Value.Should().Be(42);
     }
+
+    [Fact]
+    public void OneSlotSuppliesBothCaseVariantsWhenThereIsNoExactMatch()
+    {
+        var original = new SharedConstructorSlot(17, 42);
+        var result = SharpPackSerializer.Deserialize<SharedConstructorSlot>(SharpPackSerializer.Serialize(original))!;
+
+        result.GetLowercaseValue().Should().Be(42);
+        result.Value.Should().Be(42);
+    }
 }
 
 [SharpPackable]
@@ -42,6 +52,14 @@ public partial class CaseSensitiveConstructor
     public int GetLowercaseValue() => value;
 }
 
+[SharpPackable]
+public partial class SharedConstructorSlot(int value, int Value)
+{
+    readonly int lower = value;
+    public int Value { get; } = Value;
+
+    public int GetLowercaseValue() => lower;
+}
 
 [SharpPackable(GenerateType.CircularReference)]
 public partial class Alpha
