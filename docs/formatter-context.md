@@ -48,6 +48,27 @@ independently of the builder. A built context is safe to share between
 concurrent RPC calls. Different contexts may register different formatters for
 the same closed `T` without affecting each other.
 
+### Register a Brotli formatter
+
+To compress a type whenever its formatter is selected in a context, wrap its
+uncompressed formatter explicitly:
+
+```csharp
+var context = new SharpPackSerializerContextBuilder()
+    .Register(BrotliFormatter<MyMessage>.Wrap(messageFormatter))
+    .Build();
+```
+
+`messageFormatter` is the ordinary `SharpPackFormatter<MyMessage>` for the
+uncompressed value. Its nested reads and writes still use the current context.
+Use the member-level Brotli attribute when only a single field needs
+compression. A Brotli wrapper cannot use another generic Brotli wrapper as
+its uncompressed formatter.
+
+In 2.0, `BrotliFormatter<T>.Default` has the generic formatter type. If code
+used the old field for byte arrays, switch it to `BrotliFormatter.Default`.
+Use `Wrap` rather than `Default` for context registration.
+
 ## System.Type payload capability
 
 `System.Type` values are disabled by default, including null Type values. The

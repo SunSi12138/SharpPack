@@ -142,11 +142,12 @@ public sealed class BrotliFormatter<T> : SharpPackFormatter<T>
 {
     internal const int DefaultDecompssionSizeLimit = 1024 * 1024 * 128; // 128MB
 
-    public static readonly BrotliFormatter Default = new BrotliFormatter();
+    public static readonly BrotliFormatter<T> Default = new();
 
     readonly System.IO.Compression.CompressionLevel compressionLevel;
     readonly int window;
     readonly int decompressionSizeLimit;
+    readonly SharpPackFormatter<T>? innerFormatter;
 
     public BrotliFormatter()
         : this(System.IO.Compression.CompressionLevel.Fastest)
@@ -168,22 +169,52 @@ public sealed class BrotliFormatter<T> : SharpPackFormatter<T>
         System.IO.Compression.CompressionLevel compressionLevel,
         int window,
         int decompressionSizeLimit)
+        : this(compressionLevel, window, decompressionSizeLimit, null)
+    {
+    }
+
+    BrotliFormatter(
+        System.IO.Compression.CompressionLevel compressionLevel,
+        int window,
+        int decompressionSizeLimit,
+        SharpPackFormatter<T>? innerFormatter)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(decompressionSizeLimit);
         this.compressionLevel = compressionLevel;
         this.window = window;
         this.decompressionSizeLimit = decompressionSizeLimit;
+        this.innerFormatter = innerFormatter;
+    }
+
+    /// <summary>
+    /// Wraps an uncompressed formatter so this formatter can be registered for
+    /// the same type without resolving itself. Nested values still use the
+    /// current operation's serializer context.
+    /// </summary>
+    public static BrotliFormatter<T> Wrap(
+        SharpPackFormatter<T> innerFormatter,
+        System.IO.Compression.CompressionLevel compressionLevel = System.IO.Compression.CompressionLevel.Fastest,
+        int window = BrotliUtils.WindowBits_Default,
+        int decompressionSizeLimit = DefaultDecompssionSizeLimit)
+    {
+        ArgumentNullException.ThrowIfNull(innerFormatter);
+        if (innerFormatter is BrotliFormatter<T>)
+        {
+            throw new ArgumentException("Supply an uncompressed formatter, not another Brotli wrapper.", nameof(innerFormatter));
+        }
+        return new(compressionLevel, window, decompressionSizeLimit, innerFormatter);
     }
 
     [Preserve]
     public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref T? value)
     {
+        var formatter = innerFormatter ?? RequireUncompressedFormatter(writer.GetFormatter<T>());
         var compressor = new BrotliCompressor(compressionLevel, window);
         try
         {
             var coWriter = new SharpPackWriter<BrotliCompressor>(ref compressor, writer.OptionalState);
 
-            coWriter.WriteValue(value);
+            coWriter.WriteValueWithFormatter(formatter, value);
             coWriter.Flush();
 
             compressor.CopyTo(ref writer);
@@ -197,6 +228,7 @@ public sealed class BrotliFormatter<T> : SharpPackFormatter<T>
     [Preserve]
     public override void Deserialize(ref SharpPackReader reader, scoped ref T? value)
     {
+        var formatter = innerFormatter ?? RequireUncompressedFormatter(reader.GetFormatter<T>());
         using var decompressor = new BrotliDecompressor(decompressionSizeLimit);
 
         reader.GetRemainingSource(out var singleSource, out var remainingSource);
@@ -213,12 +245,22 @@ public sealed class BrotliFormatter<T> : SharpPackFormatter<T>
         }
 
         using var coReader = new SharpPackReader(decompressedSource, reader.OptionalState);
-        coReader.ReadValue(ref value);
+        coReader.ReadValueWithFormatter(formatter, ref value);
         if (coReader.Remaining != 0)
         {
             SharpPackSerializationException.ThrowInvalidCompressedPayload();
         }
 
         reader.Advance(consumed);
+    }
+
+    static SharpPackFormatter<T> RequireUncompressedFormatter(SharpPackFormatter<T> formatter)
+    {
+        if (formatter is BrotliFormatter<T>)
+        {
+            throw new SharpPackSerializationException(SharpPackErrorCode.FormatterResolutionFailed,
+                $"BrotliFormatter<{typeof(T)}> requires an uncompressed formatter. Use Wrap with that formatter for context registration.");
+        }
+        return formatter;
     }
 }

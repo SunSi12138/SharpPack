@@ -289,6 +289,54 @@ public class CompressionTest
             () => SharpPackSerializer.Deserialize<BrotliIntEnvelope>(segmented)).ErrorCode);
     }
 
+    [Fact]
+    public void RegisteredBrotliWrapsTheSpecifiedFormatterAndKeepsNestedOverrides()
+    {
+        var formatter = BrotliFormatter<CompressedCount>.Wrap(new CountFormatter());
+        var context = new SharpPackSerializerContextBuilder()
+            .Register(formatter)
+            .Register(new IntOffsetFormatter(10))
+            .Build();
+        var withoutOffset = new SharpPackSerializerContextBuilder().Register(formatter).Build();
+
+        var payload = SharpPackSerializer.Serialize(new CompressedCount(42), context);
+
+        Assert.Equal(42, SharpPackSerializer.Deserialize<CompressedCount>(payload, context)!.Count);
+        Assert.Equal(52, SharpPackSerializer.Deserialize<CompressedCount>(payload, withoutOffset)!.Count);
+    }
+
+    [Fact]
+    public void RegisteredBrotliRequiresAnUncompressedFormatter()
+    {
+        var context = new SharpPackSerializerContextBuilder()
+            .Register(BrotliFormatter<int>.Default)
+            .Build();
+        var wrapped = new SharpPackSerializerContextBuilder()
+            .Register(BrotliFormatter<int>.Wrap(new UnmanagedFormatter<int>()))
+            .Build();
+        var payload = SharpPackSerializer.Serialize(42, wrapped);
+        var output = new ArrayBufferWriter<byte>();
+
+        Assert.Equal(42, SharpPackSerializer.Deserialize<int>(payload, wrapped));
+        Assert.Equal(SharpPackErrorCode.FormatterResolutionFailed, Assert.Throws<SharpPackSerializationException>(
+            () => SharpPackSerializer.Serialize(ref output, 42, context)).ErrorCode);
+        Assert.Equal(0, output.WrittenCount);
+        Assert.Equal(SharpPackErrorCode.FormatterResolutionFailed, Assert.Throws<SharpPackSerializationException>(
+            () => SharpPackSerializer.Deserialize<int>(payload, context)).ErrorCode);
+        Assert.Throws<ArgumentException>(() => BrotliFormatter<int>.Wrap(BrotliFormatter<int>.Default));
+    }
+
+    sealed record CompressedCount(int Count);
+
+    sealed class CountFormatter : SharpPackFormatter<CompressedCount>
+    {
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref CompressedCount? value)
+            => writer.WriteValue(value!.Count);
+
+        public override void Deserialize(ref SharpPackReader reader, scoped ref CompressedCount? value)
+            => value = new(reader.ReadValue<int>());
+    }
+
     byte[] ReferenceDecompress(byte[] bytes)
     {
         using (var ms = new MemoryStream(bytes))
