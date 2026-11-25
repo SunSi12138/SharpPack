@@ -1,15 +1,14 @@
 <Project>
     <PropertyGroup>
-        <SharpPackToolingEnabled Condition="'$(SharpPackToolingEnabled)' == ''">true</SharpPackToolingEnabled>
         <_SharpPackToolingPath Condition="'$(_SharpPackToolingPath)' == ''">$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', 'tools', 'net10.0', 'SharpPack.Tooling.dll'))</_SharpPackToolingPath>
         <SharpPackToolingTargetFramework Condition="'$(SharpPackToolingTargetFramework)' == '' and '$(TargetFrameworks)' != ''">$(TargetFrameworks.Split(';')[0])</SharpPackToolingTargetFramework>
-        <_SharpPackArtifactsConfigured Condition="'$(SharpPackToolingEnabled)' == 'true' and '$(DesignTimeBuild)' != 'true'
-                   and '$(SkipCompilerExecution)' != 'true'
-                   and ('$(SharpPackGenerator_TypeScriptOutputDirectory)' != '' or '$(SharpPackGenerator_SerializationInfoOutputDirectory)' != '')">true</_SharpPackArtifactsConfigured>
     </PropertyGroup>
     <Target Name="_SharpPackPrepareArtifacts"
             BeforeTargets="GenerateMSBuildEditorConfigFileShouldRun;CreateCompilerGeneratedFilesOutputPath;CoreCompile"
-            Condition="'$(_SharpPackArtifactsConfigured)' == 'true' and '$(BuildingProject)' == 'true' and '$(TargetFramework)' != ''
+            Condition="('$(SharpPackToolingEnabled)' == '' or '$(SharpPackToolingEnabled)' == 'true')
+                   and '$(DesignTimeBuild)' != 'true' and '$(SkipCompilerExecution)' != 'true'
+                   and ('$(SharpPackGenerator_TypeScriptOutputDirectory)' != '' or '$(SharpPackGenerator_SerializationInfoOutputDirectory)' != '')
+                   and '$(BuildingProject)' == 'true' and '$(TargetFramework)' != ''
                    and ('$(SharpPackToolingTargetFramework)' == '' or '$(TargetFramework)' == '$(SharpPackToolingTargetFramework)')">
         <PropertyGroup>
             <SharpPackGenerator_ArtifactMode>plan</SharpPackGenerator_ArtifactMode>
@@ -80,6 +79,9 @@
             Condition="'$(_SharpPackArtifactSource)' != '' and '$(_SharpPackOuterArtifactOwner)' != '$(MSBuildProjectFullPath)'" />
 
     <Target Name="_SharpPackWriteArtifacts" Condition="'$(_SharpPackArtifactSource)' != ''">
+        <PropertyGroup>
+            <_SharpPackToolingPath Condition="'@(_SharpPackToolingAssembly)' != ''">@(_SharpPackToolingAssembly->'%(FullPath)')</_SharpPackToolingPath>
+        </PropertyGroup>
         <Error Condition="!Exists('$(_SharpPackArtifactSource)')" Text="SharpPack artifact plan is missing. Ensure the matching SharpPack analyzer runs during this build." />
         <Error Condition="!Exists('$(_SharpPackToolingPath)')" Text="SharpPack tooling is missing. Restore the matching SharpPack.Generator package." />
         <PropertyGroup>

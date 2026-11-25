@@ -105,6 +105,21 @@ public class RuntimeAbiDiagnosticsTest
     }
 
     [Fact]
+    public void ArtifactConfigurationWithoutGenerationIntentDoesNotRequireRuntimeAbi()
+    {
+        var driver = NewDriver(new GeneratorDiagnosticsTest.TypeScriptOptionProvider());
+        driver = driver.RunGeneratorsAndUpdateCompilation(CreateCompilation(null, "public class OrdinaryModel { }"),
+            out var output, out var diagnostics);
+        Assert.Empty(diagnostics);
+        Assert.Empty(output.GetDiagnostics().Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var schema = Assert.Single(driver.GetRunResult().GeneratedTrees);
+        using var reader = new StringReader(schema.ToString());
+        var plan = ArtifactSchema.ReadSource(reader);
+        Assert.Null(plan.TypeScript);
+        Assert.Empty(plan.SerializationInfo);
+    }
+
+    [Fact]
     public void StandaloneNoGenerateContract_DoesNotRequireRuntimeAbi()
     {
         const string source = """

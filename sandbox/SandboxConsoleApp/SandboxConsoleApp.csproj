@@ -23,7 +23,6 @@
     <PropertyGroup>
         <SharpPackGenerator_SerializationInfoOutputDirectory>$(MSBuildProjectDirectory)\SharpPackLogs</SharpPackGenerator_SerializationInfoOutputDirectory>
         <SharpPackToolingAdoptExisting>true</SharpPackToolingAdoptExisting>
-        <_SharpPackToolingPath>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '..', '..', 'src', 'SharpPack.Tooling', 'bin', '$(Configuration)', 'net10.0', 'SharpPack.Tooling.dll'))</_SharpPackToolingPath>
     </PropertyGroup>
 
 
@@ -34,7 +33,8 @@
             <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         </ProjectReference>
         <ProjectReference Include="..\..\src\SharpPack.Streaming\SharpPack.Streaming.csproj" />
-        <ProjectReference Include="..\..\src\SharpPack.Tooling\SharpPack.Tooling.csproj" ReferenceOutputAssembly="false" />
+        <ProjectReference Include="..\..\src\SharpPack.Tooling\SharpPack.Tooling.csproj"
+                          ReferenceOutputAssembly="false" OutputItemType="_SharpPackToolingAssembly" />
     </ItemGroup>
     <Import Project="..\..\src\SharpPack.Generator\build\SharpPack.Generator.targets" />
 

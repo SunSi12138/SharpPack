@@ -207,13 +207,20 @@ def verify_artifact_tooling(path, feed, version, env):
         "TypeScriptConvertPropertyName": "false",
         "TypeScriptEnableNullableTypes": "true",
     }
-    project(path, package_references({AGGREGATE: version}),
-            "".join(f"<SharpPackGenerator_{name}>{value}</SharpPackGenerator_{name}>"
-                    for name, value in options.items()), targets="""
+    project(path, package_references({AGGREGATE: version}), targets="""
     <Target Name="DisableFixturePlan" AfterTargets="_SharpPackPrepareArtifacts" Condition="'$(DisableFixturePlan)' == 'true'">
       <PropertyGroup><SharpPackGenerator_ArtifactMode>none</SharpPackGenerator_ArtifactMode></PropertyGroup>
     </Target>
     """)
+    artifact_options = "".join(f"<SharpPackGenerator_{name}>{value}</SharpPackGenerator_{name}>"
+                               for name, value in options.items())
+    (path / "Directory.Build.targets").write_text(f"""<Project>
+    <PropertyGroup>
+        {artifact_options}
+        <SharpPackToolingEnabled Condition="'$(DisableFixtureArtifacts)' == 'true' and '$(SharpPackToolingEnabled)' == ''">false</SharpPackToolingEnabled>
+    </PropertyGroup>
+</Project>
+""")
     shutil.copyfile(HERE / "ArtifactModel.cs", path / "Model.cs")
     (path / "Program.cs").write_text("""using SharpPack;
 var value = new ArtifactFixture.Delivery { DeliveryNote = "sent" };
@@ -242,7 +249,8 @@ namespace ArtifactFixture;
         return {item.name: item.read_bytes() for item in output.iterdir() if not item.name.startswith(".")}
 
     disabled = path / "Disabled 输出"
-    build(disabled, "-p:SharpPackToolingEnabled=false")
+    build(disabled, "-p:DisableFixtureArtifacts=true",
+          f"-p:SharpPackGenerator_SerializationInfoOutputDirectory={disabled}")
     if disabled.exists():
         raise RuntimeError("An ordinary C# build with artifact tooling disabled wrote artifacts")
 

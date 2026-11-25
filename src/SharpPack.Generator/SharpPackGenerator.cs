@@ -59,7 +59,7 @@ public partial class SharpPackGenerator : IIncrementalGenerator
             .Where(static pair => pair.Right is not null)
             .Select(static (pair, _) => (Declaration: pair.Left, Options: pair.Right!));
 
-        ReportRuntimeAbiMismatch(
+        var runtimeAbiMismatch = ReportRuntimeAbiMismatch(
             context,
             models.Where(static model => model.HasGenerationIntent).Select(static (model, _) => model.Declaration),
             unions,
@@ -78,7 +78,7 @@ public partial class SharpPackGenerator : IIncrementalGenerator
             CompatibleDeclarations(unions, unsupportedAbi), tooling);
         var scripts = RegisterTypeScript(context, CompatibleDeclarations(typeScript, unsupportedAbi));
 
-        var emitArtifacts = tooling.Combine(unsupportedAbi).Select(static (input, _) => input.Left.EmitPlan && input.Right is null);
+        var emitArtifacts = tooling.Combine(runtimeAbiMismatch).Select(static (input, _) => input.Left.EmitPlan && !input.Right);
         var artifacts = scripts.Combine(info).Combine(emitArtifacts)
             .SelectMany(static (input, _) => input.Right
                 ? ImmutableArray.Create(ArtifactSchema.WriteSource(new(input.Left.Left, input.Left.Right)))
@@ -107,7 +107,7 @@ public partial class SharpPackGenerator : IIncrementalGenerator
             .Where(static pair => pair.Right is null)
             .Select(static (pair, _) => pair.Left);
 
-    static void ReportRuntimeAbiMismatch(
+    static IncrementalValueProvider<bool> ReportRuntimeAbiMismatch(
         IncrementalGeneratorInitializationContext context,
         IncrementalValuesProvider<TypeDeclarationSyntax> models,
         IncrementalValuesProvider<TypeDeclarationSyntax> unions,
@@ -120,12 +120,13 @@ public partial class SharpPackGenerator : IIncrementalGenerator
 
         var uses = Incompatible(models).Collect().Combine(Incompatible(unions).Collect())
             .Combine(Incompatible(typeScript).Collect());
-        context.RegisterSourceOutput(uses, static (output, declarations) =>
-        {
-            var first = declarations.Left.Left.Concat(declarations.Left.Right).Concat(declarations.Right)
+        var firstMismatch = uses.Select(static (declarations, _) =>
+            declarations.Left.Left.Concat(declarations.Left.Right).Concat(declarations.Right)
                 .OrderBy(static item => item.Left.SyntaxTree.FilePath, StringComparer.Ordinal)
                 .ThenBy(static item => item.Left.SpanStart)
-                .FirstOrDefault();
+                .FirstOrDefault());
+        context.RegisterSourceOutput(firstMismatch, static (output, first) =>
+        {
             if (first.Left is not null)
             {
                 output.ReportDiagnostic(Diagnostic.Create(
@@ -136,6 +137,7 @@ public partial class SharpPackGenerator : IIncrementalGenerator
                     RuntimeGeneratedCodeAbi.MaximumVersion));
             }
         });
+        return firstMismatch.Select(static (first, _) => first.Left is not null);
     }
 
     static IncrementalValueProvider<EquatableArray<SerializationInfoFile>> RegisterSharpPackable(
