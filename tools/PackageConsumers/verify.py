@@ -101,7 +101,7 @@ def validate_package_payload(name, payload, metadata):
         required |= expected_runtime | {f"lib/net10.0/{name}.xml"}
     if name == GENERATOR:
         tool = "tools/net10.0/SharpPack.Tooling"
-        required |= {f"buildTransitive/{name}.targets", f"{tool}.dll",
+        required |= {f"buildTransitive/{name}.targets", f"buildMultiTargeting/{name}.targets", f"{tool}.dll",
                      f"{tool}.deps.json", f"{tool}.runtimeconfig.json"}
         analyzers = assemblies - {f"{tool}.dll"}
         if f"analyzers/dotnet/cs/{name}.dll" not in analyzers or not all(
@@ -133,7 +133,7 @@ def nuget_config(path, feed=None, network=False):
     return path
 
 
-def project(path, items, properties=""):
+def project(path, items, properties="", targets=""):
     path.mkdir()
     (path / "Consumer.csproj").write_text(f"""<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
@@ -143,6 +143,7 @@ def project(path, items, properties=""):
     {properties}
   </PropertyGroup>
   <ItemGroup>{items}</ItemGroup>
+  {targets}
 </Project>
 """)
 
@@ -210,7 +211,11 @@ def verify_artifact_tooling(path, feed, version, env):
     project(path, package_references({AGGREGATE: version}) +
             f'''<CompilerVisibleProperty Include="{visible}" Condition="'$(SharpPackToolingEnabled)' == 'false'" />''',
             "".join(f"<SharpPackGenerator_{name}>{value}</SharpPackGenerator_{name}>"
-                    for name, value in options.items()))
+                    for name, value in options.items()), targets="""
+    <Target Name="DisableFixturePlan" AfterTargets="_SharpPackPrepareArtifacts" Condition="'$(DisableFixturePlan)' == 'true'">
+      <PropertyGroup><SharpPackGenerator_ArtifactMode>none</SharpPackGenerator_ArtifactMode></PropertyGroup>
+    </Target>
+    """)
     shutil.copyfile(HERE / "ArtifactModel.cs", path / "Model.cs")
     (path / "Program.cs").write_text("""using SharpPack;
 var value = new ArtifactFixture.Delivery { DeliveryNote = "sent" };
@@ -261,9 +266,16 @@ namespace ArtifactFixture;
     (output / "Delivery.ts").unlink()
     manifest = json.loads(journal.read_text(encoding="utf-8"))
     journal.write_text(json.dumps(dict(manifest, Pending=manifest["Committed"])), encoding="utf-8")
+    custom_runtime = b"// custom runtime\n"
+    (output / "SharpPackReader.ts").write_bytes(custom_runtime)
     build(output)
-    if not plan.is_file() or json.loads(journal.read_text(encoding="utf-8"))["Pending"] is not None or files(output) != baseline:
+    recovered = {**baseline, "SharpPackReader.ts": custom_runtime}
+    if not plan.is_file() or json.loads(journal.read_text(encoding="utf-8"))["Pending"] is not None or files(output) != recovered:
         raise RuntimeError("A missing plan or interrupted artifact write did not recover")
+
+    build(output, "-p:DisableFixturePlan=true", error="did not write a fresh artifact plan")
+    if plan.exists() or files(output) != recovered:
+        raise RuntimeError("The build used a stale plan from an earlier compilation")
 
     build(legacy, error="is not owned by SharpPack")
     build(legacy, "-p:SharpPackToolingAdoptExisting=true")
@@ -271,14 +283,13 @@ namespace ArtifactFixture;
         raise RuntimeError("Explicit adoption changed matching legacy output")
 
     (output / "Edited.ts").write_bytes(b"// edited by the user\n")
-    (output / "SharpPackReader.ts").write_bytes(b"// custom runtime\n")
     (output / "Unrelated.ts").write_bytes(b"// never owned by SharpPack\n")
     extra.unlink()
     build(output)
     retained = files(output)
     if ({"Retired.ts", "ArtifactFixture.Retired.txt", "ArtifactFixture.Edited.txt"} & retained.keys()
             or retained.get("Edited.ts") != b"// edited by the user\n"
-            or retained.get("SharpPackReader.ts") != b"// custom runtime\n"
+            or retained.get("SharpPackReader.ts") != custom_runtime
             or retained.get("Unrelated.ts") != b"// never owned by SharpPack\n"):
         raise RuntimeError("Stale cleanup did not honor file ownership and edits")
 
@@ -292,6 +303,48 @@ namespace ArtifactFixture;
     if files(output) != retained or journal.read_bytes() != previous_manifest:
         raise RuntimeError("A failed compilation changed tooling artifacts")
     print("Artifact tooling: byte parity, reproducible rebuilds, ownership and recovery verified", flush=True)
+
+
+def verify_multitargeted_artifacts(path, feed, version, env):
+    project(path, package_references({AGGREGATE: version}), """
+    <TargetFramework />
+    <TargetFrameworks>net10.0;net10.0-windows</TargetFrameworks>
+    <OutputType>Library</OutputType>
+    <SharpPackToolingEnabled>true</SharpPackToolingEnabled>
+    <SharpPackGenerator_TypeScriptOutputDirectory>Generated 输出</SharpPackGenerator_TypeScriptOutputDirectory>
+    """)
+    model = path / "Model.cs"
+    shutil.copyfile(HERE / "ArtifactModel.cs", model)
+    error = path / "OnlyWindows.cs"
+    fail_windows = "#if WINDOWS\n#error Windows framework fixture intentionally fails\n#endif\n"
+    error.write_text(fail_windows)
+    local_env = dict(env, NUGET_PACKAGES=str(path / "packages"))
+    config = nuget_config(path / "NuGet.Config", feed)
+    run(["dotnet", "restore", "--configfile", str(config)], path, local_env)
+    output = path / "Generated 输出"
+    build = ["dotnet", "build", "-c", "Release", "--no-restore", "--nologo", "-m:1"]
+
+    def failed_multi_build():
+        log = run(build, path, local_env, expected_success=False)
+        if "error CS1029" not in log or "Windows framework fixture intentionally fails" not in log:
+            raise RuntimeError(f"Expected only the Windows framework to fail:\n{log}")
+
+    failed_multi_build()
+    if output.exists():
+        raise RuntimeError("The selected framework published before the full build succeeded")
+    error.unlink()
+    run(build, path, local_env)
+    artifact = output / "Delivery.ts"
+    previous = artifact.read_bytes()
+    model.write_text(model.read_text().replace("DeliveryNote", "UpdatedNote"))
+    error.write_text(fail_windows)
+    failed_multi_build()
+    if artifact.read_bytes() != previous:
+        raise RuntimeError("A failed multi-target build changed the previous artifacts")
+    run([*build, "-f", "net10.0"], path, local_env)
+    if b"updatedNote" not in artifact.read_bytes():
+        raise RuntimeError("An explicit successful framework build did not write artifacts")
+    print("Artifact tooling: full-build and explicit-framework commit boundaries verified", flush=True)
 
 
 def pack(name, version, feed, env, *, source=ROOT, existing_build=False):
@@ -417,6 +470,7 @@ def main():
             if name != "streaming":
                 consumer(work / f"{name}-aot", feed, refs, runtime | refs, env, args.architecture, aot=True)
         verify_artifact_tooling(work / "artifact-tooling", feed, version, env)
+        verify_multitargeted_artifacts(work / "artifact-multitarget", feed, version, env)
         if args.compatibility:
             verify_compatibility(work, packages, current_cache, version, env, args.architecture)
 

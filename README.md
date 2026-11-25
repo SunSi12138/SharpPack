@@ -630,9 +630,9 @@ Use one output directory per project (the two SharpPack outputs in the same
 project may share a directory). SharpPack keeps an ownership file next to the
 generated files and removes only unchanged files it previously generated and
 no longer needs. It leaves unrelated files and customized TypeScript runtime
-files alone. IDE design-time builds do not write artifacts. In a multi-targeted
-project, the first framework supplies the artifacts; set
-`SharpPackToolingTargetFramework` to pick another.
+files alone. IDE design-time builds do not write artifacts. A multi-targeted
+build writes artifacts only after all frameworks succeed. The first framework
+supplies the artifacts; set `SharpPackToolingTargetFramework` to pick another.
 
 For a directory created by the legacy generator, build into a new directory or
 run one build with `-p:SharpPackToolingAdoptExisting=true`. Adoption claims only

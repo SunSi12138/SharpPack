@@ -56,7 +56,7 @@ internal static class ArtifactStore
                     throw new IOException($"'{path}' is not owned by SharpPack. Move it, change the output directory, or explicitly adopt matching legacy output.");
                 }
             }
-            desired.Add(new(artifact.Name, artifact.Text));
+            desired.Add(new(artifact.Name, artifact.Text, artifact.PreserveUnowned));
         }
 
         if (manifest.Committed.SequenceEqual(desired) &&
@@ -72,18 +72,27 @@ internal static class ArtifactStore
         var previous = Index(transition.Committed, file => file.Name);
         var next = Index(transition.Pending!, file => file.Name);
 
+        var claimed = new List<OwnedFile>(next.Count);
         foreach (var file in next.Values)
         {
             var path = Path.Combine(directory, file.Name);
             var kind = EnsurePlainOrMissing(path);
             if (kind == FileKind.Plain)
             {
-                if (Matches(path, file.Text)) continue;
+                if (Matches(path, file.Text))
+                {
+                    claimed.Add(file);
+                    continue;
+                }
                 if (!previous.TryGetValue(file.Name, out var owned) || !Matches(path, owned.Text))
+                {
+                    if (file.PreserveUnowned) continue;
                     throw new IOException($"'{path}' changed during SharpPack generation. Move it before rebuilding.");
+                }
             }
 
             AtomicWrite(path, file.Text, replace: kind == FileKind.Plain);
+            claimed.Add(file);
         }
 
         foreach (var file in previous.Values)
@@ -95,7 +104,7 @@ internal static class ArtifactStore
             if (Kind(path) == FileKind.Plain && Matches(path, file.Text)) File.Delete(path);
         }
 
-        var committed = transition with { Committed = transition.Pending!, Pending = null };
+        var committed = transition with { Committed = claimed.ToArray(), Pending = null };
         Save(manifestPath, committed);
         return committed;
     }
@@ -172,6 +181,6 @@ internal static class ArtifactStore
     }
 
     enum FileKind { Missing, Plain, Other }
-    sealed record OwnedFile(string Name, string Text);
+    sealed record OwnedFile(string Name, string Text, bool PreserveUnowned);
     sealed record Manifest(int Version, string Project, OwnedFile[] Committed, OwnedFile[]? Pending);
 }

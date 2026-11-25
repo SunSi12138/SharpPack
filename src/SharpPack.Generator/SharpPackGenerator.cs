@@ -87,15 +87,16 @@ public partial class SharpPackGenerator : IIncrementalGenerator
 
     static ArtifactMode GetArtifactMode(AnalyzerConfigOptions options)
     {
-        if (options.TryGetValue("build_property.DesignTimeBuild", out var design) && string.Equals(design, "true", StringComparison.OrdinalIgnoreCase))
-            return ArtifactMode.None;
         return options.TryGetValue("build_property.SharpPackGenerator_ArtifactMode", out var mode) ? mode switch
         {
-            "plan" => ArtifactMode.Plan,
+            "plan" => IsDesignTimeBuild(options) ? ArtifactMode.None : ArtifactMode.Plan,
             "none" => ArtifactMode.None,
             _ => ArtifactMode.Legacy,
         } : ArtifactMode.Legacy;
     }
+
+    static bool IsDesignTimeBuild(AnalyzerConfigOptions options)
+        => options.TryGetValue("build_property.DesignTimeBuild", out var design) && string.Equals(design, "true", StringComparison.OrdinalIgnoreCase);
 
     static bool HasModelGenerationIntent(GeneratorAttributeSyntaxContext context)
     {
@@ -232,7 +233,7 @@ public partial class SharpPackGenerator : IIncrementalGenerator
             .Select(static (configOptions, _) =>
             {
                 var options = configOptions.GlobalOptions;
-                if (GetArtifactMode(options) == ArtifactMode.None ||
+                if (IsDesignTimeBuild(options) || GetArtifactMode(options) == ArtifactMode.None ||
                     !options.TryGetValue("build_property.SharpPackGenerator_TypeScriptOutputDirectory", out var path) || string.IsNullOrEmpty(path))
                 {
                     return null;
