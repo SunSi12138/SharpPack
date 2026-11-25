@@ -224,10 +224,10 @@ public partial class TypeMeta
         {
             var wireMembers = plan.WireSlots.Select(slot => slot.DeclaredMemberIndex is int index
                 ? Members[index] : MemberMeta.CreateEmpty(slot.Position)).ToArray();
-            serializeBody = EmitSerializeBody(wireMembers);
-            deserializeBody = EmitDeserializeBodyCore(wireMembers, honorFormatterOverrides: false);
+            serializeBody = EmitSerializeBody(wireMembers, plan);
+            deserializeBody = EmitDeserializeBodyCore(wireMembers, plan, honorFormatterOverrides: false);
             formatterOverrideMethods = EmitFormatterOverrideMethods(
-                contextFormatterTypeName, shape, wireMembers);
+                contextFormatterTypeName, plan, wireMembers);
         }
 
         var classOrStructOrRecord = (IsRecord, IsValueType) switch
@@ -394,11 +394,11 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         }
     }
 
-    private string EmitDeserializeBodyCore(MemberMeta[] members, bool honorFormatterOverrides)
+    private string EmitDeserializeBodyCore(MemberMeta[] members, SerializationPlan plan, bool honorFormatterOverrides)
     {
         var count = members.Length;
 
-        var isVersionTolerant = this.GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference;
+        var isVersionTolerant = plan.ObjectWriteStrategy != ObjectWriteStrategy.Plain;
         var readBeginBody = "";
         var readEndBody = "";
         var commentOutInvalidBody = "";
@@ -474,9 +474,11 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         {
             {{(IsValueType ? "" : "if (value == null)")}}
             {
-{{EmitDeserializeMembers(
+{{EmitDeserializeMembersCore(
     members,
+    plan.ScalarBatches,
     "                ",
+    isVersionTolerant,
     honorFormatterOverrides)}}
 
                 goto NEW;
@@ -757,24 +759,13 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         }
     }
 
-    string EmitSerializeBody(MemberMeta[] members)
-    {
-        if (this.GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference)
+    string EmitSerializeBody(MemberMeta[] members, SerializationPlan plan)
+        => plan.ObjectWriteStrategy switch
         {
-            return members.All(x =>
-                x.Kind is MemberKind.Unmanaged
-                    or MemberKind.String
-                    or MemberKind.Enum
-                    or MemberKind.UnmanagedArray
-                    or MemberKind.UnmanagedNullable
-                    or MemberKind.Blank)
-                ? EmitVersionTorelantSerializeBodyOptimized(members)
-                : EmitVersionTorelantSerializeBody(
-                    members, honorFormatterOverrides: false);
-        }
-
-        return EmitObjectSerializeBody(members, honorFormatterOverrides: false);
-    }
+            ObjectWriteStrategy.VersionedInlineLengths => EmitVersionTorelantSerializeBodyOptimized(members, plan.ScalarBatches),
+            ObjectWriteStrategy.VersionedBufferedLengths => EmitVersionTorelantSerializeBody(members, honorFormatterOverrides: false),
+            _ => EmitObjectSerializeBody(members, plan.ScalarBatches, honorFormatterOverrides: false),
+        };
 
     string EmitExactSizeSerializeMethod()
     {
@@ -844,8 +835,9 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 """;
     }
 
-    string EmitFormatterOverrideMethods(string contextFormatterTypeName, TypeShape shape, MemberMeta[] members)
+    string EmitFormatterOverrideMethods(string contextFormatterTypeName, SerializationPlan plan, MemberMeta[] members)
     {
+        var shape = plan.Shape;
         var writerCondition =
             EmitFormatterOverrideDependencyCondition(members, "writer");
         if (writerCondition.Length == 0)
@@ -854,13 +846,13 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         }
 
         var overrideSerializeBody =
-            GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference
+            plan.ObjectWriteStrategy != ObjectWriteStrategy.Plain
                 ? EmitVersionTorelantSerializeBody(
                     members, honorFormatterOverrides: true)
                 : EmitObjectSerializeBody(
-                    members, honorFormatterOverrides: true);
+                    members, plan.ScalarBatches, honorFormatterOverrides: true);
         var overrideDeserializeBody = EmitDeserializeBodyCore(
-            members, honorFormatterOverrides: true);
+            members, plan, honorFormatterOverrides: true);
         var nullable = IsValueType ? "" : "?";
         var serializeHelperName =
             GetFormatterOverrideHelperName(serialize: true);
@@ -927,7 +919,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         return name;
     }
 
-    string EmitObjectSerializeBody(MemberMeta[] members, bool honorFormatterOverrides)
+    string EmitObjectSerializeBody(MemberMeta[] members, EquatableArray<ScalarBatch> batches, bool honorFormatterOverrides)
     {
         return $$"""
 {{(!IsValueType ? $$"""
@@ -938,8 +930,9 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         }
 """ : "")}}
 
-{{EmitSerializeMembers(
+{{EmitSerializeMembersCore(
     members,
+    batches,
     "        ",
     toTempWriter: false,
     writeObjectHeader: true,
@@ -981,8 +974,9 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
             Span<int> offsets = stackalloc int[{{members.Length}}];
             var tempWriter = {{newTempWriter}};
 
-{{EmitSerializeMembers(
+{{EmitSerializeMembersCore(
     members,
+    default,
     "            ",
     toTempWriter: true,
     writeObjectHeader: false,
@@ -1017,7 +1011,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
     }
 
     // Optimized is all member is fixed size
-    string EmitVersionTorelantSerializeBodyOptimized(MemberMeta[] members)
+    string EmitVersionTorelantSerializeBodyOptimized(MemberMeta[] members, EquatableArray<ScalarBatch> batches)
     {
         static string EmitLengthHeader(MemberMeta[] members)
         {
@@ -1054,13 +1048,24 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         writer.WriteObjectHeader({{members.Length}});
 {{EmitLengthHeader(members)}}
         {{(GenerateType == GenerateType.CircularReference ? "writer.WriteVarInt(id);" : "")}}
-{{EmitSerializeMembers(members, "        ", toTempWriter: false, writeObjectHeader: false)}}
+{{EmitSerializeMembersCore(members, batches, "        ", toTempWriter: false, writeObjectHeader: false)}}
 """;
     }
 
     // toTempWriter is VersionTolerant
     public string EmitSerializeMembers(
         MemberMeta[] members,
+        string indent,
+        bool toTempWriter,
+        bool writeObjectHeader,
+        bool honorFormatterOverrides = false)
+        => EmitSerializeMembersCore(members,
+            toTempWriter || honorFormatterOverrides ? default : PlanScalarBatches(members),
+            indent, toTempWriter, writeObjectHeader, honorFormatterOverrides);
+
+    string EmitSerializeMembersCore(
+        MemberMeta[] members,
+        EquatableArray<ScalarBatch> batches,
         string indent,
         bool toTempWriter,
         bool writeObjectHeader,
@@ -1077,9 +1082,8 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         var sb = new StringBuilder();
         for (int i = 0; i < members.Length; i++)
         {
-            if (honorFormatterOverrides ||
-                !(members[i].Kind is MemberKind.Unmanaged or MemberKind.Enum or MemberKind.UnmanagedNullable) ||
-                toTempWriter)
+            var batch = toTempWriter || honorFormatterOverrides ? default : batches[i];
+            if (batch.Count == 0)
             {
                 sb.Append(indent);
                 if (i == 0 && writeObjectHeader)
@@ -1102,31 +1106,11 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
                 continue;
             }
 
-            // search optimization
-            var optimizeFrom = i;
-            var optimizeTo = i;
-            var limit = Math.Min(members.Length, i + 15);
-            var dangerous = "";
-            for (int j = i; j < limit; j++)
-            {
-                if (members[j].Kind is MemberKind.Unmanaged or MemberKind.Enum or MemberKind.UnmanagedNullable)
-                {
-                    if (members[j].Kind is MemberKind.UnmanagedNullable)
-                    {
-                        dangerous = "Dangerous";
-                    }
-                    optimizeTo = j;
-                    continue;
-                }
-                else
-                {
-                    break;
-                }
-            }
-
             // write method
+            var end = i + batch.Count;
+            var dangerous = batch.UseDangerous ? "Dangerous" : "";
             sb.Append(indent);
-            if (optimizeFrom == 0 && writeObjectHeader)
+            if (i == 0 && writeObjectHeader)
             {
                 sb.Append($"{writer}.{dangerous}WriteUnmanagedWithObjectHeader(");
                 sb.Append(members.Length);
@@ -1137,7 +1121,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
                 sb.Append($"{writer}.{dangerous}WriteUnmanaged(");
             }
 
-            for (int index = optimizeFrom; index <= optimizeTo; index++)
+            for (int index = i; index < end; index++)
             {
                 if (index != i)
                 {
@@ -1148,16 +1132,8 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
             }
             sb.Append(");");
 
-            if (toTempWriter)
-            {
-                sb.AppendLine($" offsets[{i}] = tempWriter.WrittenCount;");
-            }
-            else
-            {
-                sb.AppendLine();
-            }
-
-            i = optimizeTo;
+            sb.AppendLine();
+            i = end - 1;
         }
 
         return sb.ToString();
@@ -1169,60 +1145,47 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         string indent,
         bool honorFormatterOverrides)
     {
+        var versioned = GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference;
         return EmitDeserializeMembersCore(
             members,
+            versioned || honorFormatterOverrides ? default : PlanScalarBatches(members),
             indent,
+            versioned,
             honorFormatterOverrides);
     }
 
+    static EquatableArray<ScalarBatch> PlanScalarBatches(MemberMeta[] members)
+        => SerializationPlanner.PlanScalarBatches(members.Select(static member => member.Kind).ToArray());
+
     string EmitDeserializeMembersCore(
         MemberMeta[] members,
+        EquatableArray<ScalarBatch> batches,
         string indent,
+        bool versioned,
         bool honorFormatterOverrides)
     {
         // {{Members.Select(x => "                " + x.EmitReadToDeserialize()).NewLine()}}
         var sb = new StringBuilder();
         for (int i = 0; i < members.Length; i++)
         {
-            if (honorFormatterOverrides ||
-                !(members[i].Kind is MemberKind.Unmanaged or MemberKind.Enum or MemberKind.UnmanagedNullable) ||
-                (GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference))
+            var batch = versioned || honorFormatterOverrides ? default : batches[i];
+            if (batch.Count == 0)
             {
                 sb.Append(indent);
                 sb.AppendLine(members[i].EmitReadToDeserialize(
                     i,
-                    GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference,
+                    versioned,
                     honorFormatterOverrides));
                 continue;
             }
 
-            // search optimization
-            var optimizeFrom = i;
-            var optimizeTo = i;
-            var limit = Math.Min(members.Length, i + 15);
-            var dangerous = "";
-            for (int j = i; j < limit; j++)
-            {
-                if (members[j].Kind is MemberKind.Unmanaged or MemberKind.Enum or MemberKind.UnmanagedNullable)
-                {
-                    if (members[j].Kind is MemberKind.UnmanagedNullable)
-                    {
-                        dangerous = "Dangerous";
-                    }
-                    optimizeTo = j;
-                    continue;
-                }
-                else
-                {
-                    break;
-                }
-            }
-
             // write read method
+            var end = i + batch.Count;
+            var dangerous = batch.UseDangerous ? "Dangerous" : "";
             sb.Append(indent);
             sb.Append($"reader.{dangerous}ReadUnmanaged(");
 
-            for (int index = optimizeFrom; index <= optimizeTo; index++)
+            for (int index = i; index < end; index++)
             {
                 if (index != i)
                 {
@@ -1233,7 +1196,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
             }
             sb.AppendLine(");");
 
-            i = optimizeTo;
+            i = end - 1;
         }
 
         return sb.ToString();

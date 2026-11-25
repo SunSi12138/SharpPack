@@ -23,6 +23,11 @@ that cannot fit before the planner creates those slots. Raw unmanaged values
 have no slots. The emitter uses the slot sequence without changing the declared
 members.
 
-Wire member operations, context dependencies, AOT roots, and other wire
-strategies move to the plan next. An unchanged shape can skip planning and
-emission only after it captures every input those stages actually use.
+The plan also groups consecutive unmanaged slots within Core's overload limit
+and chooses inline or buffered length encoding for versioned writes.
+Context-aware writers still use the existing buffered path because an override
+can change the encoded length.
+
+Remaining per-member operations, context dependencies, AOT roots, and other
+wire strategies move to the plan next. An unchanged shape can skip planning
+and emission only after it captures every input those stages actually use.
