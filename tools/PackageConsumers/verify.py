@@ -306,15 +306,19 @@ namespace ArtifactFixture;
 
 
 def verify_multitargeted_artifacts(path, feed, version, env):
-    project(path, package_references({AGGREGATE: version}), """
+    project(path, f"""<PackageReference Include="{AGGREGATE}" Version="[{version}]"
+             Condition="'$(TargetFramework)' == 'net10.0'" />""", """
     <TargetFramework />
     <TargetFrameworks>net10.0;net10.0-windows</TargetFrameworks>
     <OutputType>Library</OutputType>
-    <SharpPackToolingEnabled>true</SharpPackToolingEnabled>
-    <SharpPackGenerator_TypeScriptOutputDirectory>Generated 输出</SharpPackGenerator_TypeScriptOutputDirectory>
+    """, targets="""
+    <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0' and '$(DisableFixtureArtifacts)' != 'true'">
+      <SharpPackToolingEnabled>true</SharpPackToolingEnabled>
+      <SharpPackGenerator_TypeScriptOutputDirectory>Generated 输出</SharpPackGenerator_TypeScriptOutputDirectory>
+    </PropertyGroup>
     """)
     model = path / "Model.cs"
-    shutil.copyfile(HERE / "ArtifactModel.cs", model)
+    model.write_text("#if !WINDOWS\n" + (HERE / "ArtifactModel.cs").read_text() + "\n#endif\n")
     error = path / "OnlyWindows.cs"
     fail_windows = "#if WINDOWS\n#error Windows framework fixture intentionally fails\n#endif\n"
     error.write_text(fail_windows)
@@ -344,6 +348,10 @@ def verify_multitargeted_artifacts(path, feed, version, env):
     run([*build, "-f", "net10.0"], path, local_env)
     if b"updatedNote" not in artifact.read_bytes():
         raise RuntimeError("An explicit successful framework build did not write artifacts")
+    error.unlink()
+    run([*build, "-p:DisableFixtureArtifacts=true"], path, local_env)
+    if b"updatedNote" not in artifact.read_bytes():
+        raise RuntimeError("The outer build changed artifacts despite no configured inner output")
     print("Artifact tooling: full-build and explicit-framework commit boundaries verified", flush=True)
 
 
