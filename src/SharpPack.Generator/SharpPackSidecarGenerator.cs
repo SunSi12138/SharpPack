@@ -19,22 +19,23 @@ public readonly struct SharpPackSidecarRoot(ITypeSymbol type, Location? location
 
 public readonly struct SharpPackSidecarWireMember
 {
-    internal SharpPackSidecarWireMember(int position, string name, string typeName)
-        => (Position, Name, TypeName) = (position, name, typeName);
+    internal SharpPackSidecarWireMember(int position, string name, ITypeSymbol type)
+        => (Position, Name, Type) = (position, name, type);
 
     public int Position { get; }
     public string Name { get; }
-    public string TypeName { get; }
+    /// <summary>The member type symbol from the original compilation.</summary>
+    public ITypeSymbol Type { get; }
 }
 
 /// <summary>The ordinary object wire shape of a generated sidecar.</summary>
 public sealed class SharpPackSidecarWireShape
 {
-    internal SharpPackSidecarWireShape(string typeName, bool isValueType, ImmutableArray<SharpPackSidecarWireMember> members)
-        => (TypeName, IsValueType, Members) = (typeName, isValueType, members);
+    internal SharpPackSidecarWireShape(ITypeSymbol type, ImmutableArray<SharpPackSidecarWireMember> members)
+        => (Type, Members) = (type, members);
 
-    public string TypeName { get; }
-    public bool IsValueType { get; }
+    /// <summary>The closed sidecar type symbol from the original compilation.</summary>
+    public ITypeSymbol Type { get; }
     public ImmutableArray<SharpPackSidecarWireMember> Members { get; }
 }
 
@@ -124,11 +125,13 @@ public static class SharpPackSidecarGenerator
                 if (node.Sidecar is not { } plan) continue;
                 if (!wireShapes.TryGetValue(node.Type, out var shape))
                 {
-                    shape = new(plan.Shape.TargetName, plan.Shape.IsValueType,
+                    shape = new(node.Type,
                         plan.WireSlots.Select(slot =>
                         {
-                            var member = plan.Shape.Members[slot.DeclaredMemberIndex!.Value];
-                            return new SharpPackSidecarWireMember(slot.Position, member.Name, member.TypeName);
+                            // External object dependencies follow the same declared member order as the plan.
+                            var index = slot.DeclaredMemberIndex!.Value;
+                            return new SharpPackSidecarWireMember(slot.Position, plan.Shape.Members[index].Name,
+                                node.Dependencies[index].Type);
                         }).ToImmutableArray());
                     wireShapes.Add(node.Type, shape);
                 }
