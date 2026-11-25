@@ -7,6 +7,8 @@ namespace SharpPack.Generator;
 internal sealed record TypeShape(
     string DeclarationName,
     string TargetName,
+    TypeKind DeclarationKind,
+    TypeKind TargetKind,
     string Namespace,
     string ShortName,
     GenerateType GenerateType,
@@ -26,6 +28,8 @@ internal sealed record TypeShape(
         return new TypeShape(
             declaration.FullyQualifiedToString(),
             target.FullyQualifiedToString(),
+            declaration.TypeKind,
+            target.TypeKind,
             target.ContainingNamespace.IsGlobalNamespace ? "" : target.ContainingNamespace.ToDisplayString(),
             model.TypeName,
             model.GenerateType,
@@ -100,7 +104,7 @@ internal sealed record AttributeValueShape(
     internal static AttributeValueShape Create(TypedConstant constant)
     {
         if (constant.IsNull)
-            return new(constant.Kind, true, null, null, 0, default);
+            return new(constant.Kind, true, constant.Type?.FullyQualifiedToString(), null, 0, default);
         if (constant.Kind == TypedConstantKind.Array)
             return new(constant.Kind, false, ((IArrayTypeSymbol)constant.Type!).ElementType.FullyQualifiedToString(),
                 null, 0, new EquatableArray<AttributeValueShape>(constant.Values.Select(Create)));

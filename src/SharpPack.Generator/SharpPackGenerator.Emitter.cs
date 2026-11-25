@@ -189,7 +189,7 @@ public partial class TypeMeta
     {
         if (shape.IsUnion)
         {
-            writer.AppendLine(EmitUnionTemplate(context));
+            writer.AppendLine(EmitUnionTemplate(context, shape));
             return;
         }
 
@@ -1400,9 +1400,9 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         return lines.NewLine();
     }
 
-    string EmitUnionTemplate(IGeneratorContext context)
+    string EmitUnionTemplate(IGeneratorContext context, TypeShape shape)
     {
-        var classOrInterfaceOrRecord = IsRecord ? "record" : (Symbol.TypeKind == TypeKind.Interface) ? "interface" : "class";
+        var classOrInterfaceOrRecord = shape.IsRecord ? "record" : shape.TargetKind == TypeKind.Interface ? "interface" : "class";
 
         var contextFactoryInterface =
             $"global::SharpPack.ISharpPackFormatterFactory<{TypeName}>";

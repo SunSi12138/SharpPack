@@ -79,6 +79,35 @@ public class TypeShapeTest
     }
 
     [Fact]
+    public void NullFormatterArgumentsRetainTheirDeclaredType()
+    {
+        var source = Model.Replace("new[] { 10, 20 }", "null");
+        var ints = Analyze(source, "Envelope");
+        var strings = Analyze(source.Replace("int[] values", "string[] values"), "Envelope");
+        Assert.Equal("int[]", ints.Members[0].CustomFormatter!.Arguments[0].TypeName);
+        Assert.Equal("string[]", strings.Members[0].CustomFormatter!.Arguments[0].TypeName);
+        Assert.NotEqual(ints, strings);
+    }
+
+    [Fact]
+    public void InterfaceAndAbstractClassUnionsHaveDifferentShapes()
+    {
+        const string source = """
+            using SharpPack;
+            [SharpPackable]
+            [SharpPackUnion(1, typeof(Message))]
+            public partial interface IMessage { }
+            [SharpPackable] public partial class Message : IMessage { }
+            """;
+        var asInterface = Analyze(source, "IMessage");
+        var asClass = Analyze(source.Replace("partial interface", "abstract partial class"), "IMessage");
+        Assert.Equal(TypeKind.Interface, asInterface.DeclarationKind);
+        Assert.Equal(TypeKind.Interface, asInterface.TargetKind);
+        Assert.Equal(TypeKind.Class, asClass.DeclarationKind);
+        Assert.NotEqual(asInterface, asClass);
+    }
+
+    [Fact]
     public void ExternalUnionRecordsTargetIndependentlyOfTheFormatterDeclaration()
     {
         const string source = """
@@ -98,6 +127,8 @@ public class TypeShapeTest
         var shape = Analyze(source, "MessageFormatter");
         Assert.Equal("global::Serialization.MessageFormatter", shape.DeclarationName);
         Assert.Equal("global::Models.IMessage", shape.TargetName);
+        Assert.Equal(TypeKind.Class, shape.DeclarationKind);
+        Assert.Equal(TypeKind.Interface, shape.TargetKind);
         Assert.Equal(new UnionCaseShape(19, "global::Models.Message"), Assert.Single(shape.UnionCases));
     }
 
