@@ -845,8 +845,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : global::SharpPack.ISharpPackabl
     "            ",
     toTempWriter: true,
     writeObjectHeader: false,
-    honorFormatterOverrides,
-    referenceOwner: plan.TracksReferences ? Shape.TargetName : null)}}
+    honorFormatterOverrides)}}
 
             tempWriter.Flush();
 
@@ -923,8 +922,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : global::SharpPack.ISharpPackabl
         string indent,
         bool toTempWriter,
         bool writeObjectHeader,
-        bool honorFormatterOverrides = false,
-        string? referenceOwner = null)
+        bool honorFormatterOverrides = false)
     {
         if (members.Length == 0 && writeObjectHeader)
         {
@@ -946,12 +944,9 @@ partial {{classOrStructOrRecord}} {{TypeName}} : global::SharpPack.ISharpPackabl
                     sb.Append(indent);
                 }
 
-                var member = members[i];
-                // Diagnostic: remove the direct generic self-dispatch edge.
-                var useValueDispatch = member.Kind == MemberKind.SharpPackable && member.TypeName == referenceOwner;
-                sb.Append(member.EmitSerialize(
+                sb.Append(members[i].EmitSerialize(
                     writer,
-                    honorFormatterOverrides || useValueDispatch));
+                    honorFormatterOverrides));
                 if (toTempWriter)
                 {
                     sb.AppendLine($" offsets[{i}] = tempWriter.WrittenCount;");
