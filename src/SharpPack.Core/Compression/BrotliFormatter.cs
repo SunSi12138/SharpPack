@@ -212,7 +212,7 @@ public sealed class BrotliFormatter<T> : SharpPackFormatter<T>
         var compressor = new BrotliCompressor(compressionLevel, window);
         try
         {
-            var coWriter = new SharpPackWriter<BrotliCompressor>(ref compressor, writer.OptionalState);
+            var coWriter = writer.CreateNestedWriter(ref compressor);
 
             coWriter.WriteValueWithFormatter(formatter, value);
             coWriter.Flush();
@@ -244,7 +244,7 @@ public sealed class BrotliFormatter<T> : SharpPackFormatter<T>
             decompressedSource = decompressor.Decompress(remainingSource, out consumed);
         }
 
-        using var coReader = new SharpPackReader(decompressedSource, reader.OptionalState);
+        using var coReader = reader.CreateNestedReader(decompressedSource);
         coReader.ReadValueWithFormatter(formatter, ref value);
         if (coReader.Remaining != 0)
         {

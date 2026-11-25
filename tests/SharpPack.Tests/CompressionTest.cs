@@ -8,6 +8,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -292,7 +293,8 @@ public class CompressionTest
     [Fact]
     public void RegisteredBrotliWrapsTheSpecifiedFormatterAndKeepsNestedOverrides()
     {
-        var formatter = BrotliFormatter<CompressedCount>.Wrap(new CountFormatter());
+        var inner = new CountFormatter();
+        var formatter = BrotliFormatter<CompressedCount>.Wrap(inner);
         var context = new SharpPackSerializerContextBuilder()
             .Register(formatter)
             .Register(new IntOffsetFormatter(10))
@@ -303,6 +305,22 @@ public class CompressionTest
 
         Assert.Equal(42, SharpPackSerializer.Deserialize<CompressedCount>(payload, context)!.Count);
         Assert.Equal(52, SharpPackSerializer.Deserialize<CompressedCount>(payload, withoutOffset)!.Count);
+        Assert.Equal(2, inner.WriteDepth);
+        Assert.Equal(2, inner.ReadDepth);
+    }
+
+    [Fact]
+    public void BrotliMemberUsesTheExistingObjectAndCompressedValueWireFormat()
+    {
+        var compressor = new BrotliCompressor();
+        try
+        {
+            SharpPackSerializer.Serialize(ref compressor, 42);
+            var payload = SharpPackSerializer.Serialize(new BrotliIntEnvelope { Value = 42 });
+            Assert.Equal(1, payload[0]);
+            Assert.Equal(compressor.ToArray(), payload[1..]);
+        }
+        finally { compressor.Dispose(); }
     }
 
     [Fact]
@@ -330,11 +348,31 @@ public class CompressionTest
 
     sealed class CountFormatter : SharpPackFormatter<CompressedCount>
     {
+        public int WriteDepth { get; private set; }
+        public int ReadDepth { get; private set; }
+
         public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref CompressedCount? value)
-            => writer.WriteValue(value!.Count);
+        {
+            WriteDepth = WriterProbe<TBufferWriter>.GetDepth(ref writer);
+            writer.WriteValue(value!.Count);
+        }
 
         public override void Deserialize(ref SharpPackReader reader, scoped ref CompressedCount? value)
-            => value = new(reader.ReadValue<int>());
+        {
+            ReadDepth = GetReaderDepth(ref reader);
+            value = new(reader.ReadValue<int>());
+        }
+
+        // Observe inheritance with one small value instead of building a deep
+        // compressed graph to reach the runtime recursion cutoff.
+        [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "depth")]
+        static extern ref int GetReaderDepth(ref SharpPackReader reader);
+
+        static class WriterProbe<TBufferWriter> where TBufferWriter : IBufferWriter<byte>
+        {
+            [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "depth")]
+            internal static extern ref int GetDepth(ref SharpPackWriter<TBufferWriter> writer);
+        }
     }
 
     byte[] ReferenceDecompress(byte[] bytes)

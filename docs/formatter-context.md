@@ -60,7 +60,8 @@ var context = new SharpPackSerializerContextBuilder()
 ```
 
 `messageFormatter` is the ordinary `SharpPackFormatter<MyMessage>` for the
-uncompressed value. Its nested reads and writes still use the current context.
+uncompressed value. Its nested reads and writes share the current context and
+the enclosing operation's recursion limit.
 Use the member-level Brotli attribute when only a single field needs
 compression. A Brotli wrapper cannot use another generic Brotli wrapper as
 its uncompressed formatter.
