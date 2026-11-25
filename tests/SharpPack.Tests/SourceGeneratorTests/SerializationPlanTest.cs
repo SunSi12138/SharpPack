@@ -63,6 +63,49 @@ public class SerializationPlanTest
     }
 
     [Fact]
+    public void NestedVersionedPlanBindsConstructorArgumentsInParameterOrder()
+    {
+        const string source = """
+            using SharpPack;
+            public partial class Envelope<T> where T : unmanaged
+            {
+                [SharpPackable(GenerateType.VersionTolerant)]
+                public partial class Model
+                {
+                    [SharpPackOrder(1)] public string Label { get; }
+                    [SharpPackOrder(3)] public int Count { get; }
+                    [SharpPackOrder(5)] public T[]? Items { get; init; }
+
+                    public Model(int count, string label) => (Count, Label) = (count, label);
+                }
+            }
+            """;
+
+        var shape = TypeShapeTest.Analyze(source, "Model");
+        var container = Assert.Single(shape.ContainingTypes);
+        var typeParameter = Assert.Single(container.TypeParameters);
+        Assert.Equal(("Envelope", "T", PrimaryTypeConstraint.Unmanaged), (container.Name, typeParameter.Name, typeParameter.Primary));
+        var items = shape.Members.Single(member => member.Name == "Items");
+        Assert.Equal("T", items.ElementTypeName);
+        Assert.True(items.IsSettable);
+        Assert.False(items.IsAssignable);
+
+        var plan = SerializationPlanner.Plan(shape);
+        Assert.True(plan.IsVersioned);
+        Assert.False(plan.TracksReferences);
+        Assert.Equal(new[] { 3, 1 }, plan.ConstructorArgumentSlots.ToArray());
+
+        var (compiled, diagnostics) = CSharpGeneratorRunner.RunGenerator(source);
+        Assert.Empty(diagnostics);
+        Assert.DoesNotContain(compiled.GetDiagnostics(), diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var emitted = compiled.SyntaxTrees.Single(tree => tree.FilePath.EndsWith(".SharpPackFormatter.g.cs")).ToString();
+        Assert.Contains("where T : unmanaged", emitted);
+        Assert.Contains("new Model(__Count, __Label)", emitted);
+        Assert.Contains("@Items = __Items", emitted);
+        Assert.Contains("ReadUnmanagedArray<T>()", emitted);
+    }
+
+    [Fact]
     public void GeneratedNamesAvoidMemberAndLexicalCollisions()
     {
         const string source = """

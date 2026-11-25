@@ -130,7 +130,30 @@ public class TypeShapeTest
         Assert.Equal(TypeKind.Class, shape.DeclarationKind);
         Assert.Equal(TypeKind.Interface, shape.TargetKind);
         Assert.Equal(default(GeneratedNameFacts), shape.NameFacts);
-        Assert.Equal(new UnionCaseShape(19, "global::Models.Message"), Assert.Single(shape.UnionCases));
+        var union = Assert.IsType<UnionShape>(shape.Union);
+        Assert.Equal("global::Models.IMessage", union.TypeName);
+        Assert.Equal("MessageFormatter", union.ExternalFormatter?.Name);
+        Assert.Equal(new UnionCaseShape(19, "global::Models.Message", UsePackablePath: true), Assert.Single(union.Cases));
+    }
+
+    [Fact]
+    public void CollectionCapturesSelectedInterfaceArguments()
+    {
+        const string source = """
+            using SharpPack;
+            [SharpPackable(GenerateType.Collection)]
+            public partial class Mapping : System.Collections.Generic.Dictionary<int, string> { }
+            """;
+
+        var collection = Assert.IsType<CollectionShape>(Analyze(source, "Mapping").Collection);
+        Assert.Equal(CollectionKind.Dictionary, collection.Kind);
+        Assert.Equal(new[] { "int", "string" }, collection.TypeArguments.ToArray());
+
+        var (compiled, diagnostics) = CSharpGeneratorRunner.RunGenerator(source);
+        Assert.Empty(diagnostics);
+        Assert.DoesNotContain(compiled.GetDiagnostics(), diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var emitted = compiled.SyntaxTrees.Single(tree => tree.FilePath.EndsWith("Mapping.SharpPackFormatter.g.cs")).ToString();
+        Assert.Contains("new global::SharpPack.Formatters.GenericDictionaryFormatter<Mapping, int, string>()", emitted);
     }
 
     [Fact]
@@ -150,9 +173,7 @@ public class TypeShapeTest
         var tree = CSharpSyntaxTree.ParseText(text, options, "Models.cs");
         var compilation = CSharpGeneratorRunner.CreateCompilation(tree, CSharpSyntaxTree.ParseText(unrelated, options, "Other.cs"));
         var syntax = tree.GetRoot().DescendantNodes().OfType<TypeDeclarationSyntax>().Single(node => node.Identifier.ValueText == name);
-        var result = SharpPackGenerator.AnalyzeModel(syntax, compilation, new AnalysisContext());
-        Assert.True(result.HasValue);
-        return result.Value.Shape;
+        return Assert.IsType<TypeShape>(SharpPackGenerator.AnalyzeModel(syntax, compilation, new AnalysisContext()));
     }
 
     sealed class AnalysisContext : IGeneratorContext
