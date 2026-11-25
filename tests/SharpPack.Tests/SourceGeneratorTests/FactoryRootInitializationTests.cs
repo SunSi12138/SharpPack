@@ -1,6 +1,11 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using SharpPack.Generator;
 using System;
+using System.Collections.Immutable;
 using System.Linq;
+using System.Threading;
 
 namespace SharpPack.Tests.SourceGeneratorTests;
 
@@ -135,6 +140,68 @@ public partial class Case : Union { public int Value { get; set; } }
 public partial class UnionFormatter { }
 """);
         generated.Should().Contain("private static readonly bool __SharpPackPreserveFactory_Value");
+    }
+
+    [Fact]
+    public void ExternalUnionPlanChoosesClosedMatchAndOpenFallback()
+    {
+        const string source = """
+            using SharpPack;
+            namespace Generated;
+            public partial interface INode<T> { }
+            [SharpPackable] public partial class Node<T> : INode<T> { }
+
+            [SharpPackUnionFormatter(typeof(INode<>))]
+            [SharpPackUnion(1, typeof(Node<>))]
+            public partial class Open<T> { }
+
+            [SharpPackUnionFormatter(typeof(INode<string>))]
+            [SharpPackUnion(1, typeof(Node<string>))]
+            public partial class ZString { }
+
+            [SharpPackUnionFormatter(typeof(INode<string>))]
+            [SharpPackUnion(1, typeof(Node<string>))]
+            public partial class AString { }
+            """;
+
+        var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.CSharp14));
+        var declarations = tree.GetRoot().DescendantNodes().OfType<ClassDeclarationSyntax>()
+            .Where(declaration => declaration.Identifier.ValueText is "Open" or "AString" or "ZString")
+            .ToImmutableArray<TypeDeclarationSyntax>();
+        var plan = Assert.Single(SharpPackGenerator.PlanExternalUnionTargetFactories(
+            declarations, CSharpGeneratorRunner.CreateCompilation(tree), CancellationToken.None));
+
+        Assert.Equal("global::Generated.INode<T>", plan.TargetType);
+        Assert.Equal("global::Generated.Open<T>", plan.FallbackFormatter);
+        var match = Assert.Single(plan.Matches);
+        Assert.Equal("global::Generated.AString", match.Formatter);
+        Assert.Equal(new ExternalUnionTypeMatch("T", "string"), Assert.Single(match.Arguments));
+
+        var generated = Run(source);
+        generated.Should().Contain("if (typeof(T) == typeof(string))");
+        generated.Should().Contain("(object)new global::Generated.AString()");
+        generated.Should().NotContain("(object)new global::Generated.ZString()");
+        generated.Should().Contain("return new global::Generated.Open<T>();");
+    }
+
+    [Fact]
+    public void OpenUnionBindsTypeArgumentsOfANestedCaseContainer()
+    {
+        var generated = Run("""
+            namespace Generated;
+            public partial interface INode<T>;
+            public partial class Container<T>
+            {
+                [SharpPackable] public partial class Node : INode<T> { }
+            }
+
+            [SharpPackUnionFormatter(typeof(INode<>))]
+            [SharpPackUnion(1, typeof(Container<>.Node))]
+            public partial class NodeFormatter<T>;
+            """);
+
+        generated.Should().Contain("typeof(global::Generated.Container<T>.Node)");
+        generated.Should().NotContain("typeof(global::Generated.Container<>.Node)");
     }
 
     static string Generate(string members)

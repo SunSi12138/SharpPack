@@ -9,26 +9,107 @@ internal enum RootFastPath
 
 internal readonly record struct WireSlot(int Position, int? DeclaredMemberIndex);
 
-internal sealed record SerializationPlan(TypeShape Shape, RootFastPath RootFastPath, EquatableArray<WireSlot> WireSlots);
+internal readonly record struct ScalarBatch(int Count, bool UseDangerous);
+
+internal enum ObjectWriteStrategy { Plain, VersionedInlineLengths, VersionedBufferedLengths }
+
+internal sealed record ContextDependencySet(EquatableArray<string> FactoryLookupTypes)
+{
+    internal bool HasOverridableWireMembers => FactoryLookupTypes.Length != 0;
+}
+
+internal sealed record AotRootSet(
+    EquatableArray<AotFactoryRoot> Factories,
+    EquatableArray<string> ClosedFormatters);
+
+internal sealed record GeneratedNames(
+    string ContextFormatterType,
+    string WriteWithOverrides,
+    string ReadWithOverrides,
+    string EnsureAotRoots,
+    string? SelfFactoryRoot);
+
+internal sealed record SerializationPlan(
+    TypeShape Shape,
+    RootFastPath RootFastPath,
+    EquatableArray<WireSlot> WireSlots,
+    EquatableArray<ScalarBatch> ScalarBatches,
+    EquatableArray<int> ConstructorArgumentSlots,
+    ObjectWriteStrategy ObjectWriteStrategy,
+    ContextDependencySet ContextDependencies,
+    AotRootSet AotRoots,
+    GeneratedNames Names)
+{
+    internal bool IsVersioned => ObjectWriteStrategy != ObjectWriteStrategy.Plain;
+    internal bool TracksReferences => IsVersioned && Shape.GenerateType == GenerateType.CircularReference;
+}
 
 internal static class SerializationPlanner
 {
+    const int MaximumScalarBatchArity = 15; // Core's unmanaged reader/writer overload family.
+
     internal static SerializationPlan Plan(TypeShape shape)
-        => new(shape, ChooseRootFastPath(shape), PlanWireSlots(shape));
+    {
+        var slots = PlanWireSlots(shape);
+        var kinds = slots.Select(slot => slot.DeclaredMemberIndex is int i ? shape.Members[i].Kind : MemberKind.Blank).ToArray();
+        return new(shape, ChooseRootFastPath(shape), slots, PlanScalarBatches(kinds), PlanConstructorArguments(shape, slots),
+            ChooseObjectWriteStrategy(shape, kinds), PlanContextDependencies(shape, slots),
+            PlanAotRoots(shape.AotDependencies), PlanNames(shape.NameFacts));
+    }
+
+    static GeneratedNames PlanNames(GeneratedNameFacts facts)
+        => new(
+            AvailableMember("__SharpPackContextFormatter", facts.MembersAndParameters),
+            AvailableMember("__SharpPackSerializeWithFormatterOverrides", facts.MembersAndParameters),
+            AvailableMember("__SharpPackDeserializeWithFormatterOverrides", facts.MembersAndParameters),
+            AvailableMember("__SharpPackEnsureAotFormatterRoots", facts.MembersAndParameters),
+            facts.HasUserStaticInitialization
+                ? null
+                : AvailableFactoryName(GeneratedNameFacts.SelfRootStem, facts.SelfRootIdentifiers));
+
+    static string AvailableMember(string stem, EquatableArray<string> names)
+    {
+        while (names.Contains(stem, StringComparer.Ordinal))
+            stem += "_";
+        return stem;
+    }
+
+    internal static string AvailableFactoryName(string stem, EquatableArray<string> names)
+    {
+        while (names.Contains(stem, StringComparer.Ordinal) || names.Contains(stem + "Value", StringComparer.Ordinal))
+            stem += "_";
+        return stem;
+    }
+
+    static AotRootSet PlanAotRoots(AotDependencyFacts dependencies)
+    {
+        var factories = new SortedDictionary<string, AotFactoryRoot>(StringComparer.Ordinal);
+        foreach (var factory in dependencies.Factories)
+            factories[factory.TypeName] = factory;
+        return new(
+            new EquatableArray<AotFactoryRoot>(factories.Values),
+            new EquatableArray<string>(new SortedSet<string>(dependencies.ClosedFormatters, StringComparer.Ordinal)));
+    }
+
+    static ContextDependencySet PlanContextDependencies(TypeShape shape, EquatableArray<WireSlot> slots)
+        => new(
+            new EquatableArray<string>(slots.SelectMany(slot => slot.DeclaredMemberIndex is int index
+                ? shape.Members[index].ContextDependencyTypes : default)
+                .Distinct(StringComparer.Ordinal)));
 
     static RootFastPath ChooseRootFastPath(TypeShape shape)
     {
-        if (shape.GenerateType != GenerateType.Object || shape.IsUnion ||
+        if (shape.GenerateType != GenerateType.Object || shape.Union is not null ||
             shape.IsValueType || shape.Callbacks.Length != 0)
         {
             return RootFastPath.General;
         }
 
-        if (shape.Members.All(static member => HasFixedSize(member.Kind)))
+        if (shape.Members.All(static member => IsFixedWidthScalar(member.Kind)))
             return RootFastPath.FixedSize;
 
         if (shape.Members.All(static member => member.HasExactSizeSafeAccessor &&
-            (HasFixedSize(member.Kind) || member.Kind is MemberKind.String or MemberKind.UnmanagedArray)))
+            (IsFixedWidthScalar(member.Kind) || member.Kind is MemberKind.String or MemberKind.UnmanagedArray)))
         {
             return RootFastPath.ExactSize;
         }
@@ -36,9 +117,9 @@ internal static class SerializationPlanner
         return RootFastPath.General;
     }
 
-    static EquatableArray<WireSlot> PlanWireSlots(TypeShape shape)
+    internal static EquatableArray<WireSlot> PlanWireSlots(TypeShape shape)
     {
-        if (shape.IsUnion || shape.IsUnmanaged || shape.GenerateType == GenerateType.Collection)
+        if (shape.Union is not null || shape.IsUnmanaged || shape.Collection is not null)
             return default;
 
         var members = shape.Members;
@@ -66,6 +147,65 @@ internal static class SerializationPlanner
         return new EquatableArray<WireSlot>(slots);
     }
 
-    static bool HasFixedSize(MemberKind kind)
+    static EquatableArray<int> PlanConstructorArguments(TypeShape shape, EquatableArray<WireSlot> slots)
+    {
+        if (shape.ConstructorParameters.Length == 0 || slots.Length == 0) return default;
+
+        var parameterSlots = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var slot in slots)
+        {
+            if (slot.DeclaredMemberIndex is int index && shape.Members[index].ConstructorParameter is { } parameter)
+                parameterSlots.Add(parameter, slot.Position);
+        }
+
+        var arguments = new List<int>(shape.ConstructorParameters.Length);
+        foreach (var parameter in shape.ConstructorParameters)
+        {
+            if (parameterSlots.TryGetValue(parameter.Name, out var position))
+                arguments.Add(position);
+        }
+        return new(arguments);
+    }
+
+    static ObjectWriteStrategy ChooseObjectWriteStrategy(TypeShape shape, MemberKind[] kinds)
+    {
+        if (shape.Union is not null || shape.IsUnmanaged || shape.GenerateType is not (GenerateType.VersionTolerant or GenerateType.CircularReference))
+            return ObjectWriteStrategy.Plain;
+
+        return kinds.All(static kind => IsFixedWidthScalar(kind) ||
+                kind is MemberKind.String or MemberKind.UnmanagedArray or MemberKind.Blank)
+            ? ObjectWriteStrategy.VersionedInlineLengths
+            : ObjectWriteStrategy.VersionedBufferedLengths;
+    }
+
+    // Only a batch's first slot has a nonzero Count. A nullable scalar in the
+    // batch selects the existing Dangerous unmanaged overload for the batch.
+    internal static EquatableArray<ScalarBatch> PlanScalarBatches(MemberKind[] kinds)
+    {
+        if (kinds.Length == 0) return default;
+        var starts = new ScalarBatch[kinds.Length];
+        for (var start = 0; start < kinds.Length;)
+        {
+            if (!IsFixedWidthScalar(kinds[start]))
+            {
+                start++;
+                continue;
+            }
+
+            var end = start;
+            var limit = Math.Min(kinds.Length, start + MaximumScalarBatchArity);
+            var dangerous = false;
+            while (end < limit && IsFixedWidthScalar(kinds[end]))
+            {
+                dangerous |= kinds[end] == MemberKind.UnmanagedNullable;
+                end++;
+            }
+            starts[start] = new ScalarBatch(end - start, dangerous);
+            start = end;
+        }
+        return new EquatableArray<ScalarBatch>(starts);
+    }
+
+    static bool IsFixedWidthScalar(MemberKind kind)
         => kind is MemberKind.Unmanaged or MemberKind.Enum or MemberKind.UnmanagedNullable;
 }

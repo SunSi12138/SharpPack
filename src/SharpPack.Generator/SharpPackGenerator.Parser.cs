@@ -232,6 +232,9 @@ public partial class TypeMeta
     }
 
     public bool Validate(TypeDeclarationSyntax syntax, IGeneratorContext context, bool unionFormatter)
+        => Validate(syntax, context.ReportDiagnostic, unionFormatter);
+
+    internal bool Validate(TypeDeclarationSyntax syntax, Action<Diagnostic> reportDiagnostic, bool unionFormatter)
     {
         var noError = true;
         if (unionFormatter) goto UNION_VALIDATIONS;
@@ -241,14 +244,14 @@ public partial class TypeMeta
         {
             if (Symbol.IsAbstract)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CollectionGenerateIsAbstract, syntax.Identifier.GetLocation(), Symbol.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CollectionGenerateIsAbstract, syntax.Identifier.GetLocation(), Symbol.Name));
                 return false;
             }
 
             var (kind, symbol) = ParseCollectionKind(Symbol, reference);
             if (kind == CollectionKind.None)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CollectionGenerateNotImplementedInterface, syntax.Identifier.GetLocation(), Symbol.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CollectionGenerateNotImplementedInterface, syntax.Identifier.GetLocation(), Symbol.Name));
                 return false;
             }
 
@@ -257,7 +260,7 @@ public partial class TypeMeta
                 .Any(x => x.Parameters.Length == 0);
             if (!hasParameterlessConstructor)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CollectionGenerateNoParameterlessConstructor, syntax.Identifier.GetLocation(), Symbol.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CollectionGenerateNoParameterlessConstructor, syntax.Identifier.GetLocation(), Symbol.Name));
                 return false;
             }
 
@@ -267,7 +270,7 @@ public partial class TypeMeta
         {
             if (!this.IsUseEmptyConstructor)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CircularReferenceOnlyAllowsParameterlessConstructor, syntax.Identifier.GetLocation(), Symbol.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CircularReferenceOnlyAllowsParameterlessConstructor, syntax.Identifier.GetLocation(), Symbol.Name));
                 return false;
             }
         }
@@ -277,21 +280,21 @@ public partial class TypeMeta
         // ref strcut
         if (this.Symbol.IsRefLikeType)
         {
-            context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.TypeIsRefStruct, syntax.Identifier.GetLocation(), Symbol.Name));
+            reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.TypeIsRefStruct, syntax.Identifier.GetLocation(), Symbol.Name));
             return false;
         }
 
         // interface/abstract but not union
         if (IsInterfaceOrAbstract && !IsUnion)
         {
-            context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.AbstractMustUnion, syntax.Identifier.GetLocation(), Symbol.Name));
+            reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.AbstractMustUnion, syntax.Identifier.GetLocation(), Symbol.Name));
             noError = false;
         }
 
         // ctor
         if (ctorInvalid != null)
         {
-            context.ReportDiagnostic(Diagnostic.Create(ctorInvalid, syntax.Identifier.GetLocation(), Symbol.Name));
+            reportDiagnostic(Diagnostic.Create(ctorInvalid, syntax.Identifier.GetLocation(), Symbol.Name));
             noError = false;
         }
 
@@ -299,7 +302,7 @@ public partial class TypeMeta
         {
             if (GenerateType is GenerateType.VersionTolerant)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.VersionTolerantOnUnmanagedStruct, syntax.Identifier.GetLocation(), Symbol.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.VersionTolerantOnUnmanagedStruct, syntax.Identifier.GetLocation(), Symbol.Name));
                 noError = false;
             }
 
@@ -362,7 +365,7 @@ public partial class TypeMeta
                     {
                         var location = Constructor.Locations.FirstOrDefault() ?? syntax.Identifier.GetLocation();
 
-                        context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.ConstructorHasNoMatchedParameter, location, Symbol.Name, parameter.Name));
+                        reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.ConstructorHasNoMatchedParameter, location, Symbol.Name, parameter.Name));
                         noError = false;
                     }
                 }
@@ -372,12 +375,12 @@ public partial class TypeMeta
             {
                 if (item.IsField && ((IFieldSymbol)item.Symbol).IsReadOnly && !item.IsConstructorParameter)
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.ReadOnlyFieldMustBeConstructorMember, item.GetLocation(syntax), Symbol.Name, item.Name));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.ReadOnlyFieldMustBeConstructorMember, item.GetLocation(syntax), Symbol.Name, item.Name));
                     noError = false;
                 }
                 else if (item is { SuppressDefaultInitialization: true, IsAssignable: false })
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.SuppressDefaultInitializationMustBeSettable, item.GetLocation(syntax), Symbol.Name, item.Name));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.SuppressDefaultInitializationMustBeSettable, item.GetLocation(syntax), Symbol.Name, item.Name));
                     noError = false;
                 }
             }
@@ -391,7 +394,7 @@ public partial class TypeMeta
 
             if (IsUnmanagedType)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.OnMethodInUnamannagedType, item.GetLocation(syntax), Symbol.Name, item.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.OnMethodInUnamannagedType, item.GetLocation(syntax), Symbol.Name, item.Name));
                 noError = false;
                 continue;
             }
@@ -408,7 +411,7 @@ public partial class TypeMeta
                     }
                 }
 
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.OnMethodHasParameter, item.GetLocation(syntax), Symbol.Name, item.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.OnMethodHasParameter, item.GetLocation(syntax), Symbol.Name, item.Name));
                 noError = false;
             }
         }
@@ -427,7 +430,7 @@ public partial class TypeMeta
                         var location = item.Locations.FirstOrDefault() ?? syntax.Identifier.GetLocation();
 
                         var attr = include ? "SharpPackInclude" : "SharpPackIgnore";
-                        context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.OverrideMemberCantAddAnnotation, location, Symbol.Name, item.Name, attr));
+                        reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.OverrideMemberCantAddAnnotation, location, Symbol.Name, item.Name, attr));
                         noError = false;
                     }
                 }
@@ -441,7 +444,7 @@ public partial class TypeMeta
                 if (include && item.DeclaredAccessibility == Accessibility.Private)
                 {
                     var location = item.Locations.FirstOrDefault() ?? syntax.Identifier.GetLocation();
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.InheritTypeCanNotIncludeParentPrivateMember, location, Symbol.Name, item.Name));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.InheritTypeCanNotIncludeParentPrivateMember, location, Symbol.Name, item.Name));
                     noError = false;
                 }
             }
@@ -450,7 +453,7 @@ public partial class TypeMeta
         // ALl Members
         if (Members.Length > MaximumObjectMembers)
         {
-            context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MembersCountOver250, syntax.Identifier.GetLocation(), Symbol.Name, Members.Length));
+            reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MembersCountOver250, syntax.Identifier.GetLocation(), Symbol.Name, Members.Length));
             noError = false;
         }
 
@@ -462,18 +465,18 @@ public partial class TypeMeta
             {
                 if (item.MemberType.SpecialType is SpecialType.System_Object or SpecialType.System_Array or SpecialType.System_Delegate or SpecialType.System_MulticastDelegate || item.MemberType.TypeKind == TypeKind.Delegate)
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MemberCantSerializeType, item.GetLocation(syntax), Symbol.Name, item.Name, item.MemberType.FullyQualifiedToString()));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MemberCantSerializeType, item.GetLocation(syntax), Symbol.Name, item.Name, item.MemberType.FullyQualifiedToString()));
                     noError = false;
                 }
                 else
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MemberIsNotSharpPackable, item.GetLocation(syntax), Symbol.Name, item.Name, item.MemberType.FullyQualifiedToString()));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MemberIsNotSharpPackable, item.GetLocation(syntax), Symbol.Name, item.Name, item.MemberType.FullyQualifiedToString()));
                     noError = false;
                 }
             }
             else if (item.Kind == MemberKind.RefLike)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MemberIsRefStruct, item.GetLocation(syntax), Symbol.Name, item.Name, item.MemberType.FullyQualifiedToString()));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MemberIsRefStruct, item.GetLocation(syntax), Symbol.Name, item.Name, item.MemberType.FullyQualifiedToString()));
                 noError = false;
             }
         }
@@ -484,7 +487,7 @@ public partial class TypeMeta
             {
                 if ((uint)item.Order >= MaximumObjectMembers)
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.VersionedMemberOrderOutOfRange,
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.VersionedMemberOrderOutOfRange,
                         item.GetLocation(syntax), Symbol.Name, item.Name, item.Order, MaximumObjectMembers - 1));
                     noError = false;
                 }
@@ -499,7 +502,7 @@ public partial class TypeMeta
             {
                 if (!item.HasExplicitOrder)
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.AllMembersMustAnnotateOrder, item.GetLocation(syntax), Symbol.Name, item.Name));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.AllMembersMustAnnotateOrder, item.GetLocation(syntax), Symbol.Name, item.Name));
                     noError = false;
                 }
             }
@@ -510,7 +513,7 @@ public partial class TypeMeta
             {
                 if (orderSet.TryGetValue(item.Order, out var duplicateMember))
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.DuplicateOrderDoesNotAllow, item.GetLocation(syntax), Symbol.Name, item.Name, duplicateMember.Name));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.DuplicateOrderDoesNotAllow, item.GetLocation(syntax), Symbol.Name, item.Name, duplicateMember.Name));
                     noError = false;
                 }
                 else
@@ -527,7 +530,7 @@ public partial class TypeMeta
                 {
                     if (item.Order != expectedOrder)
                     {
-                        context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.AllMembersMustBeContinuousNumber, item.GetLocation(syntax), Symbol.Name, item.Name));
+                        reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.AllMembersMustBeContinuousNumber, item.GetLocation(syntax), Symbol.Name, item.Name));
                         noError = false;
                         break;
                     }
@@ -542,25 +545,25 @@ public partial class TypeMeta
         {
             if (Symbol.IsSealed)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.SealedTypeCantBeUnion, syntax.Identifier.GetLocation(), Symbol.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.SealedTypeCantBeUnion, syntax.Identifier.GetLocation(), Symbol.Name));
                 noError = false;
             }
 
             if (!Symbol.IsAbstract)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.ConcreteTypeCantBeUnion, syntax.Identifier.GetLocation(), Symbol.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.ConcreteTypeCantBeUnion, syntax.Identifier.GetLocation(), Symbol.Name));
                 noError = false;
             }
 
             if (GenerateType != GenerateType.Union)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.GenerateTypeCannotSpeciyToUnionBaseType, syntax.Identifier.GetLocation(), Symbol.Name, GenerateType));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.GenerateTypeCannotSpeciyToUnionBaseType, syntax.Identifier.GetLocation(), Symbol.Name, GenerateType));
                 noError = false;
             }
 
             if (UnionTags.Select(x => x.Tag).HasDuplicate())
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionTagDuplicate, syntax.Identifier.GetLocation(), Symbol.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionTagDuplicate, syntax.Identifier.GetLocation(), Symbol.Name));
                 noError = false;
             }
 
@@ -576,7 +579,7 @@ public partial class TypeMeta
 
                     if (!check)
                     {
-                        context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberTypeNotImplementBaseType, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
+                        reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberTypeNotImplementBaseType, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
                         noError = false;
                     }
                 }
@@ -589,20 +592,20 @@ public partial class TypeMeta
 
                     if (!check)
                     {
-                        context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberTypeNotDerivedBaseType, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
+                        reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberTypeNotDerivedBaseType, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
                         noError = false;
                     }
                 }
 
                 if (item.Type.IsValueType)
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberNotAllowStruct, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberNotAllowStruct, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
                     noError = false;
                 }
 
                 if (!item.Type.ContainsAttribute(reference.SharpPackableAttribute))
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberMustBeSharpPackable, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberMustBeSharpPackable, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
                     noError = false;
                 }
             }

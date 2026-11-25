@@ -63,6 +63,180 @@ public class SerializationPlanTest
     }
 
     [Fact]
+    public void NestedVersionedPlanBindsConstructorArgumentsInParameterOrder()
+    {
+        const string source = """
+            using SharpPack;
+            public partial class Envelope<T> where T : unmanaged
+            {
+                [SharpPackable(GenerateType.VersionTolerant)]
+                public partial class Model
+                {
+                    [SharpPackOrder(1)] public string Label { get; }
+                    [SharpPackOrder(3)] public int Count { get; }
+                    [SharpPackOrder(5)] public T[]? Items { get; init; }
+
+                    public Model(int count, string label) => (Count, Label) = (count, label);
+                }
+            }
+            """;
+
+        var shape = TypeShapeTest.Analyze(source, "Model");
+        var container = Assert.Single(shape.ContainingTypes);
+        var typeParameter = Assert.Single(container.TypeParameters);
+        Assert.Equal(("Envelope", "T", PrimaryTypeConstraint.Unmanaged), (container.Name, typeParameter.Name, typeParameter.Primary));
+        var items = shape.Members.Single(member => member.Name == "Items");
+        Assert.Equal("T", items.ElementTypeName);
+        Assert.True(items.IsSettable);
+        Assert.False(items.IsAssignable);
+
+        var plan = SerializationPlanner.Plan(shape);
+        Assert.True(plan.IsVersioned);
+        Assert.False(plan.TracksReferences);
+        Assert.Equal(new[] { 3, 1 }, plan.ConstructorArgumentSlots.ToArray());
+
+        var (compiled, diagnostics) = CSharpGeneratorRunner.RunGenerator(source);
+        Assert.Empty(diagnostics);
+        Assert.DoesNotContain(compiled.GetDiagnostics(), diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var emitted = compiled.SyntaxTrees.Single(tree => tree.FilePath.EndsWith(".SharpPackFormatter.g.cs")).ToString();
+        Assert.Contains("where T : unmanaged", emitted);
+        Assert.Contains("new Model(__Count, __Label)", emitted);
+        Assert.Contains("@Items = __Items", emitted);
+        Assert.Contains("ReadUnmanagedArray<T>()", emitted);
+    }
+
+    [Fact]
+    public void GeneratedNamesAvoidMemberAndLexicalCollisions()
+    {
+        const string source = """
+            using SharpPack;
+            [SharpPackable]
+            public partial class Model(int __SharpPackPreserveSelfFactoryRootsValue)
+            {
+                public int __sharppackpreserveselffactoryrootsvalue { get; } = __SharpPackPreserveSelfFactoryRootsValue;
+                private void __SharpPackContextFormatter() { }
+                private void __SharpPackSerializeWithFormatterOverrides() { }
+                private void __SharpPackEnsureAotFormatterRoots() { }
+                private void Unrelated() { }
+            }
+            [SharpPackable] public partial class Strict
+            {
+                private static readonly int seed = 1;
+                public int Value { get; set; }
+            }
+            """;
+        var shape = TypeShapeTest.Analyze(source, "Model");
+        var model = SerializationPlanner.Plan(shape).Names;
+        Assert.Equal("__SharpPackPreserveSelfFactoryRoots_", model.SelfFactoryRoot);
+        Assert.Equal("__SharpPackContextFormatter_", model.ContextFormatterType);
+        Assert.Equal("__SharpPackSerializeWithFormatterOverrides_", model.WriteWithOverrides);
+        Assert.Equal("__SharpPackDeserializeWithFormatterOverrides", model.ReadWithOverrides);
+        Assert.Equal("__SharpPackEnsureAotFormatterRoots_", model.EnsureAotRoots);
+        Assert.Null(SerializationPlanner.Plan(TypeShapeTest.Analyze(source, "Strict")).Names.SelfFactoryRoot);
+        Assert.Equal(shape, TypeShapeTest.Analyze(source.Replace("Unrelated", "Different"), "Model"));
+    }
+
+    [Fact]
+    public void AotRootsSeparateTypedFactoriesFromClosedFormatterInstances()
+    {
+        const string source = """
+            using SharpPack;
+            [SharpPackable] public partial class Envelope
+            {
+                public List<Leaf[]>? Entries;
+                public Leaf? Direct;
+                public IKind? Kind;
+            }
+            [SharpPackable] public partial class Leaf { public int Id; }
+            [SharpPackable, SharpPackUnion(0, typeof(Item))]
+            public partial interface IKind { }
+            [SharpPackable] public partial class Item : IKind { }
+            """;
+        var plan = SerializationPlanner.Plan(TypeShapeTest.Analyze(source, "Envelope"));
+        Assert.Equal(new[]
+        {
+            new AotFactoryRoot("global::IKind", false),
+            new AotFactoryRoot("global::Leaf", true),
+        }, plan.AotRoots.Factories.ToArray());
+        Assert.Equal(new[]
+        {
+            "global::SharpPack.Formatters.ArrayFormatter<global::Leaf>",
+            "global::SharpPack.Formatters.ListFormatter<global::Leaf[]>",
+        }, plan.AotRoots.ClosedFormatters.ToArray());
+    }
+
+    [Fact]
+    public void ContextDependencySetTraversesArraysAndKnownGenericsOnlyOnce()
+    {
+        const string source = """
+            using SharpPack;
+            [SharpPackable] public partial class Model
+            {
+                public List<Child[]>? Sequence;
+                public Child? Direct;
+                [Utf8StringFormatter] public string? Custom;
+            }
+            [SharpPackable] public partial class Child { public int Number; }
+            [SharpPackable] public partial class CustomOnly
+            {
+                [Utf8StringFormatter] public string? Text;
+            }
+            """;
+        var plan = SerializationPlanner.Plan(TypeShapeTest.Analyze(source, "Model"));
+        Assert.Equal(new[]
+        {
+            "global::System.Collections.Generic.List<global::Child[]>",
+            "global::Child[]",
+            "global::Child",
+        }, plan.ContextDependencies.FactoryLookupTypes.ToArray());
+        Assert.True(plan.ContextDependencies.HasOverridableWireMembers);
+
+        var custom = SerializationPlanner.Plan(TypeShapeTest.Analyze(source, "CustomOnly")).ContextDependencies;
+        Assert.Empty(custom.FactoryLookupTypes);
+        Assert.False(custom.HasOverridableWireMembers);
+    }
+
+    [Fact]
+    public void ScalarBatchesStopAtTheRuntimeOverloadArityAndMemberBoundaries()
+    {
+        var kinds = Enumerable.Repeat(MemberKind.Unmanaged, 16)
+            .Concat(new[] { MemberKind.String, MemberKind.Enum, MemberKind.Blank, MemberKind.Unmanaged }).ToArray();
+        kinds[4] = MemberKind.UnmanagedNullable;
+        var batches = SerializationPlanner.PlanScalarBatches(kinds);
+        Assert.Equal(new ScalarBatch(15, true), batches[0]);
+        Assert.Equal(default, batches[4]);
+        Assert.Equal(new ScalarBatch(1, false), batches[15]);
+        Assert.Equal(default, batches[16]);
+        Assert.Equal(new ScalarBatch(1, false), batches[17]);
+        Assert.Equal(default, batches[18]);
+        Assert.Equal(new ScalarBatch(1, false), batches[19]);
+    }
+
+    [Fact]
+    public void VersionedLengthStrategyUsesTheEffectiveWireSlots()
+    {
+        const string source = """
+            using SharpPack;
+            [SharpPackable(GenerateType.VersionTolerant)]
+            public partial class InlineLengths
+            {
+                [SharpPackOrder(0)] public string? Text;
+                [SharpPackOrder(2)] public int[]? Values;
+            }
+            [SharpPackable(GenerateType.VersionTolerant)]
+            public partial class BufferedLengths
+            {
+                [SharpPackOrder(0)] public InlineLengths? Model;
+            }
+            """;
+        var inline = SerializationPlanner.Plan(TypeShapeTest.Analyze(source, "InlineLengths"));
+        var buffered = SerializationPlanner.Plan(TypeShapeTest.Analyze(source, "BufferedLengths"));
+        Assert.Equal(ObjectWriteStrategy.VersionedInlineLengths, inline.ObjectWriteStrategy);
+        Assert.Equal(new WireSlot(1, null), inline.WireSlots[1]);
+        Assert.Equal(ObjectWriteStrategy.VersionedBufferedLengths, buffered.ObjectWriteStrategy);
+    }
+
+    [Fact]
     public void SequentialVersionedDuplicateUsesTheFirstDeclaredMember()
     {
         var shape = TypeShapeTest.Analyze(SparseModel("VersionTolerant", "Sequential", 0), "Sparse");

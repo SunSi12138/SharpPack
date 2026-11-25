@@ -36,6 +36,8 @@ static class BaselineProgram
                     static type => type == typeof(SharpPackGenerator)),
             ["eng/baselines/generated/representative.g.cs.txt"] =
                 GeneratedSourceBaseline.Create(),
+            ["eng/baselines/generated/representative.ts.txt"] =
+                TypeScriptSourceBaseline.Create(),
             ["eng/baselines/generated/runtime-dependencies.txt"] =
                 GeneratedCodeDependencyBaseline.Create(repoRoot),
         };
@@ -931,7 +933,7 @@ public partial class Outer<T>
         return builder.ToString();
     }
 
-    static IEnumerable<MetadataReference> TrustedPlatformReferences()
+    internal static IEnumerable<MetadataReference> TrustedPlatformReferences()
     {
         var trustedPlatformAssemblies =
             (string?)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ??
