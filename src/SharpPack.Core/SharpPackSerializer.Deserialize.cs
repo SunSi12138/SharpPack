@@ -41,7 +41,7 @@ public static partial class SharpPackSerializer
         var reader = new SharpPackReader(buffer, state);
         try
         {
-            reader.ReadValue(ref value);
+            reader.ReadRootValue(ref value);
             return reader.Consumed;
         }
         finally
@@ -93,7 +93,7 @@ public static partial class SharpPackSerializer
         var reader = new SharpPackReader(buffer, state);
         try
         {
-            reader.ReadValue(ref value);
+            reader.ReadRootValue(ref value);
             return reader.Consumed;
         }
         finally
