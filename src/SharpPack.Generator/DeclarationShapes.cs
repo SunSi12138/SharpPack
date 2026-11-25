@@ -85,8 +85,24 @@ internal sealed record UnionShape(
                     kind is GenerateType.Object or GenerateType.VersionTolerant or GenerateType.CircularReference))),
             externalFormatter is null ? null : ExternalUnionFormatterShape.Capture(externalFormatter));
 
-        string ConstructName(INamedTypeSymbol type)
-            => (type.IsUnboundGenericType && type.Arity != 0 && type.Arity == targetArguments.Length
-                ? type.ConstructedFrom.Construct(targetArguments) : type).FullyQualifiedToString();
+        string ConstructName(INamedTypeSymbol type) => Bind(type).FullyQualifiedToString();
+
+        INamedTypeSymbol Bind(INamedTypeSymbol type)
+        {
+            if (!type.IsUnboundGenericType) return type;
+
+            var definition = type.ConstructedFrom;
+            if (type.ContainingType is { IsUnboundGenericType: true } containing)
+            {
+                // Rebind the containing declaration first: a non-generic
+                // nested case still needs its parent's type arguments.
+                var boundContainer = Bind(containing);
+                if (boundContainer.IsUnboundGenericType) return type;
+                definition = boundContainer.GetTypeMembers(type.Name, type.Arity)[0];
+            }
+
+            return definition.Arity == 0 ? definition
+                : definition.Arity == targetArguments.Length ? definition.Construct(targetArguments) : type;
+        }
     }
 }

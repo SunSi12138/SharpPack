@@ -184,6 +184,26 @@ public partial class UnionFormatter { }
         generated.Should().Contain("return new global::Generated.Open<T>();");
     }
 
+    [Fact]
+    public void OpenUnionBindsTypeArgumentsOfANestedCaseContainer()
+    {
+        var generated = Run("""
+            namespace Generated;
+            public partial interface INode<T>;
+            public partial class Container<T>
+            {
+                [SharpPackable] public partial class Node : INode<T> { }
+            }
+
+            [SharpPackUnionFormatter(typeof(INode<>))]
+            [SharpPackUnion(1, typeof(Container<>.Node))]
+            public partial class NodeFormatter<T>;
+            """);
+
+        generated.Should().Contain("typeof(global::Generated.Container<T>.Node)");
+        generated.Should().NotContain("typeof(global::Generated.Container<>.Node)");
+    }
+
     static string Generate(string members)
         => Run("namespace Generated; [SharpPackable] public partial class Model { " + members + " }");
 
