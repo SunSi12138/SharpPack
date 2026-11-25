@@ -126,17 +126,19 @@ public partial class TypeMeta
         this.OnDeserializing = CollectMethod(reference.SharpPackOnDeserializingAttribute, IsValueType, isReader: true);
         this.OnDeserialized = CollectMethod(reference.SharpPackOnDeserializedAttribute, IsValueType, isReader: true);
 
-        if (IsUnion)
+        this.UnionTags = IsUnion ? GetUnionTags(symbol, reference).ToArray() : [];
+    }
+
+    internal static IEnumerable<(ushort Tag, INamedTypeSymbol Type)> GetUnionTags(INamedTypeSymbol symbol, ReferenceSymbols references)
+    {
+        foreach (var attribute in symbol.GetAttributes())
         {
-            this.UnionTags = symbol.GetAttributes()
-                .Where(x => SymbolEqualityComparer.Default.Equals(x.AttributeClass, reference.SharpPackUnionAttribute))
-                .Where(x => x.ConstructorArguments.Length == 2)
-                .Select(x => ((ushort)x.ConstructorArguments[0].Value!, (INamedTypeSymbol)x.ConstructorArguments[1].Value!))
-                .ToArray();
-        }
-        else
-        {
-            this.UnionTags = Array.Empty<(ushort, INamedTypeSymbol)>();
+            if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, references.SharpPackUnionAttribute) &&
+                attribute.ConstructorArguments is { Length: 2 } arguments &&
+                arguments[0].Value is ushort tag && arguments[1].Value is INamedTypeSymbol type)
+            {
+                yield return (tag, type);
+            }
         }
     }
 

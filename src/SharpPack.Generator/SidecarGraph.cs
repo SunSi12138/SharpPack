@@ -28,6 +28,7 @@ internal sealed class SidecarGraph
     readonly INamedTypeSymbol? contextFactory;
     readonly HashSet<ITypeSymbol> registeredTypes;
     readonly Dictionary<ITypeSymbol, FormatterNode> nodes = new(SymbolEqualityComparer.Default);
+    Dictionary<INamedTypeSymbol, List<SharpPackGenerator.ExternalUnionFactoryEntry>>? externalUnions;
     ReferenceSymbols? completeMetadata;
 
     internal SidecarGraph(Compilation compilation, IEnumerable<ITypeSymbol> registeredTypes)
@@ -56,7 +57,7 @@ internal sealed class SidecarGraph
                 return ([], new(path.ToString(), $"the formatter dependency path exceeds {MaximumPathDepth} types"));
             if (!nodes.TryGetValue(type, out var model))
             {
-                model = Analyze(type);
+                model = Analyze(type, cancellationToken);
                 nodes.Add(type, model);
             }
             if (model.Error is { } error)
@@ -75,7 +76,7 @@ internal sealed class SidecarGraph
     static ITypeSymbol CanonicalType(ITypeSymbol type)
         => type is INamedTypeSymbol { TupleUnderlyingType: { } tuple } ? tuple : type;
 
-    FormatterNode Analyze(ITypeSymbol type)
+    FormatterNode Analyze(ITypeSymbol type, CancellationToken cancellationToken)
     {
         if (type.TypeKind is TypeKind.Error or TypeKind.Pointer or TypeKind.FunctionPointer or TypeKind.TypeParameter ||
             type.IsRefLikeType || type.SpecialType == SpecialType.System_Void || !IsClosed(type))
@@ -107,18 +108,11 @@ internal sealed class SidecarGraph
 
         var declared = named.TryGetSharpPackableType(references, out var mode, out _);
         var isUnion = named.IsWillImplementSharpPackUnion(references);
-        if (declared && (mode != GenerateType.NoGenerate || isUnion) &&
-            SymbolEqualityComparer.Default.Equals(named.ContainingAssembly, compilation.Assembly))
+        var sourceOwned = SymbolEqualityComparer.Default.Equals(named.ContainingAssembly, compilation.Assembly);
+        if (sourceOwned && declared && (mode != GenerateType.NoGenerate || isUnion))
         {
             if (isUnion)
-            {
-                var cases = named.GetAttributes()
-                    .Where(attribute => SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, references.SharpPackUnionAttribute))
-                    .Where(static attribute => attribute.ConstructorArguments.Length == 2 && attribute.ConstructorArguments[1].Value is ITypeSymbol)
-                    .Select(static attribute => (ITypeSymbol)attribute.ConstructorArguments[1].Value!)
-                    .Select(static item => new FormatterDependency(" -> union case " + item.FullyQualifiedToString(), item));
-                return Existing(cases.ToArray(), factory: TypeOwnedFactory.Default);
-            }
+                return Existing(UnionDependencies(named, named), factory: TypeOwnedFactory.Default);
 
             if (mode == GenerateType.Collection)
             {
@@ -131,6 +125,16 @@ internal sealed class SidecarGraph
             return Existing(metadata.Members.Where(static member => member.Kind != MemberKind.CustomFormatter)
                 .Select(static member => new FormatterDependency("." + member.Name, member.MemberType)).ToArray(),
                 factory: TypeOwnedFactory.Context);
+        }
+
+        // A same-compilation external union factory has not yet been added to
+        // its partial target. Use the ordinary generator's matching rules.
+        if (sourceOwned && named.IsAbstract && TryGetExternalUnionEntries(named, cancellationToken, out var entries))
+        {
+            var formatter = SharpPackGenerator.ResolveExternalUnionFormatter(named, entries);
+            return formatter is null
+                ? Unsupported("no generated external union formatter matches the closed target")
+                : Existing(UnionDependencies(named, formatter), factory: TypeOwnedFactory.Default);
         }
 
         if (HasSelfInterface(named, references.ISharpPackable.OriginalDefinition))
@@ -158,6 +162,24 @@ internal sealed class SidecarGraph
             TypeOwnedFactory factory = TypeOwnedFactory.None)
             => new(type, dependencies ?? [], BuiltInFormatter: formatter, Factory: factory);
         FormatterNode Unsupported(string reason) => new(type, [], Error: new(null, reason));
+    }
+
+    bool TryGetExternalUnionEntries(INamedTypeSymbol target, CancellationToken token,
+        out List<SharpPackGenerator.ExternalUnionFactoryEntry> entries)
+    {
+        // GetSymbolsWithName is source-only. This index is needed only for
+        // a reachable source-owned abstract type without an existing factory.
+        externalUnions ??= SharpPackGenerator.GroupExternalUnionFactories(
+            compilation.GetSymbolsWithName(static _ => true, SymbolFilter.Type, token).OfType<INamedTypeSymbol>()
+                .Where(static type => type.TypeKind == TypeKind.Class && !type.IsRecord), references);
+        return externalUnions.TryGetValue(target.OriginalDefinition, out entries!);
+    }
+
+    FormatterDependency[] UnionDependencies(INamedTypeSymbol target, INamedTypeSymbol declaration)
+    {
+        var typeArguments = target.TypeArguments.ToArray();
+        return TypeMeta.GetUnionTags(declaration, references).Select(item => UnionShape.Bind(item.Type, typeArguments))
+            .Select(static type => new FormatterDependency(" -> union case " + type.FullyQualifiedToString(), type)).ToArray();
     }
 
     static FormatterDependency[] TypeArguments(INamedTypeSymbol named)
@@ -199,6 +221,13 @@ internal sealed class SidecarGraph
             compilation.WithOptions(compilation.Options.WithMetadataImportOptions(MetadataImportOptions.All)));
         var definition = all.Compilation.GetTypeByMetadataName(MetadataName(type));
         if (definition is null) return null;
+
+        if (definition.InstanceConstructors.Any(constructor =>
+            constructor.ContainsAttribute(all.SharpPackConstructorAttribute) &&
+            !all.Compilation.IsSymbolAccessibleWithin(constructor, all.Compilation.Assembly)))
+        {
+            return new(null, "the constructor marked SharpPackConstructor is not accessible from the consuming assembly");
+        }
 
         foreach (var member in definition.GetAllMembers())
         {

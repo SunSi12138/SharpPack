@@ -96,6 +96,7 @@ public class SidecarPlanningTest
     [InlineData("public sealed class Payload { public int Number; public string? Name { get; set; } }", "relative declaration order")]
     [InlineData("public sealed class Payload { public int Number { get; } public Payload(string number) { } }", "same type")]
     [InlineData("public sealed class Payload { public int Number { get; } public Payload(ref int number) { } }", "by-value or in")]
+    [InlineData("public sealed class Payload { public int Value { get; set; } public Payload(int value) => Value = value; [SharpPackConstructor] private Payload() { } }", "constructor marked SharpPackConstructor is not accessible")]
     [InlineData("public sealed class Payload { [SharpPackInclude] private int Hidden; }", "marked SharpPackInclude")]
     [InlineData("public sealed class Payload { [SharpPackOnDeserializing] private void Callback() { } }", "callbacks require an existing formatter")]
     public void UnsupportedMetadataReportsAnAssemblyRootDiagnostic(string declaration, string reason)
@@ -133,6 +134,57 @@ public class SidecarPlanningTest
         Assert.Empty(integration.Diagnostics);
         Assert.Equal(2, integration.Roots[0].Sidecars.Length);
         Assert.DoesNotContain("Register<global::Vendor.IPayload>", integration.Source);
+    }
+
+    [Fact]
+    public void SourceExternalUnionReusesExactThenOpenAndRejectsAnUnmatchedClosedRoot()
+    {
+        var compilation = Create("""
+            namespace Vendor;
+            public sealed class ExactPayload { public int Value { get; set; } }
+            public sealed class OpenPayload { public int Value { get; set; } }
+            """, """
+            [SharpPackable(GenerateType.NoGenerate)]
+            public partial interface IUnion<T>;
+            [SharpPackable]
+            public partial class ExactCase : IUnion<int>, IExactOnly<int>
+            {
+                [SharpPackAllowSerialize] public Vendor.ExactPayload? Payload { get; set; }
+            }
+            [SharpPackable]
+            public partial class OpenCase<T> : IUnion<T>
+            {
+                [SharpPackAllowSerialize] public Vendor.OpenPayload? Payload { get; set; }
+            }
+            [SharpPackUnionFormatter(typeof(IUnion<int>))]
+            [SharpPackUnion(1, typeof(ExactCase))]
+            public partial class ExactFormatter;
+            [SharpPackUnionFormatter(typeof(IUnion<>))]
+            [SharpPackUnion(2, typeof(OpenCase<>))]
+            public partial class OpenFormatter<T>;
+            public partial interface IExactOnly<T>;
+            [SharpPackUnionFormatter(typeof(IExactOnly<int>))]
+            [SharpPackUnion(3, typeof(ExactCase))]
+            public partial class OnlyFormatter;
+            """);
+        var number = compilation.GetSpecialType(SpecialType.System_Int32);
+        var text = compilation.GetSpecialType(SpecialType.System_String);
+        var union = compilation.GetTypeByMetadataName("IUnion`1")!;
+        var exact = compilation.GetTypeByMetadataName("IExactOnly`1")!;
+        var output = SharpPackSidecarGenerator.Generate(compilation,
+            [new(union.Construct(number)), new(union.Construct(text)), new(exact.Construct(number))], "UnionProvider");
+        Assert.Empty(output.Diagnostics);
+        Assert.All(output.Roots, static root => Assert.Equal(SharpPackFormatterSupport.Existing, root.Support));
+        Assert.Equal("global::Vendor.ExactPayload", Assert.Single(output.Roots[0].Sidecars).TypeName);
+        Assert.Equal("global::Vendor.OpenPayload", Assert.Single(output.Roots[1].Sidecars).TypeName);
+        var tree = CSharpSyntaxTree.ParseText(Assert.IsType<string>(output.Source), Parse, output.HintName);
+        var (diagnostics, generated) = Run(compilation.AddSyntaxTrees(tree));
+        Assert.Empty(diagnostics);
+        Assert.Empty(generated.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+
+        var unsupported = SharpPackSidecarGenerator.Generate(compilation, [new(exact.Construct(text))], "UnmatchedProvider");
+        Assert.Equal(SharpPackFormatterSupport.Unsupported, Assert.Single(unsupported.Roots).Support);
+        Assert.Contains("no generated external union formatter matches", Assert.Single(unsupported.Diagnostics).GetMessage());
     }
 
     static Compilation Create(string vendor, string consumer)

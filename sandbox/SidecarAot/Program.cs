@@ -5,11 +5,15 @@ using SidecarFixture;
 [assembly: SharpPackExternalType(typeof(List<ExternalNote>))]
 [assembly: SharpPackExternalType(typeof(ExternalEnvelope<ExternalNote>))]
 [assembly: SharpPackExternalType(typeof(ContextOnlyRoot))]
+[assembly: SharpPackExternalType(typeof(IExternalUnion<int>))]
 
 var context = SharpPackExternalFormatters.Register(new SharpPackSerializerContextBuilder()).Build();
 
 if (SharpPackSerializer.Deserialize<ContextOnlyRoot>(new byte[] { 1, 0, 0, 0, 0 }, context)?.Record.Caption != "")
     throw new InvalidOperationException("The typed context-only factory could not resolve its external dependency.");
+if (SharpPackSerializer.Deserialize<IExternalUnion<int>>(new byte[] { 3, 1, 42, 0, 0, 0 }, context)
+    is not ExternalUnionCase { Value: 42 })
+    throw new InvalidOperationException("The generated provider did not reuse the closed union factory.");
 
 // Read the ordinary object format before any serialization. Under AOT the
 // generated provider must already contain the closed list and metadata root.
@@ -33,6 +37,12 @@ if (roundTrip is not { Messages: { } messages, Value.Label: "managed struct", Ti
     throw new InvalidOperationException("The nested closed metadata graph did not round-trip.");
 
 Console.WriteLine("External sidecar deserialize-first and nested wire checks passed.");
+
+[SharpPackable(GenerateType.NoGenerate)] public partial interface IExternalUnion<T>;
+[SharpPackable] public partial class ExternalUnionCase : IExternalUnion<int> { public int Value { get; set; } }
+[SharpPackUnionFormatter(typeof(IExternalUnion<int>))]
+[SharpPackUnion(3, typeof(ExternalUnionCase))]
+public partial class ExternalUnionFormatter;
 
 internal sealed class ContextOnlyRoot(ExternalRecord record) : ISharpPackContextFormatterFactory<ContextOnlyRoot>
 {

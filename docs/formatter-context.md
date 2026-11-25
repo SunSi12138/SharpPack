@@ -80,9 +80,10 @@ An ordinary external object uses SharpPack's existing object layout:
   present in the referenced metadata is an error. Each member needs an
   accessible setter (including `init`) or one matching constructor parameter.
 - Use a single callable constructor or select one with
-  `[SharpPackConstructor]`. Parameters must match serialized member names and
-  types. Positional records and structs containing managed references follow
-  the same rules.
+  `[SharpPackConstructor]`. A selected constructor present in the referenced
+  metadata must be accessible; its parameters must match serialized member
+  names and types. Positional records and structs containing managed references
+  follow the same rules.
 - Metadata preserves the order within its field and property tables, but not
   the relative source order of fields and properties declared together. For
   such a type, all members need contiguous `[SharpPackOrder]` values starting
