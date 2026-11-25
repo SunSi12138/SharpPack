@@ -35,6 +35,37 @@ public partial class TypeMeta
 
     static EquatableArray<ScalarBatch> PlanScalarBatches(MemberMeta[] members)
         => SerializationPlanner.PlanScalarBatches(members.Select(static member => member.Kind).ToArray());
+
+    public void EmitTypescript(StringBuilder sb, IReadOnlyDictionary<ITypeSymbol, ITypeSymbol> unionMap, TypeScriptGenerateOptions options)
+    {
+        if (IsUnion)
+        {
+            EmitTypeScriptUnion(sb, options.ImportExtension);
+            return;
+        }
+
+        unionMap.TryGetValue(Symbol, out var unionBase);
+        TypeScriptEmitter.EmitObject(sb, TypeName, unionBase?.Name,
+            Members.Select(member => TypeScriptMember.Project(member, reference, options)).ToArray());
+    }
+
+    public void EmitTypeScriptUnion(StringBuilder sb, string importExt)
+        => TypeScriptEmitter.EmitUnion(sb, TypeName, UnionShape.Capture(this, reference, externalFormatter: null).Cases, importExt);
+
+    public string EmitTypeScriptMembers(TypeScriptMember[] members)
+        => TypeScriptEmitter.EmitTypeScriptMembers(TypeScriptMembers(members));
+
+    public string EmitTypeScriptMembersInit(TypeScriptMember[] members)
+        => TypeScriptEmitter.EmitTypeScriptMembersInit(TypeScriptMembers(members));
+
+    public string EmitTypeScriptSerializeBody(TypeScriptMember[] members)
+        => TypeScriptEmitter.EmitTypeScriptSerializeBody(TypeScriptMembers(members));
+
+    public string EmitTypeScriptDeserializeBody(TypeScriptMember[] members, bool emitSkip)
+        => TypeScriptEmitter.EmitTypeScriptDeserializeBody(TypeScriptMembers(members), emitSkip);
+
+    static TypeScriptMemberShape[] TypeScriptMembers(TypeScriptMember[] members)
+        => members.Select(static member => member.Shape).ToArray();
 }
 
 public partial class MethodMeta

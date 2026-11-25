@@ -3,10 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Dynamic;
-using System.IO.Compression;
 using System.Text;
-using System.Xml.Serialization;
 
 namespace SharpPack.Generator;
 
@@ -47,7 +44,7 @@ partial class SharpPackGenerator
             return null;
         }
 
-        if (!Validate(typeMeta, syntax, context, reference))
+        if (!Validate(typeMeta, syntax, context))
         {
             return null;
         }
@@ -89,7 +86,19 @@ import { SharpPackReader } from "./SharpPackReader{{typeScriptGenerateOptions.Im
 
         try
         {
-            typeMeta.EmitTypescript(sb, unionMap, typeScriptGenerateOptions);
+            var shape = TypeShape.Create(typeSymbol, typeMeta, reference);
+            if (shape.Union is { } union)
+            {
+                TypeScriptEmitter.EmitUnion(sb, shape.ShortName, union.Cases, typeScriptGenerateOptions.ImportExtension);
+            }
+            else
+            {
+                var members = SerializationPlanner.PlanWireSlots(shape)
+                    .Select(slot => TypeScriptMember.Project(typeMeta.Members[slot.DeclaredMemberIndex!.Value], reference, typeScriptGenerateOptions))
+                    .ToArray();
+                unionMap.TryGetValue(typeSymbol, out var unionBase);
+                TypeScriptEmitter.EmitObject(sb, shape.ShortName, unionBase?.Name, members);
+            }
         }
         catch (NotSupportedTypeException ex)
         {
@@ -151,7 +160,7 @@ export const enum {{typeSymbol.Name}} {
         }
     }
 
-    static bool Validate(TypeMeta type, TypeDeclarationSyntax syntax, in SourceProductionContext context, ReferenceSymbols reference)
+    static bool Validate(TypeMeta type, TypeDeclarationSyntax syntax, in SourceProductionContext context)
     {
         var typeSymbol = type.Symbol;
 
@@ -174,39 +183,26 @@ export const enum {{typeSymbol.Name}} {
     }
 }
 
-public partial class TypeMeta
+internal static class TypeScriptEmitter
 {
-    public void EmitTypescript(StringBuilder sb, IReadOnlyDictionary<ITypeSymbol, ITypeSymbol> unionMap, TypeScriptGenerateOptions options)
+    internal static void EmitObject(StringBuilder sb, string typeName, string? unionBase, TypeScriptMemberShape[] tsMembers)
     {
-        string importExt = options.ImportExtension;
-        if (IsUnion)
-        {
-            EmitTypeScriptUnion(sb, importExt);
-            return;
-        }
-
-        if (!unionMap.TryGetValue(Symbol, out var union))
-        {
-            union = null;
-        }
-
-        var tsMembers = Members.Select(x => new TypeScriptMember(x, reference, options)).ToArray();
-        var impl = (union != null) ? $"implements {union.Name} " : "";
+        var impl = unionBase is not null ? $"implements {unionBase} " : "";
 
         var code = $$"""
-export class {{TypeName}} {{impl}}{
+export class {{typeName}} {{impl}}{
 {{EmitTypeScriptMembers(tsMembers)}}
     constructor() {
 {{EmitTypeScriptMembersInit(tsMembers)}}
     }
 
-    static serialize(value: {{TypeName}} | null): Uint8Array {
+    static serialize(value: {{typeName}} | null): Uint8Array {
         const writer = SharpPackWriter.getSharedInstance();
         this.serializeCore(writer, value);
         return writer.toArray();
     }
 
-    static serializeCore(writer: SharpPackWriter, value: {{TypeName}} | null): void {
+    static serializeCore(writer: SharpPackWriter, value: {{typeName}} | null): void {
         if (value == null) {
             writer.writeNullObjectHeader();
             return;
@@ -215,27 +211,27 @@ export class {{TypeName}} {{impl}}{
 {{EmitTypeScriptSerializeBody(tsMembers)}}
     }
 
-    static serializeArray(value: ({{TypeName}} | null)[] | null): Uint8Array {
+    static serializeArray(value: ({{typeName}} | null)[] | null): Uint8Array {
         const writer = SharpPackWriter.getSharedInstance();
         this.serializeArrayCore(writer, value);
         return writer.toArray();
     }
 
-    static serializeArrayCore(writer: SharpPackWriter, value: ({{TypeName}} | null)[] | null): void {
-        writer.writeArray(value, (writer, x) => {{TypeName}}.serializeCore(writer, x));
+    static serializeArrayCore(writer: SharpPackWriter, value: ({{typeName}} | null)[] | null): void {
+        writer.writeArray(value, (writer, x) => {{typeName}}.serializeCore(writer, x));
     }
 
-    static deserialize(buffer: ArrayBuffer): {{TypeName}} | null {
+    static deserialize(buffer: ArrayBuffer): {{typeName}} | null {
         return this.deserializeCore(new SharpPackReader(buffer));
     }
 
-    static deserializeCore(reader: SharpPackReader): {{TypeName}} | null {
+    static deserializeCore(reader: SharpPackReader): {{typeName}} | null {
         const [ok, count] = reader.tryReadObjectHeader();
         if (!ok) {
             return null;
         }
 
-        const value = new {{TypeName}}();
+        const value = new {{typeName}}();
         if (count == {{tsMembers.Length}}) {
 {{EmitTypeScriptDeserializeBody(tsMembers, false)}}
         }
@@ -248,12 +244,12 @@ export class {{TypeName}} {{impl}}{
         return value;
     }
 
-    static deserializeArray(buffer: ArrayBuffer): ({{TypeName}} | null)[] | null {
+    static deserializeArray(buffer: ArrayBuffer): ({{typeName}} | null)[] | null {
         return this.deserializeArrayCore(new SharpPackReader(buffer));
     }
 
-    static deserializeArrayCore(reader: SharpPackReader): ({{TypeName}} | null)[] | null {
-        return reader.readArray(reader => {{TypeName}}.deserializeCore(reader));
+    static deserializeArrayCore(reader: SharpPackReader): ({{typeName}} | null)[] | null {
+        return reader.readArray(reader => {{typeName}}.deserializeCore(reader));
     }
 }
 """;
@@ -261,17 +257,17 @@ export class {{TypeName}} {{impl}}{
         sb.AppendLine(code);
     }
 
-    public void EmitTypeScriptUnion(StringBuilder sb, string importExt)
+    internal static void EmitUnion(StringBuilder sb, string typeName, EquatableArray<UnionCaseShape> cases, string importExt)
     {
         string EmitUnionSerialize()
         {
             var sb = new StringBuilder();
-            foreach (var item in UnionTags)
+            foreach (var item in cases)
             {
                 sb.AppendLine($$"""
-        else if (value instanceof {{item.Type.Name}}) {
+        else if (value instanceof {{item.SimpleName}}) {
             writer.writeUnionHeader({{item.Tag}});
-            {{item.Type.Name}}.serializeCore(writer, value);
+            {{item.SimpleName}}.serializeCore(writer, value);
             return;
         }
 """);
@@ -282,31 +278,31 @@ export class {{TypeName}} {{impl}}{
         string EmitUnionDeserialize()
         {
             var sb = new StringBuilder();
-            foreach (var item in UnionTags)
+            foreach (var item in cases)
             {
                 sb.AppendLine($$"""
             case {{item.Tag}}:
-                return {{item.Type.Name}}.deserializeCore(reader);
+                return {{item.SimpleName}}.deserializeCore(reader);
 """);
             }
             return sb.ToString();
         }
 
-        foreach (var item in UnionTags)
+        foreach (var item in cases)
         {
-            sb.AppendLine($"import {{ {item.Type.Name} }} from \"./{item.Type.Name}{importExt}\"; ");
+            sb.AppendLine($"import {{ {item.SimpleName} }} from \"./{item.SimpleName}{importExt}\"; ");
         }
         sb.AppendLine();
 
         var code = $$"""
-export abstract class {{TypeName}} {
-    static serialize(value: {{TypeName}} | null): Uint8Array {
+export abstract class {{typeName}} {
+    static serialize(value: {{typeName}} | null): Uint8Array {
         const writer = SharpPackWriter.getSharedInstance();
         this.serializeCore(writer, value);
         return writer.toArray();
     }
 
-    static serializeCore(writer: SharpPackWriter, value: {{TypeName}} | null): void {
+    static serializeCore(writer: SharpPackWriter, value: {{typeName}} | null): void {
         if (value == null) {
             writer.writeNullObjectHeader();
             return;
@@ -317,21 +313,21 @@ export abstract class {{TypeName}} {
         }
     }
 
-    static serializeArray(value: {{TypeName}}[] | null): Uint8Array {
+    static serializeArray(value: {{typeName}}[] | null): Uint8Array {
         const writer = SharpPackWriter.getSharedInstance();
         this.serializeArrayCore(writer, value);
         return writer.toArray();
     }
 
-    static serializeArrayCore(writer: SharpPackWriter, value: {{TypeName}}[] | null): void {
-        writer.writeArray(value, (writer, x) => {{TypeName}}.serializeCore(writer, x));
+    static serializeArrayCore(writer: SharpPackWriter, value: {{typeName}}[] | null): void {
+        writer.writeArray(value, (writer, x) => {{typeName}}.serializeCore(writer, x));
     }
 
-    static deserialize(buffer: ArrayBuffer): {{TypeName}} | null {
+    static deserialize(buffer: ArrayBuffer): {{typeName}} | null {
         return this.deserializeCore(new SharpPackReader(buffer));
     }
 
-    static deserializeCore(reader: SharpPackReader): {{TypeName}} | null {
+    static deserializeCore(reader: SharpPackReader): {{typeName}} | null {
         const [ok, tag] = reader.tryReadUnionHeader();
         if (!ok) {
             return null;
@@ -344,19 +340,19 @@ export abstract class {{TypeName}} {
         }
     }
 
-    static deserializeArray(buffer: ArrayBuffer): ({{TypeName}} | null)[] | null {
+    static deserializeArray(buffer: ArrayBuffer): ({{typeName}} | null)[] | null {
         return this.deserializeArrayCore(new SharpPackReader(buffer));
     }
 
-    static deserializeArrayCore(reader: SharpPackReader): ({{TypeName}} | null)[] | null {
-        return reader.readArray(reader => {{TypeName}}.deserializeCore(reader));
+    static deserializeArrayCore(reader: SharpPackReader): ({{typeName}} | null)[] | null {
+        return reader.readArray(reader => {{typeName}}.deserializeCore(reader));
     }
 }
 """;
         sb.AppendLine(code);
     }
 
-    public string EmitTypeScriptMembers(TypeScriptMember[] members)
+    internal static string EmitTypeScriptMembers(TypeScriptMemberShape[] members)
     {
         var sb = new StringBuilder();
 
@@ -368,7 +364,7 @@ export abstract class {{TypeName}} {
         return sb.ToString();
     }
 
-    public string EmitTypeScriptMembersInit(TypeScriptMember[] members)
+    internal static string EmitTypeScriptMembersInit(TypeScriptMemberShape[] members)
     {
         var sb = new StringBuilder();
 
@@ -380,7 +376,7 @@ export abstract class {{TypeName}} {
         return sb.ToString();
     }
 
-    public string EmitTypeScriptSerializeBody(TypeScriptMember[] members)
+    internal static string EmitTypeScriptSerializeBody(TypeScriptMemberShape[] members)
     {
         var sb = new StringBuilder();
 
@@ -393,7 +389,7 @@ export abstract class {{TypeName}} {
         return sb.ToString();
     }
 
-    public string EmitTypeScriptDeserializeBody(TypeScriptMember[] members, bool emitSkip)
+    internal static string EmitTypeScriptDeserializeBody(TypeScriptMemberShape[] members, bool emitSkip)
     {
         var sb = new StringBuilder();
 

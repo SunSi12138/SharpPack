@@ -39,6 +39,13 @@ also use an immutable plan: closed matches are ordered before the optional
 open fallback. The representative generated-source and runtime-dependency
 snapshots must stay unchanged when a decision moves between stages.
 
+The TypeScript renderer takes the same object slot ordering and union cases
+as C#. Its projection of those members keeps JavaScript-specific scalar and
+collection names, defaults, and nullability separate. The TypeScript baseline
+compares the emitted model and enum files against the legacy generator and
+checks the shipped reader and writer. Files are still written through the
+existing opt-in path until the tooling migration is complete.
+
 ## What reruns after an edit
 
 Semantic extraction reads the compilation so related changes, such as a new

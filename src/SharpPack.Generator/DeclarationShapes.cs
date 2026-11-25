@@ -49,7 +49,7 @@ internal sealed record CollectionShape(CollectionKind Kind, EquatableArray<strin
     }
 }
 
-internal sealed record UnionCaseShape(ushort Tag, string TypeName, bool UsePackablePath);
+internal sealed record UnionCaseShape(ushort Tag, string TypeName, bool UsePackablePath, string SimpleName);
 
 internal sealed record ExternalUnionFormatterShape(
     string Name, string Namespace, string QualifiedName, EquatableArray<TypeParameterShape> TypeParameters)
@@ -82,7 +82,8 @@ internal sealed record UnionShape(
             new EquatableArray<UnionCaseShape>(model.UnionTags.Select(item => new UnionCaseShape(
                 item.Tag, ConstructName(item.Type),
                 item.Type.TryGetSharpPackableType(references, out var kind, out _) &&
-                    kind is GenerateType.Object or GenerateType.VersionTolerant or GenerateType.CircularReference))),
+                    kind is GenerateType.Object or GenerateType.VersionTolerant or GenerateType.CircularReference,
+                item.Type.Name))),
             externalFormatter is null ? null : ExternalUnionFormatterShape.Capture(externalFormatter));
 
         string ConstructName(INamedTypeSymbol type) => Bind(type).FullyQualifiedToString();
