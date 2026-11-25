@@ -45,7 +45,8 @@ Semantic extraction reads the compilation so related changes, such as a new
 type for an inherited member, are visible. Equal model shapes keep planning
 and rendering cached. Diagnostics are reported separately so their source
 locations stay current. The optional serialization-information file has a
-separate output path; changing its directory does not render C# again.
+separate output path; it refreshes on later compilations even when the C# stays
+cached. Changing its directory does not render C# again.
 
 `IncrementalGeneratorTest` tracks the real provider steps across an unrelated
 file edit and a dependency edit. It also checks that external factory rendering

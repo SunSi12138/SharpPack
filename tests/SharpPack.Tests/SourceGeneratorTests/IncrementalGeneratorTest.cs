@@ -100,7 +100,7 @@ public class IncrementalGeneratorTest
     }
 
     [Fact]
-    public void EnablingSerializationInfoWritesTheLegacyFileWithoutRenderingCSharpAgain()
+    public void SerializationInfoWritesAndRefreshesTheLegacyFileWithoutRenderingCSharpAgain()
     {
         var model = Parse("[SharpPackable] public partial class Model { public int Size; }", "Model.cs");
         var compilation = CSharpGeneratorRunner.CreateCompilation(model);
@@ -116,6 +116,11 @@ public class IncrementalGeneratorTest
             AssertStage(after, "CSharpEmission", 1, IncrementalStepRunReason.Cached);
             Assert.Equal(Sources(first), Sources(after));
             var expected = string.Join(Environment.NewLine, "GenerateType Object Model", "---", "int Size", "");
+            Assert.Equal(Encoding.UTF8.GetBytes(expected), File.ReadAllBytes(file));
+
+            File.Delete(file);
+            var afterEdit = Run(ref driver, compilation.AddSyntaxTrees(Parse("internal class Unrelated { }", "Unrelated.cs")));
+            AssertStage(afterEdit, "CSharpEmission", 1, IncrementalStepRunReason.Cached);
             Assert.Equal(Encoding.UTF8.GetBytes(expected), File.ReadAllBytes(file));
         }
         finally

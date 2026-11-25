@@ -169,10 +169,13 @@ public partial class SharpPackGenerator : IIncrementalGenerator
             .WithTrackingName("SharpPack.CSharpEmission");
         context.RegisterSourceOutput(sources, AddGeneratedSource);
 
+        // Legacy files are side effects: allow a later compilation to retry
+        // a failed write or recreate a missing file without rendering C#.
         var logFiles = shapes.Where(CSharpEmitter.HasSerializationInfo)
             .Combine(logProvider)
-            .Where(static input => input.Right is not null);
-        context.RegisterSourceOutput(logFiles, static (_, input) => WriteSerializationInfo(input.Left, input.Right!));
+            .Where(static input => input.Right is not null)
+            .Combine(context.CompilationProvider);
+        context.RegisterSourceOutput(logFiles, static (_, input) => WriteSerializationInfo(input.Left.Left, input.Left.Right!));
     }
 
     static void AddGeneratedSource(SourceProductionContext output, GeneratedSource source)
