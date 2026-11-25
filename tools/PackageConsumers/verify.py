@@ -171,7 +171,8 @@ def assets(path, expected, *, core_framework=None):
     if any(item["type"] != "package" for item in libraries.values()) or resolved != set(expected.items()):
         raise RuntimeError(f"{path.name} resolved unexpected dependencies: {libraries.keys()}")
     if core_framework is not None:
-        core = lock["targets"][core_framework][f"{CORE}/{expected[CORE]}"]
+        core_key = next(key for key in libraries if key.split("/", 1)[0] == CORE)
+        core = lock["targets"][core_framework][core_key]
         selected = f"lib/{core_framework}/{CORE}.dll"
         if set(core.get("compile", {})) != {selected} or set(core.get("runtime", {})) != {selected}:
             raise RuntimeError(f"{path.name} did not select the {core_framework} Core asset")

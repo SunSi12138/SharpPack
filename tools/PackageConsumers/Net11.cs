@@ -31,6 +31,8 @@ internal static class Net11
         T? nullable = nan;
         var nullableCopy = SharpPackSerializer.Deserialize<T?>(SharpPackSerializer.Serialize(nullable, context), context);
         EqualBits(nan, nullableCopy ?? throw new InvalidOperationException("Nullable number lost its value."));
+        if (SharpPackSerializer.Deserialize<T?>(SharpPackSerializer.Serialize<T?>(null, context), context).HasValue)
+            throw new InvalidOperationException("A null number became present.");
 
         var values = new[] { finite, negativeZero, nan, infinity };
         var arrayCopy = SharpPackSerializer.Deserialize<T[]>(SharpPackSerializer.Serialize(values, context), context);
