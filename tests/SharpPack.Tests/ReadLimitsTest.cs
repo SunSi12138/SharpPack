@@ -27,7 +27,9 @@ public class ReadLimitsTest
 
         var spanFailure = () =>
             SharpPackSerializer.Deserialize<int[]>(payload, tooSmall);
-        spanFailure.Should().Throw<SharpPackSerializationException>();
+        var error = spanFailure.Should().Throw<SharpPackSerializationException>().Which;
+        Assert.Equal(SharpPackErrorCode.ResourceLimitExceeded, error.ErrorCode);
+        Assert.Equal(SharpPackReadLimitKind.PayloadBytes, error.ReadLimitKind);
 
         var sequenceFailure = () =>
             SharpPackSerializer.Deserialize<int[]>(sequence, tooSmall);
@@ -132,6 +134,18 @@ public class ReadLimitsTest
     }
 
     [Fact]
+    public void DepthLimit_ContinuesAcrossBrotliMembers()
+    {
+        var payload = SharpPackSerializer.Serialize(new BrotliIntEnvelope { Value = 123 });
+
+        Assert.Equal(123, SharpPackSerializer.Deserialize<BrotliIntEnvelope>(payload, AtDepth(3))!.Value);
+        var error = Assert.Throws<SharpPackSerializationException>(() =>
+            SharpPackSerializer.Deserialize<BrotliIntEnvelope>(payload, AtDepth(2)));
+        Assert.Equal(SharpPackErrorCode.DepthLimitExceeded, error.ErrorCode);
+        Assert.Equal(SharpPackReadLimitKind.Depth, error.ReadLimitKind);
+    }
+
+    [Fact]
     public void DepthLimit_CountsGeneratedArrayElementScopes()
     {
         var value = new ReadLimitArrayNode { Children = [new() { Children = [new()] }] };
@@ -219,7 +233,9 @@ public class ReadLimitsTest
         var deserialize = () =>
             SharpPackSerializer.Deserialize(payload, ref destination, limited);
 
-        deserialize.Should().Throw<SharpPackSerializationException>();
+        var error = deserialize.Should().Throw<SharpPackSerializationException>().Which;
+        Assert.Equal(SharpPackErrorCode.ResourceLimitExceeded, error.ErrorCode);
+        Assert.Equal(SharpPackReadLimitKind.CollectionLength, error.ReadLimitKind);
         destination.Should().BeSameAs(original);
         destination.Should().Equal(99);
 

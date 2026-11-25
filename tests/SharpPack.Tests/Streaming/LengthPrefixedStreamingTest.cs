@@ -278,12 +278,13 @@ public class LengthPrefixedStreamingTest
         pipe.Writer.Write(header);
         await pipe.Writer.FlushAsync();
 
-        await Assert.ThrowsAsync<SharpPackSerializationException>(
+        var error = await Assert.ThrowsAsync<SharpPackSerializationException>(
             async () => await SharpPackStreamingSerializer
                 .DeserializeLengthPrefixedAsync<int>(
                     pipe.Reader,
                     maxFrameLength: 16));
 
+        error.ErrorCode.Should().Be(SharpPackErrorCode.ResourceLimitExceeded);
         await pipe.Reader.CompleteAsync();
         await pipe.Writer.CompleteAsync();
     }

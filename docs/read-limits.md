@@ -22,7 +22,8 @@ var context = new SharpPackSerializerContext(
 not the total number of values: direct reads of non-empty arrays, lists, and
 generated collections share one element scope for all siblings. The default
 retains the historical cutoff and now applies it to optimized collection paths
-that previously did not count their element depth. Dedicated raw unmanaged
+that previously did not count their element depth. An inner reader created by a
+Brotli formatter continues with the enclosing depth and limits. Dedicated raw unmanaged
 paths do not add a scope. Collection and reference limits default to `int.MaxValue`;
 zero selects the default.
 
@@ -64,11 +65,11 @@ constructors, application callbacks, or user code. A custom formatter that
 manually allocates from unguarded scalar data remains responsible for its own
 application-specific validation.
 
-Limit violations use `SharpPackSerializationException.ReadLimitKind` with
-`PayloadBytes`, `Depth`, `CollectionLength`, or `ReferenceCount`. Other failures
-leave this nullable property unset. This is a narrow resource-boundary reason,
-not the complete error-code taxonomy planned in #16. Tests and callers need not
-parse exception text. Structural header checks still precede cardinality checks
+Depth limit violations use `SharpPackErrorCode.DepthLimitExceeded`; payload,
+collection, and reference limits use `SharpPackErrorCode.ResourceLimitExceeded`.
+`SharpPackSerializationException.ReadLimitKind` identifies the specific reader
+limit: `PayloadBytes`, `Depth`, `CollectionLength`, or `ReferenceCount`. Other
+failures leave this nullable property unset. Structural header checks still precede cardinality checks
 where the reader has enough information; a failure is classified at the first
 boundary reached, not by a second whole-payload verification pass.
 

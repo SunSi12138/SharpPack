@@ -33,6 +33,15 @@ public ref partial struct SharpPackReader
     public SharpPackReaderOptionalState OptionalState => optionalState;
 
     public SharpPackReader(in ReadOnlySequence<byte> sequence, SharpPackReaderOptionalState optionalState)
+        : this(sequence, optionalState, optionalState.MaxDepth, optionalState.MaxCollectionLength)
+    {
+    }
+
+    SharpPackReader(
+        in ReadOnlySequence<byte> sequence,
+        SharpPackReaderOptionalState optionalState,
+        int maxDepth,
+        int maxCollectionLength)
     {
         this.bufferSource = sequence.IsSingleSegment ? ReadOnlySequence<byte>.Empty : sequence;
         var span = sequence.FirstSpan;
@@ -44,8 +53,8 @@ public ref partial struct SharpPackReader
         this.rentBuffer = null;
         this.smallBuffer = default;
         this.totalLength = sequence.Length;
-        this.maxDepth = optionalState.MaxDepth;
-        this.maxCollectionLength = optionalState.MaxCollectionLength;
+        this.maxDepth = maxDepth;
+        this.maxCollectionLength = maxCollectionLength;
         this.optionalState = optionalState;
     }
 
@@ -64,6 +73,9 @@ public ref partial struct SharpPackReader
         this.maxCollectionLength = optionalState.MaxCollectionLength;
         this.optionalState = optionalState;
     }
+
+    internal SharpPackReader CreateNestedReader(in ReadOnlySequence<byte> sequence)
+        => new SharpPackReader(sequence, optionalState, maxDepth, maxCollectionLength) { depth = this.depth };
 
     // buffer operations
 
@@ -492,7 +504,7 @@ public ref partial struct SharpPackReader
             }
             catch (DecoderFallbackException ex)
             {
-                throw new SharpPackSerializationException("Failed to decode a strict UTF-8 payload.", ex);
+                throw new SharpPackSerializationException(SharpPackErrorCode.InvalidEncoding, "Failed to decode a strict UTF-8 payload.", ex);
             }
         }
         else

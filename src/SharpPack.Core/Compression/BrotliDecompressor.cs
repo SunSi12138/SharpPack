@@ -50,7 +50,7 @@ public struct BrotliDecompressor : IDisposable
             DecompressCore(ref status, ref decoder, compressedSpan, out consumed);
             if (status == OperationStatus.NeedMoreData)
             {
-                SharpPackSerializationException.ThrowCompressionFailed(status);
+                SharpPackSerializationException.ThrowInvalidCompressedPayload(status);
             }
         }
         catch
@@ -102,7 +102,7 @@ public struct BrotliDecompressor : IDisposable
 
             if (status == OperationStatus.NeedMoreData)
             {
-                SharpPackSerializationException.ThrowCompressionFailed(status);
+                SharpPackSerializationException.ThrowInvalidCompressedPayload(status);
             }
         }
         catch
@@ -145,7 +145,7 @@ public struct BrotliDecompressor : IDisposable
 
                 if (status == OperationStatus.InvalidData)
                 {
-                    SharpPackSerializationException.ThrowCompressionFailed(status);
+                    SharpPackSerializationException.ThrowInvalidCompressedPayload(status);
                 }
 
                 if (bytesWritten > 0)

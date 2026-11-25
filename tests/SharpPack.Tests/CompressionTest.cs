@@ -8,6 +8,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -231,17 +232,17 @@ public class CompressionTest
         using var readerState = SharpPackReaderOptionalStatePool.Rent();
         var reader = new SharpPackReader(sequence, readerState);
         string? restored = null;
-        var error = false;
+        SharpPackErrorCode? error = null;
         try
         {
             formatter.Deserialize(ref reader, ref restored);
         }
-        catch (SharpPackSerializationException)
+        catch (SharpPackSerializationException exception)
         {
-            error = true;
+            error = exception.ErrorCode;
         }
 
-        error.Should().BeTrue();
+        error.Should().Be(SharpPackErrorCode.InvalidWireData);
     }
 
     [Fact]
@@ -253,21 +254,126 @@ public class CompressionTest
             SharpPackSerializer.Serialize(ref compressor, 123);
             SharpPackSerializer.Serialize(ref compressor, 456);
             var payload = compressor.ToArray();
-            var context = new SharpPackSerializerContextBuilder()
-                .Register<int>(new BrotliFormatter<int>())
-                .Build();
-
-            Action deserialize = () =>
-                SharpPackSerializer.Deserialize<int>(payload, context);
-
-            deserialize.Should().Throw<SharpPackSerializationException>();
+            Assert.Equal(SharpPackErrorCode.InvalidWireData, Assert.Throws<SharpPackSerializationException>(
+                () => DeserializeCompressedInt(payload)).ErrorCode);
         }
         finally
         {
             compressor.Dispose();
         }
+
+        static void DeserializeCompressedInt(byte[] payload)
+        {
+            using var state = SharpPackReaderOptionalStatePool.Rent();
+            var reader = new SharpPackReader(payload, state);
+            try
+            {
+                int value = default;
+                new BrotliFormatter<int>().Deserialize(ref reader, ref value);
+            }
+            finally { reader.Dispose(); }
+        }
     }
 
+
+    [Fact]
+    public void BrotliReportsTruncatedCompressedPayload()
+    {
+        var complete = SharpPackSerializer.Serialize(new BrotliIntEnvelope { Value = 123 });
+        var truncated = complete[..^1];
+        var segmented = ReadOnlySequenceBuilder.Create(truncated[..2], truncated[2..]);
+
+        Assert.Equal(123, SharpPackSerializer.Deserialize<BrotliIntEnvelope>(complete)!.Value);
+        Assert.Equal(SharpPackErrorCode.UnexpectedEndOfPayload, Assert.Throws<SharpPackSerializationException>(
+            () => SharpPackSerializer.Deserialize<BrotliIntEnvelope>(truncated)).ErrorCode);
+        Assert.Equal(SharpPackErrorCode.UnexpectedEndOfPayload, Assert.Throws<SharpPackSerializationException>(
+            () => SharpPackSerializer.Deserialize<BrotliIntEnvelope>(segmented)).ErrorCode);
+    }
+
+    [Fact]
+    public void RegisteredBrotliWrapsTheSpecifiedFormatterAndKeepsNestedOverrides()
+    {
+        var inner = new CountFormatter();
+        var formatter = BrotliFormatter<CompressedCount>.Wrap(inner);
+        var context = new SharpPackSerializerContextBuilder()
+            .Register(formatter)
+            .Register(new IntOffsetFormatter(10))
+            .Build();
+        var withoutOffset = new SharpPackSerializerContextBuilder().Register(formatter).Build();
+
+        var payload = SharpPackSerializer.Serialize(new CompressedCount(42), context);
+
+        Assert.Equal(42, SharpPackSerializer.Deserialize<CompressedCount>(payload, context)!.Count);
+        Assert.Equal(52, SharpPackSerializer.Deserialize<CompressedCount>(payload, withoutOffset)!.Count);
+        Assert.Equal(2, inner.WriteDepth);
+        Assert.Equal(2, inner.ReadDepth);
+    }
+
+    [Fact]
+    public void BrotliMemberUsesTheExistingObjectAndCompressedValueWireFormat()
+    {
+        var compressor = new BrotliCompressor();
+        try
+        {
+            SharpPackSerializer.Serialize(ref compressor, 42);
+            var payload = SharpPackSerializer.Serialize(new BrotliIntEnvelope { Value = 42 });
+            Assert.Equal(1, payload[0]);
+            Assert.Equal(compressor.ToArray(), payload[1..]);
+        }
+        finally { compressor.Dispose(); }
+    }
+
+    [Fact]
+    public void RegisteredBrotliRequiresAnUncompressedFormatter()
+    {
+        var context = new SharpPackSerializerContextBuilder()
+            .Register(BrotliFormatter<int>.Default)
+            .Build();
+        var wrapped = new SharpPackSerializerContextBuilder()
+            .Register(BrotliFormatter<int>.Wrap(new UnmanagedFormatter<int>()))
+            .Build();
+        var payload = SharpPackSerializer.Serialize(42, wrapped);
+        var output = new ArrayBufferWriter<byte>();
+
+        Assert.Equal(42, SharpPackSerializer.Deserialize<int>(payload, wrapped));
+        Assert.Equal(SharpPackErrorCode.FormatterResolutionFailed, Assert.Throws<SharpPackSerializationException>(
+            () => SharpPackSerializer.Serialize(ref output, 42, context)).ErrorCode);
+        Assert.Equal(0, output.WrittenCount);
+        Assert.Equal(SharpPackErrorCode.FormatterResolutionFailed, Assert.Throws<SharpPackSerializationException>(
+            () => SharpPackSerializer.Deserialize<int>(payload, context)).ErrorCode);
+        Assert.Throws<ArgumentException>(() => BrotliFormatter<int>.Wrap(BrotliFormatter<int>.Default));
+    }
+
+    sealed record CompressedCount(int Count);
+
+    sealed class CountFormatter : SharpPackFormatter<CompressedCount>
+    {
+        public int WriteDepth { get; private set; }
+        public int ReadDepth { get; private set; }
+
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref CompressedCount? value)
+        {
+            WriteDepth = WriterProbe<TBufferWriter>.GetDepth(ref writer);
+            writer.WriteValue(value!.Count);
+        }
+
+        public override void Deserialize(ref SharpPackReader reader, scoped ref CompressedCount? value)
+        {
+            ReadDepth = GetReaderDepth(ref reader);
+            value = new(reader.ReadValue<int>());
+        }
+
+        // Observe inheritance with one small value instead of building a deep
+        // compressed graph to reach the runtime recursion cutoff.
+        [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "depth")]
+        static extern ref int GetReaderDepth(ref SharpPackReader reader);
+
+        static class WriterProbe<TBufferWriter> where TBufferWriter : IBufferWriter<byte>
+        {
+            [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "depth")]
+            internal static extern ref int GetDepth(ref SharpPackWriter<TBufferWriter> writer);
+        }
+    }
 
     byte[] ReferenceDecompress(byte[] bytes)
     {
@@ -319,4 +425,11 @@ public partial class CompressionEdgeData
 {
     [BrotliFormatter]
     public byte[]? Data { get; set; }
+}
+
+[SharpPackable]
+public partial class BrotliIntEnvelope
+{
+    [BrotliFormatter<int>]
+    public int Value { get; set; }
 }

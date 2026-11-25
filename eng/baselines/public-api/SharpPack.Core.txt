@@ -69,9 +69,10 @@ type public sealed class SharpPack.Compression.BrotliFormatter<T> : SharpPack.Sh
   ctor public BrotliFormatter(System.IO.Compression.CompressionLevel compressionLevel)
   ctor public BrotliFormatter(System.IO.Compression.CompressionLevel compressionLevel, System.Int32 window)
   ctor public BrotliFormatter(System.IO.Compression.CompressionLevel compressionLevel, System.Int32 window, System.Int32 decompressionSizeLimit)
-  field public static readonly SharpPack.Compression.BrotliFormatter Default
+  field public static readonly SharpPack.Compression.BrotliFormatter<T> Default
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref T value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref T value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
+  method public static SharpPack.Compression.BrotliFormatter<T> Wrap(SharpPack.SharpPackFormatter<T> innerFormatter, System.IO.Compression.CompressionLevel compressionLevel = Fastest, System.Int32 window = 22, System.Int32 decompressionSizeLimit = 134217728)
 
 type public sealed class SharpPack.Formatters.ArrayFormatter<T> : SharpPack.SharpPackFormatter<T[]>, SharpPack.ISharpPackFormatter<T[]>
   ctor public ArrayFormatter()
@@ -719,6 +720,21 @@ type public abstract class SharpPack.SharpPackCustomFormatterAttribute<TFormatte
   ctor protected SharpPackCustomFormatterAttribute()
   method public abstract TFormatter GetFormatter()
 
+type public enum SharpPack.SharpPackErrorCode : System.Int32, System.IComparable, System.IConvertible, System.IFormattable, System.ISpanFormattable
+  field public System.Int32 value__
+  field public const SharpPack.SharpPackErrorCode DepthLimitExceeded = 6
+  field public const SharpPack.SharpPackErrorCode FormatterResolutionFailed = 8
+  field public const SharpPack.SharpPackErrorCode FrameLengthMismatch = 10
+  field public const SharpPack.SharpPackErrorCode InvalidEncoding = 5
+  field public const SharpPack.SharpPackErrorCode InvalidLength = 2
+  field public const SharpPack.SharpPackErrorCode InvalidWireData = 4
+  field public const SharpPack.SharpPackErrorCode RecursiveFormatterConstruction = 11
+  field public const SharpPack.SharpPackErrorCode ResourceLimitExceeded = 7
+  field public const SharpPack.SharpPackErrorCode SizeOverflow = 3
+  field public const SharpPack.SharpPackErrorCode TypeResolutionFailed = 9
+  field public const SharpPack.SharpPackErrorCode UnexpectedEndOfPayload = 1
+  field public const SharpPack.SharpPackErrorCode Unknown = 0
+
 type public abstract class SharpPack.SharpPackFormatter<T> : SharpPack.ISharpPackFormatter<T>
   ctor protected SharpPackFormatter()
   method public abstract System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref T value)
@@ -866,6 +882,7 @@ type public static class SharpPack.SharpPackReaderOptionalStatePool
   method public static SharpPack.SharpPackReaderOptionalStateLease Rent(SharpPack.SharpPackSerializerContext context = null)
 
 type public class SharpPack.SharpPackSerializationException : System.Exception, System.Runtime.Serialization.ISerializable
+  ctor public SharpPackSerializationException(SharpPack.SharpPackErrorCode errorCode, System.String message, System.Exception innerException)
   ctor public SharpPackSerializationException(System.String message)
   ctor public SharpPackSerializationException(System.String message, System.Exception innerException)
   method public static System.Void ThrowAlreadyDecompressed()
@@ -890,6 +907,7 @@ type public class SharpPack.SharpPackSerializationException : System.Exception, 
   method public static System.Void ThrowSequenceReachedEnd()
   method public static System.Void ThrowSizeOverflow()
   method public static System.Void ThrowWriteInvalidMemberCount(System.Byte memberCount)
+  property SharpPack.SharpPackErrorCode ErrorCode { get:public; }
   property System.Nullable<SharpPack.SharpPackReadLimitKind> ReadLimitKind { get:public; }
 
 type public static class SharpPack.SharpPackSerializer

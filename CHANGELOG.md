@@ -18,6 +18,19 @@
 - Add isolated deserialize-only NativeAOT coverage, including collection roots,
   custom/context formatters, generic and external unions, and reentrant startup.
 
+### Error classification
+
+- Use `SharpPackSerializationException.ErrorCode` to classify failures without
+  parsing messages. Existing constructors report `Unknown`; transport and
+  user-code exceptions keep their original types. See [stable error codes](docs/architecture/error-codes.md).
+
+### Brotli formatter registration
+
+- Register generic Brotli compression with `BrotliFormatter<T>.Wrap(inner)`.
+  A missing uncompressed formatter now fails with `FormatterResolutionFailed`
+  rather than re-entering the wrapper. `BrotliFormatter<T>.Default` is now
+  typed; use `BrotliFormatter.Default` for the non-generic byte-array formatter.
+
 ## 1.1.0
 
 ### MemoryPack-compatible unmanaged semantics

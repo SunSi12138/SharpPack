@@ -180,9 +180,8 @@ public sealed class SharpPackReaderOptionalState : IDisposable
             return value;
         }
 
-        SharpPackSerializationException.ThrowMessage(
+        throw new SharpPackSerializationException(SharpPackErrorCode.InvalidWireData,
             "Object is not found in this reference id:" + id);
-        return null!;
     }
 
     public void AddObjectReference(uint id, object value)
@@ -193,7 +192,7 @@ public sealed class SharpPackReaderOptionalState : IDisposable
         {
             if (sparseReferences?.ContainsKey(id) == true)
             {
-                SharpPackSerializationException.ThrowMessage(
+                throw new SharpPackSerializationException(SharpPackErrorCode.InvalidWireData,
                     "Object is already added, id:" + id);
             }
 
@@ -205,7 +204,7 @@ public sealed class SharpPackReaderOptionalState : IDisposable
 
         if (id < (uint)sequentialReferences.Count)
         {
-            SharpPackSerializationException.ThrowMessage(
+            throw new SharpPackSerializationException(SharpPackErrorCode.InvalidWireData,
                 "Object is already added, id:" + id);
         }
 

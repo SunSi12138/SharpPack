@@ -79,7 +79,7 @@ public struct SharpPackExactArrayBufferWriter : IBufferWriter<byte>
         }
         if (count > buffer.Length - written)
         {
-            SharpPackSerializationException.ThrowInvalidAdvance();
+            SharpPackSerializationException.ThrowInvalidWriteAdvance();
         }
         written += count;
     }

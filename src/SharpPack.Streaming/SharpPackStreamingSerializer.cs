@@ -157,7 +157,7 @@ public static class SharpPackStreamingSerializer
 
             if (payloadLength < 0)
             {
-                throw new SharpPackSerializationException(
+                throw new SharpPackSerializationException(SharpPackErrorCode.SizeOverflow,
                     "The serialized payload length exceeded the supported Int32 range.");
             }
 
@@ -297,7 +297,7 @@ public static class SharpPackStreamingSerializer
         if (payloadLengthValue > int.MaxValue)
         {
             pipeReader.AdvanceTo(buffer.Start, headerReader.Position);
-            throw new SharpPackSerializationException(
+            throw new SharpPackSerializationException(SharpPackErrorCode.SizeOverflow,
                 $"The frame payload length {payloadLengthValue} exceeds the supported Int32 range.");
         }
 
@@ -309,7 +309,7 @@ public static class SharpPackStreamingSerializer
         {
             pipeReader.AdvanceTo(buffer.Start, headerReader.Position);
             SharpPackSerializer.EnsurePayloadWithinLimit(payloadLength, context);
-            throw new SharpPackSerializationException(
+            throw new SharpPackSerializationException(SharpPackErrorCode.ResourceLimitExceeded,
                 $"The frame payload length {payloadLength} exceeds the configured maximum " +
                 $"{effectiveMaxFrameLength}.");
         }
@@ -317,7 +317,7 @@ public static class SharpPackStreamingSerializer
         if (payloadLength > Array.MaxLength)
         {
             pipeReader.AdvanceTo(buffer.Start, headerReader.Position);
-            throw new SharpPackSerializationException(
+            throw new SharpPackSerializationException(SharpPackErrorCode.SizeOverflow,
                 $"The frame payload length {payloadLength} exceeds the supported array length " +
                 $"{Array.MaxLength}.");
         }
@@ -645,7 +645,7 @@ public static class SharpPackStreamingSerializer
     static SharpPackSerializationException CreateCollectionCountMismatch(
         int declaredCount,
         long actualCount)
-        => new(
+        => new(SharpPackErrorCode.InvalidLength,
             $"The declared collection count is {declaredCount}, but the source " +
             $"contains {actualCount} item(s).");
 

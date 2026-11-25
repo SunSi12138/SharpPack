@@ -67,6 +67,10 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         this.optionalState = optionalState;
     }
 
+    internal SharpPackWriter<TNestedWriter> CreateNestedWriter<TNestedWriter>(ref TNestedWriter writer)
+        where TNestedWriter : IBufferWriter<byte>
+        => new SharpPackWriter<TNestedWriter>(ref writer, optionalState) { depth = this.depth };
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ref byte GetSpanReference(int sizeHint)
     {
@@ -107,7 +111,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         var rest = bufferLength - count;
         if (rest < 0)
         {
-            SharpPackSerializationException.ThrowInvalidAdvance();
+            SharpPackSerializationException.ThrowInvalidWriteAdvance();
         }
 
         bufferLength = rest;
