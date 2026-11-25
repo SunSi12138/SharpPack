@@ -462,21 +462,13 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         EnterDepth<T>();
         try
         {
-            var formatter = GetFormatter<T>();
-            if (RuntimeFeature.IsDynamicCodeSupported)
-                formatter.Serialize(ref this, ref Unsafe.AsRef(in value));
-            else
-                WriteAotValue(formatter, in value);
+            GetFormatter<T>().Serialize(ref this, ref Unsafe.AsRef(in value));
         }
         finally
         {
             depth--;
         }
     }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    void WriteAotValue<T>(SharpPackFormatter<T> formatter, scoped in T? value)
-        => formatter.Serialize(ref this, ref Unsafe.AsRef(in value));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteValueWithFormatter<TFormatter, T>(TFormatter formatter, scoped in T? value)

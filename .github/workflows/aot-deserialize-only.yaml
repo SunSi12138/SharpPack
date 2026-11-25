@@ -41,7 +41,7 @@ jobs:
       - name: Check the original direct Type deserialization sample
         run: |
           set -o pipefail
-          dotnet publish sandbox/NativeAot -c Release -p:StripSymbols=false -o "$RUNNER_TEMP/original-aot" 2>&1 | tee "$RUNNER_TEMP/original-aot-publish.txt"
+          dotnet publish sandbox/NativeAot -c Release -p:IlcFoldIdenticalMethodBodies=false -p:StripSymbols=false -o "$RUNNER_TEMP/original-aot" 2>&1 | tee "$RUNNER_TEMP/original-aot-publish.txt"
           if grep -q 'IL2111' "$RUNNER_TEMP/original-aot-publish.txt"; then exit 1; fi
           ulimit -c 0
           exe="$RUNNER_TEMP/original-aot/NativeAot"
