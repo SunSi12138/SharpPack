@@ -50,6 +50,7 @@ public partial class TypeMeta
     DiagnosticDescriptor? ctorInvalid = null;
 
     readonly ReferenceSymbols reference;
+    readonly MemberMeta[] circularWireMembers = [];
     readonly ISymbol[] circularRequiredMembers = [];
     readonly bool circularConstructorSetsRequiredMembers;
     public INamedTypeSymbol Symbol { get; set; }
@@ -76,7 +77,7 @@ public partial class TypeMeta
         if (GenerateType != GenerateType.CircularReference || Symbol.TypeKind != TypeKind.Class)
             return null;
 
-        var hasInitOnlyMembers = Members.Any(static member => member.IsInitOnly);
+        var hasInitOnlyMembers = circularWireMembers.Any(static member => member.IsInitOnly);
         if (!hasInitOnlyMembers && !circularRequiredMembers.Any(IsSerialized))
             return null;
 
@@ -85,7 +86,7 @@ public partial class TypeMeta
             ReplacesExistingValue: hasInitOnlyMembers);
     }
 
-    bool IsSerialized(ISymbol member) => Members.Any(serialized => serialized.Name == member.Name);
+    bool IsSerialized(ISymbol member) => circularWireMembers.Any(serialized => serialized.Name == member.Name);
 
     public TypeMeta(INamedTypeSymbol symbol, ReferenceSymbols reference)
         : this(symbol, reference, constructorCandidate: null)
@@ -144,6 +145,12 @@ public partial class TypeMeta
             .Select((x, i) => new MemberMeta(x, Constructor, reference, i))
             .OrderBy(x => x.Order)
             .ToArray();
+
+        if (generateType == GenerateType.CircularReference && symbol.TypeKind == TypeKind.Class)
+        {
+            // Match the wire-slot planner: sequential models keep the first member at a duplicate order.
+            circularWireMembers = Members.DistinctBy(static member => member.Order).ToArray();
+        }
 
         this.IsValueType = symbol.IsValueType;
         this.IsUnmanagedType = symbol.IsUnmanagedType;
@@ -313,7 +320,7 @@ public partial class TypeMeta
 
             if (!IsUnion && Symbol.TypeKind == TypeKind.Class)
             {
-                foreach (var member in Members.Where(static member => member.IsInitOnly))
+                foreach (var member in circularWireMembers.Where(static member => member.IsInitOnly))
                 {
                     var setter = ((IPropertySymbol)member.Symbol).SetMethod!;
                     if (!reference.Compilation.IsSymbolAccessibleWithin(setter, Symbol, throughType: Symbol))

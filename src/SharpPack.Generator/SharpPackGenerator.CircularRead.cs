@@ -56,6 +56,7 @@ internal sealed partial class CSharpEmitter
 
     string EmitCircularReadMembers(MemberShape[] members, string target, bool? honorFormatterOverrides)
     {
+        var snapshots = new StringBuilder();
         var read = new StringBuilder();
         var assign = new StringBuilder();
         for (var i = 0; i < members.Length; i++)
@@ -70,11 +71,13 @@ internal sealed partial class CSharpEmitter
             }
 
             var name = member.Name;
+            // Present init slots hydrate a new value. Seeding them from constructor defaults
+            // could register the same child for two distinct wire IDs.
+            var initialValue = member.IsInitOnly ? "default!" : $"{hasPayload} ? {target}.@{name} : default!";
+            snapshots.AppendLine($"        {member.TypeName} __{name} = {initialValue};");
             read.AppendLine($$"""
-        {{member.TypeName}} __{{name}} = default!;
         if ({{hasPayload}})
         {
-            __{{name}} = {{target}}.@{{name}};
 """);
 
             var overrideRead = plan.ContextDependencies.HasOverridableWireMembers
@@ -92,16 +95,14 @@ internal sealed partial class CSharpEmitter
             read.AppendLine("        }");
 
             if (member.IsSettable)
-                assign.AppendLine($"        if ({hasPayload}) {target}.@{name} = __{name};");
+                assign.AppendLine($"        if ({hasPayload}) {target}.@{name} = __{name}!;");
         }
-        // Stage assignments until all known members have been read, as on the ordinary circular path.
-        read.Append(assign);
-        read.AppendLine($$"""
+        // Snapshot mutable reuse targets before nested callbacks, then stage assignments as on the ordinary path.
+        return snapshots.Append(read).Append(assign).AppendLine($$"""
         for (int i = {{members.Length}}; i < deltas.Length; i++)
         {
             reader.Advance(deltas[i]);
         }
-""");
-        return read.ToString();
+""").ToString();
     }
 }

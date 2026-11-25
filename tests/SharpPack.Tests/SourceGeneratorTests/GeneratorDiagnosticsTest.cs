@@ -716,5 +716,14 @@ public partial struct Tester
             [SharpPackable(GenerateType.CircularReference, SerializeLayout.Sequential)]
             public partial class Model : BaseModel { }
             """);
+
+        Compile(47, """
+            [SharpPackable(GenerateType.CircularReference, SerializeLayout.Sequential)]
+            public partial class Model
+            {
+                [SharpPackOrder(0)] public int First { get; set; }
+                [SharpPackOrder(0)] public required int Skipped { get; set; }
+            }
+            """);
     }
 }

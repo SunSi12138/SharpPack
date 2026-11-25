@@ -46,6 +46,22 @@ public partial class CircularInitializationTest
         older!.Self.Should().BeSameAs(older);
     }
 
+    [Fact]
+    public void ConstructorDefaultsDoNotCollapseDistinctInitReferences()
+    {
+        var input = new Pair
+        {
+            Left = new RequiredOverride { Key = 1 },
+            Right = new RequiredOverride { Key = 2 },
+        };
+
+        var result = SharpPackSerializer.Deserialize<Pair>(SharpPackSerializer.Serialize(input))!;
+
+        result.Left.Should().NotBeSameAs(result.Right);
+        result.Left.Key.Should().Be(1);
+        result.Right.Key.Should().Be(2);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -159,5 +175,14 @@ public partial class CircularInitializationTest
     public partial class RequiredOverride : OverrideBase
     {
         public required override int Key { get; set; }
+    }
+
+    [SharpPackable(GenerateType.CircularReference, SerializeLayout.Sequential)]
+    public partial class Pair
+    {
+        public Pair() => Left = Right = new RequiredOverride { Key = 0 };
+
+        public RequiredOverride Left { get; init; }
+        public RequiredOverride Right { get; init; }
     }
 }
