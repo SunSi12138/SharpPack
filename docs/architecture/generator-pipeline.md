@@ -17,6 +17,12 @@ change when moving a decision between phases.
 `SerializationPlanner` chooses one root path: fixed-size, exact-size or general.
 The C# emitter renders the chosen interfaces and methods instead of repeating
 eligibility checks. The remaining C# body templates still use `TypeMeta`; wire
-member operations, context dependencies, AOT roots, and other wire strategies
-move to the plan next. An unchanged shape can skip planning and emission only
-after it captures every input those stages actually use.
+slots are now explicit in the plan, including unoccupied slots for versioned
+models. When a model uses a versioned object header, analysis rejects orders
+that cannot fit before the planner creates those slots. Raw unmanaged values
+have no slots. The emitter uses the slot sequence without changing the declared
+members.
+
+Wire member operations, context dependencies, AOT roots, and other wire
+strategies move to the plan next. An unchanged shape can skip planning and
+emission only after it captures every input those stages actually use.
