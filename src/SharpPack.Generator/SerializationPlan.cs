@@ -13,12 +13,17 @@ internal readonly record struct ScalarBatch(int Count, bool UseDangerous);
 
 internal enum ObjectWriteStrategy { Plain, VersionedInlineLengths, VersionedBufferedLengths }
 
+internal sealed record ContextDependencySet(
+    EquatableArray<string> FactoryLookupTypes,
+    bool HasOverridableWireMembers);
+
 internal sealed record SerializationPlan(
     TypeShape Shape,
     RootFastPath RootFastPath,
     EquatableArray<WireSlot> WireSlots,
     EquatableArray<ScalarBatch> ScalarBatches,
-    ObjectWriteStrategy ObjectWriteStrategy);
+    ObjectWriteStrategy ObjectWriteStrategy,
+    ContextDependencySet ContextDependencies);
 
 internal static class SerializationPlanner
 {
@@ -28,8 +33,16 @@ internal static class SerializationPlanner
     {
         var slots = PlanWireSlots(shape);
         var kinds = slots.Select(slot => slot.DeclaredMemberIndex is int i ? shape.Members[i].Kind : MemberKind.Blank).ToArray();
-        return new(shape, ChooseRootFastPath(shape), slots, PlanScalarBatches(kinds), ChooseObjectWriteStrategy(shape, kinds));
+        return new(shape, ChooseRootFastPath(shape), slots, PlanScalarBatches(kinds),
+            ChooseObjectWriteStrategy(shape, kinds), PlanContextDependencies(shape, slots));
     }
+
+    static ContextDependencySet PlanContextDependencies(TypeShape shape, EquatableArray<WireSlot> slots)
+        => new(
+            new EquatableArray<string>(shape.Members.SelectMany(static member => member.ContextDependencyTypes)
+                .Distinct(StringComparer.Ordinal)),
+            slots.Any(slot => slot.DeclaredMemberIndex is int index &&
+                shape.Members[index].ContextDependencyTypes.Length != 0));
 
     static RootFastPath ChooseRootFastPath(TypeShape shape)
     {

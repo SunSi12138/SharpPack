@@ -28,6 +28,11 @@ and chooses inline or buffered length encoding for versioned writes.
 Context-aware writers still use the existing buffered path because an override
 can change the encoded length.
 
-Remaining per-member operations, context dependencies, AOT roots, and other
-wire strategies move to the plan next. An unchanged shape can skip planning
-and emission only after it captures every input those stages actually use.
+The context dependency set records the ordered factory lookups and whether
+the effective slots need an override formatter. Analysis follows arrays and
+known generic formatter types once and does not traverse a member with an
+explicit custom formatter.
+
+Remaining per-member operations, AOT roots and other wire strategies move to
+the plan next. An unchanged shape can skip planning and emission only after it
+captures every input those stages actually use.

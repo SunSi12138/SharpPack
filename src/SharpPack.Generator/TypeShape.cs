@@ -22,9 +22,10 @@ internal sealed record TypeShape(
     EquatableArray<CallbackShape> Callbacks,
     EquatableArray<UnionCaseShape> UnionCases)
 {
-    internal static TypeShape Create(INamedTypeSymbol declaration, TypeMeta model)
+    internal static TypeShape Create(INamedTypeSymbol declaration, TypeMeta model, ReferenceSymbols references)
     {
         var target = model.Symbol;
+        var captureContextDependencies = !model.IsUnmanagedType && !model.IsUnion && model.GenerateType != GenerateType.Collection;
         return new TypeShape(
             declaration.FullyQualifiedToString(),
             target.FullyQualifiedToString(),
@@ -38,7 +39,8 @@ internal sealed record TypeShape(
             model.IsUnmanagedType,
             model.IsRecord,
             model.IsUnion,
-            new EquatableArray<MemberShape>(model.Members.Select(MemberShape.Create)),
+            new EquatableArray<MemberShape>(model.Members.Select(member =>
+                MemberShape.Create(member, references, captureContextDependencies))),
             model.Constructor is { } constructor
                 ? new EquatableArray<ParameterShape>(constructor.Parameters.Select(static parameter =>
                     new ParameterShape(parameter.Name, parameter.Type.FullyQualifiedToString())))
@@ -67,9 +69,10 @@ internal sealed record MemberShape(
     bool HasExactSizeSafeAccessor,
     bool SuppressDefaultInitialization,
     string? ConstructorParameter,
-    CustomFormatterShape? CustomFormatter)
+    CustomFormatterShape? CustomFormatter,
+    EquatableArray<string> ContextDependencyTypes)
 {
-    internal static MemberShape Create(MemberMeta member)
+    internal static MemberShape Create(MemberMeta member, ReferenceSymbols references, bool captureContextDependencies)
         => new(member.Name, member.MemberType.FullyQualifiedToString(), member.Kind, member.Order,
             member.HasExplicitOrder, member.IsAssignable, member.HasExactSizeSafeAccessor,
             member.SuppressDefaultInitialization, member.ConstructorParameterName,
@@ -80,7 +83,31 @@ internal sealed record MemberShape(
                     new EquatableArray<AttributeValueShape>(attribute.ConstructorArguments.Select(AttributeValueShape.Create)),
                     new EquatableArray<NamedAttributeValueShape>(attribute.NamedArguments.Select(static pair =>
                         new NamedAttributeValueShape(pair.Key, AttributeValueShape.Create(pair.Value)))))
-                : null);
+                : null,
+            captureContextDependencies && member.Kind != MemberKind.CustomFormatter
+                ? ContextTypes(member.MemberType, references)
+                : default);
+
+    static EquatableArray<string> ContextTypes(ITypeSymbol type, ReferenceSymbols references)
+    {
+        var names = new List<string>();
+        Add(type);
+        return new EquatableArray<string>(names);
+
+        void Add(ITypeSymbol current)
+        {
+            names.Add(current.FullyQualifiedToString());
+            if (current is IArrayTypeSymbol array)
+            {
+                Add(array.ElementType);
+            }
+            else if (current is INamedTypeSymbol { IsGenericType: true } named && references.KnownTypes.Contains(named))
+            {
+                foreach (var argument in named.TypeArguments)
+                    Add(argument);
+            }
+        }
+    }
 }
 
 internal sealed record ParameterShape(string Name, string TypeName);

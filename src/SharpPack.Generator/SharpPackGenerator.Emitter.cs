@@ -183,7 +183,7 @@ using SharpPack;
 public partial class TypeMeta
 {
     public void Emit(StringBuilder writer, IGeneratorContext context)
-        => Emit(writer, context, SerializationPlanner.Plan(TypeShape.Create(Symbol, this)));
+        => Emit(writer, context, SerializationPlanner.Plan(TypeShape.Create(Symbol, this, reference)));
 
     internal void Emit(StringBuilder writer, IGeneratorContext context, SerializationPlan plan)
     {
@@ -293,11 +293,8 @@ public partial class TypeMeta
         var contextFactoryInterface =
             $", global::SharpPack.ISharpPackFormatterFactory<{TypeName}>" +
             $", global::SharpPack.ISharpPackContextFormatterFactory<{TypeName}>";
-        var contextDependencyCondition = IsUnmanagedType
-            ? ""
-            : EmitFormatterOverrideDependencyCondition(
-                Members, "context",
-                useOptionalState: false);
+        var contextDependencyCondition = string.Join(" || ", plan.ContextDependencies.FactoryLookupTypes
+            .Select(static type => $"context.HasFormatterOverrideDependency<{type}>()"));
         var contextFormatterSelection =
             contextDependencyCondition.Length == 0
                 ? $"return new global::SharpPack.Formatters.SharpPackableFormatter<{TypeName}>();"
@@ -838,9 +835,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
     string EmitFormatterOverrideMethods(string contextFormatterTypeName, SerializationPlan plan, MemberMeta[] members)
     {
         var shape = plan.Shape;
-        var writerCondition =
-            EmitFormatterOverrideDependencyCondition(members, "writer");
-        if (writerCondition.Length == 0)
+        if (!plan.ContextDependencies.HasOverridableWireMembers)
         {
             return "";
         }
@@ -1200,55 +1195,6 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         }
 
         return sb.ToString();
-    }
-
-    string EmitFormatterOverrideDependencyCondition(
-        MemberMeta[] members,
-        string receiver,
-        bool useOptionalState = true)
-    {
-        var types = new List<ITypeSymbol>();
-        foreach (var member in members)
-        {
-            if (member.Kind is MemberKind.Blank or MemberKind.CustomFormatter)
-            {
-                continue;
-            }
-            AddTypeAndDependencies(member.MemberType);
-        }
-
-        var registrations = types
-            .Select(static type =>
-                type.ToDisplayString(
-                    SymbolDisplayFormat.FullyQualifiedFormat))
-            .Distinct(StringComparer.Ordinal)
-            .Select(type => useOptionalState
-                ? $"{receiver}.OptionalState.HasFormatterOverride<{type}>()"
-                : $"{receiver}.HasFormatterOverrideDependency<{type}>()");
-        var registrationCondition = string.Join(" || ", registrations);
-        return registrationCondition;
-
-        void AddTypeAndDependencies(ITypeSymbol type)
-        {
-            types.Add(type);
-            if (type is IArrayTypeSymbol array)
-            {
-                AddTypeAndDependencies(array.ElementType);
-                return;
-            }
-
-            if (type is not INamedTypeSymbol named ||
-                !named.IsGenericType ||
-                !reference.KnownTypes.Contains(named))
-            {
-                return;
-            }
-
-            foreach (var argument in named.TypeArguments)
-            {
-                AddTypeAndDependencies(argument);
-            }
-        }
     }
 
     string EmitReadRefDeserializeMembers(
