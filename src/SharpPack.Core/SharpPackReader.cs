@@ -727,7 +727,7 @@ public ref partial struct SharpPackReader
         EnterDepth<T>();
         try
         {
-            if (value == null || value.Length != length)
+            if (value == null || value.Length != length || value.GetType() != typeof(T[]))
             {
                 value = new T?[length];
             }
@@ -804,7 +804,7 @@ public ref partial struct SharpPackReader
         EnterDepth<T>();
         try
         {
-            if (value is null || value.Length != length)
+            if (value is null || value.Length != length || value.GetType() != typeof(T[]))
             {
                 value = new T?[length];
             }
