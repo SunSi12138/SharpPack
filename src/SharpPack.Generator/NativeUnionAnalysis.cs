@@ -37,7 +37,10 @@ internal static class NativeUnionAnalysis
         var tags = new HashSet<ushort>();
         var runtimeTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
         var cases = new List<UnionCaseShape>(mappings.Length);
-        var graph = new SidecarGraph(references.Compilation, []);
+        var compilation = references.Compilation;
+        var graph = new SidecarGraph(compilation, [], accessibleWithin: symbol);
+        var defaultFactory = compilation.GetTypeByMetadataName("SharpPack.ISharpPackFormatterFactory`1");
+        var contextFactory = compilation.GetTypeByMetadataName("SharpPack.ISharpPackContextFormatterFactory`1");
         var factories = new List<AotFactoryRoot>();
         var formatters = new List<string>();
         foreach (var (tag, caseType) in mappings)
@@ -46,8 +49,7 @@ internal static class NativeUnionAnalysis
             if (!nativeTypes.Remove(caseType))
                 return Error($"'{caseType}' is not an untagged declared case");
 
-            var boxed = caseType is INamedTypeSymbol
-                { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable ? nullable.TypeArguments[0] : caseType;
+            var boxed = BoxedType(caseType);
             if (boxed.TypeKind == TypeKind.Interface || boxed.IsAbstract)
                 return Error($"case '{caseType}' needs a supported concrete formatter type");
             if (!runtimeTypes.Add(boxed))
@@ -64,7 +66,17 @@ internal static class NativeUnionAnalysis
                 if (node.Sidecar is not null)
                     return Error($"case dependency '{node.Type}' needs a built-in or type-owned formatter");
                 if (node.BuiltInFormatter is { } formatter)
+                {
                     formatters.Add(formatter);
+                    // The default resolver prefers raw copies for reference-free
+                    // value types; a context can select the known generic formatter.
+                    if (node.Type is INamedTypeSymbol { IsGenericType: true } && BoxedType(node.Type).IsUnmanagedType)
+                        formatters.Add($"global::SharpPack.Formatters.DangerousUnmanagedFormatter<{node.Type.FullyQualifiedToString()}>");
+                }
+                if (node.Factory == TypeOwnedFactory.Context && node.Type is INamedTypeSymbol factoryType &&
+                    SidecarGraph.HasSelfInterface(factoryType, contextFactory) &&
+                    !SidecarGraph.HasSelfInterface(factoryType, defaultFactory))
+                    return Error($"case dependency '{node.Type}' provides a context-only factory and needs a default formatter factory");
                 if (node.Factory != TypeOwnedFactory.None)
                     factories.Add(new(node.Type.FullyQualifiedToString(), node.Factory == TypeOwnedFactory.Context));
             }
@@ -93,4 +105,8 @@ internal static class NativeUnionAnalysis
             return null;
         }
     }
+
+    static ITypeSymbol BoxedType(ITypeSymbol type)
+        => type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable
+            ? nullable.TypeArguments[0] : type;
 }

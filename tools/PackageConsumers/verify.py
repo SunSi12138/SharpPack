@@ -540,14 +540,22 @@ partial union SameBox(int, int?);
 sealed class NoFormatter;
 [SharpPackable, SharpPackUnion(3, typeof(NoFormatter[])), SharpPackUnion(10, typeof(bool))]
 partial union MissingDependency(NoFormatter[], bool);
+
+sealed class ContextOnly : ISharpPackContextFormatterFactory<ContextOnly>
+{
+    public static SharpPackFormatter<ContextOnly> CreateFormatter(SharpPackSerializerContext context)
+        => throw new System.NotImplementedException();
+}
+[SharpPackable, SharpPackUnion(3, typeof(ContextOnly)), SharpPackUnion(4, typeof(bool))]
+partial union MissingDefaultFactory(ContextOnly, bool);
 """)
     config = nuget_config(path / "NuGet.Config", feed)
     local_env = dict(env, NUGET_PACKAGES=str(path / "packages"))
     log = run(["dotnet", "build", "-c", "Release", "--configfile", str(config)], path, local_env, expected_success=False)
     errors = {line.split("error SHARPPACK048: ", 1)[1] for line in log.splitlines() if "error SHARPPACK048: " in line}
-    if len(errors) != 4 or not all(any(item in error for error in errors) for item in (
+    if len(errors) != 5 or not all(any(item in error for error in errors) for item in (
             "each declared case needs an explicit", "wire tag 7 is duplicated", "same boxed type",
-            "NoFormatter' needs a built-in or type-owned formatter")):
+            "NoFormatter' needs a built-in or type-owned formatter", "needs a default formatter factory")):
         raise RuntimeError(f"Expected native union schema diagnostics:\n{log}")
     print("Invalid native union case tags, boxed overlaps and missing formatters diagnosed at compile time", flush=True)
 

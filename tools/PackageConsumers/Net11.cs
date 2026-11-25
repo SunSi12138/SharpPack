@@ -56,6 +56,12 @@ internal static class Net11
         if (SharpPackSerializer.Deserialize<Net11ScalarCase>(SharpPackSerializer.Serialize(state)).Value is not Net11State.Ready ||
             SharpPackSerializer.Deserialize<Net11ScalarCase>(SharpPackSerializer.Serialize(stamp, context), context).Value is not Net11Stamp { Id: 83 })
             throw new InvalidOperationException("A user-defined enum or unmanaged union case did not round trip.");
+
+        Net11NullableStamp nullableStamp = new((Net11Stamp?)new Net11Stamp(88));
+        if (SharpPackSerializer.Deserialize<Net11NullableStamp>(SharpPackSerializer.Serialize(nullableStamp)).Value is not Net11Stamp { Id: 88 })
+            throw new InvalidOperationException("A nullable user struct did not round trip through the default root.");
+
+        Net11PrivateCases.Verify();
     }
 
     static void Check<T>(SharpPackSerializerContext context, T finite, T negativeZero, T nan, T infinity,
@@ -146,4 +152,26 @@ internal readonly record struct Net11Stamp(int Id);
 internal partial union Net11ScalarCase(Net11State, Net11Stamp)
 {
     static Net11ScalarCase() { }
+}
+
+[SharpPackable, SharpPackUnion(8, typeof(Net11Stamp?)), SharpPackUnion(9, typeof(bool))]
+internal partial union Net11NullableStamp(Net11Stamp?, bool);
+
+internal static partial class Net11PrivateCases
+{
+    [SharpPackable]
+    private partial class PrivateCase
+    {
+        public int Count { get; set; }
+    }
+
+    [SharpPackable, SharpPackUnion(7, typeof(PrivateCase)), SharpPackUnion(23, typeof(bool))]
+    private partial union PrivateChoice(PrivateCase, bool);
+
+    public static void Verify()
+    {
+        PrivateChoice input = new(new PrivateCase { Count = 31 });
+        if (SharpPackSerializer.Deserialize<PrivateChoice>(SharpPackSerializer.Serialize(input)).Value is not PrivateCase { Count: 31 })
+            throw new InvalidOperationException("A private union lost its accessible sibling case.");
+    }
 }
