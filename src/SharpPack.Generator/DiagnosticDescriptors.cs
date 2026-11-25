@@ -340,4 +340,12 @@ internal static class DiagnosticDescriptors
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor IncompatibleRuntimeAbi = new(
+        id: "SHARPPACK043",
+        title: "Incompatible SharpPack Generator and Runtime",
+        messageFormat: "Detected SharpPack Runtime ABI '{0}'; this Generator requires ABI [{1}, {2}]. Align SharpPack.Core and SharpPack.Generator package versions.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }

@@ -160,48 +160,14 @@ internal static class Extensions
     }
 
     public static bool IsSharpPackableNoGenerate(this ITypeSymbol symbol, ReferenceSymbols references)
-    {
-        var memPackAttr = symbol.GetAttribute(references.SharpPackableAttribute);
-        var packableCtorArgs = memPackAttr?.ConstructorArguments;
-        if (memPackAttr == null || packableCtorArgs == null)
-        {
-            return false;
-        }
-        else if (packableCtorArgs.Value.Length != 0)
-        {
-            // SharpPackable has three attribtues
-            // [GenerateType generateType]
-            // [SerializeLayout serializeLayout]
-            // [GenerateType generateType, SerializeLayout serializeLayout]
+        => symbol.GetAttribute(references.SharpPackableAttribute) is { } attribute &&
+            attribute.IsSharpPackableNoGenerate();
 
-            if (packableCtorArgs.Value.Length == 1)
-            {
-                var ctorValue = packableCtorArgs.Value[0];
-
-                // check which constructor was used
-                var attrConstructor = memPackAttr.AttributeConstructor;
-                var isSerializeLayout = attrConstructor!.Parameters[0].Type.Name == nameof(SerializeLayout);
-                if (isSerializeLayout)
-                {
-                    return false;
-                }
-                else
-                {
-
-                    var generateType = (GenerateType)(ctorValue.Value!);
-                    return generateType is GenerateType.NoGenerate;
-                }
-            }
-            else
-            {
-                var generateType = (GenerateType)(packableCtorArgs.Value[0].Value ?? GenerateType.Object);
-
-                return generateType is GenerateType.NoGenerate;
-            }
-        }
-
-        return false;
-    }
+    public static bool IsSharpPackableNoGenerate(this AttributeData attribute)
+        => attribute.AttributeConstructor?.Parameters is { Length: > 0 } parameters &&
+            parameters[0].Type.Name == nameof(GenerateType) &&
+            attribute.ConstructorArguments is { Length: > 0 } arguments &&
+            arguments[0].Value is int mode && mode == (int)GenerateType.NoGenerate;
 
     public static bool IsWillImplementSharpPackUnion(this ITypeSymbol symbol, ReferenceSymbols references)
     {
