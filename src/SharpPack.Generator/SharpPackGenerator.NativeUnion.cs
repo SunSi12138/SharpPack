@@ -1,23 +1,14 @@
-using System.Text;
-
 namespace SharpPack.Generator;
 
 internal sealed partial class CSharpEmitter
 {
     string EmitNativeUnionTemplate(UnionShape union)
     {
-        var code = new StringBuilder();
-        foreach (var container in Shape.ContainingTypes)
-        {
-            code.AppendLine(EmitPartialTypeDeclaration(container));
-            code.AppendLine(EmitTypeParameterConstraints(container.TypeParameters));
-            code.AppendLine("{");
-        }
-
         var type = union.TypeName;
         var factory = $"global::SharpPack.ISharpPackFormatterFactory<{type}>";
         var packable = $"global::SharpPack.ISharpPackable<{type}>";
         var selfFactoryRoot = plan.Names.SelfFactoryRoot;
+        var writerParameter = Shape.WriterTypeParameter;
         var write = union.Cases.Select(item => $$"""
         if (actual == typeof({{item.RuntimeTypeName}}))
         {
@@ -29,7 +20,7 @@ internal sealed partial class CSharpEmitter
         var read = union.Cases.Select(item =>
             $"            case {item.Tag}: value = new {type}(reader.ReadValue<{item.TypeName}>()); return;").NewLine();
 
-        code.AppendLine($$"""
+        return $$"""
 partial union {{Shape.ShortName}} : {{packable}}, {{factory}}
 {
 {{EmitSelfFactoryRoots(selfFactoryRoot, includeContextFactory: false)}}
@@ -41,8 +32,8 @@ partial union {{Shape.ShortName}} : {{packable}}, {{factory}}
         return new global::SharpPack.Formatters.SharpPackableFormatter<{{type}}>();
     }
 
-    static void {{packable}}.Serialize<TBufferWriter>(
-        ref global::SharpPack.SharpPackWriter<TBufferWriter> writer, scoped ref {{type}} value)
+    static void {{packable}}.Serialize<{{writerParameter}}>(
+        ref global::SharpPack.SharpPackWriter<{{writerParameter}}> writer, scoped ref {{type}} value)
     {
         var active = value.Value;
         if (active is null)
@@ -73,9 +64,6 @@ partial union {{Shape.ShortName}} : {{packable}}, {{factory}}
         }
     }
 }
-""");
-        for (var i = 0; i < Shape.ContainingTypes.Length; i++)
-            code.AppendLine("}");
-        return code.ToString();
+""";
     }
 }

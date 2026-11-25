@@ -175,21 +175,35 @@ using SharpPack;
     internal void EmitTemplate(StringBuilder writer, bool includeExternalRegistration = true)
     {
         var shape = plan.Shape;
+        foreach (var container in shape.ContainingTypes)
+        {
+            writer.AppendLine(EmitPartialTypeDeclaration(container));
+            writer.AppendLine("{");
+        }
+
         if (shape.Union is { } union)
         {
             writer.AppendLine(union.IsNative ? EmitNativeUnionTemplate(union)
                 : union.ExternalFormatter is { } formatter
                     ? EmitUnionFormatterTemplate(union, formatter, includeExternalRegistration)
                     : EmitUnionTemplate(union));
-            return;
         }
-
-        if (shape.Collection is { } collection)
+        else if (shape.Collection is { } collection)
         {
             writer.AppendLine(EmitGenericCollectionTemplate(collection, plan.Names.SelfFactoryRoot));
-            return;
+        }
+        else
+        {
+            EmitObjectTemplate(writer);
         }
 
+        for (var i = 0; i < shape.ContainingTypes.Length; i++)
+            writer.AppendLine("}");
+    }
+
+    void EmitObjectTemplate(StringBuilder writer)
+    {
+        var shape = plan.Shape;
         var serializeBody = "";
         var deserializeBody = "";
         var formatterOverrideMethods = "";
@@ -222,9 +236,8 @@ using SharpPack;
         var nullable = IsValueType ? "" : "?";
 
         var staticSharpPackableMethod =
-            $"static void ISharpPackable<{TypeName}>.";
+            $"static void global::SharpPack.ISharpPackable<{TypeName}>.";
         const string scopedRef = "scoped ref";
-        const string constraint = "";
         var fixedSizeInterface = "";
         var fixedSizeMethod = "";
         var exactSizeInterface = "";
@@ -234,7 +247,7 @@ using SharpPack;
             var sizeOf = string.Join(
                 " + ",
                 shape.Members.Select(member =>
-                    $"System.Runtime.CompilerServices.Unsafe.SizeOf<{member.TypeName}>()"));
+                    $"global::System.Runtime.CompilerServices.Unsafe.SizeOf<{member.TypeName}>()"));
             var headerPlus = shape.Members.Length == 0 ? "1" : "1 + ";
             fixedSizeInterface = ", global::SharpPack.IFixedSizeSharpPackable";
             fixedSizeMethod = $$"""
@@ -251,16 +264,7 @@ using SharpPack;
                 $", global::SharpPack.ISharpPackExactSizeSerializable<{TypeName}>";
             exactSizeMethod = EmitExactSizeSerializeMethod();
         }
-        const string serializeMethodSignarture =
-            "Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter>";
-
-        foreach (var container in shape.ContainingTypes)
-        {
-            writer.AppendLine(EmitPartialTypeDeclaration(container));
-            writer.AppendLine(EmitTypeParameterConstraints(
-                container.TypeParameters));
-            writer.AppendLine("{");
-        }
+        var writerParameter = shape.WriterTypeParameter;
 
         var contextFactoryInterface =
             $", global::SharpPack.ISharpPackFormatterFactory<{TypeName}>" +
@@ -316,7 +320,7 @@ using SharpPack;
 """;
 
         writer.AppendLine($$"""
-partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{fixedSizeInterface}}{{exactSizeInterface}}{{contextFactoryInterface}}
+partial {{classOrStructOrRecord}} {{TypeName}} : global::SharpPack.ISharpPackable<{{TypeName}}>{{fixedSizeInterface}}{{exactSizeInterface}}{{contextFactoryInterface}}
 {
 {{(shape.IsUnmanaged ? "" : EmitCustomFormatters(shape.Members))}}
     static partial void StaticConstructor();
@@ -328,7 +332,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 {{formatterOverrideMethods}}
 
     [global::SharpPack.CompilerServices.Preserve]
-    {{staticSharpPackableMethod}}{{serializeMethodSignarture}} writer, {{scopedRef}} {{TypeName}}{{nullable}} value) {{constraint}}
+    {{staticSharpPackableMethod}}Serialize<{{writerParameter}}>(ref global::SharpPack.SharpPackWriter<{{writerParameter}}> writer, {{scopedRef}} {{TypeName}}{{nullable}} value)
     {
 {{EmitCallbacks(shape, CallbackPhase.Serializing)}}
 {{serializeBody}}
@@ -338,7 +342,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    {{staticSharpPackableMethod}}Deserialize(ref SharpPackReader reader, {{scopedRef}} {{TypeName}}{{nullable}} value)
+    {{staticSharpPackableMethod}}Deserialize(ref global::SharpPack.SharpPackReader reader, {{scopedRef}} {{TypeName}}{{nullable}} value)
     {
 {{EmitCallbacks(shape, CallbackPhase.Deserializing)}}
 {{deserializeBody}}
@@ -349,11 +353,6 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 
 }
 """);
-
-        for (var i = 0; i < shape.ContainingTypes.Length; i++)
-        {
-            writer.AppendLine("}");
-        }
     }
 
     string EmitDeserializeBody(MemberShape[] members, bool honorFormatterOverrides)
@@ -370,20 +369,20 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         if (isVersionTolerant)
         {
             readBeginBody = """
-        Span<int> deltas = stackalloc int[count];
+        global::System.Span<int> deltas = stackalloc int[count];
         long totalDelta = 0;
         for (int i = 0; i < count; i++)
         {
             deltas[i] = reader.ReadVarIntInt32();
             if (deltas[i] < 0)
             {
-                SharpPackSerializationException.ThrowInvalidLength(deltas[i]);
+                global::SharpPack.SharpPackSerializationException.ThrowInvalidLength(deltas[i]);
             }
             totalDelta += deltas[i];
         }
         if (totalDelta > reader.Remaining)
         {
-            SharpPackSerializationException.ThrowInvalidAdvance();
+            global::SharpPack.SharpPackSerializationException.ThrowInvalidAdvance();
         }
 """;
 
@@ -402,7 +401,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         {
             circularReferenceBody = $$"""
         uint id;
-        if (count == SharpPackCode.ReferenceId)
+        if (count == global::SharpPack.SharpPackCode.ReferenceId)
         {
             id = reader.ReadVarIntUInt32();
             value = ({{TypeName}})reader.OptionalState.GetObjectReference(id);
@@ -461,7 +460,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         }
         {{commentOutInvalidBody}}else if (count > {{count}})
         {{commentOutInvalidBody}}{
-            {{commentOutInvalidBody}}SharpPackSerializationException.ThrowInvalidPropertyCount(typeof({{TypeName}}), {{count}}, count);
+            {{commentOutInvalidBody}}global::SharpPack.SharpPackSerializationException.ThrowInvalidPropertyCount(typeof({{TypeName}}), {{count}}, count);
             {{commentOutInvalidBody}}goto READ_END;
         {{commentOutInvalidBody}}}
         else
@@ -727,15 +726,16 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         var nullable = IsValueType ? "" : "?";
         var serializeHelperName = plan.Names.WriteWithOverrides;
         var deserializeHelperName = plan.Names.ReadWithOverrides;
+        var writerParameter = Shape.WriterTypeParameter;
 
         return $$"""
 
     [global::System.Runtime.CompilerServices.MethodImpl(
         global::System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-    static void {{serializeHelperName}}<TBufferWriter>(
-        ref global::SharpPack.SharpPackWriter<TBufferWriter> writer,
+    static void {{serializeHelperName}}<{{writerParameter}}>(
+        ref global::SharpPack.SharpPackWriter<{{writerParameter}}> writer,
         scoped ref {{TypeName}}{{nullable}} value)
-        where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        where {{writerParameter}} : global::System.Buffers.IBufferWriter<byte>
     {
 {{EmitCallbacks(shape, CallbackPhase.Serializing)}}
 {{overrideSerializeBody}}
@@ -762,8 +762,8 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         : global::SharpPack.SharpPackFormatter<{{TypeName}}>,
           global::SharpPack.ISharpPackContextOverrideFormatter
     {
-        public override void Serialize<TBufferWriter>(
-            ref global::SharpPack.SharpPackWriter<TBufferWriter> writer,
+        public override void Serialize<{{writerParameter}}>(
+            ref global::SharpPack.SharpPackWriter<{{writerParameter}}> writer,
             scoped ref {{TypeName}}{{nullable}} value)
             => {{serializeHelperName}}(ref writer, ref value);
 
@@ -799,7 +799,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
     string EmitVersionedSerializeBody(MemberShape[] members, bool honorFormatterOverrides)
     {
         const string newTempWriter =
-            "new SharpPackWriter<global::SharpPack.Internal.ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState)";
+            "new global::SharpPack.SharpPackWriter<global::SharpPack.Internal.ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState)";
 
         var checkCircularReference = "";
         if (plan.TracksReferences)
@@ -827,7 +827,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
             out var tempBufferLeaseId);
         try
         {
-            Span<int> offsets = stackalloc int[{{members.Length}}];
+            global::System.Span<int> offsets = stackalloc int[{{members.Length}}];
             var tempWriter = {{newTempWriter}};
 
 {{EmitSerializeMembersCore(
@@ -1087,8 +1087,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
     }
 """;
         const string scopedRef = "scoped ref";
-        const string serializeMethodSignarture =
-            "Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter>";
+        var writerParameter = shape.WriterTypeParameter;
 
         var code = $$"""
 
@@ -1100,12 +1099,12 @@ partial {{classOrInterfaceOrRecord}} {{TypeName}} : {{contextFactoryInterface}}
 {{contextFactoryMethod}}
 
     [global::SharpPack.CompilerServices.Preserve]
-    sealed class {{shape.SimpleName}}Formatter : SharpPackFormatter<{{TypeName}}>
+    sealed class {{shape.SimpleName}}Formatter : global::SharpPack.SharpPackFormatter<{{TypeName}}>
     {
 {{EmitUnionTypeToTagField(union.Cases)}}
 
         [global::SharpPack.CompilerServices.Preserve]
-        public override void {{serializeMethodSignarture}} writer, {{scopedRef}} {{TypeName}}? value)
+        public override void Serialize<{{writerParameter}}>(ref global::SharpPack.SharpPackWriter<{{writerParameter}}> writer, {{scopedRef}} {{TypeName}}? value)
         {
 {{EmitCallbacks(shape, CallbackPhase.Serializing, "            ")}}
 {{EmitUnionSerializeBody(union)}}
@@ -1113,7 +1112,7 @@ partial {{classOrInterfaceOrRecord}} {{TypeName}} : {{contextFactoryInterface}}
         }
 
         [global::SharpPack.CompilerServices.Preserve]
-        public override void Deserialize(ref SharpPackReader reader, {{scopedRef}} {{TypeName}}? value)
+        public override void Deserialize(ref global::SharpPack.SharpPackReader reader, {{scopedRef}} {{TypeName}}? value)
         {
 {{EmitCallbacks(shape, CallbackPhase.Deserializing, "            ")}}
 {{EmitUnionDeserializeBody(union)}}
@@ -1128,9 +1127,7 @@ partial {{classOrInterfaceOrRecord}} {{TypeName}} : {{contextFactoryInterface}}
 
     string EmitUnionFormatterTemplate(UnionShape union, ExternalUnionFormatterShape formatter, bool includeRegistration)
     {
-        var writerTypeParameter = "TBufferWriter";
-        while (formatter.TypeParameters.Any(parameter => parameter.Name == writerTypeParameter))
-            writerTypeParameter += "_";
+        var writerTypeParameter = Shape.WriterTypeParameter;
         var symbolFullQualified = union.TypeName;
         var constraints = EmitTypeParameterConstraints(formatter.TypeParameters);
         var declaration = $$"""
@@ -1430,7 +1427,7 @@ internal static class MemberCSharpEmitter
             case MemberKind.Unmanaged:
             case MemberKind.Enum:
             case MemberKind.UnmanagedNullable:
-                return $"writer.WriteVarInt(System.Runtime.CompilerServices.Unsafe.SizeOf<{member.TypeName}>());";
+                return $"writer.WriteVarInt(global::System.Runtime.CompilerServices.Unsafe.SizeOf<{member.TypeName}>());";
             case MemberKind.String:
                 return $"writer.WriteVarInt(writer.GetStringWriteLength(value.@{member.Name}));";
             case MemberKind.UnmanagedArray:
