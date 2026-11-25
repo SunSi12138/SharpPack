@@ -38,10 +38,10 @@ public static partial class SharpPackSerializer
     {
         var state = AcquireReaderOptionalState();
 
-        var reader = new SharpPackReader(buffer, state);
+        var reader = new SharpPackReader(buffer, state, SharpPackReadLimits.CurrentCompatibleMaxDepth, int.MaxValue);
         try
         {
-            reader.ReadValue(ref value);
+            reader.ReadRootValue(ref value);
             return reader.Consumed;
         }
         finally
@@ -90,10 +90,10 @@ public static partial class SharpPackSerializer
     {
         var state = AcquireReaderOptionalState();
 
-        var reader = new SharpPackReader(buffer, state);
+        var reader = new SharpPackReader(buffer, state, SharpPackReadLimits.CurrentCompatibleMaxDepth, int.MaxValue);
         try
         {
-            reader.ReadValue(ref value);
+            reader.ReadRootValue(ref value);
             return reader.Consumed;
         }
         finally
@@ -276,6 +276,7 @@ public static partial class SharpPackSerializer
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentOutOfRangeException.ThrowIfNegative(payloadLength);
+        EnsurePayloadWithinLimit(payloadLength, context);
         cancellationToken.ThrowIfCancellationRequested();
 
         if (stream is MemoryStream memoryStream &&
@@ -293,7 +294,7 @@ public static partial class SharpPackSerializer
             var payload = segment.AsSpan(position, payloadLength);
             var consumed = context is null
                 ? Deserialize(payload, ref value)
-                : Deserialize(payload, ref value, context);
+                : DeserializeWithContext(payload, ref value, context);
             EnsurePayloadConsumed(payloadLength, consumed);
             memoryStream.Seek(payloadLength, SeekOrigin.Current);
             return value;
@@ -344,7 +345,7 @@ public static partial class SharpPackSerializer
             T? value = default;
             var consumed = context is null
                 ? Deserialize(sequence, ref value)
-                : Deserialize(sequence, ref value, context);
+                : DeserializeWithContext(sequence, ref value, context);
             EnsurePayloadConsumed(payloadLength, consumed);
             return value;
         }
@@ -353,6 +354,21 @@ public static partial class SharpPackSerializer
             ReusableReadOnlySequenceBuilderPool.Return(
                 builder,
                 builderLeaseId);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static void EnsurePayloadWithinLimit(
+        long payloadLength,
+        SharpPackSerializerContext? context)
+    {
+        var maxPayloadBytes = context?.MaxPayloadBytes ?? long.MaxValue;
+        if (payloadLength > maxPayloadBytes)
+        {
+            SharpPackSerializationException.ThrowReadLimitExceeded(
+                SharpPackReadLimitKind.PayloadBytes,
+                maxPayloadBytes,
+                payloadLength);
         }
     }
 

@@ -244,6 +244,42 @@ public class StreamingSerializer
     }
 
     [Fact]
+    public async Task DeserializeLegacyCollection_LeavesInputAvailableAfterLimitRejection()
+    {
+        var payload = SharpPackSerializer.Serialize(new[] { 1, 2, 3 });
+        var pipe = new Pipe();
+        await pipe.Writer.WriteAsync(payload.AsMemory(0, sizeof(int)));
+        var context = new SharpPackSerializerContext(
+            SharpPackSerializerConfiguration.Default with
+            {
+                ReadLimits = SharpPackReadLimits.Default with
+                {
+                    MaxCollectionLength = 2,
+                },
+            });
+
+        var error = await Assert.ThrowsAsync<SharpPackSerializationException>(async () =>
+        {
+            await foreach (var _ in SharpPackStreamingSerializer
+                               .DeserializeAsync<int>(
+                                   pipe.Reader,
+                                   bufferAtLeast: 4,
+                                   readMinimumSize: 4,
+                                   context))
+            {
+            }
+        });
+        Assert.Equal(SharpPackReadLimitKind.CollectionLength, error.ReadLimitKind);
+        await pipe.Writer.WriteAsync(payload.AsMemory(sizeof(int)));
+        await pipe.Writer.CompleteAsync();
+        Assert.True(pipe.Reader.TryRead(out var retry));
+        Assert.Equal(payload, retry.Buffer.ToArray());
+        pipe.Reader.AdvanceTo(retry.Buffer.End);
+
+        await pipe.Reader.CompleteAsync();
+    }
+
+    [Fact]
     public async Task DeserializeUsesExplicitTypeRegistry()
     {
         var expected = new[]

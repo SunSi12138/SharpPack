@@ -17,7 +17,7 @@ Messages remain human-facing and may change independently of classification.
 - Invalid headers, property counts on read, union tags, reference IDs, array dimension/count mismatch, unexpected nulls, and malformed compressed fields: `InvalidWireData`.
 - Invalid UTF encoding or encoded-length mismatch: `InvalidEncoding`.
 - Reader/writer recursion depth: `DepthLimitExceeded`.
-- Decompression and configured frame size limits: `ResourceLimitExceeded`.
+- Payload, collection, reference-count, decompression, and configured frame size limits: `ResourceLimitExceeded`.
 - Formatter discovery/configuration: `FormatterResolutionFailed`.
 - Disabled/unregistered Type values or IDs and unregistered union types: `TypeResolutionFailed`.
 - Exact payload consumption mismatch: `FrameLengthMismatch`.
@@ -32,6 +32,5 @@ and business exceptions thrown by formatter operations remain their original
 exceptions. A complete but internally truncated frame is a payload failure, not
 transport EOF. Formatter discovery is a separate, SharpPack-owned boundary.
 
-The broader reader limits tracked in #15 will use these codes when integrated;
-depth rejection is `DepthLimitExceeded`, and the other limits use
-`ResourceLimitExceeded`.
+For reader limits configured on the serializer context, `ReadLimitKind` gives
+the precise boundary. See [Deserialization read limits](../read-limits.md).

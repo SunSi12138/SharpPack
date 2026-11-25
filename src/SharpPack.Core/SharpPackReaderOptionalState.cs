@@ -179,25 +179,39 @@ public sealed class SharpPackReaderOptionalState : IDisposable
     {
         requiresReset = true;
         sequentialReferences ??= [];
-        if (id == (uint)sequentialReferences.Count)
+        var sequentialCount = (uint)sequentialReferences.Count;
+        if (id < sequentialCount ||
+            (id == sequentialCount && sparseReferences?.ContainsKey(id) == true))
         {
-            if (sparseReferences?.ContainsKey(id) == true)
-            {
-                throw new SharpPackSerializationException(SharpPackErrorCode.InvalidWireData,
-                    "Object is already added, id:" + id);
-            }
+            ThrowDuplicateReferenceId(id);
+        }
 
+        // Only circular-reference reads need a table size and its limit.
+        var count = (long)sequentialCount + (sparseReferences?.Count ?? 0);
+        var maxCount = SerializerContext?.MaxReferenceCount ?? int.MaxValue;
+        if (count >= maxCount)
+        {
+            if (id > sequentialCount && sparseReferences?.ContainsKey(id) == true)
+            {
+                ThrowDuplicateReferenceId(id);
+            }
+            SharpPackSerializationException.ThrowReadLimitExceeded(
+                SharpPackReadLimitKind.ReferenceCount, maxCount, count + 1);
+        }
+        if (id == sequentialCount)
+        {
             sequentialReferences.Add(value);
             return;
         }
-
-        if (id < (uint)sequentialReferences.Count ||
-            !(sparseReferences ??= []).TryAdd(id, value))
+        if (!(sparseReferences ??= []).TryAdd(id, value))
         {
-            throw new SharpPackSerializationException(SharpPackErrorCode.InvalidWireData,
-                "Object is already added, id:" + id);
+            ThrowDuplicateReferenceId(id);
         }
     }
+
+    static void ThrowDuplicateReferenceId(uint id)
+        => throw new SharpPackSerializationException(
+            SharpPackErrorCode.InvalidWireData, "Object is already added, id:" + id);
 
     public void Reset()
     {

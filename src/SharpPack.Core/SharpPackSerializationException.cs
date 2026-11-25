@@ -10,6 +10,11 @@ public class SharpPackSerializationException : Exception
     /// <summary>Stable machine-readable classification; do not parse Message.</summary>
     public SharpPackErrorCode ErrorCode { get; }
 
+    /// <summary>
+    /// The exceeded resource boundary, or null for other serialization failures.
+    /// </summary>
+    public SharpPackReadLimitKind? ReadLimitKind { get; private init; }
+
     public SharpPackSerializationException(string message)
         : base(message)
     {
@@ -47,6 +52,26 @@ public class SharpPackSerializationException : Exception
     public static void ThrowMessage(string message)
     {
         throw new SharpPackSerializationException(message);
+    }
+
+    [DoesNotReturn]
+    internal static void ThrowReadLimitExceeded(
+        SharpPackReadLimitKind boundary,
+        long limit,
+        long actual,
+        Type? type = null)
+    {
+        var typeSuffix = type is null
+            ? string.Empty
+            : $" while reading {type.FullName}";
+        throw new SharpPackSerializationException(
+            boundary == SharpPackReadLimitKind.Depth
+                ? SharpPackErrorCode.DepthLimitExceeded
+                : SharpPackErrorCode.ResourceLimitExceeded,
+            $"The {boundary} read limit {limit} was exceeded by value {actual}{typeSuffix}.")
+        {
+            ReadLimitKind = boundary,
+        };
     }
 
     [DoesNotReturn]

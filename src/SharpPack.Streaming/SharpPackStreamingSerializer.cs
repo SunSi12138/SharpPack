@@ -1,4 +1,4 @@
-﻿using SharpPack.Internal;
+using SharpPack.Internal;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.IO.Pipelines;
@@ -76,6 +76,7 @@ public static class SharpPackStreamingSerializer
     {
         ArgumentNullException.ThrowIfNull(pipeReader);
         ArgumentOutOfRangeException.ThrowIfNegative(payloadLength);
+        SharpPackSerializer.EnsurePayloadWithinLimit(payloadLength, context);
 
         var result = await pipeReader
             .ReadAtLeastAsync(payloadLength, cancellationToken)
@@ -102,7 +103,10 @@ public static class SharpPackStreamingSerializer
             T? value = default;
             var consumed = context is null
                 ? SharpPackSerializer.Deserialize(payload, ref value)
-                : SharpPackSerializer.Deserialize(payload, ref value, context);
+                : SharpPackSerializer.DeserializeWithContext(
+                    payload,
+                    ref value,
+                    context);
 
             SharpPackSerializer.EnsurePayloadConsumed(
                 payloadLength,
@@ -298,12 +302,16 @@ public static class SharpPackStreamingSerializer
         }
 
         var payloadLength = (int)payloadLengthValue;
-        if (payloadLength > maxFrameLength)
+        var effectiveMaxFrameLength = Math.Min(
+            maxFrameLength,
+            context?.MaxPayloadBytes ?? long.MaxValue);
+        if (payloadLength > effectiveMaxFrameLength)
         {
             pipeReader.AdvanceTo(buffer.Start, headerReader.Position);
+            SharpPackSerializer.EnsurePayloadWithinLimit(payloadLength, context);
             throw new SharpPackSerializationException(SharpPackErrorCode.ResourceLimitExceeded,
                 $"The frame payload length {payloadLength} exceeds the configured maximum " +
-                $"{maxFrameLength}.");
+                $"{effectiveMaxFrameLength}.");
         }
 
         if (payloadLength > Array.MaxLength)
@@ -393,7 +401,10 @@ public static class SharpPackStreamingSerializer
             T? value = default;
             var consumedPayload = context is null
                 ? SharpPackSerializer.Deserialize(payload.Span, ref value)
-                : SharpPackSerializer.Deserialize(payload.Span, ref value, context);
+                : SharpPackSerializer.DeserializeWithContext(
+                    payload.Span,
+                    ref value,
+                    context);
 
             SharpPackSerializer.EnsurePayloadConsumed(
                 payloadLength,
@@ -662,6 +673,7 @@ public static class SharpPackStreamingSerializer
             if (!reader.DangerousTryReadCollectionHeader(out length))
             {
                 length = 0;
+                return;
             }
         }
 
@@ -722,12 +734,21 @@ public static class SharpPackStreamingSerializer
                     continue;
                 }
 
-                ReadCollectionHeader(buffer, state, out remain);
-                parseStart = buffer.GetPosition(4);
-                if (remain > 0)
+                var headerEnd = buffer.GetPosition(sizeof(int));
+                try
                 {
-                    itemBuffer.EnsureCapacity(Math.Min(remain, 256));
+                    ReadCollectionHeader(buffer, state, out remain);
+                    if (remain > 0)
+                    {
+                        itemBuffer.EnsureCapacity(Math.Min(remain, 256));
+                    }
                 }
+                catch
+                {
+                    pipeReader.AdvanceTo(buffer.Start, headerEnd);
+                    throw;
+                }
+                parseStart = headerEnd;
             }
 
             if (remain == 0)

@@ -145,12 +145,25 @@ public static partial class SharpPackSerializer
         SharpPackSerializerContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        EnsurePayloadWithinLimit(buffer.Length, context);
+        return DeserializeWithContext(buffer, ref value, context);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static int DeserializeWithContext<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+        T>(
+        ReadOnlySpan<byte> buffer,
+        ref T? value,
+        SharpPackSerializerContext context)
+    {
         var state = AcquireReaderOptionalState();
         state.Init(context);
-        var reader = new SharpPackReader(buffer, state);
+        var reader = new SharpPackReader(buffer, state, context.MaxReadDepth, context.MaxCollectionLength);
         try
         {
-            reader.ReadValue(ref value);
+            reader.BeginRootRead();
+            context.GetFormatter<T>().Deserialize(ref reader, ref value);
             return reader.Consumed;
         }
         finally
@@ -179,12 +192,24 @@ public static partial class SharpPackSerializer
         SharpPackSerializerContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        EnsurePayloadWithinLimit(buffer.Length, context);
+        return DeserializeWithContext(buffer, ref value, context);
+    }
+
+    internal static int DeserializeWithContext<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+        T>(
+        in ReadOnlySequence<byte> buffer,
+        ref T? value,
+        SharpPackSerializerContext context)
+    {
         var state = AcquireReaderOptionalState();
         state.Init(context);
-        var reader = new SharpPackReader(buffer, state);
+        var reader = new SharpPackReader(buffer, state, context.MaxReadDepth, context.MaxCollectionLength);
         try
         {
-            reader.ReadValue(ref value);
+            reader.BeginRootRead();
+            context.GetFormatter<T>().Deserialize(ref reader, ref value);
             return reader.Consumed;
         }
         finally
@@ -223,67 +248,86 @@ public static partial class SharpPackSerializer
         {
             cancellationToken.ThrowIfCancellationRequested();
             T? value = default;
-            var consumed = Deserialize(
+            var consumed = DeserializeWithContext(
                 segment.AsSpan(checked((int)memoryStream.Position)),
                 ref value,
                 context);
+            EnsurePayloadWithinLimit(consumed, context);
             memoryStream.Seek(consumed, SeekOrigin.Current);
             return value;
         }
 
         var builder = ReusableReadOnlySequenceBuilderPool.Rent(
             out var builderLeaseId);
+        byte[]? pendingBuffer = null;
         try
         {
-            var buffer = ArrayPool<byte>.Shared.Rent(65536);
+            var maxPayloadBytes = context.MaxPayloadBytes;
+            pendingBuffer = ArrayPool<byte>.Shared.Rent(AllowProbeByte(65536, maxPayloadBytes));
             var offset = 0;
+            long totalRead = 0;
             while (true)
             {
-                if (offset == buffer.Length)
+                if (offset == pendingBuffer.Length)
                 {
-                    builder.Add(buffer, returnToPool: true);
-                    buffer = ArrayPool<byte>.Shared.Rent(
-                        Math.Min(
-                            MathEx.NewArrayCapacity(buffer.Length),
-                            MaximumStreamSegmentSize));
+                    var nextRequest = AllowProbeByte(
+                        Math.Min(MathEx.NewArrayCapacity(pendingBuffer.Length), MaximumStreamSegmentSize),
+                        maxPayloadBytes - totalRead);
+                    builder.Add(pendingBuffer, returnToPool: true);
+                    pendingBuffer = null; // Ownership transferred only after Add succeeds.
+                    pendingBuffer = ArrayPool<byte>.Shared.Rent(nextRequest);
                     offset = 0;
                 }
 
-                int read;
-                try
-                {
-                    read = await stream.ReadAsync(
-                        buffer.AsMemory(offset, buffer.Length - offset),
-                        cancellationToken).ConfigureAwait(false);
-                }
-                catch
-                {
-                    ArrayPool<byte>.Shared.Return(buffer);
-                    throw;
-                }
-
+                // A pool bucket can exceed the requested size. Bound the slice,
+                // including one probe byte to distinguish exact-limit EOF.
+                var read = await stream.ReadAsync(
+                    pendingBuffer.AsMemory(offset, AllowProbeByte(
+                        pendingBuffer.Length - offset,
+                        maxPayloadBytes - totalRead)),
+                    cancellationToken).ConfigureAwait(false);
                 offset += read;
+                totalRead += read;
+                EnsurePayloadWithinLimit(totalRead, context);
                 if (read == 0)
                 {
-                    builder.Add(buffer.AsMemory(0, offset), returnToPool: true);
+                    builder.Add(pendingBuffer.AsMemory(0, offset), returnToPool: true);
+                    pendingBuffer = null;
                     break;
                 }
             }
 
             if (builder.TryGetSingleMemory(out var memory))
             {
-                return Deserialize<T>(memory.Span, context);
+                T? singleValue = default;
+                _ = DeserializeWithContext(
+                    memory.Span,
+                    ref singleValue,
+                    context);
+                return singleValue;
             }
 
             var sequence = builder.Build();
-            return Deserialize<T>(sequence, context);
+            T? sequenceValue = default;
+            _ = DeserializeWithContext(
+                sequence,
+                ref sequenceValue,
+                context);
+            return sequenceValue;
         }
         finally
         {
+            if (pendingBuffer is not null)
+            {
+                ArrayPool<byte>.Shared.Return(pendingBuffer);
+            }
             ReusableReadOnlySequenceBuilderPool.Return(
                 builder,
                 builderLeaseId);
         }
+
+        static int AllowProbeByte(int bufferLimit, long remainingBudget)
+            => (int)Math.Min(bufferLimit - 1L, remainingBudget) + 1;
     }
 
     /// <summary>

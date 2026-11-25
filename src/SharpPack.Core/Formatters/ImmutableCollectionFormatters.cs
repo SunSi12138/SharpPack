@@ -94,6 +94,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>();
             var formatter = reader.GetFormatter<T?>();
 
             var builder = ImmutableList.CreateBuilder<T?>();
@@ -173,6 +174,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>();
             var items = new List<T?>(
                 FormatterValidation.InitialCapacity(length));
             var formatter = reader.GetFormatter<T?>();
@@ -252,6 +254,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>();
             var items = new List<T?>(
                 FormatterValidation.InitialCapacity(length));
             var formatter = reader.GetFormatter<T?>();
@@ -322,13 +325,14 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var entries = KeyValuePairFormatter.EnterReadScope<TKey, TValue>(ref reader, length, out var unmanagedEntries);
             var keyFormatter = reader.GetFormatter<TKey>();
             var valueFormatter = reader.GetFormatter<TValue>();
 
             var builder = ImmutableDictionary.CreateBuilder<TKey, TValue?>(keyEqualityComparer, valueEqualityComparer);
             for (int i = 0; i < length; i++)
             {
-                KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
+                KeyValuePairFormatter.DeserializeEntry(keyFormatter, valueFormatter, ref reader, unmanagedEntries, out var k, out var v);
                 builder.Add(k!, v);
             }
 
@@ -396,6 +400,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>();
             var formatter = reader.GetFormatter<T?>();
 
             var builder = ImmutableHashSet.CreateBuilder<T?>(equalityComparer);
@@ -467,13 +472,14 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var entries = KeyValuePairFormatter.EnterReadScope<TKey, TValue>(ref reader, length, out var unmanagedEntries);
             var keyFormatter = reader.GetFormatter<TKey>();
             var valueFormatter = reader.GetFormatter<TValue>();
 
             var builder = ImmutableSortedDictionary.CreateBuilder<TKey, TValue?>(keyComparer, valueEqualityComparer);
             for (int i = 0; i < length; i++)
             {
-                KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
+                KeyValuePairFormatter.DeserializeEntry(keyFormatter, valueFormatter, ref reader, unmanagedEntries, out var k, out var v);
                 builder.Add(k!, v);
             }
 
@@ -541,6 +547,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>();
             var formatter = reader.GetFormatter<T?>();
 
             var builder = ImmutableSortedSet.CreateBuilder<T?>(keyComparer);
@@ -598,6 +605,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>();
             var formatter = reader.GetFormatter<T?>();
 
             var builder = ImmutableList.CreateBuilder<T?>();
@@ -677,6 +685,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>();
             var items = new List<T?>(
                 FormatterValidation.InitialCapacity(length));
             var formatter = reader.GetFormatter<T?>();
@@ -755,6 +764,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>();
             var items = new List<T?>(
                 FormatterValidation.InitialCapacity(length));
             var formatter = reader.GetFormatter<T?>();
@@ -828,13 +838,14 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var entries = KeyValuePairFormatter.EnterReadScope<TKey, TValue>(ref reader, length, out var unmanagedEntries);
             var keyFormatter = reader.GetFormatter<TKey>();
             var valueFormatter = reader.GetFormatter<TValue>();
 
             var builder = ImmutableDictionary.CreateBuilder<TKey, TValue?>(keyEqualityComparer, valueEqualityComparer);
             for (int i = 0; i < length; i++)
             {
-                KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
+                KeyValuePairFormatter.DeserializeEntry(keyFormatter, valueFormatter, ref reader, unmanagedEntries, out var k, out var v);
                 builder.Add(k!, v);
             }
 
@@ -905,6 +916,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>();
             var formatter = reader.GetFormatter<T?>();
 
             var builder = ImmutableHashSet.CreateBuilder<T?>(equalityComparer);
