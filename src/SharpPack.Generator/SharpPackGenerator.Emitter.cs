@@ -222,28 +222,12 @@ public partial class TypeMeta
         }
         else
         {
-            var originalMembers = Members;
-            if (GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference)
-            {
-                // for emit time, replace padded empty
-                if (Members.Length != 0)
-                {
-                    var maxOrder = Members.Max(x => x.Order);
-                    var tempMembers = new MemberMeta[maxOrder + 1];
-                    for (int i = 0; i <= maxOrder; i++)
-                    {
-                        tempMembers[i] = Members.FirstOrDefault(x => x.Order == i) ?? MemberMeta.CreateEmpty(i);
-                    }
-                    Members = tempMembers;
-                }
-            }
-
-            serializeBody = EmitSerializeBody();
-            deserializeBody = EmitDeserializeBody();
+            var wireMembers = plan.WireSlots.Select(slot => slot.DeclaredMemberIndex is int index
+                ? Members[index] : MemberMeta.CreateEmpty(slot.Position)).ToArray();
+            serializeBody = EmitSerializeBody(wireMembers);
+            deserializeBody = EmitDeserializeBodyCore(wireMembers, honorFormatterOverrides: false);
             formatterOverrideMethods = EmitFormatterOverrideMethods(
-                contextFormatterTypeName);
-
-            Members = originalMembers;
+                contextFormatterTypeName, shape, wireMembers);
         }
 
         var classOrStructOrRecord = (IsRecord, IsValueType) switch
@@ -312,7 +296,7 @@ public partial class TypeMeta
         var contextDependencyCondition = IsUnmanagedType
             ? ""
             : EmitFormatterOverrideDependencyCondition(
-                "context",
+                Members, "context",
                 useOptionalState: false);
         var contextFormatterSelection =
             contextDependencyCondition.Length == 0
@@ -410,15 +394,9 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         }
     }
 
-    private string EmitDeserializeBody()
+    private string EmitDeserializeBodyCore(MemberMeta[] members, bool honorFormatterOverrides)
     {
-        return EmitDeserializeBodyCore(
-            honorFormatterOverrides: false);
-    }
-
-    private string EmitDeserializeBodyCore(bool honorFormatterOverrides)
-    {
-        var count = Members.Length;
+        var count = members.Length;
 
         var isVersionTolerant = this.GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference;
         var readBeginBody = "";
@@ -489,7 +467,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 {{circularReferenceBody}}
 {{readBeginBody}}
 {{circularReferenceBody2}}
-{{Members.Where(x => x.Symbol != null).Select(x => $"        {x.MemberType.FullyQualifiedToString()} __{x.Name};").NewLine()}}
+{{members.Where(x => x.Symbol != null).Select(x => $"        {x.MemberType.FullyQualifiedToString()} __{x.Name};").NewLine()}}
 
         {{(!isVersionTolerant ? "" : "var readCount = " + count + ";")}}
         if (count == {{count}})
@@ -497,7 +475,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
             {{(IsValueType ? "" : "if (value == null)")}}
             {
 {{EmitDeserializeMembers(
-    Members,
+    members,
     "                ",
     honorFormatterOverrides)}}
 
@@ -505,10 +483,10 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
             }
 {{(IsValueType ? "#if false" : "            else")}}
             {
-{{Members.Where(x => x.Symbol != null).Select(x => $"                __{x.Name} = value.@{x.Name};").NewLine()}}
+{{members.Where(x => x.Symbol != null).Select(x => $"                __{x.Name} = value.@{x.Name};").NewLine()}}
 
 {{EmitReadRefDeserializeMembers(
-    Members,
+    members,
     "                ",
     includeCountJumps: false,
     honorFormatterOverrides)}}
@@ -526,17 +504,17 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         {
             {{(IsValueType ? "" : "if (value == null)")}}
             {
-{{Members.Where(x => x.Symbol != null).Select(x => $"               __{x.Name} = default!;").NewLine()}}
+{{members.Where(x => x.Symbol != null).Select(x => $"               __{x.Name} = default!;").NewLine()}}
             }
 {{(IsValueType ? "#if false" : "            else")}}
             {
-{{Members.Where(x => x.Symbol != null).Select(x => $"               __{x.Name} = value.@{x.Name};").NewLine()}}
+{{members.Where(x => x.Symbol != null).Select(x => $"               __{x.Name} = value.@{x.Name};").NewLine()}}
             }
 {{(IsValueType ? "#endif" : "")}}
 
             if (count == 0) goto SKIP_READ;
 {{EmitReadRefDeserializeMembers(
-    Members,
+    members,
     "            ",
     includeCountJumps: true,
     honorFormatterOverrides)}}
@@ -555,15 +533,15 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 
     SET:
         {{(!IsUseEmptyConstructor ? "goto NEW;" : "")}}
-{{Members.Where(x => x.IsAssignable).Select(x => $"        {(IsUseEmptyConstructor ? "" : "// ")}value.@{x.Name} = __{x.Name};").NewLine()}}
+{{members.Where(x => x.IsAssignable).Select(x => $"        {(IsUseEmptyConstructor ? "" : "// ")}value.@{x.Name} = __{x.Name};").NewLine()}}
         goto READ_END;
 
     NEW:
-        value = {{EmitConstructor()}}
+        value = {{EmitConstructor(members)}}
         {
-{{EmitDeserializeConstruction("            ")}}
+{{EmitDeserializeConstruction(members, "            ")}}
         };
-{{EmitDeserializeConstructionWithBranching("        ")}}
+{{EmitDeserializeConstructionWithBranching(members, "        ")}}
     READ_END:
 {{readEndBody}}
 """;
@@ -779,23 +757,23 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         }
     }
 
-    string EmitSerializeBody()
+    string EmitSerializeBody(MemberMeta[] members)
     {
         if (this.GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference)
         {
-            return Members.All(x =>
+            return members.All(x =>
                 x.Kind is MemberKind.Unmanaged
                     or MemberKind.String
                     or MemberKind.Enum
                     or MemberKind.UnmanagedArray
                     or MemberKind.UnmanagedNullable
                     or MemberKind.Blank)
-                ? EmitVersionTorelantSerializeBodyOptimized()
+                ? EmitVersionTorelantSerializeBodyOptimized(members)
                 : EmitVersionTorelantSerializeBody(
-                    honorFormatterOverrides: false);
+                    members, honorFormatterOverrides: false);
         }
 
-        return EmitObjectSerializeBody(honorFormatterOverrides: false);
+        return EmitObjectSerializeBody(members, honorFormatterOverrides: false);
     }
 
     string EmitExactSizeSerializeMethod()
@@ -866,10 +844,10 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 """;
     }
 
-    string EmitFormatterOverrideMethods(string contextFormatterTypeName)
+    string EmitFormatterOverrideMethods(string contextFormatterTypeName, TypeShape shape, MemberMeta[] members)
     {
         var writerCondition =
-            EmitFormatterOverrideDependencyCondition("writer");
+            EmitFormatterOverrideDependencyCondition(members, "writer");
         if (writerCondition.Length == 0)
         {
             return "";
@@ -878,11 +856,11 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         var overrideSerializeBody =
             GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference
                 ? EmitVersionTorelantSerializeBody(
-                    honorFormatterOverrides: true)
+                    members, honorFormatterOverrides: true)
                 : EmitObjectSerializeBody(
-                    honorFormatterOverrides: true);
+                    members, honorFormatterOverrides: true);
         var overrideDeserializeBody = EmitDeserializeBodyCore(
-            honorFormatterOverrides: true);
+            members, honorFormatterOverrides: true);
         var nullable = IsValueType ? "" : "?";
         var serializeHelperName =
             GetFormatterOverrideHelperName(serialize: true);
@@ -898,10 +876,10 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         scoped ref {{TypeName}}{{nullable}} value)
         where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
     {
-{{OnSerializing.Select(x => "        " + x.Emit()).NewLine()}}
+{{EmitCallbacks(shape, CallbackPhase.Serializing)}}
 {{overrideSerializeBody}}
     END:
-{{OnSerialized.Select(x => "        " + x.Emit()).NewLine()}}
+{{EmitCallbacks(shape, CallbackPhase.Serialized)}}
         return;
     }
 
@@ -911,10 +889,10 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         ref global::SharpPack.SharpPackReader reader,
         scoped ref {{TypeName}}{{nullable}} value)
     {
-{{OnDeserializing.Select(x => "        " + x.Emit()).NewLine()}}
+{{EmitCallbacks(shape, CallbackPhase.Deserializing)}}
 {{overrideDeserializeBody}}
     END:
-{{OnDeserialized.Select(x => "        " + x.Emit()).NewLine()}}
+{{EmitCallbacks(shape, CallbackPhase.Deserialized)}}
         return;
     }
 
@@ -949,7 +927,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         return name;
     }
 
-    string EmitObjectSerializeBody(bool honorFormatterOverrides)
+    string EmitObjectSerializeBody(MemberMeta[] members, bool honorFormatterOverrides)
     {
         return $$"""
 {{(!IsValueType ? $$"""
@@ -961,7 +939,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 """ : "")}}
 
 {{EmitSerializeMembers(
-    Members,
+    members,
     "        ",
     toTempWriter: false,
     writeObjectHeader: true,
@@ -969,7 +947,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 """;
     }
 
-    string EmitVersionTorelantSerializeBody(bool honorFormatterOverrides)
+    string EmitVersionTorelantSerializeBody(MemberMeta[] members, bool honorFormatterOverrides)
     {
         const string newTempWriter =
             "new SharpPackWriter<global::SharpPack.Internal.ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState)";
@@ -1000,11 +978,11 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
             out var tempBufferLeaseId);
         try
         {
-            Span<int> offsets = stackalloc int[{{Members.Length}}];
+            Span<int> offsets = stackalloc int[{{members.Length}}];
             var tempWriter = {{newTempWriter}};
 
 {{EmitSerializeMembers(
-    Members,
+    members,
     "            ",
     toTempWriter: true,
     writeObjectHeader: false,
@@ -1012,8 +990,8 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 
             tempWriter.Flush();
 
-            writer.WriteObjectHeader({{Members.Length}});
-            for (int i = 0; i < {{Members.Length}}; i++)
+            writer.WriteObjectHeader({{members.Length}});
+            for (int i = 0; i < {{members.Length}}; i++)
             {
                 int delta;
                 if (i == 0)
@@ -1039,7 +1017,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
     }
 
     // Optimized is all member is fixed size
-    string EmitVersionTorelantSerializeBodyOptimized()
+    string EmitVersionTorelantSerializeBodyOptimized(MemberMeta[] members)
     {
         static string EmitLengthHeader(MemberMeta[] members)
         {
@@ -1073,10 +1051,10 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         }
 """ : "")}}
 {{checkCircularReference}}
-        writer.WriteObjectHeader({{Members.Length}});
-{{EmitLengthHeader(Members)}}
+        writer.WriteObjectHeader({{members.Length}});
+{{EmitLengthHeader(members)}}
         {{(GenerateType == GenerateType.CircularReference ? "writer.WriteVarInt(id);" : "")}}
-{{EmitSerializeMembers(Members, "        ", toTempWriter: false, writeObjectHeader: false)}}
+{{EmitSerializeMembers(members, "        ", toTempWriter: false, writeObjectHeader: false)}}
 """;
     }
 
@@ -1262,11 +1240,12 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
     }
 
     string EmitFormatterOverrideDependencyCondition(
+        MemberMeta[] members,
         string receiver,
         bool useOptionalState = true)
     {
         var types = new List<ITypeSymbol>();
-        foreach (var member in Members)
+        foreach (var member in members)
         {
             if (member.Kind is MemberKind.Blank or MemberKind.CustomFormatter)
             {
@@ -1328,7 +1307,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
             .NewLine();
     }
 
-    string EmitConstructor()
+    string EmitConstructor(MemberMeta[] members)
     {
         // no need `;` because after using object initializer
         if (this.Constructor == null || this.Constructor.Parameters.Length == 0)
@@ -1337,7 +1316,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         }
         else
         {
-            var nameDict = Members.Where(x => x.IsConstructorParameter).ToDictionary(x => x.ConstructorParameterName, x => x.Name, StringComparer.OrdinalIgnoreCase);
+            var nameDict = members.Where(x => x.IsConstructorParameter).ToDictionary(x => x.ConstructorParameterName, x => x.Name, StringComparer.OrdinalIgnoreCase);
             var parameters = this.Constructor.Parameters
                 .Select(x =>
                 {
@@ -1353,23 +1332,23 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         }
     }
 
-    string EmitDeserializeConstruction(string indent)
+    static string EmitDeserializeConstruction(MemberMeta[] members, string indent)
     {
         // all value is deserialized, __Name is exsits.
-        return string.Join("," + Environment.NewLine, Members
+        return string.Join("," + Environment.NewLine, members
             .Where(x => x is { IsSettable: true, IsConstructorParameter: false, SuppressDefaultInitialization: false })
             .Select(x => $"{indent}@{x.Name} = __{x.Name}"));
     }
 
-    string EmitDeserializeConstructionWithBranching(string indent)
+    string EmitDeserializeConstructionWithBranching(MemberMeta[] members, string indent)
     {
-        var members = Members
+        var initialized = members
             .Select((x, i) => (x, i))
             .Where(v => v.x.SuppressDefaultInitialization);
 
         var lines = GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference
-            ? members.Select(v => $"{indent}if (deltas.Length > {v.i} && deltas[{v.i}] != 0) value.@{v.x.Name} = __{v.x.Name};")
-            : members.Select(v => $"{indent}if ({v.i + 1} <= count) value.@{v.x.Name} = __{v.x.Name};");
+            ? initialized.Select(v => $"{indent}if (deltas.Length > {v.i} && deltas[{v.i}] != 0) value.@{v.x.Name} = __{v.x.Name};")
+            : initialized.Select(v => $"{indent}if ({v.i + 1} <= count) value.@{v.x.Name} = __{v.x.Name};");
 
         return lines.NewLine();
     }

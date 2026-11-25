@@ -45,6 +45,8 @@ public enum MemberKind
 
 public partial class TypeMeta
 {
+    const int MaximumObjectMembers = 249; // SharpPackCode.Reserved1 - 1
+
     DiagnosticDescriptor? ctorInvalid = null;
 
     readonly ReferenceSymbols reference;
@@ -53,7 +55,7 @@ public partial class TypeMeta
     public SerializeLayout SerializeLayout { get; }
     /// <summary>MinimallyQualifiedFormat(include generics T)</summary>
     public string TypeName { get; }
-    public MemberMeta[] Members { get; private set; }
+    public MemberMeta[] Members { get; }
     public bool IsValueType { get; set; }
     public bool IsUnmanagedType { get; }
     public bool IsUnion { get; }
@@ -446,7 +448,7 @@ public partial class TypeMeta
         }
 
         // ALl Members
-        if (Members.Length >= 250) // SharpPackCode.Reserved1
+        if (Members.Length > MaximumObjectMembers)
         {
             context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MembersCountOver250, syntax.Identifier.GetLocation(), Symbol.Name, Members.Length));
             noError = false;
@@ -473,6 +475,19 @@ public partial class TypeMeta
             {
                 context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MemberIsRefStruct, item.GetLocation(syntax), Symbol.Name, item.Name, item.MemberType.FullyQualifiedToString()));
                 noError = false;
+            }
+        }
+
+        if (GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference)
+        {
+            foreach (var item in Members)
+            {
+                if ((uint)item.Order >= MaximumObjectMembers)
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.VersionedMemberOrderOutOfRange,
+                        item.GetLocation(syntax), Symbol.Name, item.Name, item.Order, MaximumObjectMembers - 1));
+                    noError = false;
+                }
             }
         }
 
