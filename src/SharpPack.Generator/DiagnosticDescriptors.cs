@@ -348,4 +348,12 @@ internal static class DiagnosticDescriptors
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor VersionedMemberOrderOutOfRange = new(
+        id: "SHARPPACK044",
+        title: "Versioned member order is outside the wire header",
+        messageFormat: "The SharpPackable object '{0}' member '{1}' has order '{2}'; this wire format supports orders 0 through {3}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }
