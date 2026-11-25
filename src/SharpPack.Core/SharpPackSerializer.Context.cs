@@ -151,7 +151,7 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static int DeserializeWithContext<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(
         ReadOnlySpan<byte> buffer,
         ref T? value,
@@ -196,7 +196,7 @@ public static partial class SharpPackSerializer
     }
 
     internal static int DeserializeWithContext<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(
         in ReadOnlySequence<byte> buffer,
         ref T? value,

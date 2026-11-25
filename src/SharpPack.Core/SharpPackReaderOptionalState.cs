@@ -192,8 +192,7 @@ public sealed class SharpPackReaderOptionalState : IDisposable
         {
             if (sparseReferences?.ContainsKey(id) == true)
             {
-                throw new SharpPackSerializationException(SharpPackErrorCode.InvalidWireData,
-                    "Object is already added, id:" + id);
+                ThrowDuplicateReferenceId(id);
             }
 
             ThrowIfReferenceLimitExceeded();
@@ -204,8 +203,7 @@ public sealed class SharpPackReaderOptionalState : IDisposable
 
         if (id < (uint)sequentialReferences.Count)
         {
-            throw new SharpPackSerializationException(SharpPackErrorCode.InvalidWireData,
-                "Object is already added, id:" + id);
+            ThrowDuplicateReferenceId(id);
         }
 
         if (referenceCount >= maxReferenceCount)
@@ -214,15 +212,13 @@ public sealed class SharpPackReaderOptionalState : IDisposable
             // duplicate-ID classification. Successful inserts retain TryAdd.
             if (sparseReferences?.ContainsKey(id) == true)
             {
-                SharpPackSerializationException.ThrowMessage(
-                    "Object is already added, id:" + id);
+                ThrowDuplicateReferenceId(id);
             }
             ThrowIfReferenceLimitExceeded();
         }
         if (!(sparseReferences ??= []).TryAdd(id, value))
         {
-            SharpPackSerializationException.ThrowMessage(
-                "Object is already added, id:" + id);
+            ThrowDuplicateReferenceId(id);
         }
         referenceCount++;
     }
@@ -235,11 +231,13 @@ public sealed class SharpPackReaderOptionalState : IDisposable
             SharpPackSerializationException.ThrowReadLimitExceeded(
                 SharpPackReadLimitKind.ReferenceCount,
                 maxReferenceCount,
-                referenceCount == int.MaxValue
-                    ? int.MaxValue
-                    : referenceCount + 1);
+                (long)referenceCount + 1);
         }
     }
+
+    static void ThrowDuplicateReferenceId(uint id)
+        => throw new SharpPackSerializationException(
+            SharpPackErrorCode.InvalidWireData, "Object is already added, id:" + id);
 
     public void Reset()
     {

@@ -398,6 +398,22 @@ public class ReadLimitsTest
             defaultStructContext).Should().BeEquivalentTo(value);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void DuplicateReferenceId_RemainsInvalidWireDataWithOrWithoutRoom(int maxCount)
+    {
+        var context = CreateContext(readLimits: new SharpPackReadLimits { MaxReferenceCount = maxCount });
+        using var lease = SharpPackReaderOptionalStatePool.Rent(context);
+        var original = new object();
+        lease.AddObjectReference(4, original);
+
+        var failure = Assert.Throws<SharpPackSerializationException>(() => lease.AddObjectReference(4, new object()));
+        Assert.Equal(SharpPackErrorCode.InvalidWireData, failure.ErrorCode);
+        Assert.Null(failure.ReadLimitKind);
+        Assert.Same(original, lease.GetObjectReference(4));
+    }
+
     static SharpPackSerializerContext AtDepth(int maxDepth)
         => CreateContext(readLimits: new SharpPackReadLimits { MaxDepth = maxDepth });
 
