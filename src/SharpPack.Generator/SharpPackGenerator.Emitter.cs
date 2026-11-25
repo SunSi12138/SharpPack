@@ -93,7 +93,7 @@ using SharpPack;
         }
         else
         {
-            typeMeta.Emit(sb, context, shape);
+            typeMeta.Emit(sb, context, SerializationPlanner.Plan(shape));
         }
 
         if (ns.Length != 0 && !context.IsCSharp10OrGreater())
@@ -183,10 +183,11 @@ using SharpPack;
 public partial class TypeMeta
 {
     public void Emit(StringBuilder writer, IGeneratorContext context)
-        => Emit(writer, context, TypeShape.Create(Symbol, this));
+        => Emit(writer, context, SerializationPlanner.Plan(TypeShape.Create(Symbol, this)));
 
-    internal void Emit(StringBuilder writer, IGeneratorContext context, TypeShape shape)
+    internal void Emit(StringBuilder writer, IGeneratorContext context, SerializationPlan plan)
     {
+        var shape = plan.Shape;
         if (shape.IsUnion)
         {
             writer.AppendLine(EmitUnionTemplate(context, shape));
@@ -272,28 +273,13 @@ public partial class TypeMeta
         var fixedSizeMethod = "";
         var exactSizeInterface = "";
         var exactSizeMethod = "";
-        var fixedSize = Members.All(x =>
-            x.Kind is MemberKind.Unmanaged
-                or MemberKind.Enum
-                or MemberKind.UnmanagedNullable
-                or MemberKind.Blank);
-        var callbackCount = new[]
-        {
-            OnSerializing,
-            OnSerialized,
-            OnDeserialized,
-            OnDeserializing,
-        }.Select(x => x.Length).Sum();
-        if (fixedSize &&
-            GenerateType == GenerateType.Object &&
-            !IsValueType &&
-            callbackCount == 0)
+        if (plan.RootFastPath == RootFastPath.FixedSize)
         {
             var sizeOf = string.Join(
                 " + ",
-                Members.Select(x =>
-                    $"System.Runtime.CompilerServices.Unsafe.SizeOf<{x.MemberType.FullyQualifiedToString()}>()"));
-            var headerPlus = Members.Length == 0 ? "1" : "1 + ";
+                shape.Members.Select(member =>
+                    $"System.Runtime.CompilerServices.Unsafe.SizeOf<{member.TypeName}>()"));
+            var headerPlus = shape.Members.Length == 0 ? "1" : "1 + ";
             fixedSizeInterface = ", global::SharpPack.IFixedSizeSharpPackable";
             fixedSizeMethod = $$"""
 
@@ -303,19 +289,7 @@ public partial class TypeMeta
 """;
         }
 
-        var exactSizeEligible =
-            !IsValueType &&
-            !fixedSize &&
-            GenerateType == GenerateType.Object &&
-            callbackCount == 0 &&
-            Members.All(static member => member.HasExactSizeSafeAccessor &&
-                member.Kind is
-                MemberKind.Unmanaged or
-                MemberKind.Enum or
-                MemberKind.UnmanagedNullable or
-                MemberKind.String or
-                MemberKind.UnmanagedArray);
-        if (exactSizeEligible)
+        else if (plan.RootFastPath == RootFastPath.ExactSize)
         {
             exactSizeInterface =
                 $", global::SharpPack.ISharpPackExactSizeSerializable<{TypeName}>";
