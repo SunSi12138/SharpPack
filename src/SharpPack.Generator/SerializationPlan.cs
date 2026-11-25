@@ -22,6 +22,13 @@ internal sealed record AotRootSet(
     EquatableArray<AotFactoryRoot> Factories,
     EquatableArray<string> ClosedFormatters);
 
+internal sealed record GeneratedNames(
+    string ContextFormatterType,
+    string WriteWithOverrides,
+    string ReadWithOverrides,
+    string EnsureAotRoots,
+    string? SelfFactoryRoot);
+
 internal sealed record SerializationPlan(
     TypeShape Shape,
     RootFastPath RootFastPath,
@@ -29,7 +36,8 @@ internal sealed record SerializationPlan(
     EquatableArray<ScalarBatch> ScalarBatches,
     ObjectWriteStrategy ObjectWriteStrategy,
     ContextDependencySet ContextDependencies,
-    AotRootSet AotRoots);
+    AotRootSet AotRoots,
+    GeneratedNames Names);
 
 internal static class SerializationPlanner
 {
@@ -41,7 +49,31 @@ internal static class SerializationPlanner
         var kinds = slots.Select(slot => slot.DeclaredMemberIndex is int i ? shape.Members[i].Kind : MemberKind.Blank).ToArray();
         return new(shape, ChooseRootFastPath(shape), slots, PlanScalarBatches(kinds),
             ChooseObjectWriteStrategy(shape, kinds), PlanContextDependencies(shape, slots),
-            PlanAotRoots(shape.AotDependencies));
+            PlanAotRoots(shape.AotDependencies), PlanNames(shape.NameFacts));
+    }
+
+    static GeneratedNames PlanNames(GeneratedNameFacts facts)
+        => new(
+            AvailableMember("__SharpPackContextFormatter", facts.MembersAndParameters),
+            AvailableMember("__SharpPackSerializeWithFormatterOverrides", facts.MembersAndParameters),
+            AvailableMember("__SharpPackDeserializeWithFormatterOverrides", facts.MembersAndParameters),
+            AvailableMember("__SharpPackEnsureAotFormatterRoots", facts.MembersAndParameters),
+            facts.HasUserStaticInitialization
+                ? null
+                : AvailableFactoryName(GeneratedNameFacts.SelfRootStem, facts.SelfRootIdentifiers));
+
+    static string AvailableMember(string stem, EquatableArray<string> names)
+    {
+        while (names.Contains(stem, StringComparer.Ordinal))
+            stem += "_";
+        return stem;
+    }
+
+    internal static string AvailableFactoryName(string stem, EquatableArray<string> names)
+    {
+        while (names.Contains(stem, StringComparer.Ordinal) || names.Contains(stem + "Value", StringComparer.Ordinal))
+            stem += "_";
+        return stem;
     }
 
     static AotRootSet PlanAotRoots(AotDependencyFacts dependencies)
