@@ -41,6 +41,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="../SidecarFixture/SidecarFixture.csproj" />
         <ProjectReference Include="..\..\src\SharpPack.Core\SharpPack.Core.csproj" />
         <ProjectReference Include="..\..\src\SharpPack.Streaming\SharpPack.Streaming.csproj" />
         <ProjectReference Include="..\..\src\SharpPack.Generator\SharpPack.Generator.csproj">

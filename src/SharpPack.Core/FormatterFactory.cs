@@ -42,9 +42,12 @@ internal static class ContextFormatterSlot<T>
 
         return cache.GetValue(
             graph,
-            static graph => new Holder(
-                FormatterResolver<T>.Create(graph.Owner),
-                isExplicitRegistration: false)).Formatter;
+            static graph => new Holder(Create(graph), isExplicitRegistration: false)).Formatter;
+
+        static SharpPackFormatter<T> Create(FormatterGraph graph)
+            => graph.HasGeneratedFactories && GeneratedFormatterFactorySlot<T>.TryGet(graph, out var factory)
+                ? factory(graph.Owner)
+                : FormatterResolver<T>.Create(graph.Owner);
     }
 
     internal static void Register(FormatterGraph graph, SharpPackFormatter<T> formatter)
@@ -71,6 +74,20 @@ internal static class ContextFormatterSlot<T>
         internal SharpPackFormatter<T> Formatter { get; } = formatter;
         internal bool IsExplicitRegistration { get; } = isExplicitRegistration;
     }
+}
+
+// Generated factory descriptors are only read when the resolved formatter
+// slot misses. As with resolved formatters, their lifetime belongs to the graph.
+internal static class GeneratedFormatterFactorySlot<T>
+{
+    static readonly ConditionalWeakTable<FormatterGraph, Func<SharpPackSerializerContext, SharpPackFormatter<T>>> factories = new();
+
+    internal static void Register(FormatterGraph graph, Func<SharpPackSerializerContext, SharpPackFormatter<T>> factory)
+        => factories.TryAdd(graph, factory);
+
+    internal static bool TryGet(
+        FormatterGraph graph, [NotNullWhen(true)] out Func<SharpPackSerializerContext, SharpPackFormatter<T>>? factory)
+        => factories.TryGetValue(graph, out factory);
 }
 
 internal static class FormatterTypeTraits<T>

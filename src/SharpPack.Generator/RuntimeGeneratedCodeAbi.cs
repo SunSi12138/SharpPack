@@ -7,10 +7,19 @@ internal static class RuntimeGeneratedCodeAbi
 {
     internal const int MinimumVersion = 1;
     internal const int MaximumVersion = 1;
+    internal const int SidecarVersion = 1;
     const string ContractMetadataName =
         "SharpPack.CompilerServices.SharpPackGeneratedCodeContract";
+    const string SidecarMetadataName =
+        "SharpPack.CompilerServices.SharpPackSidecarRegistration";
 
     internal static string? GetUnsupportedVersion(Compilation compilation)
+        => GetUnsupportedVersion(compilation, ContractMetadataName, MinimumVersion, MaximumVersion);
+
+    internal static string? GetUnsupportedSidecarVersion(Compilation compilation)
+        => GetUnsupportedVersion(compilation, SidecarMetadataName, SidecarVersion, SidecarVersion);
+
+    static string? GetUnsupportedVersion(Compilation compilation, string metadataName, int min, int max)
     {
         // Emission binds to global::SharpPack. An alias-only reference or a
         // same-named consumer type cannot supply the marker for that runtime.
@@ -20,7 +29,7 @@ internal static class RuntimeGeneratedCodeAbi
             .Select(compilation.GetAssemblyOrModuleSymbol)
             .OfType<IAssemblySymbol>()
             .FirstOrDefault(static assembly => assembly.Identity.Name == "SharpPack.Core");
-        var contract = runtime?.GetTypeByMetadataName(ContractMetadataName);
+        var contract = runtime?.GetTypeByMetadataName(metadataName);
         if (contract is null) return "missing";
 
         var members = contract.GetMembers("Version");
@@ -34,7 +43,7 @@ internal static class RuntimeGeneratedCodeAbi
             return "invalid";
         }
 
-        return value >= MinimumVersion && value <= MaximumVersion
+        return value >= min && value <= max
             ? null
             : value.ToString(CultureInfo.InvariantCulture);
     }

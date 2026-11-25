@@ -135,7 +135,7 @@ internal sealed record MemberShape(
     }
 }
 
-internal sealed record ParameterShape(string Name, string TypeName);
+internal sealed record ParameterShape(string Name, string TypeName, bool PassByIn = false);
 
 internal enum CallbackPhase { Serializing, Serialized, Deserializing, Deserialized }
 

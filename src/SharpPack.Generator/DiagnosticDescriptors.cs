@@ -356,4 +356,20 @@ internal static class DiagnosticDescriptors
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    internal static readonly DiagnosticDescriptor UnsupportedSidecarRoot = new(
+        id: "SHARPPACK045",
+        title: "No compile-time SharpPack formatter",
+        messageFormat: "Cannot use SharpPack for '{0}' at '{1}': {2}. Use a supported DTO or supply an explicit formatter.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    internal static readonly DiagnosticDescriptor IncompatibleSidecarRuntimeAbi = new(
+        id: "SHARPPACK046",
+        title: "Incompatible SharpPack external formatter runtime",
+        messageFormat: "Detected SharpPack sidecar ABI '{0}'; this Generator requires sidecar ABI {1}. Upgrade SharpPack.Core and SharpPack.Generator together.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }

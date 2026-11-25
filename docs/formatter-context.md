@@ -48,6 +48,74 @@ independently of the builder. A built context is safe to share between
 concurrent RPC calls. Different contexts may register different formatters for
 the same closed `T` without affecting each other.
 
+### Generate formatters for external types
+
+Declare a root with `[assembly: SharpPackExternalType(typeof(T))]` when its
+type is defined in another assembly and cannot be made `partial`. Add the
+generated provider once when you build the context:
+
+```csharp
+using SharpPack;
+using SharpPack.Generated;
+using Vendor;
+
+[assembly: SharpPackExternalType(typeof(Shipment))]
+
+var builder = new SharpPackSerializerContextBuilder();
+var context = SharpPackExternalFormatters.Register(builder).Build();
+byte[] payload = SharpPackSerializer.Serialize(shipment, context);
+Shipment? copy = SharpPackSerializer.Deserialize<Shipment>(payload, context);
+```
+
+Declare multiple roots with multiple attributes. The generator visits only
+their serialization graphs, includes closed arrays and known collections,
+and reuses existing SharpPack and built-in formatters. Explicit context
+registrations take precedence over generated ones. The context-free APIs do
+not use these formatters.
+
+An ordinary external object uses SharpPack's existing object layout:
+
+- Public readable properties and fields participate, base type first, with
+  SharpPack include/ignore attributes applied. An inaccessible included member
+  present in the referenced metadata is an error. Each member needs an
+  accessible setter (including `init`) or one matching constructor parameter.
+- Use a single callable constructor or select one with
+  `[SharpPackConstructor]`. A selected constructor present in the referenced
+  metadata must be accessible; its parameters must match serialized member
+  names and types. Positional records and structs containing managed references
+  follow the same rules.
+- Metadata preserves the order within its field and property tables, but not
+  the relative source order of fields and properties declared together. For
+  such a type, all members need contiguous `[SharpPackOrder]` values starting
+  at zero. With a vendor type you cannot annotate, use a DTO or an explicit
+  formatter instead of guessing the order.
+- Version-tolerant objects, reference-tracked objects, unions, callbacks and
+  member-specific formatters use their existing authoritative SharpPack
+  formatter. Sidecars do not infer those contracts. A recursive *type* graph
+  is valid, but an ordinary object layout does not preserve cyclic instances.
+
+`SHARPPACK045` identifies the root, the nested path and the reason when no
+formatter can be generated. No reflection-based object serializer is tried
+at runtime. Existing unmanaged raw-copy bytes, including the padding policy,
+are unchanged.
+
+#### Reuse the compiler API in an integration
+
+Reference the shipped `SharpPack.Generator.dll` in the compiler project, not
+the runtime application. Call `SharpPackSidecarGenerator.Generate` with your
+original Roslyn compilation, the payload roots selected by your own routing,
+and a unique provider name. Report the returned diagnostics and add the
+returned source using its hint name. Your generated startup code calls
+`SharpPack.Generated.<providerName>.Register(builder)` before building the
+adapter context.
+
+The result supplies each root's support and the ordered wire members of its
+reachable sidecars; integrations can use those descriptions for compatibility
+checks. Pass a type in `registeredFormatterTypes` only when your integration
+will provide that formatter. This hands the node to the integration without
+analyzing its members. No generated attribute has to be visible to a second
+source generator.
+
 ### Register an external union formatter
 
 When a formatter declared with `[SharpPackUnionFormatter]` lives in a separate

@@ -89,24 +89,24 @@ internal sealed record UnionShape(
                 item.Type.Name))),
             externalFormatter is null ? null : ExternalUnionFormatterShape.Capture(externalFormatter));
 
-        string ConstructName(INamedTypeSymbol type) => Bind(type).FullyQualifiedToString();
+        string ConstructName(INamedTypeSymbol type) => Bind(type, targetArguments).FullyQualifiedToString();
+    }
 
-        INamedTypeSymbol Bind(INamedTypeSymbol type)
+    internal static INamedTypeSymbol Bind(INamedTypeSymbol type, ITypeSymbol[] targetArguments)
+    {
+        if (!type.IsUnboundGenericType) return type;
+
+        var definition = type.ConstructedFrom;
+        if (type.ContainingType is { IsUnboundGenericType: true } containing)
         {
-            if (!type.IsUnboundGenericType) return type;
-
-            var definition = type.ConstructedFrom;
-            if (type.ContainingType is { IsUnboundGenericType: true } containing)
-            {
-                // Rebind the containing declaration first: a non-generic
-                // nested case still needs its parent's type arguments.
-                var boundContainer = Bind(containing);
-                if (boundContainer.IsUnboundGenericType) return type;
-                definition = boundContainer.GetTypeMembers(type.Name, type.Arity)[0];
-            }
-
-            return definition.Arity == 0 ? definition
-                : definition.Arity == targetArguments.Length ? definition.Construct(targetArguments) : type;
+            // Rebind the containing declaration first: a non-generic
+            // nested case still needs its parent's type arguments.
+            var boundContainer = Bind(containing, targetArguments);
+            if (boundContainer.IsUnboundGenericType) return type;
+            definition = boundContainer.GetTypeMembers(type.Name, type.Arity)[0];
         }
+
+        return definition.Arity == 0 ? definition
+            : definition.Arity == targetArguments.Length ? definition.Construct(targetArguments) : type;
     }
 }

@@ -273,6 +273,33 @@ public class ReferenceSymbols
             return false;
         }
 
+        // Contains also accepts a broad family of collection members for the
+        // object generator. The root probe must require an actual formatter.
+        internal bool IsKnownLeaf(ITypeSymbol type)
+            => type.SpecialType == SpecialType.System_String || type is INamedTypeSymbol { IsGenericType: false } && knownTypes.Contains(type);
+
+        internal string? GetExactGenericFormatter(INamedTypeSymbol type)
+        {
+            var name = GetNonDefaultFormatterName(type);
+            if (name is null || !type.IsGenericType) return null;
+
+            // The general naming helper is also used on open model members
+            // for AOT roots. For closed roots verify that the named formatter
+            // actually formats this symbol, not a same-named lookalike.
+            var prefix = "global::".Length;
+            var definition = parent.Compilation.GetTypeByMetadataName(
+                name.Substring(prefix, name.IndexOf('<') - prefix) + "`" + type.Arity);
+            var target = definition?.Construct(type.TypeArguments.ToArray());
+            var formatter = parent.Compilation.GetTypeByMetadataName("SharpPack.SharpPackFormatter`1");
+            for (var candidate = target?.BaseType; candidate is not null; candidate = candidate.BaseType)
+            {
+                if (SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, formatter) &&
+                    SymbolEqualityComparer.Default.Equals(candidate.TypeArguments[0], type))
+                    return name;
+            }
+            return null;
+        }
+
         public string? GetNonDefaultFormatterName(ITypeSymbol? type)
         {
             if (type == null) return null;

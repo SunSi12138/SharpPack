@@ -32,6 +32,11 @@ type public sealed class SharpPack.CompilerServices.PreserveAttribute : System.A
 type public static class SharpPack.CompilerServices.SharpPackGeneratedCodeContract
   field public const System.Int32 Version = 1
 
+type public static class SharpPack.CompilerServices.SharpPackSidecarRegistration
+  field public const System.Int32 Version = 1
+  method public static System.Void Register<T>(SharpPack.SharpPackSerializerContextBuilder builder, System.Func<SharpPack.SharpPackSerializerContext, SharpPack.SharpPackFormatter<T>> factory)
+  method public static System.Void RegisterBuiltIn<T>(SharpPack.SharpPackSerializerContextBuilder builder, System.Func<SharpPack.SharpPackFormatter<T>> factory)
+
 type public sealed class SharpPack.Compression.BitPackFormatter : SharpPack.SharpPackFormatter<System.Boolean[]>, SharpPack.ISharpPackFormatter<System.Boolean[]>
   ctor public BitPackFormatter()
   field public static readonly SharpPack.Compression.BitPackFormatter Default
@@ -741,6 +746,10 @@ type public enum SharpPack.SharpPackErrorCode : System.Int32, System.IComparable
   field public const SharpPack.SharpPackErrorCode UnexpectedEndOfPayload = 1
   field public const SharpPack.SharpPackErrorCode Unknown = 0
 
+type public sealed class SharpPack.SharpPackExternalTypeAttribute : System.Attribute
+  ctor public SharpPackExternalTypeAttribute(System.Type type)
+  property System.Type Type { get:public; }
+
 type public abstract class SharpPack.SharpPackFormatter<T> : SharpPack.ISharpPackFormatter<T>
   ctor protected SharpPackFormatter()
   method public abstract System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref T value)
@@ -1161,4 +1170,3 @@ type public sealed class SharpPack.Utf16StringFormatterAttribute : SharpPack.Sha
 type public sealed class SharpPack.Utf8StringFormatterAttribute : SharpPack.SharpPackCustomFormatterAttribute<SharpPack.Formatters.Utf8StringFormatter, System.String>
   ctor public Utf8StringFormatterAttribute()
   method public override SharpPack.Formatters.Utf8StringFormatter GetFormatter()
-

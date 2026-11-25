@@ -18,26 +18,31 @@ partial class SharpPackGenerator
             return default;
         }
 
-        var references = new ReferenceSymbols(compilation);
+        var formatters = declarations.Select(declaration =>
+            compilation.GetSemanticModel(declaration.SyntaxTree).GetDeclaredSymbol(declaration, cancellationToken))
+            .OfType<INamedTypeSymbol>();
+        var groups = GroupExternalUnionFactories(formatters, new ReferenceSymbols(compilation));
+        var plans = groups.OrderBy(static group =>
+                     group.Key.FullyQualifiedToString(),
+                     StringComparer.Ordinal)
+            .Select(static group => PlanExternalUnionTargetFactory(group.Key, group.Value))
+            .OfType<ExternalUnionFactoryPlan>();
+        return new(plans);
+    }
+
+    internal static Dictionary<INamedTypeSymbol, List<ExternalUnionFactoryEntry>> GroupExternalUnionFactories(
+        IEnumerable<INamedTypeSymbol> formatters, ReferenceSymbols references)
+    {
         var groups =
             new Dictionary<INamedTypeSymbol, List<ExternalUnionFactoryEntry>>(
                 SymbolEqualityComparer.Default);
 
-        foreach (var declaration in declarations)
+        foreach (var formatter in formatters)
         {
-            var semanticModel =
-                compilation.GetSemanticModel(declaration.SyntaxTree);
-            if (semanticModel.GetDeclaredSymbol(
-                    declaration,
-                    cancellationToken) is not INamedTypeSymbol formatter)
-            {
-                continue;
-            }
-
             var attribute = formatter.GetAttribute(
                 references.SharpPackUnionFormatterAttribute);
-            if (attribute?.ConstructorArguments[0].Value is not
-                INamedTypeSymbol union)
+            if (attribute?.ConstructorArguments is not { Length: 1 } arguments ||
+                arguments[0].Value is not INamedTypeSymbol union)
             {
                 continue;
             }
@@ -61,12 +66,7 @@ partial class SharpPackGenerator
             entries.Add(new ExternalUnionFactoryEntry(formatter, union));
         }
 
-        var plans = groups.OrderBy(static group =>
-                     group.Key.FullyQualifiedToString(),
-                     StringComparer.Ordinal)
-            .Select(static group => PlanExternalUnionTargetFactory(group.Key, group.Value))
-            .OfType<ExternalUnionFactoryPlan>();
-        return new(plans);
+        return groups;
     }
 
     static bool IsPartialTarget(INamedTypeSymbol target)
@@ -92,16 +92,7 @@ partial class SharpPackGenerator
         INamedTypeSymbol target,
         List<ExternalUnionFactoryEntry> entries)
     {
-        var compatibleEntries = entries
-            .Where(entry => CanConstructFormatter(target, entry))
-            .OrderBy(static entry => IsOpenPattern(entry.Union) ? 1 : 0)
-            .ThenBy(static entry =>
-                entry.Union.FullyQualifiedToString(),
-                StringComparer.Ordinal)
-            .ThenBy(static entry =>
-                entry.Formatter.FullyQualifiedToString(),
-                StringComparer.Ordinal)
-            .ToArray();
+        var compatibleEntries = OrderExternalUnionFactories(target, entries).ToArray();
         if (compatibleEntries.Length == 0)
         {
             return null;
@@ -132,6 +123,19 @@ partial class SharpPackGenerator
             SerializationPlanner.AvailableFactoryName(rootStem, GeneratedNameFacts.CaptureFactoryIdentifiers(target, rootStem)),
             new(matches), fallback);
     }
+
+    internal static INamedTypeSymbol? ResolveExternalUnionFormatter(INamedTypeSymbol closedTarget,
+        List<ExternalUnionFactoryEntry> entries)
+        => OrderExternalUnionFactories(closedTarget.OriginalDefinition, entries)
+            .FirstOrDefault(entry => IsOpenPattern(entry.Union) ||
+                SymbolEqualityComparer.Default.Equals(entry.Union, closedTarget))?.Formatter;
+
+    static IEnumerable<ExternalUnionFactoryEntry> OrderExternalUnionFactories(
+        INamedTypeSymbol target, List<ExternalUnionFactoryEntry> entries)
+        => entries.Where(entry => CanConstructFormatter(target, entry))
+            .OrderBy(static entry => IsOpenPattern(entry.Union) ? 1 : 0)
+            .ThenBy(static entry => entry.Union.FullyQualifiedToString(), StringComparer.Ordinal)
+            .ThenBy(static entry => entry.Formatter.FullyQualifiedToString(), StringComparer.Ordinal);
 
     static bool CanConstructFormatter(
         INamedTypeSymbol target,
@@ -168,7 +172,7 @@ partial class SharpPackGenerator
         return ExternalUnionFormatterShape.QualifyName(formatter);
     }
 
-    readonly record struct ExternalUnionFactoryEntry(INamedTypeSymbol Formatter, INamedTypeSymbol Union);
+    internal sealed record ExternalUnionFactoryEntry(INamedTypeSymbol Formatter, INamedTypeSymbol Union);
 }
 
 internal sealed record ExternalUnionFactoryPlan(

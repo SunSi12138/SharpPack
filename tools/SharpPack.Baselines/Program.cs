@@ -33,7 +33,8 @@ static class BaselineProgram
             ["eng/baselines/public-api/SharpPack.Generator.txt"] =
                 PublicApiBaseline.Create(
                     typeof(SharpPackGenerator).Assembly,
-                    static type => type == typeof(SharpPackGenerator)),
+                    static type => type == typeof(SharpPackGenerator) || type == typeof(SharpPackFormatterSupport) ||
+                        type.Name.StartsWith("SharpPackSidecar", StringComparison.Ordinal)),
             ["eng/baselines/generated/representative.g.cs.txt"] =
                 GeneratedSourceBaseline.Create(),
             ["eng/baselines/generated/representative.ts.txt"] =

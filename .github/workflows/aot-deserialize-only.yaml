@@ -9,6 +9,8 @@ on:
       - 'sandbox/DeserializeOnlyAot.Contracts/**'
       - 'sandbox/HandwrittenFactoryAot/**'
       - 'sandbox/NativeAot/**'
+      - 'sandbox/SidecarAot/**'
+      - 'sandbox/SidecarFixture/**'
       - 'src/**'
       - 'Directory.Build.props'
       - 'global.json'
@@ -45,6 +47,10 @@ jobs:
         run: |
           dotnet publish sandbox/HandwrittenFactoryAot -c Release -o "$RUNNER_TEMP/handwritten-aot"
           "$RUNNER_TEMP/handwritten-aot/HandwrittenFactoryAot"
+      - name: Read external metadata roots without dynamic code
+        run: |
+          dotnet publish sandbox/SidecarAot -c Release -p:SharpPackSidecarPublishMode=aot -o "$RUNNER_TEMP/sidecar-aot"
+          "$RUNNER_TEMP/sidecar-aot/SidecarAot"
       - name: Verify the unused private method is trimmed
         run: |
           set -o pipefail
@@ -70,4 +76,6 @@ jobs:
           "$RUNNER_TEMP/trimmed-jit/DeserializeOnlyAot"
           dotnet publish sandbox/HandwrittenFactoryAot -c Release -p:SharpPackTrimmedJit=true --self-contained true -r linux-x64 -o "$RUNNER_TEMP/handwritten-trimmed-jit"
           "$RUNNER_TEMP/handwritten-trimmed-jit/HandwrittenFactoryAot"
+          dotnet publish sandbox/SidecarAot -c Release -p:SharpPackSidecarPublishMode=trim --self-contained true -r linux-x64 -o "$RUNNER_TEMP/sidecar-trimmed-jit"
+          "$RUNNER_TEMP/sidecar-trimmed-jit/SidecarAot"
       - run: git diff --exit-code

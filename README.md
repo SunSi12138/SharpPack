@@ -166,6 +166,10 @@ for lifecycle rules, migration details and architecture. A complete executable
 example is available in
 [`sandbox/CollectibleAlcSample`](sandbox/CollectibleAlcSample).
 
+To serialize a third-party type without changing it or writing a formatter,
+declare its closed type at compile time and add the generated provider to your
+context. See [Generate formatters for external types](docs/formatter-context.md#generate-formatters-for-external-types).
+
 See [SharpPack versus MemoryPack benchmarks](docs/benchmarks.md) for the
 reproducible NuGet-only comparison and current latency, throughput and
 allocation results. SharpPack 1.1.0 matches MemoryPack 1.21.4 for unmanaged

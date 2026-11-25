@@ -86,6 +86,7 @@ public sealed class SharpPackSerializerContext
 public sealed class SharpPackSerializerContextBuilder
 {
     readonly List<Action<SharpPackSerializerContext>> registrations = [];
+    List<Action<SharpPackSerializerContext>>? generatedRegistrations;
     SharpPackSerializerConfiguration configuration = SharpPackSerializerConfiguration.Default;
     readonly Dictionary<string, Type> typesById = new(StringComparer.Ordinal);
     readonly HashSet<Type> registeredTypes = [];
@@ -141,6 +142,12 @@ public sealed class SharpPackSerializerContextBuilder
         where TFactory : ISharpPackFormatterFactory<T>
         => Register<T>(TFactory.CreateFormatter());
 
+    internal void RegisterGeneratedFactory<T>(Func<SharpPackSerializerContext, SharpPackFormatter<T>> factory)
+    {
+        ThrowIfBuilt();
+        (generatedRegistrations ??= []).Add(context => context.Graph.RegisterGeneratedFactory(factory));
+    }
+
     public SharpPackSerializerContextBuilder RegisterCollection<TCollection, TElement>()
         where TCollection : ICollection<TElement?>, new()
         => Register(new GenericCollectionFormatter<TCollection, TElement>());
@@ -169,12 +176,16 @@ public sealed class SharpPackSerializerContextBuilder
             {
                 registration(context);
             }
+            if (generatedRegistrations is not null)
+                foreach (var register in generatedRegistrations)
+                    register(context);
             context.FreezeRegistrations();
             return context;
         }
         finally
         {
             registrations.Clear();
+            generatedRegistrations?.Clear();
             typesById.Clear();
             registeredTypes.Clear();
         }

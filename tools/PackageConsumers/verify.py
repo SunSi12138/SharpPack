@@ -414,6 +414,47 @@ def verify_roslyn_hosts(work, current_cache, previous_cache, version, env):
     print("Minimum and current Roslyn hosts generated identical source", flush=True)
 
 
+def verify_sidecar_integration(work, feed, current_cache, version, env):
+    generator = current_cache / GENERATOR.lower() / version / f"analyzers/dotnet/cs/{GENERATOR}.dll"
+    vendor = work / "sidecar-vendor"
+    project(vendor, "", "<OutputType>Library</OutputType><AssemblyName>SidecarFixture</AssemblyName>")
+    shutil.copyfile(ROOT / "sandbox/SidecarFixture/ExternalModels.cs", vendor / "ExternalModels.cs")
+    config = nuget_config(vendor / "NuGet.Config", feed)
+    run(["dotnet", "build", "-c", "Release", "--configfile", str(config)], vendor, env)
+    vendor_assembly = vendor / "bin/Release/net10.0/SidecarFixture.dll"
+
+    analyzer = work / "sidecar-integration-analyzer"
+    project(analyzer, package_references({"Microsoft.CodeAnalysis.CSharp": ROSLYN_HOSTS[0]}) +
+            f'<Reference Include="{GENERATOR}"><HintPath>{escape(str(generator))}</HintPath></Reference>',
+            "<TargetFramework>netstandard2.0</TargetFramework><OutputType>Library</OutputType>"
+            "<AssemblyName>SidecarConsumerAnalyzer</AssemblyName>")
+    shutil.copyfile(HERE / "SidecarConsumerAnalyzer.cs", analyzer / "SidecarConsumerAnalyzer.cs")
+    config = nuget_config(analyzer / "NuGet.Config", network=True)
+    run(["dotnet", "build", "-c", "Release", "--configfile", str(config)], analyzer, env)
+    analyzer_assembly = analyzer / "bin/Release/netstandard2.0/SidecarConsumerAnalyzer.dll"
+
+    path = work / "sidecar-integration"
+    project(path, package_references({AGGREGATE: version}) +
+            f'<Reference Include="SidecarFixture"><HintPath>{escape(str(vendor_assembly))}</HintPath></Reference>'
+            f'<Analyzer Include="{escape(str(analyzer_assembly))}" />')
+    (path / "Program.cs").write_text("""using SharpPack;
+using SharpPack.Generated;
+using SidecarFixture;
+
+var context = PackageRoute.Register(new SharpPackSerializerContextBuilder()).Build();
+var original = new ExternalNote { Count = 4, Text = "package route" };
+var roundTrip = SharpPackSerializer.Deserialize<ExternalNote>(SharpPackSerializer.Serialize(original, context), context);
+if (roundTrip is not { Count: 4, Text: "package route" })
+    throw new InvalidOperationException("Packaged generator integration did not round-trip.");
+""")
+    config = nuget_config(path / "NuGet.Config", feed)
+    local_env = dict(env, NUGET_PACKAGES=str(path / "packages"))
+    run(["dotnet", "restore", "--configfile", str(config)], path, local_env)
+    assets(path, {name: version for name in (CORE, GENERATOR, AGGREGATE)})
+    run(["dotnet", "run", "-c", "Release", "--no-restore"], path, local_env)
+    print("A separate compiler integration used the packaged SharpPack analyzer and external metadata", flush=True)
+
+
 def verify_lockstep(work, feed, streaming_package, version, env):
     # A resolver-only alternate package, from the same build, is never run or published.
     newer = f"{int(version.split('.')[0]) + 1}.0.0"
@@ -494,6 +535,7 @@ def main():
         verify_artifact_tooling(work / "artifact-tooling", feed, version, env)
         verify_multitargeted_artifacts(work / "artifact-multitarget", feed, version, env)
         if args.compatibility:
+            verify_sidecar_integration(work, feed, current_cache, version, env)
             verify_compatibility(work, packages, current_cache, version, env, args.architecture)
 
 

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Compile-time external formatters
+
+- Declare closed external roots and register one generated provider when
+  building a context. Unsupported members fail the build with a nested
+  path. Existing SharpPack formatters and unmanaged raw-copy bytes are reused.
+- Integrations can request the same analysis and emission from their original
+  Roslyn compilation. See [external type formatters](docs/formatter-context.md#generate-formatters-for-external-types).
+
 ### NativeAOT deserialization roots
 
 - Narrow generic deserialization preservation from non-public methods to
