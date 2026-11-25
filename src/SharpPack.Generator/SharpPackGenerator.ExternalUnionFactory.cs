@@ -8,18 +8,6 @@ namespace SharpPack.Generator;
 
 partial class SharpPackGenerator
 {
-    static void GenerateExternalUnionTargetFactories(
-        ImmutableArray<TypeDeclarationSyntax> declarations,
-        Compilation compilation,
-        IGeneratorContext context)
-    {
-        foreach (var plan in PlanExternalUnionTargetFactories(declarations, compilation, context.CancellationToken))
-        {
-            var (hint, source) = CSharpEmitter.EmitExternalUnionTargetFactory(plan, context.IsCSharp10OrGreater());
-            context.AddSource(hint, source);
-        }
-    }
-
     internal static EquatableArray<ExternalUnionFactoryPlan> PlanExternalUnionTargetFactories(
         ImmutableArray<TypeDeclarationSyntax> declarations,
         Compilation compilation,
@@ -214,7 +202,7 @@ internal sealed record ExternalUnionTypeMatch(string Parameter, string TypeName)
 
 internal sealed partial class CSharpEmitter
 {
-    internal static (string Hint, string Source) EmitExternalUnionTargetFactory(ExternalUnionFactoryPlan factory, bool fileScopedNamespace)
+    internal static GeneratedSource EmitExternalUnionTargetFactory(ExternalUnionFactoryPlan factory, bool fileScopedNamespace)
     {
         var targetType = factory.TargetType;
         var sb = new StringBuilder();
@@ -302,6 +290,6 @@ internal sealed partial class CSharpEmitter
             .Replace(">", "_")
             .Replace(",", "_")
             .Replace(" ", "");
-        return ($"{hintName}.SharpPackExternalUnionFactory.g.cs", sb.ToString());
+        return new($"{hintName}.SharpPackExternalUnionFactory.g.cs", sb.ToString());
     }
 }

@@ -173,14 +173,8 @@ public class TypeShapeTest
         var tree = CSharpSyntaxTree.ParseText(text, options, "Models.cs");
         var compilation = CSharpGeneratorRunner.CreateCompilation(tree, CSharpSyntaxTree.ParseText(unrelated, options, "Other.cs"));
         var syntax = tree.GetRoot().DescendantNodes().OfType<TypeDeclarationSyntax>().Single(node => node.Identifier.ValueText == name);
-        return Assert.IsType<TypeShape>(SharpPackGenerator.AnalyzeModel(syntax, compilation, new AnalysisContext()));
-    }
-
-    sealed class AnalysisContext : IGeneratorContext
-    {
-        public CancellationToken CancellationToken => CancellationToken.None;
-        public LanguageVersion LanguageVersion => LanguageVersion.CSharp14;
-        public void AddSource(string hintName, string source) => throw new InvalidOperationException("Analysis cannot emit C#.");
-        public void ReportDiagnostic(Diagnostic diagnostic) => throw new InvalidOperationException(diagnostic.ToString());
+        var result = SharpPackGenerator.AnalyzeModel(syntax, compilation, CancellationToken.None);
+        Assert.Empty(result.Diagnostics);
+        return Assert.IsType<TypeShape>(result.Shape);
     }
 }
