@@ -133,6 +133,7 @@ public class BitArrayWireTest
             () => SharpPackSerializer.Deserialize<BitArray>(payload.AsSpan(0, payload.Length - 1)));
         var decoded = SharpPackSerializer.Deserialize<BitArray>(payload)!;
         Assert.True(decoded[0]);
+        Assert.Equal((byte)1, CollectionsMarshal.AsBytes(decoded)[0]);
         Assert.Equal(Payload(1, 1, 1), SharpPackSerializer.Serialize(decoded));
     }
 
