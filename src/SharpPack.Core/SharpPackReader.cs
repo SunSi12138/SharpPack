@@ -615,10 +615,16 @@ public ref partial struct SharpPackReader
     // The serializer calls this once on a fresh reader. Every normalized
     // depth limit permits the root; nested reads use the normal depth scopes.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void ReadRootValue<T>(scoped ref T? value)
+    internal void BeginRootRead()
     {
         System.Diagnostics.Debug.Assert(depth == 0);
         depth = 1;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void ReadRootValue<T>(scoped ref T? value)
+    {
+        BeginRootRead();
         GetFormatter<T>().Deserialize(ref this, ref value);
     }
 

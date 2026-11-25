@@ -162,7 +162,8 @@ public static partial class SharpPackSerializer
         var reader = new SharpPackReader(buffer, state, context.MaxReadDepth, context.MaxCollectionLength);
         try
         {
-            reader.ReadRootValue(ref value);
+            reader.BeginRootRead();
+            context.GetFormatter<T>().Deserialize(ref reader, ref value);
             return reader.Consumed;
         }
         finally
@@ -207,7 +208,8 @@ public static partial class SharpPackSerializer
         var reader = new SharpPackReader(buffer, state, context.MaxReadDepth, context.MaxCollectionLength);
         try
         {
-            reader.ReadRootValue(ref value);
+            reader.BeginRootRead();
+            context.GetFormatter<T>().Deserialize(ref reader, ref value);
             return reader.Consumed;
         }
         finally
