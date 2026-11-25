@@ -9,12 +9,27 @@ internal enum RootFastPath
 
 internal readonly record struct WireSlot(int Position, int? DeclaredMemberIndex);
 
-internal sealed record SerializationPlan(TypeShape Shape, RootFastPath RootFastPath, EquatableArray<WireSlot> WireSlots);
+internal readonly record struct ScalarBatch(int Count, bool UseDangerous);
+
+internal enum ObjectWriteStrategy { Plain, VersionedInlineLengths, VersionedBufferedLengths }
+
+internal sealed record SerializationPlan(
+    TypeShape Shape,
+    RootFastPath RootFastPath,
+    EquatableArray<WireSlot> WireSlots,
+    EquatableArray<ScalarBatch> ScalarBatches,
+    ObjectWriteStrategy ObjectWriteStrategy);
 
 internal static class SerializationPlanner
 {
+    const int MaximumScalarBatchArity = 15; // Core's unmanaged reader/writer overload family.
+
     internal static SerializationPlan Plan(TypeShape shape)
-        => new(shape, ChooseRootFastPath(shape), PlanWireSlots(shape));
+    {
+        var slots = PlanWireSlots(shape);
+        var kinds = slots.Select(slot => slot.DeclaredMemberIndex is int i ? shape.Members[i].Kind : MemberKind.Blank).ToArray();
+        return new(shape, ChooseRootFastPath(shape), slots, PlanScalarBatches(kinds), ChooseObjectWriteStrategy(shape, kinds));
+    }
 
     static RootFastPath ChooseRootFastPath(TypeShape shape)
     {
@@ -24,11 +39,11 @@ internal static class SerializationPlanner
             return RootFastPath.General;
         }
 
-        if (shape.Members.All(static member => HasFixedSize(member.Kind)))
+        if (shape.Members.All(static member => IsFixedWidthScalar(member.Kind)))
             return RootFastPath.FixedSize;
 
         if (shape.Members.All(static member => member.HasExactSizeSafeAccessor &&
-            (HasFixedSize(member.Kind) || member.Kind is MemberKind.String or MemberKind.UnmanagedArray)))
+            (IsFixedWidthScalar(member.Kind) || member.Kind is MemberKind.String or MemberKind.UnmanagedArray)))
         {
             return RootFastPath.ExactSize;
         }
@@ -66,6 +81,45 @@ internal static class SerializationPlanner
         return new EquatableArray<WireSlot>(slots);
     }
 
-    static bool HasFixedSize(MemberKind kind)
+    static ObjectWriteStrategy ChooseObjectWriteStrategy(TypeShape shape, MemberKind[] kinds)
+    {
+        if (shape.IsUnmanaged || shape.GenerateType is not (GenerateType.VersionTolerant or GenerateType.CircularReference))
+            return ObjectWriteStrategy.Plain;
+
+        return kinds.All(static kind => IsFixedWidthScalar(kind) ||
+                kind is MemberKind.String or MemberKind.UnmanagedArray or MemberKind.Blank)
+            ? ObjectWriteStrategy.VersionedInlineLengths
+            : ObjectWriteStrategy.VersionedBufferedLengths;
+    }
+
+    // Only a batch's first slot has a nonzero Count. A nullable scalar in the
+    // batch selects the existing Dangerous unmanaged overload for the batch.
+    internal static EquatableArray<ScalarBatch> PlanScalarBatches(MemberKind[] kinds)
+    {
+        if (kinds.Length == 0) return default;
+        var starts = new ScalarBatch[kinds.Length];
+        for (var start = 0; start < kinds.Length;)
+        {
+            if (!IsFixedWidthScalar(kinds[start]))
+            {
+                start++;
+                continue;
+            }
+
+            var end = start;
+            var limit = Math.Min(kinds.Length, start + MaximumScalarBatchArity);
+            var dangerous = false;
+            while (end < limit && IsFixedWidthScalar(kinds[end]))
+            {
+                dangerous |= kinds[end] == MemberKind.UnmanagedNullable;
+                end++;
+            }
+            starts[start] = new ScalarBatch(end - start, dangerous);
+            start = end;
+        }
+        return new EquatableArray<ScalarBatch>(starts);
+    }
+
+    static bool IsFixedWidthScalar(MemberKind kind)
         => kind is MemberKind.Unmanaged or MemberKind.Enum or MemberKind.UnmanagedNullable;
 }

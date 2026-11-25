@@ -63,6 +63,46 @@ public class SerializationPlanTest
     }
 
     [Fact]
+    public void ScalarBatchesStopAtTheRuntimeOverloadArityAndMemberBoundaries()
+    {
+        var kinds = Enumerable.Repeat(MemberKind.Unmanaged, 16)
+            .Concat(new[] { MemberKind.String, MemberKind.Enum, MemberKind.Blank, MemberKind.Unmanaged }).ToArray();
+        kinds[4] = MemberKind.UnmanagedNullable;
+        var batches = SerializationPlanner.PlanScalarBatches(kinds);
+        Assert.Equal(new ScalarBatch(15, true), batches[0]);
+        Assert.Equal(default, batches[4]);
+        Assert.Equal(new ScalarBatch(1, false), batches[15]);
+        Assert.Equal(default, batches[16]);
+        Assert.Equal(new ScalarBatch(1, false), batches[17]);
+        Assert.Equal(default, batches[18]);
+        Assert.Equal(new ScalarBatch(1, false), batches[19]);
+    }
+
+    [Fact]
+    public void VersionedLengthStrategyUsesTheEffectiveWireSlots()
+    {
+        const string source = """
+            using SharpPack;
+            [SharpPackable(GenerateType.VersionTolerant)]
+            public partial class InlineLengths
+            {
+                [SharpPackOrder(0)] public string? Text;
+                [SharpPackOrder(2)] public int[]? Values;
+            }
+            [SharpPackable(GenerateType.VersionTolerant)]
+            public partial class BufferedLengths
+            {
+                [SharpPackOrder(0)] public InlineLengths? Model;
+            }
+            """;
+        var inline = SerializationPlanner.Plan(TypeShapeTest.Analyze(source, "InlineLengths"));
+        var buffered = SerializationPlanner.Plan(TypeShapeTest.Analyze(source, "BufferedLengths"));
+        Assert.Equal(ObjectWriteStrategy.VersionedInlineLengths, inline.ObjectWriteStrategy);
+        Assert.Equal(new WireSlot(1, null), inline.WireSlots[1]);
+        Assert.Equal(ObjectWriteStrategy.VersionedBufferedLengths, buffered.ObjectWriteStrategy);
+    }
+
+    [Fact]
     public void SequentialVersionedDuplicateUsesTheFirstDeclaredMember()
     {
         var shape = TypeShapeTest.Analyze(SparseModel("VersionTolerant", "Sequential", 0), "Sparse");
