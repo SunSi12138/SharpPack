@@ -109,9 +109,10 @@ returned source using its hint name. Your generated startup code calls
 `SharpPack.Generated.<providerName>.Register(builder)` before building the
 adapter context.
 
-The result supplies each root's support and the ordered wire members of its
-reachable sidecars; integrations can use those descriptions for compatibility
-checks. Pass a type in `registeredFormatterTypes` only when your integration
+The result supplies each root's support, reachable sidecar types, and ordered
+wire members. It returns Roslyn type symbols rather than C# display names, so
+your integration can apply its existing identity rules, such as ignoring tuple
+element labels. Pass a type in `registeredFormatterTypes` only when your integration
 will provide that formatter. This hands the node to the integration without
 analyzing its members. No generated attribute has to be visible to a second
 source generator.

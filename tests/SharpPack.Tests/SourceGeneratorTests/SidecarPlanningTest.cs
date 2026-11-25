@@ -77,7 +77,7 @@ public class SidecarPlanningTest
         Assert.All(output.Roots.Take(8), static result => Assert.Equal(SharpPackFormatterSupport.Existing, result.Support));
         Assert.All(output.Roots.Skip(8), static result => Assert.Equal(SharpPackFormatterSupport.GenerateExternal, result.Support));
         Assert.Equal(["Metadata", "Children"], output.Roots[^1].Sidecars
-            .Single(static shape => shape.TypeName == "global::Vendor.Node").Members.Select(static member => member.Name));
+            .Single(static shape => shape.Type.Name == "Node").Members.Select(static member => member.Name));
         Assert.Empty(output.Roots.Single(static result => result.Type.Name == "Raw").Sidecars);
         Assert.Equal(output.Source, SharpPackSidecarGenerator.Generate(compilation, roots.Reverse().ToImmutableArray(), "RouteProvider").Source);
 
@@ -137,6 +137,35 @@ public class SidecarPlanningTest
     }
 
     [Fact]
+    public void WireShapesExposeSymbolsAnIntegrationCanCanonicalize()
+    {
+        var compilation = Create("""
+            namespace Vendor;
+            public sealed class Box<T>
+            {
+                [SharpPackOrder(1)] public T Value { get; set; }
+                [SharpPackOrder(0)] public int Count { get; set; }
+            }
+            """, """
+            public class Roots { public Vendor.Box<(int Id, string Label)> Model { get; set; } }
+            """);
+        var root = Assert.IsAssignableFrom<IPropertySymbol>(compilation.GetTypeByMetadataName("Roots")!.GetMembers("Model")[0]);
+        var result = SharpPackSidecarGenerator.Generate(compilation, [new(root.Type)], "TupleProvider");
+        Assert.Empty(result.Diagnostics);
+        var sidecar = Assert.Single(Assert.Single(result.Roots).Sidecars);
+        Assert.Equal([(0, "Count"), (1, "Value")], sidecar.Members.Select(static member => (member.Position, member.Name)));
+        Assert.Equal(SpecialType.System_Int32, sidecar.Members[0].Type.SpecialType);
+        var member = sidecar.Members[1];
+        Assert.True(SymbolEqualityComparer.Default.Equals(root.Type, sidecar.Type));
+        Assert.True(SymbolEqualityComparer.Default.Equals(
+            ((IPropertySymbol)root.Type.GetMembers("Value")[0]).Type, member.Type));
+
+        var identityFormat = SymbolDisplayFormat.FullyQualifiedFormat.AddMiscellaneousOptions(SymbolDisplayMiscellaneousOptions.ExpandValueTuple);
+        Assert.Equal("global::Vendor.Box<global::System.ValueTuple<int, string>>", sidecar.Type.ToDisplayString(identityFormat));
+        Assert.Equal("global::System.ValueTuple<int, string>", member.Type.ToDisplayString(identityFormat));
+    }
+
+    [Fact]
     public void SourceExternalUnionReusesExactThenOpenAndRejectsAnUnmatchedClosedRoot()
     {
         var compilation = Create("""
@@ -175,8 +204,8 @@ public class SidecarPlanningTest
             [new(union.Construct(number)), new(union.Construct(text)), new(exact.Construct(number))], "UnionProvider");
         Assert.Empty(output.Diagnostics);
         Assert.All(output.Roots, static root => Assert.Equal(SharpPackFormatterSupport.Existing, root.Support));
-        Assert.Equal("global::Vendor.ExactPayload", Assert.Single(output.Roots[0].Sidecars).TypeName);
-        Assert.Equal("global::Vendor.OpenPayload", Assert.Single(output.Roots[1].Sidecars).TypeName);
+        Assert.Equal("global::Vendor.ExactPayload", Assert.Single(output.Roots[0].Sidecars).Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+        Assert.Equal("global::Vendor.OpenPayload", Assert.Single(output.Roots[1].Sidecars).Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
         var tree = CSharpSyntaxTree.ParseText(Assert.IsType<string>(output.Source), Parse, output.HintName);
         var (diagnostics, generated) = Run(compilation.AddSyntaxTrees(tree));
         Assert.Empty(diagnostics);
