@@ -219,7 +219,7 @@ public partial class Hoge
     }
 
 
-    class TypeScriptOptionProvider : AnalyzerConfigOptionsProvider
+    internal sealed class TypeScriptOptionProvider : AnalyzerConfigOptionsProvider
     {
         readonly Dictionary<string, string> _values = new();
 

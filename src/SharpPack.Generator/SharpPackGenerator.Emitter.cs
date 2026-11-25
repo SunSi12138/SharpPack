@@ -367,7 +367,7 @@ public partial class TypeMeta
             fixedSizeInterface = ", global::SharpPack.IFixedSizeSharpPackable";
             fixedSizeMethod = $$"""
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static int global::SharpPack.IFixedSizeSharpPackable.Size => {{headerPlus}}{{sizeOf}};
 
 """;
@@ -438,7 +438,7 @@ public partial class TypeMeta
             ? ""
             : $$"""
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static void {{aotRootMethodName}}()
     {
 {{aotFormatterRoots}}
@@ -446,7 +446,7 @@ public partial class TypeMeta
 """;
         var contextFactoryMethod = $$"""
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<{{TypeName}}> global::SharpPack.ISharpPackFormatterFactory<{{TypeName}}>.CreateFormatter()
     {
 {{selfFactoryRootRead}}
@@ -454,7 +454,7 @@ public partial class TypeMeta
         return new global::SharpPack.Formatters.SharpPackableFormatter<{{TypeName}}>();
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<{{TypeName}}> global::SharpPack.ISharpPackContextFormatterFactory<{{TypeName}}>.CreateFormatter(
         global::SharpPack.SharpPackSerializerContext context)
     {
@@ -477,7 +477,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 {{contextFactoryMethod}}
 {{formatterOverrideMethods}}
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     {{staticSharpPackableMethod}}{{serializeMethodSignarture}} writer, {{scopedRef}} {{TypeName}}{{nullable}} value) {{constraint}}
     {
 {{(IsUnmanagedType ? "" : OnSerializing.Select(x => "        " + x.Emit()).NewLine())}}
@@ -487,7 +487,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         return;
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     {{staticSharpPackableMethod}}Deserialize(ref SharpPackReader reader, {{scopedRef}} {{TypeName}}{{nullable}} value)
     {
 {{(IsUnmanagedType ? "" : OnDeserializing.Select(x => "        " + x.Emit()).NewLine())}}
@@ -932,7 +932,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 
         return $$"""
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     byte[] global::SharpPack.ISharpPackExactSizeSerializable<{{TypeName}}>.SerializeExact()
     {
 {{captureMembers}}
@@ -1007,7 +1007,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         return;
     }
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     sealed class {{contextFormatterTypeName}}
         : global::SharpPack.SharpPackFormatter<{{TypeName}}>,
           global::SharpPack.ISharpPackContextOverrideFormatter
@@ -1472,7 +1472,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         var selfFactoryRoot = GetSelfFactoryRootName();
         var contextFactoryMethod = $$"""
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<{{TypeName}}> global::SharpPack.ISharpPackFormatterFactory<{{TypeName}}>.CreateFormatter()
     {
 {{EmitFactoryRootRead(selfFactoryRoot)}}
@@ -1492,12 +1492,12 @@ partial {{classOrInterfaceOrRecord}} {{TypeName}} : {{contextFactoryInterface}}
 {{EmitSelfFactoryRoots(selfFactoryRoot, includeContextFactory: false)}}
 {{contextFactoryMethod}}
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     sealed class {{Symbol.Name}}Formatter : SharpPackFormatter<{{TypeName}}>
     {
 {{EmitUnionTypeToTagField()}}
 
-        [global::SharpPack.Internal.Preserve]
+        [global::SharpPack.CompilerServices.Preserve]
         public override void {{serializeMethodSignarture}} writer, {{scopedRef}} {{TypeName}}? value)
         {
 {{OnSerializing.Select(x => "            " + x.Emit()).NewLine()}}
@@ -1505,7 +1505,7 @@ partial {{classOrInterfaceOrRecord}} {{TypeName}} : {{contextFactoryInterface}}
 {{OnSerialized.Select(x => "            " + x.Emit()).NewLine()}}
         }
 
-        [global::SharpPack.Internal.Preserve]
+        [global::SharpPack.CompilerServices.Preserve]
         public override void Deserialize(ref SharpPackReader reader, {{scopedRef}} {{TypeName}}? value)
         {
 {{OnDeserializing.Select(x => "            " + x.Emit()).NewLine()}}
@@ -1537,7 +1537,7 @@ partial {{classOrInterfaceOrRecord}} {{TypeName}} : {{contextFactoryInterface}}
             $"Register{formatterSymbol.Name}";
 
         var code = $$"""
-[global::SharpPack.Internal.Preserve]
+[global::SharpPack.CompilerServices.Preserve]
 partial class {{TypeName}} :
     SharpPackFormatter<{{symbolFullQualified}}>,
     global::SharpPack.ISharpPackFormatterFactory<{{symbolFullQualified}}>
@@ -1551,7 +1551,7 @@ partial class {{TypeName}} :
 
 {{EmitUnionTypeToTagField()}}
 
-        [global::SharpPack.Internal.Preserve]
+        [global::SharpPack.CompilerServices.Preserve]
         public override void {{serializeMethodSignarture}} writer, {{scopedRef}} {{symbolFullQualified}}? value)
         {
 {{OnSerializing.Select(x => "            " + x.Emit()).NewLine()}}
@@ -1559,7 +1559,7 @@ partial class {{TypeName}} :
 {{OnSerialized.Select(x => "            " + x.Emit()).NewLine()}}
         }
 
-        [global::SharpPack.Internal.Preserve]
+        [global::SharpPack.CompilerServices.Preserve]
         public override void Deserialize(ref SharpPackReader reader, {{scopedRef}} {{symbolFullQualified}}? value)
         {
 {{OnDeserializing.Select(x => "            " + x.Emit()).NewLine()}}
@@ -1568,7 +1568,7 @@ partial class {{TypeName}} :
         }
 }
 
-[global::SharpPack.Internal.Preserve]
+[global::SharpPack.CompilerServices.Preserve]
 public static class {{registrationClassName}}
 {
     public static global::SharpPack.SharpPackSerializerContextBuilder
@@ -1792,7 +1792,7 @@ public static class {{registrationClassName}}
         var selfFactoryRoot = GetSelfFactoryRootName();
         var contextFactoryMethod = $$"""
 
-    [global::SharpPack.Internal.Preserve]
+    [global::SharpPack.CompilerServices.Preserve]
     static global::SharpPack.SharpPackFormatter<{{TypeName}}> global::SharpPack.ISharpPackFormatterFactory<{{TypeName}}>.CreateFormatter()
     {
 {{EmitFactoryRootRead(selfFactoryRoot)}}
