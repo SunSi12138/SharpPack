@@ -109,7 +109,7 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
         else
         {
             var buffer = current.FreeBuffer;
-            if (buffer.Length >= sizeHint)
+            if (buffer.Length != 0 && buffer.Length >= sizeHint)
             {
                 return buffer;
             }
