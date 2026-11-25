@@ -38,6 +38,10 @@ Analysis records which model factories can provide context; the planner sorts
 and deduplicates the dependencies. The emitter preserves typed factories for
 trimming and keeps closed formatter instances only without dynamic code.
 
-Remaining per-member operations, generated root names and other wire strategies
+Analysis also captures the names already in use and whether a static initializer
+is required. Planning chooses available helper names and the self-factory root
+form. The model templates render those names without searching for collisions.
+
+Remaining per-member operations, type declarations and other wire strategies
 move to the plan next. An unchanged shape can skip planning and emission only
 after it captures every input those stages actually use.

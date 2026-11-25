@@ -63,6 +63,37 @@ public class SerializationPlanTest
     }
 
     [Fact]
+    public void GeneratedNamesAvoidMemberAndLexicalCollisions()
+    {
+        const string source = """
+            using SharpPack;
+            [SharpPackable]
+            public partial class Model(int __SharpPackPreserveSelfFactoryRootsValue)
+            {
+                public int __sharppackpreserveselffactoryrootsvalue { get; } = __SharpPackPreserveSelfFactoryRootsValue;
+                private void __SharpPackContextFormatter() { }
+                private void __SharpPackSerializeWithFormatterOverrides() { }
+                private void __SharpPackEnsureAotFormatterRoots() { }
+                private void Unrelated() { }
+            }
+            [SharpPackable] public partial class Strict
+            {
+                private static readonly int seed = 1;
+                public int Value { get; set; }
+            }
+            """;
+        var shape = TypeShapeTest.Analyze(source, "Model");
+        var model = SerializationPlanner.Plan(shape).Names;
+        Assert.Equal("__SharpPackPreserveSelfFactoryRoots_", model.SelfFactoryRoot);
+        Assert.Equal("__SharpPackContextFormatter_", model.ContextFormatterType);
+        Assert.Equal("__SharpPackSerializeWithFormatterOverrides_", model.WriteWithOverrides);
+        Assert.Equal("__SharpPackDeserializeWithFormatterOverrides", model.ReadWithOverrides);
+        Assert.Equal("__SharpPackEnsureAotFormatterRoots_", model.EnsureAotRoots);
+        Assert.Null(SerializationPlanner.Plan(TypeShapeTest.Analyze(source, "Strict")).Names.SelfFactoryRoot);
+        Assert.Equal(shape, TypeShapeTest.Analyze(source.Replace("Unrelated", "Different"), "Model"));
+    }
+
+    [Fact]
     public void AotRootsSeparateTypedFactoriesFromClosedFormatterInstances()
     {
         const string source = """

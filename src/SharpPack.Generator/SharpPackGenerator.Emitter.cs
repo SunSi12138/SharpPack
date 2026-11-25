@@ -190,27 +190,20 @@ public partial class TypeMeta
         var shape = plan.Shape;
         if (shape.IsUnion)
         {
-            writer.AppendLine(EmitUnionTemplate(context, shape));
+            writer.AppendLine(EmitUnionTemplate(context, plan));
             return;
         }
 
         if (shape.GenerateType == GenerateType.Collection)
         {
-            writer.AppendLine(EmitGenericCollectionTemplate(context));
+            writer.AppendLine(EmitGenericCollectionTemplate(context, plan.Names.SelfFactoryRoot));
             return;
         }
 
         var serializeBody = "";
         var deserializeBody = "";
         var formatterOverrideMethods = "";
-        var contextFormatterTypeName = "__SharpPackContextFormatter";
-        while (Symbol.GetAllMembers().Any(
-                   member => member.Name == contextFormatterTypeName) ||
-               Symbol.TypeParameters.Any(
-                   parameter => parameter.Name == contextFormatterTypeName))
-        {
-            contextFormatterTypeName += "_";
-        }
+        var contextFormatterTypeName = plan.Names.ContextFormatterType;
         if (IsUnmanagedType)
         {
             serializeBody = $$"""
@@ -226,8 +219,7 @@ public partial class TypeMeta
                 ? Members[index] : MemberMeta.CreateEmpty(slot.Position)).ToArray();
             serializeBody = EmitSerializeBody(wireMembers, plan);
             deserializeBody = EmitDeserializeBodyCore(wireMembers, plan, honorFormatterOverrides: false);
-            formatterOverrideMethods = EmitFormatterOverrideMethods(
-                contextFormatterTypeName, plan, wireMembers);
+            formatterOverrideMethods = EmitFormatterOverrideMethods(plan, wireMembers);
         }
 
         var classOrStructOrRecord = (IsRecord, IsValueType) switch
@@ -305,17 +297,10 @@ public partial class TypeMeta
         }
         return new global::SharpPack.Formatters.SharpPackableFormatter<{{TypeName}}>();
 """;
-        var selfFactoryRoot = GetSelfFactoryRootName();
+        var selfFactoryRoot = plan.Names.SelfFactoryRoot;
         var selfFactoryRootRead = EmitFactoryRootRead(selfFactoryRoot);
         var aotFormatterRoots = EmitAotFormatterRoots(plan.AotRoots, "        ");
-        var aotRootMethodName = "__SharpPackEnsureAotFormatterRoots";
-        while (Symbol.GetAllMembers().Any(
-                   member => member.Name == aotRootMethodName) ||
-               Symbol.TypeParameters.Any(
-                   parameter => parameter.Name == aotRootMethodName))
-        {
-            aotRootMethodName += "_";
-        }
+        var aotRootMethodName = plan.Names.EnsureAotRoots;
         var aotRootCall = aotFormatterRoots.Length == 0
             ? ""
             : $"        {aotRootMethodName}();";
@@ -608,52 +593,8 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         };
     }
 
-    bool HasUserStaticInitialization()
-        => Members.Any(member => member.Kind == MemberKind.CustomFormatter) ||
-           Symbol.GetMembers().Any(member =>
-               member is IMethodSymbol method && method.IsStatic &&
-               (method.MethodKind == MethodKind.StaticConstructor ||
-                method.Name == "StaticConstructor" && method.Parameters.Length == 0 &&
-                method.DeclaringSyntaxReferences.Any(reference =>
-                    reference.GetSyntax() is MethodDeclarationSyntax declaration &&
-                    (declaration.Body is not null || declaration.ExpressionBody is not null))) ||
-               member is IFieldSymbol field && field.IsStatic && !field.IsConst &&
-               field.DeclaringSyntaxReferences.Any(reference =>
-                   reference.GetSyntax() is VariableDeclaratorSyntax { Initializer: not null }) ||
-               member is IPropertySymbol property && property.IsStatic &&
-               property.DeclaringSyntaxReferences.Any(reference =>
-                   reference.GetSyntax() is PropertyDeclarationSyntax { Initializer: not null }));
-
-    string? GetSelfFactoryRootName()
-        => HasUserStaticInitialization() ? null : GetFactoryRootName(Symbol, "__SharpPackPreserveSelfFactoryRoots");
-
     internal static string GetFactoryRootName(INamedTypeSymbol type, string stem)
-    {
-        // Avoid rebinding existing unqualified names, such as captured
-        // primary-constructor parameters and names imported by using static.
-        var names = new HashSet<string>(StringComparer.Ordinal) { type.Name };
-        foreach (var member in type.GetAllMembers())
-        {
-            names.Add(member.Name);
-        }
-        foreach (var reference in type.DeclaringSyntaxReferences)
-        {
-            foreach (var token in reference.GetSyntax().DescendantTokens())
-            {
-                if (token.IsKind(SyntaxKind.IdentifierToken) && token.ValueText.StartsWith(stem, StringComparison.Ordinal))
-                {
-                    names.Add(token.ValueText);
-                }
-            }
-        }
-
-        var name = stem;
-        while (names.Contains(name) || names.Contains(name + "Value"))
-        {
-            name += "_";
-        }
-        return name;
-    }
+        => SerializationPlanner.AvailableFactoryName(stem, GeneratedNameFacts.CaptureFactoryIdentifiers(type, stem));
 
     internal static string EmitFactoryRootRead(string? name)
         => name is null ? "" : $"        var {name} = {name}Value;";
@@ -787,7 +728,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 """;
     }
 
-    string EmitFormatterOverrideMethods(string contextFormatterTypeName, SerializationPlan plan, MemberMeta[] members)
+    string EmitFormatterOverrideMethods(SerializationPlan plan, MemberMeta[] members)
     {
         var shape = plan.Shape;
         if (!plan.ContextDependencies.HasOverridableWireMembers)
@@ -804,10 +745,8 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         var overrideDeserializeBody = EmitDeserializeBodyCore(
             members, plan, honorFormatterOverrides: true);
         var nullable = IsValueType ? "" : "?";
-        var serializeHelperName =
-            GetFormatterOverrideHelperName(serialize: true);
-        var deserializeHelperName =
-            GetFormatterOverrideHelperName(serialize: false);
+        var serializeHelperName = plan.Names.WriteWithOverrides;
+        var deserializeHelperName = plan.Names.ReadWithOverrides;
 
         return $$"""
 
@@ -839,7 +778,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    sealed class {{contextFormatterTypeName}}
+    sealed class {{plan.Names.ContextFormatterType}}
         : global::SharpPack.SharpPackFormatter<{{TypeName}}>,
           global::SharpPack.ISharpPackContextOverrideFormatter
     {
@@ -854,19 +793,6 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
             => {{deserializeHelperName}}(ref reader, ref value);
     }
 """;
-    }
-
-    string GetFormatterOverrideHelperName(bool serialize)
-    {
-        var name = serialize
-            ? "__SharpPackSerializeWithFormatterOverrides"
-            : "__SharpPackDeserializeWithFormatterOverrides";
-        while (Symbol.GetAllMembers().Any(member => member.Name == name) ||
-               Symbol.TypeParameters.Any(parameter => parameter.Name == name))
-        {
-            name += "_";
-        }
-        return name;
     }
 
     string EmitObjectSerializeBody(MemberMeta[] members, EquatableArray<ScalarBatch> batches, bool honorFormatterOverrides)
@@ -1217,13 +1143,14 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         return lines.NewLine();
     }
 
-    string EmitUnionTemplate(IGeneratorContext context, TypeShape shape)
+    string EmitUnionTemplate(IGeneratorContext context, SerializationPlan plan)
     {
+        var shape = plan.Shape;
         var classOrInterfaceOrRecord = shape.IsRecord ? "record" : shape.TargetKind == TypeKind.Interface ? "interface" : "class";
 
         var contextFactoryInterface =
             $"global::SharpPack.ISharpPackFormatterFactory<{TypeName}>";
-        var selfFactoryRoot = GetSelfFactoryRootName();
+        var selfFactoryRoot = plan.Names.SelfFactoryRoot;
         var contextFactoryMethod = $$"""
 
     [global::SharpPack.CompilerServices.Preserve]
@@ -1521,7 +1448,7 @@ public static class {{registrationClassName}}
 """;
     }
 
-    string EmitGenericCollectionTemplate(IGeneratorContext context)
+    string EmitGenericCollectionTemplate(IGeneratorContext context, string? selfFactoryRoot)
     {
         var (collectionKind, collectionSymbol) = ParseCollectionKind(Symbol, reference);
         var methodName = collectionKind switch
@@ -1543,7 +1470,6 @@ public static class {{registrationClassName}}
         };
         var contextFactoryInterface =
             $"global::SharpPack.ISharpPackFormatterFactory<{TypeName}>";
-        var selfFactoryRoot = GetSelfFactoryRootName();
         var contextFactoryMethod = $$"""
 
     [global::SharpPack.CompilerServices.Preserve]

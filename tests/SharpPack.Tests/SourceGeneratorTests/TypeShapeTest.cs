@@ -129,6 +129,7 @@ public class TypeShapeTest
         Assert.Equal("global::Models.IMessage", shape.TargetName);
         Assert.Equal(TypeKind.Class, shape.DeclarationKind);
         Assert.Equal(TypeKind.Interface, shape.TargetKind);
+        Assert.Equal(default(GeneratedNameFacts), shape.NameFacts);
         Assert.Equal(new UnionCaseShape(19, "global::Models.Message"), Assert.Single(shape.UnionCases));
     }
 

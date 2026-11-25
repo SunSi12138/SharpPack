@@ -21,9 +21,11 @@ internal sealed record TypeShape(
     EquatableArray<ParameterShape> ConstructorParameters,
     EquatableArray<CallbackShape> Callbacks,
     EquatableArray<UnionCaseShape> UnionCases,
-    AotDependencyFacts AotDependencies)
+    AotDependencyFacts AotDependencies,
+    GeneratedNameFacts NameFacts)
 {
-    internal static TypeShape Create(INamedTypeSymbol declaration, TypeMeta model, ReferenceSymbols references)
+    internal static TypeShape Create(
+        INamedTypeSymbol declaration, TypeMeta model, ReferenceSymbols references, bool captureModelNames = true)
     {
         var target = model.Symbol;
         var captureContextDependencies = !model.IsUnmanagedType && !model.IsUnion && model.GenerateType != GenerateType.Collection;
@@ -55,7 +57,8 @@ internal sealed record TypeShape(
                 new UnionCaseShape(item.Tag, item.Type.FullyQualifiedToString()))),
             model.IsUnion || model.GenerateType == GenerateType.Collection
                 ? default
-                : AotDependencyFacts.Capture(model.Members, references));
+                : AotDependencyFacts.Capture(model.Members, references),
+            captureModelNames ? GeneratedNameFacts.Capture(target, model.Members) : default);
 
         static IEnumerable<CallbackShape> CallbacksFor(CallbackPhase phase, IEnumerable<MethodMeta> callbacks)
             => callbacks.Select(callback => new CallbackShape(phase, callback.Name, callback.IsStatic, callback.IsValueType,
