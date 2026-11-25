@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using SharpPack;
+using SharpPack.Formatters;
 
 internal static class Net11
 {
@@ -20,6 +21,18 @@ internal static class Net11
             Decimal128.NegativeZero, Decimal128.NaN, Decimal128.PositiveInfinity, "000000000000000000000000000040B0");
 
         VerifyNativeUnion(context);
+        VerifyDateTimeOffsetMigration();
+    }
+
+    static void VerifyDateTimeOffsetMigration()
+    {
+        var context = new SharpPackSerializerContextBuilder().Register(new DotNetDateTimeOffsetFormatter()).Build();
+        var value = SharpPackSerializer.Deserialize<DateTimeOffset>(
+            Convert.FromHexString("D4FE000000000000008ADFC6014FDF08"), context);
+        if (value.Offset != TimeSpan.FromHours(-5) || value.UtcTicks != 639316541160000000)
+            throw new InvalidOperationException("The .NET 9 DateTimeOffset fixture did not retain its instant and offset.");
+        if (!value.EqualsExact(SharpPackSerializer.Deserialize<DateTimeOffset>(SharpPackSerializer.Serialize(value, context))))
+            throw new InvalidOperationException("The normalized timestamp must be readable without the migration context.");
     }
 
     static void VerifyNativeUnion(SharpPackSerializerContext context)

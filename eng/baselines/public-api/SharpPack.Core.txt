@@ -166,6 +166,11 @@ type public sealed class SharpPack.Formatters.DictionaryFormatter<TKey, TValue> 
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.Collections.Generic.Dictionary<TKey, TValue> value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref System.Collections.Generic.Dictionary<TKey, TValue> value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
 
+type public sealed class SharpPack.Formatters.DotNetDateTimeOffsetFormatter : SharpPack.SharpPackFormatter<System.DateTimeOffset>, SharpPack.ISharpPackFormatter<System.DateTimeOffset>
+  ctor public DotNetDateTimeOffsetFormatter()
+  method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref System.DateTimeOffset value)
+  method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref System.DateTimeOffset value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
+
 type public sealed class SharpPack.Formatters.DynamicUnionFormatter<TBase> : SharpPack.SharpPackFormatter<TBase>, SharpPack.ISharpPackFormatter<TBase> where TBase : class
   method public override System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref TBase value)
   method public override System.Void Serialize<TBufferWriter>(ref SharpPack.SharpPackWriter<TBufferWriter> writer, ref TBase value) where TBufferWriter : System.Buffers.IBufferWriter<System.Byte>
