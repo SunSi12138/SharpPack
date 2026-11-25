@@ -6,7 +6,7 @@
 
 - Upgrade Core and Generator together, preferably with the `SharpPack`
   package, then rebuild every assembly with generated models. For NativeAOT
-  and trimming, generic wrappers now propagate `NonPublicConstructors`, and
+  and trimming, generic wrappers must propagate `NonPublicConstructors`, and
   handwritten factories that still rely on automatic resolution must be
   preserved explicitly. See the [AOT factory migration guide][aot-v2].
 - `System.Type` values are disabled by default. To exchange them, enable Type
