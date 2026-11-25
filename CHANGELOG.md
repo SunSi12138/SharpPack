@@ -1,57 +1,59 @@
 # Changelog
 
-## Unreleased
+## 2.0.0
 
-### Compile-time external formatters
+### Upgrade from 1.x
 
-- Declare closed external roots and register one generated provider when
-  building a context. Unsupported members fail the build with a nested
-  path. Existing SharpPack formatters and unmanaged raw-copy bytes are reused.
-- Integrations can request the same analysis and emission from their original
-  Roslyn compilation. See [external type formatters](docs/formatter-context.md#generate-formatters-for-external-types).
+- Upgrade Core and Generator together, preferably with the `SharpPack`
+  package, then rebuild every assembly with generated models. For NativeAOT
+  and trimming, generic wrappers now propagate `NonPublicConstructors`, and
+  handwritten factories that still rely on automatic resolution must be
+  preserved explicitly. See the [AOT factory migration guide][aot-v2].
+- `System.Type` values are disabled by default. To exchange them, enable Type
+  serialization on a context and register the same stable IDs at both ends.
+  Convert existing Type-name payloads with the 1.1.0 reader before upgrading;
+  2.0 does not read that format. See [Type payload migration][type-v2].
+- Use `BrotliFormatter<T>.Wrap(inner)` for generic Brotli compression with a
+  specific uncompressed formatter. `BrotliFormatter<T>.Default` now has the
+  generic formatter type; use `BrotliFormatter.Default` for the non-generic
+  byte-array formatter.
+- TypeScript and serialization-info outputs are written by MSBuild after a
+  successful build, not by the compiler. For an existing output directory, use
+  a new directory or adopt matching files with
+  `dotnet build -p:SharpPackToolingAdoptExisting=true`.
 
-### NativeAOT deserialization roots
+### What's new
 
-- Narrow generic deserialization preservation from non-public methods to
-  non-public constructors and have generated initialization retain exact
-  formatter factories. Direct System.Type reads no longer need unrelated
-  reflection methods.
-- Core and Generator must be upgraded together and model assemblies fully
-  rebuilt. Older generated assemblies do not contain these roots; runtime-only
-  DLL replacement is not a supported deserialize-only NativeAOT upgrade.
-  Prefer the SharpPack meta-package; keep separate package references in sync.
-- Generic wrappers must propagate `NonPublicConstructors`. Handwritten
-  factories used through automatic resolution must be preserved explicitly.
-  See [the AOT migration guide](docs/aot-factory-migration.md).
-- Add isolated deserialize-only NativeAOT coverage, including collection roots,
-  custom/context formatters, generic and external unions, and reentrant startup.
+- **Compile-time formatters for third-party types.** Declare closed roots and
+  register one generated provider on the context builder. Unsupported shapes
+  report the nested path at build time. Integrations can call the same planner
+  from the original Roslyn compilation. Existing formatters and unmanaged
+  raw-copy bytes are unchanged. See [external type formatters][sidecars-v2].
+- **Length-prefixed Pipe streaming.** Write and read complete individual
+  values with `SerializeLengthPrefixedAsync` and `DeserializeLengthPrefixedAsync`,
+  or read successive frames with `DeserializeLengthPrefixedItemsAsync`.
+  Framing wraps the standard SharpPack payload; it does not change it. See
+  [streaming boundaries][streaming-v2].
+- **Configurable read limits and stable errors.** Set payload, collection,
+  reference, and depth budgets on a serializer context. Classify SharpPack
+  failures with `SharpPackSerializationException.ErrorCode` instead of parsing
+  messages; transport and user-code exceptions keep their original types.
+  See [read limits][limits-v2] and [error codes][errors-v2].
+- **More precise NativeAOT roots.** Generated models keep their own formatter
+  factories for deserialize-only applications. Core and Generator also check
+  the generated-code contract before emitting incompatible code.
+- **Compatibility and lifecycle fixes.** Collection writes validate counts,
+  transport reports failures at the appropriate boundary, and context
+  builders release startup registrations after building. `BitArray` reads
+  still accept legacy extra words; writes preserve the logical bit length
+  and clear unused bits.
 
-### Error classification
-
-- Use `SharpPackSerializationException.ErrorCode` to classify failures without
-  parsing messages. Existing constructors report `Unknown`; transport and
-  user-code exceptions keep their original types. See [stable error codes](docs/architecture/error-codes.md).
-
-### Brotli formatter registration
-
-- Register generic Brotli compression with `BrotliFormatter<T>.Wrap(inner)`.
-  A missing uncompressed formatter now fails with `FormatterResolutionFailed`
-  rather than re-entering the wrapper. `BrotliFormatter<T>.Default` is now
-  typed; use `BrotliFormatter.Default` for the non-generic byte-array formatter.
-
-### BitArray on .NET 10
-
-- Read and write `BitArray` through its supported byte view. The wire format
-  still carries the logical bit length and Int32 words. Writers clear unused
-  bits and omit redundant words; readers still accept legacy extra words.
-
-### TypeScript and serialization-info artifacts
-
-- Configured artifact outputs are written after a successful build, not by the
-  C# compiler. The generated bytes are unchanged; unchanged owned files are
-  not rewritten, and only unchanged owned files may be removed when obsolete.
-- For existing output directories, use a new directory or explicitly adopt
-  matching files with `dotnet build -p:SharpPackToolingAdoptExisting=true`.
+[aot-v2]: https://github.com/SunSi12138/SharpPack/blob/v2.0.0/docs/aot-factory-migration.md
+[type-v2]: https://github.com/SunSi12138/SharpPack/blob/v2.0.0/docs/formatter-context.md#systemtype-payload-capability
+[sidecars-v2]: https://github.com/SunSi12138/SharpPack/blob/v2.0.0/docs/formatter-context.md#generate-formatters-for-external-types
+[streaming-v2]: https://github.com/SunSi12138/SharpPack/blob/v2.0.0/docs/architecture/streaming-boundaries.md
+[limits-v2]: https://github.com/SunSi12138/SharpPack/blob/v2.0.0/docs/read-limits.md
+[errors-v2]: https://github.com/SunSi12138/SharpPack/blob/v2.0.0/docs/architecture/error-codes.md
 
 ## 1.1.0
 

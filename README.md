@@ -13,9 +13,9 @@ original MemoryPack binary wire format for non-`System.Type` payloads while usin
 context-owned formatter graphs, modern .NET 10 runtime targets, and aggressive
 performance optimizations. See [NOTICE](NOTICE) for attribution.
 
-The development branch intentionally changes `System.Type` payloads: they are
-disabled by default and use explicitly registered, context-owned stable IDs.
-This is a breaking change from the published 1.1.0 Type-name wire contract.
+Starting in SharpPack 2.0, `System.Type` payloads are disabled by default.
+When enabled, they use explicitly registered, context-owned stable IDs instead
+of the Type names written by 1.1.0.
 See [Type payload migration](docs/formatter-context.md#systemtype-payload-capability)
 before upgrading applications that exchange Type values.
 
@@ -44,12 +44,12 @@ Other than performance, SharpPack has these features.
 
 Installation
 ---
-SharpPack 1.x targets .NET 10 and uses C# 14.
+SharpPack 2.0 targets .NET 10 and uses C# 14.
 
 Install the aggregate runtime and source-generator package from NuGet:
 
 ```shell
-dotnet add package SharpPack --version 1.1.0
+dotnet add package SharpPack --version 2.0.0
 ```
 
 Versioned packages and symbols are also attached to

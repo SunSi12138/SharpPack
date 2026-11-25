@@ -185,7 +185,7 @@ sandbox controlled by the built-in Type formatter.
 
 ### Migration from the 1.x Type-name contract
 
-This development change intentionally breaks previous `System.Type` payloads.
+SharpPack 2.0 cannot read 1.x `System.Type` payloads.
 Choose stable protocol IDs on both endpoints and register each allowed Type
 explicitly. Do not use assembly-qualified names as protocol IDs. Legacy CLR-name
 payloads are not automatically resolved or converted, including the old
