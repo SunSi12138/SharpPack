@@ -324,10 +324,11 @@ namespace SharpPack.Formatters
             var items = ArrayPool<T?>.Shared.Rent(count);
             try
             {
-                // CopyTo returns pop order; the wire has always stored push order.
-                value.CopyTo(items, 0);
+                // Enumeration is in pop order; fill the wire's push order in one pass.
                 var ordered = items.AsSpan(0, count);
-                ordered.Reverse();
+                var next = count;
+                foreach (var item in value)
+                    ordered[--next] = item;
                 writer.WriteSpan(ordered);
             }
             finally
