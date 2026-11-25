@@ -50,14 +50,15 @@ internal static class ContextFormatterSlot<T>
     internal static void Register(FormatterGraph graph, SharpPackFormatter<T> formatter)
     {
         ArgumentNullException.ThrowIfNull(formatter);
-        if (!cache.TryAdd(
-                graph,
-                new Holder(formatter, isExplicitRegistration: true)))
+        if (!TryRegister(graph, formatter, isExplicitRegistration: true))
         {
             throw new InvalidOperationException(
                 $"A formatter for {typeof(T).FullName} is already registered or resolved.");
         }
     }
+
+    internal static bool TryRegister(FormatterGraph graph, SharpPackFormatter<T> formatter, bool isExplicitRegistration)
+        => cache.TryAdd(graph, new Holder(formatter, isExplicitRegistration));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static bool HasExplicitRegistration(FormatterGraph graph)

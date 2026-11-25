@@ -70,6 +70,11 @@ public partial class TypeMeta
     public bool IsUseEmptyConstructor => Constructor == null || Constructor.Parameters.IsEmpty;
 
     public TypeMeta(INamedTypeSymbol symbol, ReferenceSymbols reference)
+        : this(symbol, reference, constructorCandidate: null)
+    {
+    }
+
+    TypeMeta(INamedTypeSymbol symbol, ReferenceSymbols reference, Func<IMethodSymbol, bool>? constructorCandidate)
     {
         this.reference = reference;
         this.Symbol = symbol;
@@ -79,7 +84,7 @@ public partial class TypeMeta
         this.SerializeLayout = serializeLayout;
 
         this.TypeName = symbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
-        this.Constructor = ChooseConstructor(symbol, reference);
+        this.Constructor = ChooseConstructor(symbol, reference, constructorCandidate);
 
         this.Members = symbol.GetAllMembers() // iterate includes parent type
             .Where(x => x is (IFieldSymbol or IPropertySymbol) and { IsStatic: false, IsImplicitlyDeclared: false, CanBeReferencedByName: true })
@@ -139,10 +144,11 @@ public partial class TypeMeta
     // If has no explicit constrtucotr, use parameterless one(includes private).
     // If has a one parameterless/parameterized constructor, choose it.
     // If has multiple construcotrs, should apply [SharpPackConstructor] attribute(no automatically choose one), otherwise generator error it.
-    IMethodSymbol? ChooseConstructor(INamedTypeSymbol symbol, ReferenceSymbols reference)
+    IMethodSymbol? ChooseConstructor(INamedTypeSymbol symbol, ReferenceSymbols reference, Func<IMethodSymbol, bool>? constructorCandidate)
     {
         var ctors = symbol.InstanceConstructors
             .Where(x => !x.IsImplicitlyDeclared) // remove empty ctor(struct always generate it), record's clone ctor
+            .Where(x => constructorCandidate is null || constructorCandidate(x))
             .ToArray();
 
         if (ctors.Length == 0)

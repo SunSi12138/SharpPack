@@ -38,6 +38,8 @@ public partial class SharpPackGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
+        RegisterExternalFormatters(context);
+
         var unsupportedAbi = context.CompilationProvider
             .Select(static (compilation, _) => RuntimeGeneratedCodeAbi.GetUnsupportedVersion(compilation))
             .WithTrackingName("SharpPack.RuntimeAbi");

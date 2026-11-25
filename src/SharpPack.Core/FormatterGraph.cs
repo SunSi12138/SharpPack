@@ -23,14 +23,18 @@ internal sealed class FormatterGraph
 
     internal void Register<T>(SharpPackFormatter<T> formatter)
     {
-        if (registrationsFrozen)
-        {
-            throw new InvalidOperationException(
-                "Formatter registrations are frozen after the context is built.");
-        }
-
+        ThrowIfFrozen();
         ContextFormatterSlot<T>.Register(this, formatter);
         hasRegistrations = true;
+    }
+
+    internal bool TryRegisterGenerated<T>(SharpPackFormatter<T> formatter, bool isSidecar)
+    {
+        ThrowIfFrozen();
+        if (!ContextFormatterSlot<T>.TryRegister(this, formatter, isExplicitRegistration: isSidecar))
+            return false;
+        hasRegistrations = true;
+        return true;
     }
 
     internal SharpPackFormatter<T> GetFormatter<T>()
@@ -98,4 +102,10 @@ internal sealed class FormatterGraph
 
     internal void FreezeRegistrations()
         => registrationsFrozen = true;
+
+    void ThrowIfFrozen()
+    {
+        if (registrationsFrozen)
+            throw new InvalidOperationException("Formatter registrations are frozen after the context is built.");
+    }
 }

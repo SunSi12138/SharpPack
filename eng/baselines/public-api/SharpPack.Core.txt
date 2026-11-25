@@ -741,6 +741,10 @@ type public enum SharpPack.SharpPackErrorCode : System.Int32, System.IComparable
   field public const SharpPack.SharpPackErrorCode UnexpectedEndOfPayload = 1
   field public const SharpPack.SharpPackErrorCode Unknown = 0
 
+type public sealed class SharpPack.SharpPackExternalTypeAttribute : System.Attribute
+  ctor public SharpPackExternalTypeAttribute(System.Type type)
+  property System.Type Type { get:public; }
+
 type public abstract class SharpPack.SharpPackFormatter<T> : SharpPack.ISharpPackFormatter<T>
   ctor protected SharpPackFormatter()
   method public abstract System.Void Deserialize(ref SharpPack.SharpPackReader reader, ref T value)
@@ -976,6 +980,7 @@ type public sealed class SharpPack.SharpPackSerializerContextBuilder
   method public SharpPack.SharpPackSerializerContextBuilder RegisterCollection<TCollection, TElement>() where TCollection : System.Collections.Generic.ICollection<TElement>, new()
   method public SharpPack.SharpPackSerializerContextBuilder RegisterDictionary<TDictionary, TKey, TValue>() where TDictionary : System.Collections.Generic.IDictionary<TKey, TValue>, new() where TKey : notnull
   method public SharpPack.SharpPackSerializerContextBuilder RegisterFactory<T, TFactory>() where TFactory : SharpPack.ISharpPackFormatterFactory<T>
+  method public SharpPack.SharpPackSerializerContextBuilder RegisterGeneratedFormatter<T>(SharpPack.SharpPackFormatter<T> formatter, System.Boolean isSidecar, System.Action<SharpPack.SharpPackSerializerContext> initialize = null)
   method public SharpPack.SharpPackSerializerContextBuilder RegisterSet<TSet, TElement>() where TSet : System.Collections.Generic.ISet<TElement>, new()
   method public SharpPack.SharpPackSerializerContextBuilder RegisterType(System.Type type, System.String typeId)
   method public SharpPack.SharpPackSerializerContextBuilder RegisterType<T>(System.String typeId)
@@ -1161,4 +1166,3 @@ type public sealed class SharpPack.Utf16StringFormatterAttribute : SharpPack.Sha
 type public sealed class SharpPack.Utf8StringFormatterAttribute : SharpPack.SharpPackCustomFormatterAttribute<SharpPack.Formatters.Utf8StringFormatter, System.String>
   ctor public Utf8StringFormatterAttribute()
   method public override SharpPack.Formatters.Utf8StringFormatter GetFormatter()
-
