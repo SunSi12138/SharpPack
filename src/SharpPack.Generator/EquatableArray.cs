@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 
 namespace SharpPack.Generator;
@@ -6,16 +7,21 @@ namespace SharpPack.Generator;
 public readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>, IEnumerable<T>
     where T : IEquatable<T>
 {
-    readonly T[]? array;
+    readonly ImmutableArray<T> array;
+    ImmutableArray<T> Items => array.IsDefault ? ImmutableArray<T>.Empty : array;
 
     public EquatableArray() // for collection literal []
     {
-        array = [];
+        array = ImmutableArray<T>.Empty;
     }
 
-    public EquatableArray(T[] array)
+    public EquatableArray(T[] array) : this((IEnumerable<T>)array)
     {
-        this.array = array;
+    }
+
+    internal EquatableArray(IEnumerable<T> items)
+    {
+        array = items.ToImmutableArray();
     }
 
     public static implicit operator EquatableArray<T>(T[] array)
@@ -26,14 +32,14 @@ public readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>, IEnume
     public ref readonly T this[int index]
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => ref array![index];
+        get => ref array.ItemRef(index);
     }
 
-    public int Length => array!.Length;
+    public int Length => Items.Length;
 
     public ReadOnlySpan<T> AsSpan()
     {
-        return array.AsSpan();
+        return Items.AsSpan();
     }
 
     public ReadOnlySpan<T>.Enumerator GetEnumerator()
@@ -43,16 +49,28 @@ public readonly struct EquatableArray<T> : IEquatable<EquatableArray<T>>, IEnume
 
     IEnumerator<T> IEnumerable<T>.GetEnumerator()
     {
-        return array.AsEnumerable().GetEnumerator();
+        return ((IEnumerable<T>)Items).GetEnumerator();
     }
 
     IEnumerator IEnumerable.GetEnumerator()
     {
-        return array.AsEnumerable().GetEnumerator();
+        return ((IEnumerable)Items).GetEnumerator();
     }
 
     public bool Equals(EquatableArray<T> other)
     {
         return AsSpan().SequenceEqual(other.AsSpan());
+    }
+
+    public override bool Equals(object? obj) => obj is EquatableArray<T> other && Equals(other);
+
+    public override int GetHashCode()
+    {
+        var hash = 17;
+        foreach (var item in AsSpan())
+        {
+            hash = unchecked(31 * hash + EqualityComparer<T>.Default.GetHashCode(item));
+        }
+        return hash;
     }
 }

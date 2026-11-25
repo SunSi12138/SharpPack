@@ -54,6 +54,9 @@ global using SharpPack;
         baseCompilation = compilation;
     }
 
+    internal static Compilation CreateCompilation(params SyntaxTree[] trees)
+        => baseCompilation.AddSyntaxTrees(trees);
+
     public static (Compilation, ImmutableArray<Diagnostic>) RunGenerator(string source, string[]? preprocessorSymbols = null, AnalyzerConfigOptionsProvider? options = null)
     {
         if (preprocessorSymbols == null)

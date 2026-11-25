@@ -11,58 +11,10 @@ partial class SharpPackGenerator
 {
     static void Generate(TypeDeclarationSyntax syntax, Compilation compilation, string? serializationInfoLogDirectoryPath, IGeneratorContext context)
     {
-        var semanticModel = compilation.GetSemanticModel(syntax.SyntaxTree);
-
-        var typeSymbol = semanticModel.GetDeclaredSymbol(syntax, context.CancellationToken);
-        if (typeSymbol == null)
-        {
+        if (AnalyzeModel(syntax, compilation, context) is not { } model)
             return;
-        }
-
-        // verify is partial
-        if (!IsPartial(syntax))
-        {
-            context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MustBePartial, syntax.Identifier.GetLocation(), typeSymbol.Name));
-            return;
-        }
-
-        if (IsNested(syntax) && !IsNestedContainingTypesPartial(syntax))
-        {
-            context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.NestedContainingTypesMustBePartial, syntax.Identifier.GetLocation(), typeSymbol.Name));
-            return;
-        }
-
-        var reference = new ReferenceSymbols(compilation);
-
-        var unionSymbol = default(INamedTypeSymbol);
-        var unionFormatterAttr = typeSymbol.GetAttribute(reference.SharpPackUnionFormatterAttribute);
-        if (unionFormatterAttr != null)
-        {
-            // change symbol
-            unionSymbol = unionFormatterAttr.ConstructorArguments[0].Value as INamedTypeSymbol;
-            if (unionSymbol == null) return;
-        }
-        var unionFormatter = (unionSymbol != null);
-
-        var typeMeta = new TypeMeta(typeSymbol, reference);
-        if (unionFormatter)
-        {
-            // replace original symbol
-            typeMeta.Symbol = unionSymbol!;
-        }
-
-        if (!unionFormatter && !typeMeta.IsUnion && typeMeta.GenerateType == GenerateType.NoGenerate)
-        {
-            return;
-        }
-
-        // ReportDiagnostic when validate failed.
-        if (!typeMeta.Validate(syntax, context, unionFormatter))
-        {
-            return;
-        }
-
-        var fullType = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+        var (shape, typeMeta, externalFormatter) = model;
+        var fullType = shape.DeclarationName
             .Replace("@", "")
             .Replace("global::", "")
             .Replace("<", "_")
@@ -93,8 +45,8 @@ using System;
 using SharpPack;
 ");
 
-        var ns = typeMeta.Symbol.ContainingNamespace;
-        if (!ns.IsGlobalNamespace)
+        var ns = shape.Namespace;
+        if (ns.Length != 0)
         {
             if (context.IsCSharp10OrGreater())
             {
@@ -108,9 +60,9 @@ using SharpPack;
         sb.AppendLine();
 
         // Write document comment as remarks
-        if (typeMeta.GenerateType is GenerateType.Object or GenerateType.VersionTolerant or GenerateType.CircularReference)
+        if (shape.GenerateType is GenerateType.Object or GenerateType.VersionTolerant or GenerateType.CircularReference)
         {
-            BuildDebugInfo(sb, typeMeta, true);
+            BuildDebugInfo(sb, shape, true);
 
             // also output to log
             if (serializationInfoLogDirectoryPath != null)
@@ -122,7 +74,7 @@ using SharpPack;
                         Directory.CreateDirectory(serializationInfoLogDirectoryPath);
                     }
                     var logSw = new StringBuilder();
-                    BuildDebugInfo(logSw, typeMeta, false);
+                    BuildDebugInfo(logSw, shape, false);
                     var message = logSw.ToString();
 
                     File.WriteAllText(Path.Combine(serializationInfoLogDirectoryPath, $"{fullType}.txt"), message, new UTF8Encoding(false));
@@ -135,16 +87,16 @@ using SharpPack;
         }
 
         // emit type info
-        if (unionFormatter)
+        if (externalFormatter is not null)
         {
-            typeMeta.EmitUnionFormatterTemplate(sb, context, typeSymbol);
+            typeMeta.EmitUnionFormatterTemplate(sb, context, externalFormatter);
         }
         else
         {
-            typeMeta.Emit(sb, context);
+            typeMeta.Emit(sb, context, shape);
         }
 
-        if (!ns.IsGlobalNamespace && !context.IsCSharp10OrGreater())
+        if (ns.Length != 0 && !context.IsCSharp10OrGreater())
         {
             sb.AppendLine($"}}");
         }
@@ -153,36 +105,11 @@ using SharpPack;
         context.AddSource($"{fullType}.SharpPackFormatter.g.cs", code);
     }
 
-    static bool IsPartial(TypeDeclarationSyntax typeDeclaration)
+    static void BuildDebugInfo(StringBuilder sb, TypeShape type, bool xmlDocument)
     {
-        return typeDeclaration.Modifiers.Any(m => m.IsKind(SyntaxKind.PartialKeyword));
-    }
-
-    static bool IsNestedContainingTypesPartial(TypeDeclarationSyntax typeDeclaration)
-    {
-        if (typeDeclaration.Parent is TypeDeclarationSyntax parentTypeDeclaration)
+        string WithEscape(string qualifiedName)
         {
-            if (!IsPartial(parentTypeDeclaration))
-                return false;
-
-            return IsNestedContainingTypesPartial(parentTypeDeclaration);
-        }
-        else
-        {
-            return true;
-        }
-    }
-
-    static bool IsNested(TypeDeclarationSyntax typeDeclaration)
-    {
-        return typeDeclaration.Parent is TypeDeclarationSyntax;
-    }
-
-    static void BuildDebugInfo(StringBuilder sb, TypeMeta type, bool xmlDocument)
-    {
-        string WithEscape(ISymbol symbol)
-        {
-            var str = symbol.FullyQualifiedToString().Replace("global::", "");
+            var str = qualifiedName.Replace("global::", "");
             if (xmlDocument)
             {
                 return str.Replace("<", "&lt;").Replace(">", "&gt;");
@@ -195,7 +122,7 @@ using SharpPack;
 
         if (!xmlDocument)
         {
-            if (type.IsUnmanagedType)
+            if (type.IsUnmanaged)
             {
                 sb.Append("GenerateType unmanaged ");
             }
@@ -203,13 +130,13 @@ using SharpPack;
             {
                 sb.Append("GenerateType " + type.GenerateType.ToString() + " ");
             }
-            sb.AppendLine(WithEscape(type.Symbol));
+            sb.AppendLine(WithEscape(type.TargetName));
             sb.AppendLine("---");
         }
         else
         {
             sb.AppendLine("/// <remarks>");
-            if (type.IsUnmanagedType)
+            if (type.IsUnmanaged)
             {
                 sb.AppendLine("/// SharpPack GenerateType: unmanaged<br/>");
             }
@@ -227,7 +154,7 @@ using SharpPack;
                 sb.Append("/// <b>");
             }
 
-            sb.Append(WithEscape(item.MemberType));
+            sb.Append(WithEscape(item.TypeName));
             if (xmlDocument)
             {
                 sb.Append("</b>");
@@ -256,14 +183,17 @@ using SharpPack;
 public partial class TypeMeta
 {
     public void Emit(StringBuilder writer, IGeneratorContext context)
+        => Emit(writer, context, TypeShape.Create(Symbol, this));
+
+    internal void Emit(StringBuilder writer, IGeneratorContext context, TypeShape shape)
     {
-        if (IsUnion)
+        if (shape.IsUnion)
         {
-            writer.AppendLine(EmitUnionTemplate(context));
+            writer.AppendLine(EmitUnionTemplate(context, shape));
             return;
         }
 
-        if (GenerateType == GenerateType.Collection)
+        if (shape.GenerateType == GenerateType.Collection)
         {
             writer.AppendLine(EmitGenericCollectionTemplate(context));
             return;
@@ -468,7 +398,7 @@ public partial class TypeMeta
         writer.AppendLine($$"""
 partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{fixedSizeInterface}}{{exactSizeInterface}}{{contextFactoryInterface}}
 {
-{{(IsUnmanagedType ? "" : EmitCustomFormatters())}}
+{{(IsUnmanagedType ? "" : EmitCustomFormatters(shape.Members))}}
     static partial void StaticConstructor();
 
 {{EmitSelfFactoryRoots(selfFactoryRoot, includeContextFactory: true)}}
@@ -480,20 +410,20 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
     [global::SharpPack.CompilerServices.Preserve]
     {{staticSharpPackableMethod}}{{serializeMethodSignarture}} writer, {{scopedRef}} {{TypeName}}{{nullable}} value) {{constraint}}
     {
-{{(IsUnmanagedType ? "" : OnSerializing.Select(x => "        " + x.Emit()).NewLine())}}
+{{EmitCallbacks(shape, CallbackPhase.Serializing)}}
 {{serializeBody}}
     END:
-{{(IsUnmanagedType ? "" : OnSerialized.Select(x => "        " + x.Emit()).NewLine())}}
+{{EmitCallbacks(shape, CallbackPhase.Serialized)}}
         return;
     }
 
     [global::SharpPack.CompilerServices.Preserve]
     {{staticSharpPackableMethod}}Deserialize(ref SharpPackReader reader, {{scopedRef}} {{TypeName}}{{nullable}} value)
     {
-{{(IsUnmanagedType ? "" : OnDeserializing.Select(x => "        " + x.Emit()).NewLine())}}
+{{EmitCallbacks(shape, CallbackPhase.Deserializing)}}
 {{deserializeBody}}
     END:
-{{(IsUnmanagedType ? "" : OnDeserialized.Select(x => "        " + x.Emit()).NewLine())}}
+{{EmitCallbacks(shape, CallbackPhase.Deserialized)}}
         return;
     }
 
@@ -665,32 +595,39 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
 """;
     }
 
-    string EmitCustomFormatters()
+    static string EmitCallbacks(TypeShape shape, CallbackPhase phase)
+        => shape.IsUnmanaged ? "" : shape.Callbacks.Where(callback => callback.Phase == phase)
+            .Select(callback => "        " + MethodMeta.EmitInvocation(
+                callback.Name, callback.IsStatic, callback.IsValueType, callback.PassArguments
+                    ? (phase is CallbackPhase.Serializing or CallbackPhase.Serialized
+                        ? "ref writer, ref value" : "ref reader, ref value")
+                    : "")).NewLine();
+
+    static string EmitCustomFormatters(EquatableArray<MemberShape> members)
     {
         var sb = new StringBuilder();
-        foreach (var item in Members.Where(x => x.Kind == MemberKind.CustomFormatter))
+        foreach (var item in members)
         {
-            var attribute = item.CustomFormatterAttribute!;
+            if (item.CustomFormatter is not { } attribute) continue;
             var arguments = string.Join(
                 ", ",
-                attribute.ConstructorArguments.Select(EmitTypedConstant));
-            var initializers = attribute.NamedArguments
-                .Select(static pair =>
-                    $"@{pair.Key} = {EmitTypedConstant(pair.Value)}")
+                attribute.Arguments.Select(EmitTypedConstant));
+            var initializers = attribute.Initializers
+                .Select(static pair => $"@{pair.Name} = {EmitTypedConstant(pair.Value)}")
                 .ToArray();
             var initializer = initializers.Length == 0
                 ? ""
                 : $" {{ {string.Join(", ", initializers)} }}";
 
             sb.AppendLine(
-                $"    static readonly {item.CustomFormatterName} __{item.Name}Formatter = " +
-                $"new {item.CustomFormatter!.FullyQualifiedToString()}({arguments})" +
+                $"    static readonly {attribute.FormatterType} __{item.Name}Formatter = " +
+                $"new {attribute.AttributeType}({arguments})" +
                 $"{initializer}.GetFormatter();");
         }
         return sb.ToString();
     }
 
-    static string EmitTypedConstant(TypedConstant constant)
+    static string EmitTypedConstant(AttributeValueShape constant)
     {
         if (constant.IsNull)
         {
@@ -701,20 +638,20 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         {
             TypedConstantKind.Primitive =>
                 Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatPrimitive(
-                    constant.Value!,
+                    constant.Scalar!,
                     quoteStrings: true,
                     useHexadecimalNumbers: false),
             TypedConstantKind.Enum =>
-                $"({constant.Type!.FullyQualifiedToString()})" +
+                $"({constant.TypeName})" +
                 Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatPrimitive(
-                    constant.Value!,
+                    constant.Scalar!,
                     quoteStrings: false,
                     useHexadecimalNumbers: false),
             TypedConstantKind.Type =>
-                $"typeof({((ITypeSymbol)constant.Value!).FullyQualifiedToString()})",
+                $"typeof({constant.TypeName})",
             TypedConstantKind.Array =>
-                $"new {((IArrayTypeSymbol)constant.Type!).ElementType.FullyQualifiedToString()}[]" +
-                $" {{ {string.Join(", ", constant.Values.Select(EmitTypedConstant))} }}",
+                $"new {constant.TypeName}[]" +
+                $" {{ {string.Join(", ", constant.Elements.Select(EmitTypedConstant))} }}",
             _ => throw new InvalidOperationException(
                 $"Unsupported custom formatter attribute argument: {constant.Kind}."),
         };
@@ -1463,9 +1400,9 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
         return lines.NewLine();
     }
 
-    string EmitUnionTemplate(IGeneratorContext context)
+    string EmitUnionTemplate(IGeneratorContext context, TypeShape shape)
     {
-        var classOrInterfaceOrRecord = IsRecord ? "record" : (Symbol.TypeKind == TypeKind.Interface) ? "interface" : "class";
+        var classOrInterfaceOrRecord = shape.IsRecord ? "record" : shape.TargetKind == TypeKind.Interface ? "interface" : "class";
 
         var contextFactoryInterface =
             $"global::SharpPack.ISharpPackFormatterFactory<{TypeName}>";
@@ -1817,24 +1754,11 @@ partial class {{TypeName}} : {{contextFactoryInterface}}
 public partial class MethodMeta
 {
     public string Emit()
-    {
-        var instance = (IsStatic) ? ""
-            : (IsValueType) ? "value."
-            : "value?.";
+        => EmitInvocation(Name, IsStatic, IsValueType, UseReaderArgument
+            ? "ref reader, ref value" : UseWriterArgument ? "ref writer, ref value" : "");
 
-        if (UseReaderArgument)
-        {
-            return $"{instance}{Name}(ref reader, ref value);";
-        }
-        else if (UseWriterArgument)
-        {
-            return $"{instance}{Name}(ref writer, ref value);";
-        }
-        else
-        {
-            return $"{instance}{Name}();";
-        }
-    }
+    internal static string EmitInvocation(string name, bool isStatic, bool isValueType, string arguments)
+        => $"{(isStatic ? "" : isValueType ? "value." : "value?.")}{name}({arguments});";
 }
 
 public partial class MemberMeta
