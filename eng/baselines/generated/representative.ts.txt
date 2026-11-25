@@ -1,0 +1,259 @@
+# Representative TypeScript output
+
+===== Fault.ts =====
+import { SharpPackWriter } from "./SharpPackWriter.mjs";
+import { SharpPackReader } from "./SharpPackReader.mjs";
+import { IWireMessage } from "./IWireMessage.mjs";
+
+export class Fault implements IWireMessage {
+    code: number;
+
+    constructor() {
+        this.code = 0;
+
+    }
+
+    static serialize(value: Fault | null): Uint8Array {
+        const writer = SharpPackWriter.getSharedInstance();
+        this.serializeCore(writer, value);
+        return writer.toArray();
+    }
+
+    static serializeCore(writer: SharpPackWriter, value: Fault | null): void {
+        if (value == null) {
+            writer.writeNullObjectHeader();
+            return;
+        }
+
+        writer.writeObjectHeader(1);
+        writer.writeInt32(value.code);
+
+    }
+
+    static serializeArray(value: (Fault | null)[] | null): Uint8Array {
+        const writer = SharpPackWriter.getSharedInstance();
+        this.serializeArrayCore(writer, value);
+        return writer.toArray();
+    }
+
+    static serializeArrayCore(writer: SharpPackWriter, value: (Fault | null)[] | null): void {
+        writer.writeArray(value, (writer, x) => Fault.serializeCore(writer, x));
+    }
+
+    static deserialize(buffer: ArrayBuffer): Fault | null {
+        return this.deserializeCore(new SharpPackReader(buffer));
+    }
+
+    static deserializeCore(reader: SharpPackReader): Fault | null {
+        const [ok, count] = reader.tryReadObjectHeader();
+        if (!ok) {
+            return null;
+        }
+
+        const value = new Fault();
+        if (count == 1) {
+            value.code = reader.readInt32();
+
+        }
+        else if (count > 1) {
+            throw new Error("Current object's property count is larger than type schema, can't deserialize about versioning.");
+        }
+        else {
+            if (count == 0) return value;
+            value.code = reader.readInt32(); if (count == 1) return value;
+
+        }
+        return value;
+    }
+
+    static deserializeArray(buffer: ArrayBuffer): (Fault | null)[] | null {
+        return this.deserializeArrayCore(new SharpPackReader(buffer));
+    }
+
+    static deserializeArrayCore(reader: SharpPackReader): (Fault | null)[] | null {
+        return reader.readArray(reader => Fault.deserializeCore(reader));
+    }
+}
+
+===== IWireMessage.ts =====
+import { SharpPackWriter } from "./SharpPackWriter.mjs";
+import { SharpPackReader } from "./SharpPackReader.mjs";
+
+import { Packet } from "./Packet.mjs"; 
+import { Fault } from "./Fault.mjs"; 
+
+export abstract class IWireMessage {
+    static serialize(value: IWireMessage | null): Uint8Array {
+        const writer = SharpPackWriter.getSharedInstance();
+        this.serializeCore(writer, value);
+        return writer.toArray();
+    }
+
+    static serializeCore(writer: SharpPackWriter, value: IWireMessage | null): void {
+        if (value == null) {
+            writer.writeNullObjectHeader();
+            return;
+        }
+        else if (value instanceof Packet) {
+            writer.writeUnionHeader(4);
+            Packet.serializeCore(writer, value);
+            return;
+        }
+        else if (value instanceof Fault) {
+            writer.writeUnionHeader(300);
+            Fault.serializeCore(writer, value);
+            return;
+        }
+
+        else {
+            throw new Error("Concrete type is not in SharpPackUnion");
+        }
+    }
+
+    static serializeArray(value: IWireMessage[] | null): Uint8Array {
+        const writer = SharpPackWriter.getSharedInstance();
+        this.serializeArrayCore(writer, value);
+        return writer.toArray();
+    }
+
+    static serializeArrayCore(writer: SharpPackWriter, value: IWireMessage[] | null): void {
+        writer.writeArray(value, (writer, x) => IWireMessage.serializeCore(writer, x));
+    }
+
+    static deserialize(buffer: ArrayBuffer): IWireMessage | null {
+        return this.deserializeCore(new SharpPackReader(buffer));
+    }
+
+    static deserializeCore(reader: SharpPackReader): IWireMessage | null {
+        const [ok, tag] = reader.tryReadUnionHeader();
+        if (!ok) {
+            return null;
+        }
+
+        switch (tag) {
+            case 4:
+                return Packet.deserializeCore(reader);
+            case 300:
+                return Fault.deserializeCore(reader);
+
+            default:
+                throw new Error("Tag is not found in this SharpPackUnion");
+        }
+    }
+
+    static deserializeArray(buffer: ArrayBuffer): (IWireMessage | null)[] | null {
+        return this.deserializeArrayCore(new SharpPackReader(buffer));
+    }
+
+    static deserializeArrayCore(reader: SharpPackReader): (IWireMessage | null)[] | null {
+        return reader.readArray(reader => IWireMessage.deserializeCore(reader));
+    }
+}
+
+===== Packet.ts =====
+import { SharpPackWriter } from "./SharpPackWriter.mjs";
+import { SharpPackReader } from "./SharpPackReader.mjs";
+import { Status } from "./Status.mjs";
+import { IWireMessage } from "./IWireMessage.mjs";
+
+export class Packet implements IWireMessage {
+    topic: string;
+    state: Status;
+    details: string | null;
+    index: Map<number, (string | null)[] | null> | null;
+    groups: (number[] | null)[] | null;
+    body: Uint8Array | null;
+
+    constructor() {
+        this.topic = "";
+        this.state = 0;
+        this.details = null;
+        this.index = null;
+        this.groups = null;
+        this.body = null;
+
+    }
+
+    static serialize(value: Packet | null): Uint8Array {
+        const writer = SharpPackWriter.getSharedInstance();
+        this.serializeCore(writer, value);
+        return writer.toArray();
+    }
+
+    static serializeCore(writer: SharpPackWriter, value: Packet | null): void {
+        if (value == null) {
+            writer.writeNullObjectHeader();
+            return;
+        }
+
+        writer.writeObjectHeader(6);
+        writer.writeString(value.topic);
+        writer.writeUint8(value.state);
+        writer.writeString(value.details);
+        writer.writeMap(value.index, (writer, x) => writer.writeInt32(x), (writer, x) => writer.writeArray(x, (writer, x) => writer.writeString(x)));
+        writer.writeArray(value.groups, (writer, x) => writer.writeArray(x, (writer, x) => writer.writeInt32(x)));
+        writer.writeUint8Array(value.body);
+
+    }
+
+    static serializeArray(value: (Packet | null)[] | null): Uint8Array {
+        const writer = SharpPackWriter.getSharedInstance();
+        this.serializeArrayCore(writer, value);
+        return writer.toArray();
+    }
+
+    static serializeArrayCore(writer: SharpPackWriter, value: (Packet | null)[] | null): void {
+        writer.writeArray(value, (writer, x) => Packet.serializeCore(writer, x));
+    }
+
+    static deserialize(buffer: ArrayBuffer): Packet | null {
+        return this.deserializeCore(new SharpPackReader(buffer));
+    }
+
+    static deserializeCore(reader: SharpPackReader): Packet | null {
+        const [ok, count] = reader.tryReadObjectHeader();
+        if (!ok) {
+            return null;
+        }
+
+        const value = new Packet();
+        if (count == 6) {
+            value.topic = reader.readString();
+            value.state = reader.readUint8();
+            value.details = reader.readString();
+            value.index = reader.readMap(reader => reader.readInt32(), reader => reader.readArray(reader => reader.readString()));
+            value.groups = reader.readArray(reader => reader.readArray(reader => reader.readInt32()));
+            value.body = reader.readUint8Array();
+
+        }
+        else if (count > 6) {
+            throw new Error("Current object's property count is larger than type schema, can't deserialize about versioning.");
+        }
+        else {
+            if (count == 0) return value;
+            value.topic = reader.readString(); if (count == 1) return value;
+            value.state = reader.readUint8(); if (count == 2) return value;
+            value.details = reader.readString(); if (count == 3) return value;
+            value.index = reader.readMap(reader => reader.readInt32(), reader => reader.readArray(reader => reader.readString())); if (count == 4) return value;
+            value.groups = reader.readArray(reader => reader.readArray(reader => reader.readInt32())); if (count == 5) return value;
+            value.body = reader.readUint8Array(); if (count == 6) return value;
+
+        }
+        return value;
+    }
+
+    static deserializeArray(buffer: ArrayBuffer): (Packet | null)[] | null {
+        return this.deserializeArrayCore(new SharpPackReader(buffer));
+    }
+
+    static deserializeArrayCore(reader: SharpPackReader): (Packet | null)[] | null {
+        return reader.readArray(reader => Packet.deserializeCore(reader));
+    }
+}
+
+===== Status.ts =====
+export const enum Status {
+    Pending = 0,
+    Ready = 2,
+
+}
