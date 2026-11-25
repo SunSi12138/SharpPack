@@ -224,78 +224,15 @@ public partial class SharpPackGenerator : IIncrementalGenerator
         IncrementalGeneratorInitializationContext context,
         IncrementalValuesProvider<(TypeDeclarationSyntax Declaration, TypeScriptGenerateOptions Options)> typeScript)
     {
-        var typeScriptGenerateSource = typeScript.Combine(context.CompilationProvider).Collect();
-
-        context.RegisterSourceOutput(typeScriptGenerateSource, static (context, source) =>
+        var source = typeScript.Collect().Combine(context.CompilationProvider);
+        context.RegisterSourceOutput(source, static (output, input) =>
         {
-            ReferenceSymbols? reference = null;
-            string? generatePath = null;
-
-            var unionMap = new Dictionary<ITypeSymbol, ITypeSymbol>(SymbolEqualityComparer.Default); // <impl, base>
-            foreach (var item in source)
-            {
-                var ((syntax, options), compilation) = item;
-                var semanticModel = compilation.GetSemanticModel(syntax.SyntaxTree);
-                var typeSymbol = semanticModel.GetDeclaredSymbol(syntax, context.CancellationToken) as ITypeSymbol;
-                if (typeSymbol == null) continue;
-                if (reference == null)
-                {
-                    reference = new ReferenceSymbols(compilation);
-                }
-
-                generatePath ??= options.OutputDirectory;
-
-                var isUnion = typeSymbol.ContainsAttribute(reference.SharpPackUnionAttribute);
-
-                if (isUnion)
-                {
-                    var unionTags = typeSymbol.GetAttributes()
-                        .Where(x => SymbolEqualityComparer.Default.Equals(x.AttributeClass, reference.SharpPackUnionAttribute))
-                        .Where(x => x.ConstructorArguments.Length == 2)
-                        .Select(x => (INamedTypeSymbol)x.ConstructorArguments[1].Value!);
-                    foreach (var implType in unionTags)
-                    {
-                        unionMap[implType] = typeSymbol;
-                    }
-                }
-            }
-
-            if (generatePath != null)
-            {
-                var collector = new TypeCollector();
-                foreach (var item in source)
-                {
-                    var ((typeDeclaration, options), compilation) = item;
-
-                    if (reference == null)
-                    {
-                        reference = new ReferenceSymbols(compilation);
-                    }
-
-                    var meta = GenerateTypeScript(typeDeclaration, compilation, options, context, reference, unionMap);
-                    if (meta != null)
-                    {
-                        collector.Visit(meta, false);
-                    }
-                }
-
-                GenerateEnums(collector.GetEnums(), generatePath);
-
-                // generate runtime
-                var runtime = new[]{
-                    ("SharpPackWriter.ts", TypeScriptRuntime.SharpPackWriter),
-                    ("SharpPackReader.ts", TypeScriptRuntime.SharpPackReader),
-                };
-
-                foreach (var item in runtime)
-                {
-                    var filePath = Path.Combine(generatePath, item.Item1);
-                    if (!File.Exists(filePath))
-                    {
-                        File.WriteAllText(filePath, item.Item2, new UTF8Encoding(false));
-                    }
-                }
-            }
+            if (input.Left.IsEmpty) return;
+            var options = input.Left[0].Options;
+            var plan = PlanTypeScript(input.Left.Select(static item => item.Declaration), input.Right, options,
+                output.CancellationToken, output.ReportDiagnostic);
+            if (plan is not null)
+                WriteLegacyTypeScript(plan, options.OutputDirectory);
         });
     }
 }

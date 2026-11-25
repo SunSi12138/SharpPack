@@ -43,7 +43,9 @@ The TypeScript renderer takes the same object slot ordering and union cases
 as C#. Its projection of those members keeps JavaScript-specific scalar and
 collection names, defaults, and nullability separate. The TypeScript baseline
 compares the emitted model and enum files against the legacy generator and
-checks the shipped reader and writer. Files are still written through the
+checks the shipped reader and writer. The project artifact plan contains the
+model imports, ordered members and cases, and enum fields. Its renderers do not
+read the compilation or filesystem. Files are still written through the
 existing opt-in path until the tooling migration is complete.
 
 ## What reruns after an edit

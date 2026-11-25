@@ -18,21 +18,51 @@ public record TypeScriptGenerateOptions
 
 partial class SharpPackGenerator
 {
-    static TypeMeta? GenerateTypeScript(TypeDeclarationSyntax syntax, Compilation compilation, TypeScriptGenerateOptions typeScriptGenerateOptions, in SourceProductionContext context,
-        ReferenceSymbols reference, IReadOnlyDictionary<ITypeSymbol, ITypeSymbol> unionMap)
+    internal static TypeScriptArtifactPlan? PlanTypeScript(
+        IEnumerable<TypeDeclarationSyntax> declarations, Compilation compilation, TypeScriptGenerateOptions options,
+        CancellationToken cancellationToken, Action<Diagnostic> reportDiagnostic)
     {
-        var semanticModel = compilation.GetSemanticModel(syntax.SyntaxTree);
+        var inputs = declarations.Select(syntax => (Syntax: syntax,
+            Symbol: compilation.GetSemanticModel(syntax.SyntaxTree).GetDeclaredSymbol(syntax, cancellationToken))).ToArray();
+        if (!inputs.Any(input => input.Symbol is not null)) return null;
 
-        var typeSymbol = semanticModel.GetDeclaredSymbol(syntax, context.CancellationToken);
-        if (typeSymbol == null)
+        var reference = new ReferenceSymbols(compilation);
+        var unionMap = new Dictionary<ITypeSymbol, ITypeSymbol>(SymbolEqualityComparer.Default);
+        foreach (var (_, symbol) in inputs)
         {
-            return null;
+            if (symbol is null || !symbol.ContainsAttribute(reference.SharpPackUnionAttribute)) continue;
+            foreach (var attribute in symbol.GetAttributes())
+            {
+                if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, reference.SharpPackUnionAttribute) &&
+                    attribute.ConstructorArguments.Length == 2 && attribute.ConstructorArguments[1].Value is INamedTypeSymbol variant)
+                    unionMap[variant] = symbol;
+            }
         }
 
+        var models = new List<TypeScriptModelPlan>();
+        var enumCollector = new TypeCollector();
+        foreach (var (syntax, symbol) in inputs)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (symbol is null) continue;
+            var model = PlanTypeScriptModel(syntax, symbol, options, reference, unionMap, enumCollector, reportDiagnostic);
+            if (model is not null) models.Add(model);
+        }
+
+        var enums = enumCollector.GetEnums().OfType<INamedTypeSymbol>().Select(static symbol => new TypeScriptEnumPlan(
+            symbol.Name, new EquatableArray<TypeScriptEnumField>(symbol.GetMembers().OfType<IFieldSymbol>().Select(static field =>
+                new TypeScriptEnumField(field.Name, field.HasConstantValue ? $"{field.ConstantValue}" : null)))));
+        return new(options.ImportExtension, new(models), new(enums));
+    }
+
+    static TypeScriptModelPlan? PlanTypeScriptModel(TypeDeclarationSyntax syntax, INamedTypeSymbol typeSymbol,
+        TypeScriptGenerateOptions options, ReferenceSymbols reference, IReadOnlyDictionary<ITypeSymbol, ITypeSymbol> unionMap,
+        TypeCollector enumCollector, Action<Diagnostic> reportDiagnostic)
+    {
         // require [SharpPackable]
         if (!typeSymbol.ContainsAttribute(reference.SharpPackableAttribute))
         {
-            context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.GenerateTypeScriptMustBeSharpPackable, syntax.Identifier.GetLocation(), typeSymbol.Name));
+            reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.GenerateTypeScriptMustBeSharpPackable, syntax.Identifier.GetLocation(), typeSymbol.Name));
             return null;
         }
 
@@ -40,21 +70,14 @@ partial class SharpPackGenerator
 
         if (typeMeta.GenerateType is not (GenerateType.Object or GenerateType.Union))
         {
-            context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.GenerateTypeScriptOnlyAllowsGenerateTypeObject, syntax.Identifier.GetLocation(), typeSymbol.Name));
+            reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.GenerateTypeScriptOnlyAllowsGenerateTypeObject, syntax.Identifier.GetLocation(), typeSymbol.Name));
             return null;
         }
 
-        if (!Validate(typeMeta, syntax, context))
+        if (!ValidateTypeScript(typeMeta, syntax, reportDiagnostic))
         {
             return null;
         }
-
-        var sb = new StringBuilder();
-
-        sb.AppendLine($$"""
-import { SharpPackWriter } from "./SharpPackWriter{{typeScriptGenerateOptions.ImportExtension}}";
-import { SharpPackReader } from "./SharpPackReader{{typeScriptGenerateOptions.ImportExtension}}";
-""");
 
         var collector = new TypeCollector();
         collector.Visit(typeMeta, true);
@@ -66,107 +89,65 @@ import { SharpPackReader } from "./SharpPackReader{{typeScriptGenerateOptions.Im
             {
                 if (nts.EnumUnderlyingType!.SpecialType is SpecialType.System_Int64 or SpecialType.System_UInt64)
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.GenerateTypeScriptDoesNotAllowLongEnum, syntax.Identifier.GetLocation(), typeSymbol.Name, item.FullyQualifiedToString()));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.GenerateTypeScriptDoesNotAllowLongEnum, syntax.Identifier.GetLocation(), typeSymbol.Name, item.FullyQualifiedToString()));
                     return null;
                 }
             }
         }
 
-        // add import(enum, union, sharppackable)
-        foreach (var item in collector.GetEnums())
-        {
-            sb.AppendLine($"import {{ {item.Name} }} from \"./{item.Name}{typeScriptGenerateOptions.ImportExtension}\";");
-        }
-        foreach (var item in collector.GetSharpPackableTypes(reference)
-            .Where(x => !SymbolEqualityComparer.Default.Equals(x, typeSymbol) && !x.IsSharpPackableNoGenerate(reference)))
-        {
-            sb.AppendLine($"import {{ {item.Name} }} from \"./{item.Name}{typeScriptGenerateOptions.ImportExtension}\";");
-        }
-        sb.AppendLine();
+        var imports = new EquatableArray<string>(collector.GetEnums().Concat(collector.GetSharpPackableTypes(reference)
+            .Where(type => !SymbolEqualityComparer.Default.Equals(type, typeSymbol) && !type.IsSharpPackableNoGenerate(reference)))
+            .Select(static type => type.Name));
 
         try
         {
             var shape = TypeShape.Create(typeSymbol, typeMeta, reference);
-            if (shape.Union is { } union)
-            {
-                TypeScriptEmitter.EmitUnion(sb, shape.ShortName, union.Cases, typeScriptGenerateOptions.ImportExtension);
-            }
-            else
-            {
-                var members = SerializationPlanner.PlanWireSlots(shape)
-                    .Select(slot => TypeScriptMember.Project(typeMeta.Members[slot.DeclaredMemberIndex!.Value], reference, typeScriptGenerateOptions))
-                    .ToArray();
-                unionMap.TryGetValue(typeSymbol, out var unionBase);
-                TypeScriptEmitter.EmitObject(sb, shape.ShortName, unionBase?.Name, members);
-            }
+            var members = shape.Union is null ? new EquatableArray<TypeScriptMemberShape>(SerializationPlanner.PlanWireSlots(shape)
+                .Select(slot => TypeScriptMember.Project(typeMeta.Members[slot.DeclaredMemberIndex!.Value], reference, options))) : default;
+            unionMap.TryGetValue(typeSymbol, out var unionBase);
+            enumCollector.Visit(typeMeta, false);
+            return new(shape.ShortName, imports, unionBase?.Name, members, shape.Union);
         }
         catch (NotSupportedTypeException ex)
         {
-            context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.GenerateTypeScriptNotSupportedType, ex.MemberMeta!.GetLocation(syntax),
+            reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.GenerateTypeScriptNotSupportedType, ex.MemberMeta!.GetLocation(syntax),
                 typeMeta.Symbol.Name, ex.MemberMeta.Name, ex.MemberMeta.MemberType.FullyQualifiedToString()));
             return null;
         }
-
-        // save to file
-        try
-        {
-            if (!Directory.Exists(typeScriptGenerateOptions.OutputDirectory))
-            {
-                Directory.CreateDirectory(typeScriptGenerateOptions.OutputDirectory);
-            }
-
-            File.WriteAllText(Path.Combine(typeScriptGenerateOptions.OutputDirectory, $"{typeMeta.TypeName}.ts"), sb.ToString(), new UTF8Encoding(false));
-        }
-        catch (Exception ex)
-        {
-            Trace.WriteLine(ex.ToString());
-        }
-
-        return typeMeta;
     }
 
-    static void GenerateEnums(IEnumerable<ISymbol?>? enums, string typeScriptOutputDirectoryPath)
+    static void WriteLegacyTypeScript(TypeScriptArtifactPlan plan, string directory)
     {
-        if (enums == null) return;
-        if (!Directory.Exists(typeScriptOutputDirectoryPath))
+        var encoding = new UTF8Encoding(false);
+        if (!Directory.Exists(directory)) Directory.CreateDirectory(directory);
+        foreach (var model in plan.Models)
         {
-            Directory.CreateDirectory(typeScriptOutputDirectoryPath);
-        }
-
-        foreach (var e in enums)
-        {
-            if (e is INamedTypeSymbol typeSymbol)
+            try
             {
-                if (typeSymbol.TypeKind != TypeKind.Enum) continue;
-
-                var sb = new StringBuilder();
-                foreach (var member in typeSymbol.GetMembers())
-                {
-                    // (ok[0] as IFieldSymbol).ConstantValue
-                    var fs = member as IFieldSymbol;
-                    if (fs == null) continue;
-                    var value = fs.HasConstantValue ? $" = {fs.ConstantValue}" : "";
-                    sb.AppendLine($"    {fs.Name}{value},");
-                }
-
-                var code = $$"""
-export const enum {{typeSymbol.Name}} {
-{{sb.ToString()}}
-}
-""";
-
-                File.WriteAllText(Path.Combine(typeScriptOutputDirectoryPath, $"{typeSymbol.Name}.ts"), code, new UTF8Encoding(false));
+                File.WriteAllText(Path.Combine(directory, $"{model.Name}.ts"), TypeScriptEmitter.EmitModelFile(model, plan.ImportExtension), encoding);
             }
+            catch (Exception ex)
+            {
+                Trace.WriteLine(ex.ToString());
+            }
+        }
+        foreach (var model in plan.Enums)
+            File.WriteAllText(Path.Combine(directory, $"{model.Name}.ts"), TypeScriptEmitter.EmitEnumFile(model), encoding);
+
+        foreach (var (name, code) in TypeScriptEmitter.RuntimeFiles())
+        {
+            var file = Path.Combine(directory, name);
+            if (!File.Exists(file)) File.WriteAllText(file, code, encoding);
         }
     }
 
-    static bool Validate(TypeMeta type, TypeDeclarationSyntax syntax, in SourceProductionContext context)
+    static bool ValidateTypeScript(TypeMeta type, TypeDeclarationSyntax syntax, Action<Diagnostic> reportDiagnostic)
     {
         var typeSymbol = type.Symbol;
 
         if (type.Symbol.IsGenericType)
         {
-            context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.GenerateTypeScriptDoesNotAllowGenerics, syntax.Identifier.GetLocation(), typeSymbol.Name));
+            reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.GenerateTypeScriptDoesNotAllowGenerics, syntax.Identifier.GetLocation(), typeSymbol.Name));
             return false;
         }
 
@@ -174,7 +155,7 @@ export const enum {{typeSymbol.Name}} {
         {
             if (item.Kind == MemberKind.CustomFormatter)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.GenerateTypeScriptNotSupportedCustomFormatter, item.GetLocation(syntax), typeSymbol.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.GenerateTypeScriptNotSupportedCustomFormatter, item.GetLocation(syntax), typeSymbol.Name));
                 return false;
             }
         }
@@ -183,8 +164,57 @@ export const enum {{typeSymbol.Name}} {
     }
 }
 
+internal sealed record TypeScriptArtifactPlan(
+    string ImportExtension, EquatableArray<TypeScriptModelPlan> Models, EquatableArray<TypeScriptEnumPlan> Enums);
+
+internal sealed record TypeScriptModelPlan(
+    string Name, EquatableArray<string> Imports, string? UnionBase, EquatableArray<TypeScriptMemberShape> Members, UnionShape? Union);
+
+internal sealed record TypeScriptEnumPlan(string Name, EquatableArray<TypeScriptEnumField> Fields);
+
+internal sealed record TypeScriptEnumField(string Name, string? Constant);
+
 internal static class TypeScriptEmitter
 {
+    internal static string EmitModelFile(TypeScriptModelPlan model, string importExtension)
+    {
+        var writer = new StringBuilder();
+        writer.AppendLine($$"""
+import { SharpPackWriter } from "./SharpPackWriter{{importExtension}}";
+import { SharpPackReader } from "./SharpPackReader{{importExtension}}";
+""");
+        foreach (var name in model.Imports)
+            writer.AppendLine($"import {{ {name} }} from \"./{name}{importExtension}\";");
+        writer.AppendLine();
+
+        if (model.Union is { } union)
+            EmitUnion(writer, model.Name, union.Cases, importExtension);
+        else
+            EmitObject(writer, model.Name, model.UnionBase, model.Members.ToArray());
+        return writer.ToString();
+    }
+
+    internal static string EmitEnumFile(TypeScriptEnumPlan model)
+    {
+        var fields = new StringBuilder();
+        foreach (var field in model.Fields)
+        {
+            var value = field.Constant is { } constant ? $" = {constant}" : "";
+            fields.AppendLine($"    {field.Name}{value},");
+        }
+        return $$"""
+export const enum {{model.Name}} {
+{{fields.ToString()}}
+}
+""";
+    }
+
+    internal static IEnumerable<(string Name, string Source)> RuntimeFiles()
+    {
+        yield return ("SharpPackWriter.ts", TypeScriptRuntime.SharpPackWriter);
+        yield return ("SharpPackReader.ts", TypeScriptRuntime.SharpPackReader);
+    }
+
     internal static void EmitObject(StringBuilder sb, string typeName, string? unionBase, TypeScriptMemberShape[] tsMembers)
     {
         var impl = unionBase is not null ? $"implements {unionBase} " : "";
