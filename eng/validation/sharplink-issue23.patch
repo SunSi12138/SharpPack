@@ -1,0 +1,256 @@
+diff --git a/Directory.Packages.props b/Directory.Packages.props
+index 7aed96a..dee4cd1 100644
+--- a/Directory.Packages.props
++++ b/Directory.Packages.props
+@@ -19,7 +19,8 @@
+     <PackageVersion Include="System.Text.Json" Version="10.0.14" />
+     <PackageVersion Include="System.Threading.RateLimiting" Version="10.0.14" />
+     <!--  第三方依赖  -->
+-    <PackageVersion Include="SharpPack" Version="[1.1.0]" />
++      <PackageVersion Include="SharpPack" Version="[2.0.0-wireid.1]" />
++      <PackageVersion Include="SharpPack.Generator" Version="[2.0.0-wireid.1]" />
+     <PackageVersion Include="ZstdSharp.Port" Version="[0.8.8]" />
+     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+     <PackageVersion Include="PublicApiGenerator" Version="11.5.4" />
+diff --git a/src/SharpLink.Generator/RpcGenerator.SharpPackSharedProbe.cs b/src/SharpLink.Generator/RpcGenerator.SharpPackSharedProbe.cs
+new file mode 100644
+index 0000000..9aa0470
+--- /dev/null
++++ b/src/SharpLink.Generator/RpcGenerator.SharpPackSharedProbe.cs
+@@ -0,0 +1,150 @@
++using SharpPack.Generator;
++using System.Runtime.CompilerServices;
++
++namespace SharpLink.Generator;
++
++internal readonly record struct SharpPackIntegrationDiagnosticModel(string TypeName, string Detail, Location? Location);
++
++internal sealed record SharpPackIntegrationAnalysisResult(
++    string? ProviderSource, ImmutableArray<SharpPackIntegrationDiagnosticModel> Diagnostics, bool HasBindings)
++{
++    internal static SharpPackIntegrationAnalysisResult Empty { get; } = new(null, [], false);
++}
++
++public partial class RpcGenerator
++{
++    private const string SharpPackAdapterId = "sharplink.serializer.sharppack/v1";
++    private const string SharpPackAdapterTypeName = "global::SharpLink.Serializer.SharpPack.SharpPackRpcCodecAdapter";
++    private const string SharedProvider = "SharpLinkRoutedFormatters";
++
++    private static bool IsSharpPackAdapter(GeneratedCodecModel model)
++        => model.Kind == GeneratedCodecKind.Adapter && model.AdapterId == SharpPackAdapterId &&
++           model.AdapterType == SharpPackAdapterTypeName;
++
++    private static bool IsSharpPackAdapterPlan(FinalAdapterCodecPlan plan)
++        => plan.AdapterId == SharpPackAdapterId && plan.AdapterTypeName == SharpPackAdapterTypeName;
++
++    private static SharpPackIntegrationAnalysisResult AnalyzeSharpPackIntegration(
++        Compilation compilation, CancellationToken cancellationToken)
++    {
++        if (compilation.GetTypeByMetadataName("SharpPack.SharpPackFormatter`1") is null ||
++            compilation.GetTypeByMetadataName("SharpLink.Serializer.SharpPack.SharpPackRpcCodecAdapter") is null)
++            return SharpPackIntegrationAnalysisResult.Empty;
++        return AnalyzeRoutedSharpPackIntegration(compilation, cancellationToken);
++    }
++
++    // Keep the optional analyzer dependency out of the SDK-only path, even at JIT time.
++    [MethodImpl(MethodImplOptions.NoInlining)]
++    private static SharpPackIntegrationAnalysisResult AnalyzeRoutedSharpPackIntegration(
++        Compilation compilation, CancellationToken cancellationToken)
++    {
++        var roots = new Dictionary<string, SharpPackSidecarRoot>(StringComparer.Ordinal);
++        var diagnostics = ImmutableArray.CreateBuilder<SharpPackIntegrationDiagnosticModel>();
++        AddRoots(contractMode: false);
++        AddRoots(contractMode: true);
++        if (roots.Count == 0 && diagnostics.Count == 0) return SharpPackIntegrationAnalysisResult.Empty;
++
++        var plan = SharpPackSidecarGenerator.Generate(compilation, roots.OrderBy(static entry => entry.Key, StringComparer.Ordinal)
++            .Select(static entry => entry.Value).ToImmutableArray(), SharedProvider, cancellationToken: cancellationToken);
++        foreach (var diagnostic in plan.Diagnostics)
++            diagnostics.Add(new("SharpPack routed payload graph", diagnostic.GetMessage(InvariantCulture), diagnostic.Location));
++        return new(plan.Source, diagnostics.ToImmutable(), true);
++
++        void AddRoots(bool contractMode)
++        {
++            var state = new DtoAnalysisState(compilation, cancellationToken, contractMode,
++                applyCodecPolicy: true, selectorOnlyContractDefault: false);
++            _ = state.AnalyzeWithFinalCodecBindings();
++            var graph = state.ResolveFinalCodecGraph(includeSerializable: !contractMode, includeContracts: contractMode);
++            foreach (var root in graph.Plans.Values.OfType<FinalAdapterCodecPlan>().Where(IsSharpPackAdapterPlan))
++            {
++                if (state.TryResolveSharpPackReachableType(root.TypeName, out var type))
++                    roots[root.TypeName] = new(type, type.Locations.FirstOrDefault(static loc => loc.IsInSource));
++                else
++                    diagnostics.Add(new(root.TypeName, "The closed routed payload symbol could not be resolved.", Location.None));
++            }
++        }
++    }
++
++    private static string GenerateSharpPackIntegration(SharpPackIntegrationAnalysisResult analysis)
++    {
++        var builder = new StringBuilder(analysis.ProviderSource ?? "// <auto-generated/>\n");
++        builder.AppendLine("""
++            namespace SharpLink.Generated
++            {
++                internal static class __SharpLinkGeneratedSharpPackIntegration
++                {
++                    internal static void Configure(global::SharpLink.Abstractions.IRpcCodecAdapterScope adapterScope)
++                    {
++            """);
++        if (analysis.ProviderSource is { } source)
++        {
++            var identity = Hashing.GetIdentifierHash(source);
++            builder.AppendLine($$"""
++                        if (adapterScope is not global::SharpLink.Serializer.SharpPack.ISharpPackRpcCodecAdapterScopeConfiguration configurable)
++                            throw new global::System.InvalidOperationException("SharpPack adapter scope does not support generated Contract formatter configuration.");
++                        configurable.Configure("slsp/{{identity}}", static builder =>
++                            global::SharpPack.Generated.{{SharedProvider}}.Register(builder));
++                """);
++        }
++        else
++        {
++            builder.AppendLine("            _ = adapterScope;");
++        }
++        return builder.AppendLine("""
++                    }
++                }
++            }
++            """).ToString();
++    }
++
++    private sealed partial class DtoAnalysisState
++    {
++        private FinalCodecGraph ApplySharpPackSidecarCodecIdentities(FinalCodecGraph graph)
++            => graph.Plans.Values.Any(static item => item is FinalAdapterCodecPlan adapter && IsSharpPackAdapterPlan(adapter))
++                ? ApplyRoutedSharpPackSidecarCodecIdentities(graph) : graph;
++
++        [MethodImpl(MethodImplOptions.NoInlining)]
++        private FinalCodecGraph ApplyRoutedSharpPackSidecarCodecIdentities(FinalCodecGraph graph)
++        {
++            var adapterRoots = graph.Plans.Values.OfType<FinalAdapterCodecPlan>().Where(IsSharpPackAdapterPlan)
++                .Select(plan => TryResolveReachableType(plan.TypeName, out var type) ? new SharpPackSidecarRoot(type) : default)
++                .Where(static root => root.Type is not null).ToImmutableArray();
++            if (adapterRoots.IsDefaultOrEmpty) return graph;
++
++            var plan = SharpPackSidecarGenerator.Generate(_compilation, adapterRoots, SharedProvider, cancellationToken: _cancellationToken);
++            Dictionary<string, FinalCodecPlan>? updated = null;
++            foreach (var root in plan.Roots)
++            {
++                if (root.Sidecars.IsDefaultOrEmpty) continue;
++                var typeName = GetTypeName(root.Type);
++                var adapter = (FinalAdapterCodecPlan)graph.Plans[typeName];
++                updated ??= graph.Plans.ToDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal);
++                updated[typeName] = adapter with
++                {
++                    ClosedTargetLogicalIdentity = Hashing.GetSemanticHash("adapter-target/sharppack-sidecar/v1",
++                        adapter.ClosedTargetLogicalIdentity.ToHex(), GetSharpPackSidecarWireIdentity(root.Sidecars).ToHex())
++                };
++            }
++            return updated is null ? graph : new FinalCodecGraph(updated, graph.RootTypes);
++        }
++    }
++
++    private static RpcHashValue GetSharpPackSidecarWireIdentity(ImmutableArray<SharpPackSidecarWireShape> sidecars)
++    {
++        var parts = new List<string> { "sharppack-sidecar-wire/v1" };
++        foreach (var sidecar in sidecars.OrderBy(static shape => GetTypeName(shape.Type), StringComparer.Ordinal))
++        {
++            parts.Add(GetTypeName(sidecar.Type));
++            parts.Add(sidecar.Type.IsValueType ? "value" : "ref");
++            parts.Add(sidecar.Members.Length.ToString(InvariantCulture));
++            foreach (var member in sidecar.Members)
++            {
++                parts.Add(member.Position.ToString(InvariantCulture));
++                parts.Add(member.Name);
++                parts.Add(GetTypeName(member.Type));
++            }
++        }
++        return Hashing.GetSemanticHash(parts.ToArray());
++    }
++}
+diff --git a/src/SharpLink.Generator/SharpLink.Generator.csproj b/src/SharpLink.Generator/SharpLink.Generator.csproj
+index 08f9bf5..906dbdb 100644
+--- a/src/SharpLink.Generator/SharpLink.Generator.csproj
++++ b/src/SharpLink.Generator/SharpLink.Generator.csproj
+@@ -24,9 +24,12 @@
+         <!-- Published analyzers must remain loadable by the compiler bundled with the pinned SDK. -->
+         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.0.0" />
+         <PackageReference Include="System.Text.Json" PrivateAssets="all" />
++        <PackageReference Include="SharpPack.Generator" PrivateAssets="all" ExcludeAssets="all" GeneratePathProperty="true" />
++        <Reference Include="SharpPack.Generator" HintPath="$(PkgSharpPack_Generator)/analyzers/dotnet/cs/SharpPack.Generator.dll" />
+     </ItemGroup>
+ 
+     <ItemGroup>
++        <Compile Remove="RpcGenerator.SharpPackIntegration.cs;RpcGenerator.SharpPackIntegration.Analysis.cs;RpcGenerator.SharpPackIntegration.Emitter.cs;RpcGenerator.SharpPackIntegration.GeneratedDependencies.cs;RpcGenerator.SharpPackIntegration.Identity.cs;RpcGenerator.SharpPackIntegration.MetadataSemantics.cs;RpcGenerator.SharpPackIntegration.TypeHelpers.cs" />
+         <Compile Include="..\SharpLink.Shared\RpcBuiltinCollectionWireCatalog.cs"
+                  Link="Shared\RpcBuiltinCollectionWireCatalog.cs" />
+     </ItemGroup>
+diff --git a/test/SharpLink.Generator.Tests/SharpPackSharedPlannerProof.cs b/test/SharpLink.Generator.Tests/SharpPackSharedPlannerProof.cs
+new file mode 100644
+index 0000000..1aa0418
+--- /dev/null
++++ b/test/SharpLink.Generator.Tests/SharpPackSharedPlannerProof.cs
+@@ -0,0 +1,37 @@
++using System;
++
++namespace SharpLink.Generator.Tests;
++
++public partial class RpcAnalyzerTests
++{
++    [Test]
++    public void TupleLabelsDoNotChangeTheSharpPackCodecIdentity()
++    {
++        const string route = """
++            global::System.Threading.Tasks.Task<Vendor.ExternalRequest> EchoAsync(
++                Vendor.ExternalRequest request,
++                global::System.Threading.CancellationToken cancellationToken);
++            """;
++        string Build(string firstLabel, string secondLabel, string assemblyName)
++        {
++            var vendor = CreateSharpPackVendorReference($$"""
++                namespace Vendor;
++                public sealed class Box<T> { public T Value { get; set; } }
++                public sealed class ExternalRequest
++                {
++                    public (int {{firstLabel}}, string Label) Data { get; set; }
++                    public Box<(int {{firstLabel}}, string Value)>? Text { get; set; }
++                    public Box<(int {{secondLabel}}, int Value)>? Number { get; set; }
++                }
++                """);
++            var result = RunSharpPackAndCompile(assemblyName, BuildSharpPackContractSource(route), [vendor]);
++            EnsureNoSharpPackErrors(result);
++            return GetSharpPackCodecHash(result.DriverRunResult, "global::Vendor.ExternalRequest");
++        }
++
++        var first = Build("Alpha", "Zulu", "TupleNamesFirst");
++        var second = Build("Zulu", "Alpha", "TupleNamesSecond");
++        Ensure(string.Equals(first, second, StringComparison.Ordinal),
++            $"Tuple labels cannot change the negotiated codec identity: {first} versus {second}");
++    }
++}
+diff --git a/test/SharpLink.Generator.Tests/SharpPackSidecarGeneratorTests.cs b/test/SharpLink.Generator.Tests/SharpPackSidecarGeneratorTests.cs
+index 386f73f..03acb2e 100644
+--- a/test/SharpLink.Generator.Tests/SharpPackSidecarGeneratorTests.cs
++++ b/test/SharpLink.Generator.Tests/SharpPackSidecarGeneratorTests.cs
+@@ -195,7 +195,7 @@ public sealed class ExternalRequest
+         var diagnostic = result.DriverDiagnostics.FirstOrDefault(static item => item.Id == "SLSP0001");
+ 
+         Ensure(diagnostic is not null, "unsupported SharpPack graph produces SLSP0001");
+-        Ensure(diagnostic!.GetMessage().Contains("member 'Child'", StringComparison.Ordinal),
++        Ensure(diagnostic!.GetMessage().Contains("Vendor.ExternalRequest.Child", StringComparison.Ordinal),
+             "diagnostic contains the dependency member path");
+         Ensure(diagnostic.GetMessage().Contains("constructor", StringComparison.OrdinalIgnoreCase),
+             "diagnostic identifies construction as the unsupported capability");
+diff --git a/test/SharpLink.SharpPackAotSmoke/Program.cs b/test/SharpLink.SharpPackAotSmoke/Program.cs
+index f9923f8..7cc75bb 100644
+--- a/test/SharpLink.SharpPackAotSmoke/Program.cs
++++ b/test/SharpLink.SharpPackAotSmoke/Program.cs
+@@ -11,7 +11,7 @@ using SharpLink.Sdk;
+ using SharpLink.Serializer.SharpPack;
+ using SharpLink.Server;
+ 
+-[assembly: RpcCodecAdapter(typeof(ExternalAotPayload), typeof(SharpPackRpcCodecAdapter))]
++[assembly: RpcCodecRoute(RpcCodecScope.All, typeof(SharpPackRpcCodecAdapter))]
+ 
+ namespace SharpLink.SharpPackAotSmoke;
+ 
