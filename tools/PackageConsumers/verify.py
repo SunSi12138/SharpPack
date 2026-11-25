@@ -39,7 +39,10 @@ def run(args, cwd, env, expected_success=True):
 def normalized_version(version):
     # NuGet removes build metadata, normalizes zero padding, and compares
     # prerelease identifiers case-insensitively.
-    number, _, suffix = version.split("+", 1)[0].partition("-")
+    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+){0,3})(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?", version)
+    if match is None:
+        raise RuntimeError(f"Invalid NuGet version: {version}")
+    number, suffix = match.groups()
     parts = [int(part) for part in number.split(".")]
     parts += [0] * (3 - len(parts))
     if len(parts) == 4 and parts[-1] == 0:
@@ -59,15 +62,18 @@ def inspect_feed(feed, version):
             if len(names) != len(set(names)) or len(manifests) != 1:
                 raise RuntimeError(f"Invalid package inventory: {path.name}")
             metadata = ET.fromstring(archive.read(manifests[0])).find("{*}metadata")
+            if metadata is None:
+                raise RuntimeError(f"Missing package metadata: {path.name}")
             name = metadata.findtext("{*}id")
             identity = (name, path.suffix)
             if (identity not in expected or identity in found or
-                    normalized_version(metadata.findtext("{*}version")) != version):
+                    normalized_version(metadata.findtext("{*}version", default="")) != version):
                 raise RuntimeError(f"Unexpected package identity or version: {path.name}")
             if name == STREAMING:
-                dependencies = [(item.get("id"), item.get("version"))
-                                for item in metadata.findall(".//{*}dependency")]
-                if dependencies != [(CORE, f"[{version}]")]:
+                dependencies = metadata.findall(".//{*}dependency")
+                core = dependencies[0] if len(dependencies) == 1 and dependencies[0].get("id") == CORE else None
+                exact = None if core is None else re.fullmatch(r"\[([^,\[\]]+)\]", core.get("version", ""))
+                if exact is None or normalized_version(exact[1]) != version:
                     raise RuntimeError(f"{path.name} must depend on {CORE} [{version}]")
 
             payload = {item for item in names if item != manifests[0]
@@ -143,8 +149,9 @@ def package_references(versions):
 
 def assets(path, expected):
     libraries = json.loads((path / "obj/project.assets.json").read_text())["libraries"]
-    resolved = dict(item.split("/", 1) for item in libraries if item.startswith("SharpPack"))
-    if any(item["type"] != "package" for item in libraries.values()) or resolved != expected:
+    packages = (key.split("/", 1) for key in libraries if key.startswith("SharpPack"))
+    resolved = {(name, normalized_version(version)) for name, version in packages}
+    if any(item["type"] != "package" for item in libraries.values()) or resolved != set(expected.items()):
         raise RuntimeError(f"{path.name} resolved unexpected dependencies: {libraries.keys()}")
 
 
