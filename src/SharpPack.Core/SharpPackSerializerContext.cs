@@ -11,7 +11,9 @@ public sealed class SharpPackSerializerContext
 {
     readonly FormatterGraph graph;
     internal TypeRegistry TypeRegistry { get; }
-    readonly SharpPackReadLimits readLimits;
+    internal readonly int MaxReadDepth;
+    internal readonly int MaxCollectionLength;
+    internal readonly int MaxReferenceCount;
     readonly long maxPayloadBytes;
 
     public SharpPackSerializerConfiguration Configuration { get; }
@@ -38,7 +40,10 @@ public sealed class SharpPackSerializerContext
         Configuration = configuration;
         TypeRegistry = new TypeRegistry(configuration.TypeSerializationMode, typeRegistrations);
         ArgumentOutOfRangeException.ThrowIfNegative(configuration.MaxPayloadBytes);
-        readLimits = configuration.ReadLimits.Normalize();
+        var limits = configuration.ReadLimits.Normalize();
+        MaxReadDepth = limits.MaxDepth;
+        MaxCollectionLength = limits.MaxCollectionLength;
+        MaxReferenceCount = limits.MaxReferenceCount;
         maxPayloadBytes = configuration.MaxPayloadBytes == 0
             ? long.MaxValue
             : configuration.MaxPayloadBytes;
@@ -65,8 +70,6 @@ public sealed class SharpPackSerializerContext
         => graph.HasRegistrations ? graph : null;
 
     internal FormatterGraph Graph => graph;
-
-    internal SharpPackReadLimits ReadLimits => readLimits;
 
     internal long MaxPayloadBytes => maxPayloadBytes;
 

@@ -114,10 +114,9 @@ public sealed class SharpPackReaderOptionalState : IDisposable
         requiresReset = true;
         SerializerContext = context;
         FormatterGraph = context.OverrideGraph;
-        var limits = context.ReadLimits;
-        MaxDepth = limits.MaxDepth;
-        MaxCollectionLength = limits.MaxCollectionLength;
-        maxReferenceCount = limits.MaxReferenceCount;
+        MaxDepth = context.MaxReadDepth;
+        MaxCollectionLength = context.MaxCollectionLength;
+        maxReferenceCount = context.MaxReferenceCount;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
