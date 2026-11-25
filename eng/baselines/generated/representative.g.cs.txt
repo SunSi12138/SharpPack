@@ -1327,7 +1327,6 @@ namespace BaselineFixtures;
 /// </code>
 /// </remarks>
 partial class Outer<T>
-
 {
 partial class Inner<U> : global::SharpPack.ISharpPackable<Inner<U>>, global::SharpPack.ISharpPackFormatterFactory<Inner<U>>, global::SharpPack.ISharpPackContextFormatterFactory<Inner<U>>
 {

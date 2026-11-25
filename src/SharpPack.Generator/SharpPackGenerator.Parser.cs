@@ -577,15 +577,18 @@ public partial class TypeMeta
 
             foreach (var item in UnionTags)
             {
-                // type does not derived target symbol
+                var openExternalCase = unionFormatter && item.Type.IsGenericType;
+                var caseType = unionFormatter
+                    ? (openExternalCase ? item.Type.OriginalDefinition : item.Type)
+                    : UnionShape.BindSourceCase(item.Type, Symbol);
+                bool IsUnionTarget(INamedTypeSymbol type) => openExternalCase
+                    ? type.EqualsUnconstructedGenericType(Symbol)
+                    : SymbolEqualityComparer.Default.Equals(type, Symbol);
+
                 if (Symbol.TypeKind == TypeKind.Interface)
                 {
                     // interface, check interfaces.
-                    var check = item.Type.IsGenericType
-                        ? item.Type.OriginalDefinition.AllInterfaces.Any(x => x.EqualsUnconstructedGenericType(Symbol))
-                        : item.Type.AllInterfaces.Any(x => SymbolEqualityComparer.Default.Equals(x, Symbol));
-
-                    if (!check)
+                    if (!caseType.AllInterfaces.Any(IsUnionTarget))
                     {
                         reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberTypeNotImplementBaseType, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
                         noError = false;
@@ -594,11 +597,7 @@ public partial class TypeMeta
                 else
                 {
                     // abstract type, check base.
-                    var check = item.Type.IsGenericType
-                        ? item.Type.OriginalDefinition.GetAllBaseTypes().Any(x => x.EqualsUnconstructedGenericType(Symbol))
-                        : item.Type.GetAllBaseTypes().Any(x => SymbolEqualityComparer.Default.Equals(x, Symbol));
-
-                    if (!check)
+                    if (!caseType.GetAllBaseTypes().Any(IsUnionTarget))
                     {
                         reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberTypeNotDerivedBaseType, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
                         noError = false;

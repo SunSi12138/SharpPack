@@ -99,7 +99,7 @@ public class SerializationPlanTest
         Assert.Empty(diagnostics);
         Assert.DoesNotContain(compiled.GetDiagnostics(), diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
         var emitted = compiled.SyntaxTrees.Single(tree => tree.FilePath.EndsWith(".SharpPackFormatter.g.cs")).ToString();
-        Assert.Contains("where T : unmanaged", emitted);
+        Assert.Contains("partial class Envelope<T>", emitted);
         Assert.Contains("new Model(__Count, __Label)", emitted);
         Assert.Contains("@Items = __Items", emitted);
         Assert.Contains("ReadUnmanagedArray<T>()", emitted);

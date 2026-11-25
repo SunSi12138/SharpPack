@@ -21,7 +21,7 @@ internal readonly record struct GeneratedNameFacts(
         static bool IsInScope(INamedTypeSymbol type, string name)
         {
             for (INamedTypeSymbol? current = type; current is not null; current = current.ContainingType)
-                if (current.TypeParameters.Any(parameter => parameter.Name == name))
+                if (current.Name == name || current.TypeParameters.Any(parameter => parameter.Name == name))
                     return true;
             return false;
         }

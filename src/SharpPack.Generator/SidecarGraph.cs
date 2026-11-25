@@ -186,7 +186,10 @@ internal sealed class SidecarGraph
     FormatterDependency[] UnionDependencies(INamedTypeSymbol target, INamedTypeSymbol declaration)
     {
         var typeArguments = target.TypeArguments.ToArray();
-        return TypeMeta.GetUnionTags(declaration, references).Select(item => UnionShape.Bind(item.Type, typeArguments))
+        var sourceUnion = SymbolEqualityComparer.Default.Equals(target, declaration);
+        return TypeMeta.GetUnionTags(declaration, references).Select(item => sourceUnion
+                ? UnionShape.BindSourceCase(item.Type, target)
+                : UnionShape.Bind(item.Type, typeArguments))
             .Select(static type => new FormatterDependency(" -> union case " + type.FullyQualifiedToString(), type)).ToArray();
     }
 

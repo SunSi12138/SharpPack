@@ -178,7 +178,6 @@ using SharpPack;
         foreach (var container in shape.ContainingTypes)
         {
             writer.AppendLine(EmitPartialTypeDeclaration(container));
-            writer.AppendLine(EmitTypeParameterConstraints(container.TypeParameters));
             writer.AppendLine("{");
         }
 
