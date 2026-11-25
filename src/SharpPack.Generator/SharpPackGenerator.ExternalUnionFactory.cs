@@ -119,14 +119,14 @@ partial class SharpPackGenerator
             }
 
             var arguments = new EquatableArray<ExternalUnionTypeMatch>(target.TypeParameters.Zip(entry.Union.TypeArguments,
-                static (parameter, argument) => new ExternalUnionTypeMatch(parameter.Name, argument.FullyQualifiedToString())));
+                static (parameter, argument) => new ExternalUnionTypeMatch(parameter.FullyQualifiedToString(), argument.FullyQualifiedToString())));
             if (patterns.Add(arguments))
                 matches.Add(new(arguments, ConstructedFormatterName(target, entry)));
         }
 
         const string rootStem = "__SharpPackPreserveFactory";
         return new(
-            target.FullyQualifiedToString(), ConstructedTargetName(target),
+            target.FullyQualifiedToString(),
             target.ContainingNamespace.IsGlobalNamespace ? "" : target.ContainingNamespace.ToString(),
             PartialTypeShape.Capture(target), PartialTypeShape.CaptureContainers(target, useOriginalDefinitions: true),
             SerializationPlanner.AvailableFactoryName(rootStem, GeneratedNameFacts.CaptureFactoryIdentifiers(target, rootStem)),
@@ -158,41 +158,21 @@ partial class SharpPackGenerator
            union.IsUnboundGenericType ||
            union.TypeArguments.All(static argument => argument is ITypeParameterSymbol);
 
-    static string ConstructedTargetName(INamedTypeSymbol target)
-    {
-        if (!target.IsGenericType)
-        {
-            return target.FullyQualifiedToString();
-        }
-
-        var typeArguments = string.Join(
-            ", ",
-            target.TypeParameters.Select(static parameter => parameter.Name));
-        var definition = target.ConstructUnboundGenericType()
-            .FullyQualifiedToString();
-        return definition.Replace("<>", $"<{typeArguments}>");
-    }
-
     static string ConstructedFormatterName(
         INamedTypeSymbol target,
         ExternalUnionFactoryEntry entry)
     {
-        if (entry.Formatter.TypeParameters.Length == 0)
-        {
-            return entry.Formatter.Name;
-        }
-
-        var typeArguments = string.Join(
-            ", ",
-            target.TypeParameters.Select(static parameter => parameter.Name));
-        return $"{entry.Formatter.Name}<{typeArguments}>";
+        var formatter = entry.Formatter;
+        if (formatter.Arity != 0)
+            formatter = formatter.Construct(target.TypeParameters.Cast<ITypeSymbol>().ToArray());
+        return ExternalUnionFormatterShape.QualifyName(formatter);
     }
 
     readonly record struct ExternalUnionFactoryEntry(INamedTypeSymbol Formatter, INamedTypeSymbol Union);
 }
 
 internal sealed record ExternalUnionFactoryPlan(
-    string DeclarationName, string TargetType, string Namespace, PartialTypeShape Target,
+    string TargetType, string Namespace, PartialTypeShape Target,
     EquatableArray<PartialTypeShape> ContainingTypes, string RootName, EquatableArray<ExternalUnionFactoryMatch> Matches,
     string? FallbackFormatter);
 
@@ -284,7 +264,7 @@ internal sealed partial class CSharpEmitter
             sb.AppendLine("}");
         }
 
-        var hintName = factory.DeclarationName
+        var hintName = targetType
             .Replace("global::", "")
             .Replace("<", "_")
             .Replace(">", "_")

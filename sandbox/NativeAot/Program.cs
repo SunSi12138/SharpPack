@@ -565,9 +565,12 @@ public partial class AotExternalUnionItem : IAotExternalUnion
     public int Value { get; set; }
 }
 
-[SharpPackUnionFormatter(typeof(IAotExternalUnion))]
-[SharpPackUnion(3, typeof(AotExternalUnionItem))]
-public partial class AotExternalUnionFormatter;
+namespace AotFormatters
+{
+    [SharpPackUnionFormatter(typeof(IAotExternalUnion))]
+    [SharpPackUnion(3, typeof(AotExternalUnionItem))]
+    public partial class AotExternalUnionFormatter;
+}
 
 [SharpPackable(GenerateType.NoGenerate)]
 public partial interface IAotClosedExternalUnion<T>;

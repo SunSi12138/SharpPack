@@ -758,7 +758,7 @@ partial interface IAnimal : global::SharpPack.ISharpPackFormatterFactory<IAnimal
     [global::SharpPack.CompilerServices.Preserve]
     sealed class IAnimalFormatter : SharpPackFormatter<IAnimal>
     {
-        static readonly System.Collections.Generic.Dictionary<Type, ushort> __typeToTag = new(2)
+        static readonly global::System.Collections.Generic.Dictionary<global::System.Type, ushort> __typeToTag = new(2)
         {
             { typeof(global::BaselineFixtures.Cat), 0 },
             { typeof(global::BaselineFixtures.Dog), 1 },
@@ -781,15 +781,15 @@ partial interface IAnimal : global::SharpPack.ISharpPackFormatterFactory<IAnimal
 
                 switch (tag)
                 {
-                    case 0: writer.WritePackable(System.Runtime.CompilerServices.Unsafe.As<global::BaselineFixtures.IAnimal?, global::BaselineFixtures.Cat>(ref value)); break;
-                    case 1: writer.WritePackable(System.Runtime.CompilerServices.Unsafe.As<global::BaselineFixtures.IAnimal?, global::BaselineFixtures.Dog>(ref value)); break;
+                    case 0: writer.WritePackable(global::System.Runtime.CompilerServices.Unsafe.As<global::BaselineFixtures.IAnimal?, global::BaselineFixtures.Cat>(ref value)); break;
+                    case 1: writer.WritePackable(global::System.Runtime.CompilerServices.Unsafe.As<global::BaselineFixtures.IAnimal?, global::BaselineFixtures.Dog>(ref value)); break;
                     default:
                         break;
                 }
             }
             else
             {
-                SharpPackSerializationException.ThrowNotFoundInUnionType(value.GetType(), typeof(global::BaselineFixtures.IAnimal));
+                global::SharpPack.SharpPackSerializationException.ThrowNotFoundInUnionType(value.GetType(), typeof(global::BaselineFixtures.IAnimal));
             }
 
         }
@@ -810,7 +810,7 @@ partial interface IAnimal : global::SharpPack.ISharpPackFormatterFactory<IAnimal
                 case 0:
                     if (value is global::BaselineFixtures.Cat)
                     {
-                        reader.ReadPackable(ref System.Runtime.CompilerServices.Unsafe.As<global::BaselineFixtures.IAnimal?, global::BaselineFixtures.Cat>(ref value));
+                        reader.ReadPackable(ref global::System.Runtime.CompilerServices.Unsafe.As<global::BaselineFixtures.IAnimal?, global::BaselineFixtures.Cat>(ref value));
                     }
                     else
                     {
@@ -820,7 +820,7 @@ partial interface IAnimal : global::SharpPack.ISharpPackFormatterFactory<IAnimal
                 case 1:
                     if (value is global::BaselineFixtures.Dog)
                     {
-                        reader.ReadPackable(ref System.Runtime.CompilerServices.Unsafe.As<global::BaselineFixtures.IAnimal?, global::BaselineFixtures.Dog>(ref value));
+                        reader.ReadPackable(ref global::System.Runtime.CompilerServices.Unsafe.As<global::BaselineFixtures.IAnimal?, global::BaselineFixtures.Dog>(ref value));
                     }
                     else
                     {
@@ -828,7 +828,7 @@ partial interface IAnimal : global::SharpPack.ISharpPackFormatterFactory<IAnimal
                     }
                     break;
                 default:
-                    SharpPackSerializationException.ThrowInvalidTag(tag, typeof(global::BaselineFixtures.IAnimal));
+                    global::SharpPack.SharpPackSerializationException.ThrowInvalidTag(tag, typeof(global::BaselineFixtures.IAnimal));
                     break;
             }
 

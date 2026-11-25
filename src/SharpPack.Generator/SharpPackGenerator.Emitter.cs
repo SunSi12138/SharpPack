@@ -34,10 +34,15 @@ using System;
 using SharpPack;
 ");
 
-        var ns = Shape.Namespace;
+        // The formatter must join its declaration; registration remains in
+        // the target namespace so existing callers keep the same extension.
+        var separateRegistration = Shape.Union is { ExternalFormatter: { } formatter } union &&
+            formatter.Namespace != Shape.Namespace ? union : null;
+        var ns = separateRegistration?.ExternalFormatter?.Namespace ?? Shape.Namespace;
+        var useFileScopedNamespace = fileScopedNamespace && separateRegistration is null;
         if (ns.Length != 0)
         {
-            if (fileScopedNamespace)
+            if (useFileScopedNamespace)
             {
                 sb.AppendLine($"namespace {ns};");
             }
@@ -51,11 +56,21 @@ using SharpPack;
         if (HasSerializationInfo(Shape))
             BuildDebugInfo(sb, Shape, xmlDocument: true);
 
-        EmitTemplate(sb);
+        EmitTemplate(sb, includeExternalRegistration: separateRegistration is null);
 
-        if (ns.Length != 0 && !fileScopedNamespace)
+        if (ns.Length != 0 && !useFileScopedNamespace)
         {
             sb.AppendLine("}");
+        }
+
+        if (separateRegistration is { ExternalFormatter: { } declaredFormatter })
+        {
+            var targetNamespace = Shape.Namespace;
+            if (targetNamespace.Length != 0)
+                sb.AppendLine($"namespace {targetNamespace} {{");
+            sb.AppendLine(EmitUnionContextRegistration(separateRegistration.TypeName, declaredFormatter, declaredFormatter.QualifiedName));
+            if (targetNamespace.Length != 0)
+                sb.AppendLine("}");
         }
 
         return new($"{ModelFileStem(Shape)}.SharpPackFormatter.g.cs", sb.ToString());
@@ -152,13 +167,13 @@ using SharpPack;
     bool IsValueType => Shape.IsValueType;
     bool UsesEmptyConstructor => Shape.ConstructorParameters.Length == 0;
 
-    internal void EmitTemplate(StringBuilder writer)
+    internal void EmitTemplate(StringBuilder writer, bool includeExternalRegistration = true)
     {
         var shape = plan.Shape;
         if (shape.Union is { } union)
         {
             writer.AppendLine(union.ExternalFormatter is { } formatter
-                ? EmitUnionFormatterTemplate(union, formatter)
+                ? EmitUnionFormatterTemplate(union, formatter, includeExternalRegistration)
                 : EmitUnionTemplate(union));
             return;
         }
@@ -1105,26 +1120,19 @@ partial {{classOrInterfaceOrRecord}} {{TypeName}} : {{contextFactoryInterface}}
         return code;
     }
 
-    string EmitUnionFormatterTemplate(UnionShape union, ExternalUnionFormatterShape formatter)
+    string EmitUnionFormatterTemplate(UnionShape union, ExternalUnionFormatterShape formatter, bool includeRegistration)
     {
-        const string scopedRef = "scoped ref";
-        const string serializeMethodSignarture =
-            "Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter>";
-
+        var writerTypeParameter = "TBufferWriter";
+        while (formatter.TypeParameters.Any(parameter => parameter.Name == writerTypeParameter))
+            writerTypeParameter += "_";
         var symbolFullQualified = union.TypeName;
-        var formatterTypeParameters = EmitTypeParameterList(formatter.TypeParameters);
-        var registrationConstraints = EmitTypeParameterConstraints(formatter.TypeParameters);
-        var registrationClassName =
-            $"{formatter.Name}SharpPackContextExtensions";
-        var registrationMethodName =
-            $"Register{formatter.Name}";
-
-        return $$"""
+        var constraints = EmitTypeParameterConstraints(formatter.TypeParameters);
+        var declaration = $$"""
 [global::SharpPack.CompilerServices.Preserve]
 partial class {{TypeName}} :
-    SharpPackFormatter<{{symbolFullQualified}}>,
+    global::SharpPack.SharpPackFormatter<{{symbolFullQualified}}>,
     global::SharpPack.ISharpPackFormatterFactory<{{symbolFullQualified}}>
-{{registrationConstraints}}
+{{constraints}}
 {
     static global::SharpPack.SharpPackFormatter<{{symbolFullQualified}}>
         global::SharpPack.ISharpPackFormatterFactory<{{symbolFullQualified}}>.CreateFormatter()
@@ -1135,7 +1143,7 @@ partial class {{TypeName}} :
 {{EmitUnionTypeToTagField(union.Cases)}}
 
         [global::SharpPack.CompilerServices.Preserve]
-        public override void {{serializeMethodSignarture}} writer, {{scopedRef}} {{symbolFullQualified}}? value)
+        public override void Serialize<{{writerTypeParameter}}>(ref global::SharpPack.SharpPackWriter<{{writerTypeParameter}}> writer, scoped ref {{symbolFullQualified}}? value)
         {
 {{EmitCallbacks(Shape, CallbackPhase.Serializing, "            ")}}
 {{EmitUnionSerializeBody(union)}}
@@ -1143,26 +1151,36 @@ partial class {{TypeName}} :
         }
 
         [global::SharpPack.CompilerServices.Preserve]
-        public override void Deserialize(ref SharpPackReader reader, {{scopedRef}} {{symbolFullQualified}}? value)
+        public override void Deserialize(ref global::SharpPack.SharpPackReader reader, scoped ref {{symbolFullQualified}}? value)
         {
 {{EmitCallbacks(Shape, CallbackPhase.Deserializing, "            ")}}
 {{EmitUnionDeserializeBody(union)}}
 {{EmitCallbacks(Shape, CallbackPhase.Deserialized, "            ")}}
         }
 }
+""";
+        return includeRegistration
+            ? declaration + Environment.NewLine + Environment.NewLine + EmitUnionContextRegistration(union.TypeName, formatter, TypeName)
+            : declaration;
+    }
 
+    static string EmitUnionContextRegistration(string targetType, ExternalUnionFormatterShape formatter, string formatterType)
+    {
+        var typeParameters = EmitTypeParameterList(formatter.TypeParameters);
+        var constraints = EmitTypeParameterConstraints(formatter.TypeParameters);
+        return $$"""
 [global::SharpPack.CompilerServices.Preserve]
-public static class {{registrationClassName}}
+public static class {{formatter.Name}}SharpPackContextExtensions
 {
     public static global::SharpPack.SharpPackSerializerContextBuilder
-        {{registrationMethodName}}{{formatterTypeParameters}}(
+        Register{{formatter.Name}}{{typeParameters}}(
             this global::SharpPack.SharpPackSerializerContextBuilder builder)
-{{registrationConstraints}}
+{{constraints}}
     {
         global::System.ArgumentNullException.ThrowIfNull(builder);
         return builder.RegisterFactory<
-            {{symbolFullQualified}},
-            {{TypeName}}>();
+            {{targetType}},
+            {{formatterType}}>();
     }
 }
 """;
@@ -1226,7 +1244,7 @@ public static class {{registrationClassName}}
         var elements = cases.Select(x => $"            {{ typeof({x.TypeName}), {x.Tag} }},").NewLine();
 
         return $$"""
-        static readonly System.Collections.Generic.Dictionary<Type, ushort> __typeToTag = new({{cases.Length}})
+        static readonly global::System.Collections.Generic.Dictionary<global::System.Type, ushort> __typeToTag = new({{cases.Length}})
         {
 {{elements}}
         };
@@ -1241,7 +1259,7 @@ public static class {{registrationClassName}}
             .Select(x =>
             {
                 var method = x.UsePackablePath ? "WritePackable" : "WriteValue";
-                return $"                    case {x.Tag}: writer.{method}(System.Runtime.CompilerServices.Unsafe.As<{symbolFullQualified}?, {x.TypeName}>(ref value)); break;";
+                return $"                    case {x.Tag}: writer.{method}(global::System.Runtime.CompilerServices.Unsafe.As<{symbolFullQualified}?, {x.TypeName}>(ref value)); break;";
             })
             .NewLine();
 
@@ -1266,7 +1284,7 @@ public static class {{registrationClassName}}
             }
             else
             {
-                SharpPackSerializationException.ThrowNotFoundInUnionType(value.GetType(), typeof({{symbolFullQualified}}));
+                global::SharpPack.SharpPackSerializationException.ThrowNotFoundInUnionType(value.GetType(), typeof({{symbolFullQualified}}));
             }
 """;
     }
@@ -1289,7 +1307,7 @@ public static class {{registrationClassName}}
                 case {{x.Tag}}:
                     if (value is {{tagTypeFullQualified}})
                     {
-                        reader.{{method}}(ref System.Runtime.CompilerServices.Unsafe.As<{{symbolFullQualified}}?, {{tagTypeFullQualified}}>(ref value));
+                        reader.{{method}}(ref global::System.Runtime.CompilerServices.Unsafe.As<{{symbolFullQualified}}?, {{tagTypeFullQualified}}>(ref value));
                     }
                     else
                     {
@@ -1312,7 +1330,7 @@ public static class {{registrationClassName}}
             {
 {{readBody}}
                 default:
-                    SharpPackSerializationException.ThrowInvalidTag(tag, typeof({{symbolFullQualified}}));
+                    global::SharpPack.SharpPackSerializationException.ThrowInvalidTag(tag, typeof({{symbolFullQualified}}));
                     break;
             }
 """;

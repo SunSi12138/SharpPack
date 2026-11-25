@@ -172,16 +172,36 @@ public partial class UnionFormatter { }
             declarations, CSharpGeneratorRunner.CreateCompilation(tree), CancellationToken.None));
 
         Assert.Equal("global::Generated.INode<T>", plan.TargetType);
-        Assert.Equal("Open<T>", plan.FallbackFormatter);
+        Assert.Equal("global::Generated.Open<T>", plan.FallbackFormatter);
         var match = Assert.Single(plan.Matches);
-        Assert.Equal("AString", match.Formatter);
+        Assert.Equal("global::Generated.AString", match.Formatter);
         Assert.Equal(new ExternalUnionTypeMatch("T", "string"), Assert.Single(match.Arguments));
 
         var generated = Run(source);
         generated.Should().Contain("if (typeof(T) == typeof(string))");
-        generated.Should().Contain("(object)new AString()");
-        generated.Should().NotContain("(object)new ZString()");
-        generated.Should().Contain("return new Open<T>();");
+        generated.Should().Contain("(object)new global::Generated.AString()");
+        generated.Should().NotContain("(object)new global::Generated.ZString()");
+        generated.Should().Contain("return new global::Generated.Open<T>();");
+    }
+
+    [Fact]
+    public void OpenUnionBindsTypeArgumentsOfANestedCaseContainer()
+    {
+        var generated = Run("""
+            namespace Generated;
+            public partial interface INode<T>;
+            public partial class Container<T>
+            {
+                [SharpPackable] public partial class Node : INode<T> { }
+            }
+
+            [SharpPackUnionFormatter(typeof(INode<>))]
+            [SharpPackUnion(1, typeof(Container<>.Node))]
+            public partial class NodeFormatter<T>;
+            """);
+
+        generated.Should().Contain("typeof(global::Generated.Container<T>.Node)");
+        generated.Should().NotContain("typeof(global::Generated.Container<>.Node)");
     }
 
     static string Generate(string members)
