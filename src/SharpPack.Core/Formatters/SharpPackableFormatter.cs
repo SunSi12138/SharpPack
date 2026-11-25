@@ -3,8 +3,9 @@ using System.Runtime.CompilerServices;
 
 namespace SharpPack.Formatters;
 
+
 [Preserve]
-public sealed class SharpPackableFormatter<T> : SharpPackFormatter<T>, ISharpPackReusableBufferFormatter<T>
+public sealed class SharpPackableFormatter<T> : SharpPackFormatter<T>
     where T : ISharpPackable<T>
 {
     [Preserve]
@@ -12,9 +13,6 @@ public sealed class SharpPackableFormatter<T> : SharpPackFormatter<T>, ISharpPac
     {
         T.Serialize(ref writer, ref Unsafe.AsRef(in value));
     }
-
-    void ISharpPackReusableBufferFormatter<T>.Serialize(ref SharpPackWriter<ReusableLinkedArrayBufferWriter> writer, scoped ref T? value)
-        => T.Serialize(ref writer, ref value);
 
     [Preserve]
     public override void Deserialize(ref SharpPackReader reader, scoped ref T? value)

@@ -462,18 +462,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         EnterDepth<T>();
         try
         {
-            var formatter = GetFormatter<T>();
-            if (!RuntimeFeature.IsDynamicCodeSupported &&
-                typeof(TBufferWriter) == typeof(ReusableLinkedArrayBufferWriter) &&
-                formatter is ISharpPackReusableBufferFormatter<T> reusable)
-            {
-                reusable.Serialize(ref Unsafe.As<SharpPackWriter<TBufferWriter>, SharpPackWriter<ReusableLinkedArrayBufferWriter>>(ref this),
-                    ref Unsafe.AsRef(in value));
-            }
-            else
-            {
-                formatter.Serialize(ref this, ref Unsafe.AsRef(in value));
-            }
+            GetFormatter<T>().Serialize(ref this, ref Unsafe.AsRef(in value));
         }
         finally
         {

@@ -38,10 +38,17 @@ jobs:
           dotnet publish sandbox/DeserializeOnlyAot -c Release -o "$RUNNER_TEMP/deserialize-only"
           "$RUNNER_TEMP/deserialize-only/DeserializeOnlyAot"
           stat -c '%n %s bytes' "$RUNNER_TEMP/deserialize-only/DeserializeOnlyAot"
+      - name: Compare the same graph on the .NET 11 NativeAOT toolchain
+        continue-on-error: true
+        run: |
+          dotnet publish sandbox/NativeAot -c Release -p:SharpPackCompareNet11Aot=true -o "$RUNNER_TEMP/original-aot-net11"
+          jq -r '.libraries | keys[] | select(contains("ILCompiler"))' sandbox/NativeAot/obj/project.assets.json
+          "$RUNNER_TEMP/original-aot-net11/NativeAot"
       - name: Check the original direct Type deserialization sample
         run: |
           set -o pipefail
           dotnet publish sandbox/NativeAot -c Release -p:StripSymbols=false -o "$RUNNER_TEMP/original-aot" 2>&1 | tee "$RUNNER_TEMP/original-aot-publish.txt"
+          jq -r '.libraries | keys[] | select(contains("ILCompiler"))' sandbox/NativeAot/obj/project.assets.json
           if grep -q 'IL2111' "$RUNNER_TEMP/original-aot-publish.txt"; then exit 1; fi
           ulimit -c 0
           exe="$RUNNER_TEMP/original-aot/NativeAot"
