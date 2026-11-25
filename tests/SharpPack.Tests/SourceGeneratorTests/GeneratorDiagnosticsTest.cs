@@ -123,6 +123,16 @@ public partial class Hoge
     }
 }
 """);
+
+        Compile(6, """
+            [SharpPackable(GenerateType.VersionTolerant, SerializeLayout.Sequential)]
+            public partial class DroppedConstructorSlot
+            {
+                [SharpPackOrder(0)] public int First { get; set; }
+                [SharpPackOrder(0)] public int Other { get; set; }
+                public DroppedConstructorSlot(int other) => Other = other;
+            }
+            """);
     }
 
     [Fact]
@@ -694,5 +704,49 @@ public partial struct Tester
                         }
                     }
                     """);
+    }
+
+    [Fact]
+    public void SHARPPACK049_ConstructorParameterCannotBindMultipleMembers()
+    {
+        Compile(49, """
+            [SharpPackable]
+            public partial class Ambiguous
+            {
+                [SharpPackInclude] private readonly int _b;
+                public int B => _b;
+                public Ambiguous(int b) => _b = b;
+            }
+            """);
+    }
+
+    [Fact]
+    public void SHARPPACK050_ExplicitlyIncludedPropertyMustBePopulatable()
+    {
+        Compile(50, """
+            [SharpPackable]
+            public partial class GetterOnly
+            {
+                string? stored;
+                [SharpPackInclude] public string? Value => stored;
+                public void Seed(string? value) => stored = value;
+            }
+            """);
+
+        Compile(50, """
+            public class Parent
+            {
+                [SharpPackInclude] public string? Value { get; private set; }
+            }
+            [SharpPackable] public partial class Child : Parent;
+            """);
+
+        Compile(50, """
+            [SharpPackable(GenerateType.CircularReference)]
+            public partial class Circular
+            {
+                [SharpPackInclude, SharpPackOrder(0)] public string? Value { get; init; }
+            }
+            """);
     }
 }

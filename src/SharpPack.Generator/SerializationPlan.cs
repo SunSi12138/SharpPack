@@ -151,20 +151,16 @@ internal static class SerializationPlanner
     {
         if (shape.ConstructorParameters.Length == 0 || slots.Length == 0) return default;
 
-        var parameterSlots = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var slot in slots)
-        {
-            if (slot.DeclaredMemberIndex is int index && shape.Members[index].ConstructorParameter is { } parameter)
-                parameterSlots.Add(parameter, slot.Position);
-        }
-
         var arguments = new List<int>(shape.ConstructorParameters.Length);
         foreach (var parameter in shape.ConstructorParameters)
         {
-            if (parameterSlots.TryGetValue(parameter.Name, out var position))
-                arguments.Add(position);
+            var matches = Extensions.FindConstructorBindings(slots, GetBinding, parameter.Name);
+            if (matches.Length == 1)
+                arguments.Add(matches[0].Position);
         }
         return new(arguments);
+
+        string? GetBinding(WireSlot slot) => slot.DeclaredMemberIndex is int index ? shape.Members[index].ConstructorParameter : null;
     }
 
     static ObjectWriteStrategy ChooseObjectWriteStrategy(TypeShape shape, MemberKind[] kinds)

@@ -42,8 +42,7 @@ public partial class TypeMeta
 
         foreach (var parameter in constructor.Parameters)
         {
-            var matching = model.Members.Where(member =>
-                string.Equals(member.ConstructorParameterName, parameter.Name, StringComparison.OrdinalIgnoreCase)).ToArray();
+            var matching = Extensions.FindConstructorBindings(model.Members, static member => member.ConstructorParameterName, parameter.Name);
             if (matching.Length != 1 || !SymbolEqualityComparer.Default.Equals(matching[0].MemberType, parameter.Type))
                 return Failed(null, $"constructor parameter '{parameter.Name}' must match exactly one serialized member of the same type");
         }
