@@ -51,9 +51,10 @@ public partial class MemberKindsAllUnmanaged
         return H;
     }
 
-    public MemberKindsAllUnmanaged(int c, int d)
+    public MemberKindsAllUnmanaged(int c, int d, int j1 = 0)
     {
         this.C = c;
         this.D = d;
+        j = j1;
     }
 }

@@ -250,11 +250,17 @@ internal static class Extensions
 
         return constructorParameter != null;
 
-        static IParameterSymbol? GetConstructorParameter(IMethodSymbol constructor, string name) => constructor.Parameters.FirstOrDefault(x => x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        static IParameterSymbol? GetConstructorParameter(IMethodSymbol constructor, string name)
+            => constructor.Parameters.FirstOrDefault(parameter => parameter.Name == name)
+                ?? constructor.Parameters.FirstOrDefault(parameter => parameter.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
     }
 
-    public static bool ContainsConstructorParameter(this IEnumerable<MemberMeta> members, IParameterSymbol constructorParameter) =>
-        members.Any(x =>
-            x.IsConstructorParameter &&
-            string.Equals(constructorParameter.Name, x.ConstructorParameterName, StringComparison.OrdinalIgnoreCase));
+    internal static T[] FindConstructorBindings<T>(IEnumerable<T> candidates, Func<T, string?> getBinding, string parameter)
+    {
+        var exact = candidates.Where(candidate => getBinding(candidate) == parameter).ToArray();
+        // A single legacy slot can supply parameters that differ only by case. If each
+        // spelling has its own slot, the exact match takes precedence.
+        return exact.Length != 0 ? exact : candidates.Where(candidate =>
+            string.Equals(getBinding(candidate), parameter, StringComparison.OrdinalIgnoreCase)).ToArray();
+    }
 }

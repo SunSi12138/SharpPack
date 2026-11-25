@@ -427,16 +427,29 @@ public partial class TypeMeta
         }
         else
         {
+            var wireMembers = GenerateType switch
+            {
+                GenerateType.CircularReference when Symbol.TypeKind == TypeKind.Class => circularWireMembers,
+                GenerateType.VersionTolerant or GenerateType.CircularReference => Members.DistinctBy(static member => member.Order).ToArray(),
+                _ => Members,
+            };
+
             // check ctor members
             if (this.Constructor != null)
             {
                 foreach (var parameter in Constructor.Parameters)
                 {
-                    if (!Members.ContainsConstructorParameter(parameter))
+                    var matches = Extensions.FindConstructorBindings(wireMembers, static member => member.ConstructorParameterName, parameter.Name);
+                    var location = Constructor.Locations.FirstOrDefault() ?? syntax.Identifier.GetLocation();
+                    if (matches.Length == 0)
                     {
-                        var location = Constructor.Locations.FirstOrDefault() ?? syntax.Identifier.GetLocation();
-
                         reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.ConstructorHasNoMatchedParameter, location, Symbol.Name, parameter.Name));
+                        noError = false;
+                    }
+                    else if (matches.Length > 1)
+                    {
+                        reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.AmbiguousConstructorParameter, location,
+                            Symbol.Name, parameter.Name, string.Join(", ", matches.Select(static member => member.Name))));
                         noError = false;
                     }
                 }
@@ -452,6 +465,21 @@ public partial class TypeMeta
                 else if (item is { SuppressDefaultInitialization: true, IsAssignable: false })
                 {
                     reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.SuppressDefaultInitializationMustBeSettable, item.GetLocation(syntax), Symbol.Name, item.Name));
+                    noError = false;
+                }
+            }
+
+            foreach (var item in wireMembers)
+            {
+                if (!item.IsConstructorParameter && item.Symbol is IPropertySymbol property &&
+                    !(GenerateType == GenerateType.CircularReference && Symbol.TypeKind == TypeKind.Class && item.IsInitOnly) &&
+                    property.ContainsAttribute(reference.SharpPackIncludeAttribute) &&
+                    reference.Compilation.IsSymbolAccessibleWithin(property, Symbol, throughType: Symbol) &&
+                    (property.SetMethod is not { } setter ||
+                     !reference.Compilation.IsSymbolAccessibleWithin(setter, Symbol, throughType: Symbol)))
+                {
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.IncludedPropertyCannotBePopulated,
+                        item.GetLocation(syntax), Symbol.Name, item.Name));
                     noError = false;
                 }
             }

@@ -126,7 +126,7 @@ public partial class CircularInitializationTest
         [SharpPackOrder(0)]
         public InitNode? Self { get; set; }
 
-        [SharpPackOrder(1)]
+        [SharpPackOrder(1), SharpPackInclude]
         public string Label
         {
             get => label;
