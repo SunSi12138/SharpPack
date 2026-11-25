@@ -13,11 +13,13 @@ internal readonly record struct GeneratedNameFacts(
 
     internal static GeneratedNameFacts Capture(INamedTypeSymbol type, MemberMeta[] members)
     {
-        var memberNames = type.GetAllMembers().Select(static member => member.Name).ToArray();
+        var memberNames = type.GetAllMembers().Select(static member => member.Name)
+            .Where(IsReservedHelperName).ToArray();
         var hasStaticInitialization = members.Any(static member => member.Kind == MemberKind.CustomFormatter) ||
             type.GetMembers().Any(UsesStaticInitialization);
         return new(
-            OrderedNames(memberNames.Concat(type.TypeParameters.Select(static parameter => parameter.Name))),
+            OrderedNames(memberNames.Concat(type.TypeParameters.Select(static parameter => parameter.Name)
+                .Where(IsReservedHelperName))),
             hasStaticInitialization ? default : CaptureFactoryIdentifiers(type, SelfRootStem, memberNames),
             hasStaticInitialization);
     }
@@ -29,7 +31,10 @@ internal readonly record struct GeneratedNameFacts(
     {
         // Preserve binding of primary-constructor parameters and unqualified
         // names imported by using static, not just declared member names.
-        var names = new HashSet<string>(members, StringComparer.Ordinal) { type.Name };
+        var names = new HashSet<string>(members.Where(name => name.StartsWith(stem, StringComparison.Ordinal)),
+            StringComparer.Ordinal);
+        if (type.Name.StartsWith(stem, StringComparison.Ordinal))
+            names.Add(type.Name);
         foreach (var reference in type.DeclaringSyntaxReferences)
         foreach (var token in reference.GetSyntax().DescendantTokens())
         {
@@ -41,6 +46,9 @@ internal readonly record struct GeneratedNameFacts(
 
     static EquatableArray<string> OrderedNames(IEnumerable<string> names)
         => new(new SortedSet<string>(names, StringComparer.Ordinal));
+
+    static bool IsReservedHelperName(string name)
+        => name.StartsWith("__SharpPack", StringComparison.Ordinal);
 
     static bool UsesStaticInitialization(ISymbol member)
         => member is IMethodSymbol method && method.IsStatic &&
