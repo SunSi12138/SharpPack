@@ -612,6 +612,8 @@ def main():
         verify_native_union_diagnostics(net11 / "native-union-diagnostics", feed, version, env)
         consumer(work / "deserialize-array-aot", feed, runtime, runtime, env, args.architecture,
                  aot=True, sources=("DeserializeArray.cs",))
+        consumer(net11 / "deserialize-array-aot", feed, aggregate, runtime | aggregate, env, args.architecture,
+                 framework="net11.0", aot=True, sources=("DeserializeArray.cs",))
 
         if args.compatibility:
             verify_sidecar_integration(work, feed, current_cache, version, env)
