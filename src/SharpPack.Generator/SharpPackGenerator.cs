@@ -1,6 +1,7 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.Diagnostics;
 using System.Text;
 
 namespace SharpPack.Generator;
@@ -45,13 +46,11 @@ public partial class SharpPackGenerator : IIncrementalGenerator
                 SharpPackableAttributeFullName,
                 static (node, _) => node is ClassDeclarationSyntax or StructDeclarationSyntax or RecordDeclarationSyntax or InterfaceDeclarationSyntax,
                 static (context, _) => (Declaration: (TypeDeclarationSyntax)context.TargetNode,
-                    HasGenerationIntent: HasModelGenerationIntent(context)))
-            .WithTrackingName("SharpPack.SharpPackable.1_ForAttributeSharpPackableAttribute");
+                    HasGenerationIntent: HasModelGenerationIntent(context)));
         var unions = context.SyntaxProvider.ForAttributeWithMetadataName(
                 SharpPackUnionFormatterAttributeFullName,
                 static (node, _) => node is ClassDeclarationSyntax,
-                static (context, _) => (TypeDeclarationSyntax)context.TargetNode)
-            .WithTrackingName("SharpPack.SharpPackable.1_ForAttributeSharpPackUnion");
+                static (context, _) => (TypeDeclarationSyntax)context.TargetNode);
         var typeScript = context.SyntaxProvider.ForAttributeWithMetadataName(
             GenerateTypeScriptAttributeFullName,
             static (node, _) => node is ClassDeclarationSyntax or RecordDeclarationSyntax or InterfaceDeclarationSyntax,
@@ -120,84 +119,77 @@ public partial class SharpPackGenerator : IIncrementalGenerator
         });
     }
 
-    void RegisterSharpPackable(
+    static void RegisterSharpPackable(
         IncrementalGeneratorInitializationContext context,
         IncrementalValuesProvider<TypeDeclarationSyntax> models,
         IncrementalValuesProvider<TypeDeclarationSyntax> unions)
     {
-        // return dir of info output or null .
         var logProvider = context.AnalyzerConfigOptionsProvider
-            .Select((configOptions, token) =>
-            {
-                if (configOptions.GlobalOptions.TryGetValue("build_property.SharpPackGenerator_SerializationInfoOutputDirectory", out var path))
-                {
-                    return path;
-                }
+            .Select(static (config, _) => config.GlobalOptions.TryGetValue(
+                "build_property.SharpPackGenerator_SerializationInfoOutputDirectory", out var path) ? path : null);
+        var fileScopedNamespace = context.ParseOptionsProvider
+            .Select(static (options, _) => ((CSharpParseOptions)options).LanguageVersion >= LanguageVersion.CSharp10);
 
-                return (string?)null;
-            })
-            .WithTrackingName("SharpPack.SharpPackable.0_AnalyzerConfigOptionsProvider"); // annotate for IncrementalGeneratorTest
+        RegisterModelEmission(context, models, logProvider, fileScopedNamespace);
+        RegisterModelEmission(context, unions, logProvider, fileScopedNamespace);
 
-        var parseOptions = context.ParseOptionsProvider
-            .Select((parseOptions, token) =>
-            {
-                var csOptions = (CSharpParseOptions)parseOptions;
-                var langVersion = csOptions.LanguageVersion;
-                return langVersion;
-            })
-            .WithTrackingName("SharpPack.SharpPackable.0_ParseOptionsProvider");
+        var externalFactories = unions.Collect()
+            .Combine(context.CompilationProvider)
+            .Select(static (input, token) => PlanExternalUnionTargetFactories(input.Left, input.Right, token))
+            .WithTrackingName("SharpPack.ExternalUnionFactoryPlans")
+            .SelectMany(static (plans, _) => plans)
+            .Combine(fileScopedNamespace)
+            .Select(static (input, _) => CSharpEmitter.EmitExternalUnionTargetFactory(input.Left, input.Right))
+            .WithTrackingName("SharpPack.ExternalUnionFactoryEmission");
+        context.RegisterSourceOutput(externalFactories, AddGeneratedSource);
+    }
 
+    static void RegisterModelEmission(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValuesProvider<TypeDeclarationSyntax> declarations,
+        IncrementalValueProvider<string?> logProvider,
+        IncrementalValueProvider<bool> fileScopedNamespace)
+    {
+        var analysis = declarations.Combine(context.CompilationProvider)
+            .Select(static (input, token) => AnalyzeModel(input.Left, input.Right, token))
+            .WithTrackingName("SharpPack.ModelAnalysis");
+        context.RegisterSourceOutput(analysis.Where(static result => !result.Diagnostics.IsEmpty), static (output, result) =>
         {
-            var source = models
-                .Combine(context.CompilationProvider)
-                .Combine(logProvider)
-                .Combine(parseOptions)
-                .WithTrackingName("SharpPack.SharpPackable.2_SharpPackableCombined");
+            foreach (var diagnostic in result.Diagnostics)
+                output.ReportDiagnostic(diagnostic);
+        });
 
-            context.RegisterSourceOutput(source, static (context, source) =>
-            {
-                var (typeDeclaration, compilation) = source.Left.Item1;
-                var logPath = source.Left.Item2;
-                var langVersion = source.Right;
+        var shapes = analysis.Where(static result => result.Shape is not null)
+            .Select(static (result, _) => result.Shape!)
+            .WithTrackingName("SharpPack.TypeShape");
+        var sources = shapes.Select(static (shape, _) => SerializationPlanner.Plan(shape))
+            .WithTrackingName("SharpPack.SerializationPlan")
+            .Combine(fileScopedNamespace)
+            .Select(static (input, _) => new CSharpEmitter(input.Left).EmitModel(input.Right))
+            .WithTrackingName("SharpPack.CSharpEmission");
+        context.RegisterSourceOutput(sources, AddGeneratedSource);
 
-                Generate(typeDeclaration, compilation, logPath, new GeneratorContext(context, langVersion));
-            });
+        var logFiles = shapes.Where(CSharpEmitter.HasSerializationInfo)
+            .Combine(logProvider)
+            .Where(static input => input.Right is not null);
+        context.RegisterSourceOutput(logFiles, static (_, input) => WriteSerializationInfo(input.Left, input.Right!));
+    }
+
+    static void AddGeneratedSource(SourceProductionContext output, GeneratedSource source)
+        => output.AddSource(source.HintName, source.Text);
+
+    static void WriteSerializationInfo(TypeShape shape, string outputDirectory)
+    {
+        try
+        {
+            if (!Directory.Exists(outputDirectory))
+                Directory.CreateDirectory(outputDirectory);
+            var file = Path.Combine(outputDirectory, $"{CSharpEmitter.ModelFileStem(shape)}.txt");
+            File.WriteAllText(file, CSharpEmitter.EmitSerializationInfo(shape), new UTF8Encoding(false));
         }
+        catch (Exception ex)
         {
-            var source = unions
-                .Combine(context.CompilationProvider)
-                .Combine(logProvider)
-                .Combine(parseOptions)
-                .WithTrackingName("SharpPack.SharpPackable.2_SharpPackUnionCombined");
-
-            context.RegisterSourceOutput(source, static (context, source) =>
-            {
-                var (typeDeclaration, compilation) = source.Left.Item1;
-                var logPath = source.Left.Item2;
-                var langVersion = source.Right;
-
-                Generate(typeDeclaration, compilation, logPath, new GeneratorContext(context, langVersion));
-            });
-        }
-        {
-            var source = unions
-                .Collect()
-                .Combine(context.CompilationProvider)
-                .Combine(parseOptions)
-                .WithTrackingName(
-                    "SharpPack.SharpPackable.2_ExternalUnionFactoriesCombined");
-
-            context.RegisterSourceOutput(source, static (context, source) =>
-            {
-                var declarations = source.Left.Left;
-                var compilation = source.Left.Right;
-                var langVersion = source.Right;
-
-                GenerateExternalUnionTargetFactories(
-                    declarations,
-                    compilation,
-                    new GeneratorContext(context, langVersion));
-            });
+            Trace.WriteLine(ex.ToString());
         }
     }
 
@@ -302,30 +294,5 @@ public partial class SharpPackGenerator : IIncrementalGenerator
                 }
             }
         });
-    }
-
-    class GeneratorContext : IGeneratorContext
-    {
-        SourceProductionContext context;
-
-        public GeneratorContext(SourceProductionContext context, LanguageVersion languageVersion)
-        {
-            this.context = context;
-            this.LanguageVersion = languageVersion;
-        }
-
-        public CancellationToken CancellationToken => context.CancellationToken;
-
-        public Microsoft.CodeAnalysis.CSharp.LanguageVersion LanguageVersion { get; }
-
-        public void AddSource(string hintName, string source)
-        {
-            context.AddSource(hintName, source);
-        }
-
-        public void ReportDiagnostic(Diagnostic diagnostic)
-        {
-            context.ReportDiagnostic(diagnostic);
-        }
     }
 }

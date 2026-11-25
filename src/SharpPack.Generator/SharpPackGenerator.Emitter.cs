@@ -1,22 +1,14 @@
 ﻿using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Diagnostics;
 using System.Text;
 
 namespace SharpPack.Generator;
 
-partial class SharpPackGenerator
-{
-    static void Generate(TypeDeclarationSyntax syntax, Compilation compilation, string? serializationInfoLogDirectoryPath, IGeneratorContext context)
-    {
-        if (AnalyzeModel(syntax, compilation, context) is not { } shape)
-            return;
-        var fullType = shape.DeclarationName
-            .Replace("@", "")
-            .Replace("global::", "")
-            .Replace("<", "_")
-            .Replace(">", "_");
+internal readonly record struct GeneratedSource(string HintName, string Text);
 
+internal sealed partial class CSharpEmitter(SerializationPlan plan)
+{
+    internal GeneratedSource EmitModel(bool fileScopedNamespace)
+    {
         var sb = new StringBuilder();
 
         sb.AppendLine(@"
@@ -42,10 +34,10 @@ using System;
 using SharpPack;
 ");
 
-        var ns = shape.Namespace;
+        var ns = Shape.Namespace;
         if (ns.Length != 0)
         {
-            if (context.IsCSharp10OrGreater())
+            if (fileScopedNamespace)
             {
                 sb.AppendLine($"namespace {ns};");
             }
@@ -56,43 +48,30 @@ using SharpPack;
         }
         sb.AppendLine();
 
-        // Write document comment as remarks
-        if (shape.GenerateType is GenerateType.Object or GenerateType.VersionTolerant or GenerateType.CircularReference)
+        if (HasSerializationInfo(Shape))
+            BuildDebugInfo(sb, Shape, xmlDocument: true);
+
+        EmitTemplate(sb);
+
+        if (ns.Length != 0 && !fileScopedNamespace)
         {
-            BuildDebugInfo(sb, shape, true);
-
-            // also output to log
-            if (serializationInfoLogDirectoryPath != null)
-            {
-                try
-                {
-                    if (!Directory.Exists(serializationInfoLogDirectoryPath))
-                    {
-                        Directory.CreateDirectory(serializationInfoLogDirectoryPath);
-                    }
-                    var logSw = new StringBuilder();
-                    BuildDebugInfo(logSw, shape, false);
-                    var message = logSw.ToString();
-
-                    File.WriteAllText(Path.Combine(serializationInfoLogDirectoryPath, $"{fullType}.txt"), message, new UTF8Encoding(false));
-                }
-                catch (Exception ex)
-                {
-                    Trace.WriteLine(ex.ToString());
-                }
-            }
+            sb.AppendLine("}");
         }
 
-        // emit type info
-        new CSharpEmitter(SerializationPlanner.Plan(shape)).EmitTemplate(sb);
+        return new($"{ModelFileStem(Shape)}.SharpPackFormatter.g.cs", sb.ToString());
+    }
 
-        if (ns.Length != 0 && !context.IsCSharp10OrGreater())
-        {
-            sb.AppendLine($"}}");
-        }
+    internal static bool HasSerializationInfo(TypeShape shape)
+        => shape.GenerateType is GenerateType.Object or GenerateType.VersionTolerant or GenerateType.CircularReference;
 
-        var code = sb.ToString();
-        context.AddSource($"{fullType}.SharpPackFormatter.g.cs", code);
+    internal static string ModelFileStem(TypeShape shape)
+        => shape.DeclarationName.Replace("@", "").Replace("global::", "").Replace("<", "_").Replace(">", "_");
+
+    internal static string EmitSerializationInfo(TypeShape shape)
+    {
+        var writer = new StringBuilder();
+        BuildDebugInfo(writer, shape, xmlDocument: false);
+        return writer.ToString();
     }
 
     static void BuildDebugInfo(StringBuilder sb, TypeShape type, bool xmlDocument)
@@ -168,10 +147,6 @@ using SharpPack;
             sb.AppendLine("/// </remarks>");
         }
     }
-}
-
-internal sealed partial class CSharpEmitter(SerializationPlan plan)
-{
     TypeShape Shape => plan.Shape;
     string TypeName => Shape.ShortName;
     bool IsValueType => Shape.IsValueType;
