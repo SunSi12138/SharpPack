@@ -10,6 +10,7 @@ internal sealed class FormatterGraph
 {
     bool registrationsFrozen;
     bool hasRegistrations;
+    bool hasGeneratedFactories;
     readonly Lock formatterCreationLock = new();
     readonly HashSet<Type> creatingFormatterTypes = [];
 
@@ -20,6 +21,7 @@ internal sealed class FormatterGraph
 
     internal SharpPackSerializerContext Owner { get; }
     internal bool HasRegistrations => hasRegistrations;
+    internal bool HasGeneratedFactories => hasGeneratedFactories;
 
     internal void Register<T>(SharpPackFormatter<T> formatter)
     {
@@ -28,13 +30,13 @@ internal sealed class FormatterGraph
         hasRegistrations = true;
     }
 
-    internal bool TryRegisterGenerated<T>(SharpPackFormatter<T> formatter, bool isSidecar)
+    internal void RegisterGeneratedFactory<T>(Func<SharpPackSerializerContext, SharpPackFormatter<T>> factory)
     {
         ThrowIfFrozen();
-        if (!ContextFormatterSlot<T>.TryRegister(this, formatter, isExplicitRegistration: isSidecar))
-            return false;
+        if (ContextFormatterSlot<T>.HasExplicitRegistration(this)) return;
+        GeneratedFormatterFactorySlot<T>.Register(this, factory);
         hasRegistrations = true;
-        return true;
+        hasGeneratedFactories = true;
     }
 
     internal SharpPackFormatter<T> GetFormatter<T>()

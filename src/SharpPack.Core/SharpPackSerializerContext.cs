@@ -86,7 +86,7 @@ public sealed class SharpPackSerializerContext
 public sealed class SharpPackSerializerContextBuilder
 {
     readonly List<Action<SharpPackSerializerContext>> registrations = [];
-    List<Func<SharpPackSerializerContext, Action<SharpPackSerializerContext>?>>? generatedRegistrations;
+    List<Action<SharpPackSerializerContext>>? generatedRegistrations;
     SharpPackSerializerConfiguration configuration = SharpPackSerializerConfiguration.Default;
     readonly Dictionary<string, Type> typesById = new(StringComparer.Ordinal);
     readonly HashSet<Type> registeredTypes = [];
@@ -142,17 +142,10 @@ public sealed class SharpPackSerializerContextBuilder
         where TFactory : ISharpPackFormatterFactory<T>
         => Register<T>(TFactory.CreateFormatter());
 
-    /// <summary>Registers a generated sidecar or a closed built-in formatter before publishing the context.</summary>
-    /// <remarks>Explicit registrations win. Initialization runs after all generated slots have been filled.</remarks>
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public SharpPackSerializerContextBuilder RegisterGeneratedFormatter<T>(
-        SharpPackFormatter<T> formatter, bool isSidecar, Action<SharpPackSerializerContext>? initialize = null)
+    internal void RegisterGeneratedFactory<T>(Func<SharpPackSerializerContext, SharpPackFormatter<T>> factory)
     {
         ThrowIfBuilt();
-        ArgumentNullException.ThrowIfNull(formatter);
-        (generatedRegistrations ??= []).Add(context =>
-            context.Graph.TryRegisterGenerated(formatter, isSidecar) ? initialize : null);
-        return this;
+        (generatedRegistrations ??= []).Add(context => context.Graph.RegisterGeneratedFactory(factory));
     }
 
     public SharpPackSerializerContextBuilder RegisterCollection<TCollection, TElement>()
@@ -184,15 +177,8 @@ public sealed class SharpPackSerializerContextBuilder
                 registration(context);
             }
             if (generatedRegistrations is not null)
-            {
-                List<Action<SharpPackSerializerContext>>? initializers = null;
                 foreach (var register in generatedRegistrations)
-                    if (register(context) is { } initialize)
-                        (initializers ??= []).Add(initialize);
-                if (initializers is not null)
-                    foreach (var initialize in initializers)
-                        initialize(context);
-            }
+                    register(context);
             context.FreezeRegistrations();
             return context;
         }

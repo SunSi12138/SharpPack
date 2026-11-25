@@ -32,6 +32,11 @@ type public sealed class SharpPack.CompilerServices.PreserveAttribute : System.A
 type public static class SharpPack.CompilerServices.SharpPackGeneratedCodeContract
   field public const System.Int32 Version = 1
 
+type public static class SharpPack.CompilerServices.SharpPackSidecarRegistration
+  field public const System.Int32 Version = 1
+  method public static System.Void Register<T>(SharpPack.SharpPackSerializerContextBuilder builder, System.Func<SharpPack.SharpPackSerializerContext, SharpPack.SharpPackFormatter<T>> factory)
+  method public static System.Void RegisterBuiltIn<T>(SharpPack.SharpPackSerializerContextBuilder builder, System.Func<SharpPack.SharpPackFormatter<T>> factory)
+
 type public sealed class SharpPack.Compression.BitPackFormatter : SharpPack.SharpPackFormatter<System.Boolean[]>, SharpPack.ISharpPackFormatter<System.Boolean[]>
   ctor public BitPackFormatter()
   field public static readonly SharpPack.Compression.BitPackFormatter Default
@@ -980,7 +985,6 @@ type public sealed class SharpPack.SharpPackSerializerContextBuilder
   method public SharpPack.SharpPackSerializerContextBuilder RegisterCollection<TCollection, TElement>() where TCollection : System.Collections.Generic.ICollection<TElement>, new()
   method public SharpPack.SharpPackSerializerContextBuilder RegisterDictionary<TDictionary, TKey, TValue>() where TDictionary : System.Collections.Generic.IDictionary<TKey, TValue>, new() where TKey : notnull
   method public SharpPack.SharpPackSerializerContextBuilder RegisterFactory<T, TFactory>() where TFactory : SharpPack.ISharpPackFormatterFactory<T>
-  method public SharpPack.SharpPackSerializerContextBuilder RegisterGeneratedFormatter<T>(SharpPack.SharpPackFormatter<T> formatter, System.Boolean isSidecar, System.Action<SharpPack.SharpPackSerializerContext> initialize = null)
   method public SharpPack.SharpPackSerializerContextBuilder RegisterSet<TSet, TElement>() where TSet : System.Collections.Generic.ISet<TElement>, new()
   method public SharpPack.SharpPackSerializerContextBuilder RegisterType(System.Type type, System.String typeId)
   method public SharpPack.SharpPackSerializerContextBuilder RegisterType<T>(System.String typeId)

@@ -13,8 +13,7 @@ public class SidecarWireTest
     [Fact]
     public void StandaloneMetadataFormatterSharesTheGeneratedObjectWire()
     {
-        var parse = new CSharpParseOptions(LanguageVersion.CSharp14, preprocessorSymbols: ["NET10_0_OR_GREATER"]);
-        var vendorCompilation = CSharpGeneratorRunner.CreateCompilation(CSharpSyntaxTree.ParseText("""
+        CompileAndVerify("""
             namespace Vendor;
 
             public sealed class Request
@@ -23,10 +22,7 @@ public class SidecarWireTest
                 public string? Name { get; init; }
                 public Request(int count) => Count = count;
             }
-            """, parse, "Vendor.cs")).WithAssemblyName("SidecarWireVendor");
-        var vendor = Emit(vendorCompilation);
-
-        var consumer = CSharpGeneratorRunner.CreateCompilation(CSharpSyntaxTree.ParseText("""
+            """, """
             [assembly: SharpPackExternalType(typeof(Vendor.Request))]
 
             [SharpPackable]
@@ -69,10 +65,93 @@ public class SidecarWireTest
                     value = encoded;
                 }
             }
-            """, parse, "Consumer.cs")).WithAssemblyName("SidecarWireConsumer")
+            """, "Vendor.Request");
+    }
+
+    [Fact]
+    public void ContextOnlyFactoryIsBoundLazilyForAnOtherwiseEmptyContext()
+    {
+        CompileAndVerify("""
+            namespace Vendor;
+
+            public sealed class ContextOnly(int value) : ISharpPackContextFormatterFactory<ContextOnly>
+            {
+                public int Value { get; } = value;
+                public static int Calls { get; private set; }
+
+                static SharpPackFormatter<ContextOnly> ISharpPackContextFormatterFactory<ContextOnly>.CreateFormatter(
+                    SharpPackSerializerContext context)
+                {
+                    Calls++;
+                    return new Codec(context.Configuration.StringEncoding == SharpPackStringEncoding.Utf16 ? 2 : 0);
+                }
+
+                private sealed class Codec(int adjustment) : SharpPackFormatter<ContextOnly>
+                {
+                    public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref ContextOnly? value)
+                        => writer.WriteUnmanaged(value!.Value - adjustment);
+                    public override void Deserialize(ref SharpPackReader reader, scoped ref ContextOnly? value)
+                    {
+                        reader.ReadUnmanaged(out int encoded);
+                        value = new ContextOnly(encoded + adjustment);
+                    }
+                }
+            }
+            """, """
+            [assembly: SharpPackExternalType(typeof(Vendor.ContextOnly))]
+            public static class WireChecks
+            {
+                public static bool Check()
+                {
+                    var context = SharpPack.Generated.SharpPackExternalFormatters
+                        .Register(new SharpPackSerializerContextBuilder().Configure(SharpPackSerializerConfiguration.Utf16)).Build();
+                    if (Vendor.ContextOnly.Calls != 0) return false;
+                    var reader = context.GetFormatter<Vendor.ContextOnly>();
+                    return SharpPackSerializer.Deserialize<Vendor.ContextOnly>(new byte[] { 5, 0, 0, 0 }, context) is { Value: 7 }
+                        && ReferenceEquals(reader, context.GetFormatter<Vendor.ContextOnly>())
+                        && Vendor.ContextOnly.Calls == 1;
+                }
+            }
+            """, "Vendor.ContextOnly");
+    }
+
+    [Fact]
+    public void DeserializationCallsTheExplicitlySelectedInConstructor()
+    {
+        CompileAndVerify("""
+            namespace Vendor;
+            public sealed class Choice
+            {
+                public int Value { get; }
+                public Choice(int value) => Value = -1;
+                [SharpPackConstructor]
+                public Choice(in int value) => Value = value;
+            }
+            """, """
+            [assembly: SharpPackExternalType(typeof(Vendor.Choice))]
+            public static class WireChecks
+            {
+                public static bool Check()
+                {
+                    var context = SharpPack.Generated.SharpPackExternalFormatters
+                        .Register(new SharpPackSerializerContextBuilder()).Build();
+                    return SharpPackSerializer.Deserialize<Vendor.Choice>(new byte[] { 1, 7, 0, 0, 0 }, context) is { Value: 7 };
+                }
+            }
+            """, "Vendor.Choice");
+    }
+
+    static void CompileAndVerify(string vendorSource, string consumerSource, string typeName)
+    {
+        var parse = new CSharpParseOptions(LanguageVersion.CSharp14, preprocessorSymbols: ["NET10_0_OR_GREATER"]);
+        var vendorCompilation = CSharpGeneratorRunner.CreateCompilation(CSharpSyntaxTree.ParseText(vendorSource, parse, "Vendor.cs"))
+            .WithAssemblyName("SidecarWireVendor");
+        var vendor = Emit(vendorCompilation);
+        var consumer = CSharpGeneratorRunner.CreateCompilation(CSharpSyntaxTree.ParseText(consumerSource, parse, "Consumer.cs"))
+            .WithAssemblyName("SidecarWireConsumer")
             .AddReferences(MetadataReference.CreateFromImage(vendor));
 
-        var target = Assert.IsAssignableFrom<INamedTypeSymbol>(consumer.GetTypeByMetadataName("Vendor.Request"));
+        var target = Assert.IsAssignableFrom<INamedTypeSymbol>(consumer.GetTypeByMetadataName(typeName));
         Assert.Empty(target.DeclaringSyntaxReferences);
         CSharpGeneratorDriver.Create([new SharpPackGenerator().AsSourceGenerator()], parseOptions: parse)
             .RunGeneratorsAndUpdateCompilation(consumer, out var generated, out var diagnostics);

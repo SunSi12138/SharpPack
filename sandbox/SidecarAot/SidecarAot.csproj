@@ -5,6 +5,13 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <WarningsAsErrors>$(WarningsAsErrors);IL2026;IL2055;IL2070;IL2091;IL2111;IL3050</WarningsAsErrors>
     </PropertyGroup>
+    <PropertyGroup Condition="'$(SharpPackSidecarPublishMode)' == 'aot'">
+        <PublishAot>true</PublishAot>
+        <SelfContained>true</SelfContained>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(SharpPackSidecarPublishMode)' == 'trim'">
+        <PublishTrimmed>true</PublishTrimmed>
+    </PropertyGroup>
     <ItemGroup>
         <ProjectReference Include="../SidecarFixture/SidecarFixture.csproj" />
         <ProjectReference Include="../../src/SharpPack.Core/SharpPack.Core.csproj" />

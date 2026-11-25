@@ -96,6 +96,8 @@ public class SidecarPlanningTest
     [InlineData("public sealed class Payload { public int Number; public string? Name { get; set; } }", "relative declaration order")]
     [InlineData("public sealed class Payload { public int Number { get; } public Payload(string number) { } }", "same type")]
     [InlineData("public sealed class Payload { public int Number { get; } public Payload(ref int number) { } }", "by-value or in")]
+    [InlineData("public sealed class Payload { [SharpPackInclude] private int Hidden; }", "marked SharpPackInclude")]
+    [InlineData("public sealed class Payload { [SharpPackOnDeserializing] private void Callback() { } }", "callbacks require an existing formatter")]
     public void UnsupportedMetadataReportsAnAssemblyRootDiagnostic(string declaration, string reason)
     {
         var compilation = Create("namespace Vendor; " + declaration, """
@@ -130,7 +132,7 @@ public class SidecarPlanningTest
         var integration = SharpPackSidecarGenerator.Generate(compilation, [new(root)], "CustomProvider", [custom]);
         Assert.Empty(integration.Diagnostics);
         Assert.Equal(2, integration.Roots[0].Sidecars.Length);
-        Assert.DoesNotContain("RegisterGeneratedFormatter<global::Vendor.IPayload>", integration.Source);
+        Assert.DoesNotContain("Register<global::Vendor.IPayload>", integration.Source);
     }
 
     static Compilation Create(string vendor, string consumer)

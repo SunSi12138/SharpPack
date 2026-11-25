@@ -85,11 +85,17 @@ public static class SharpPackSidecarGenerator
         if (roots.IsDefaultOrEmpty)
             return new(hintName, null, ImmutableArray<Diagnostic>.Empty, ImmutableArray<SharpPackSidecarRootResult>.Empty);
 
-        if (RuntimeGeneratedCodeAbi.GetUnsupportedVersion(compilation) is { } abi)
+        var abiDiagnostic = RuntimeGeneratedCodeAbi.GetUnsupportedVersion(compilation) is { } abi
+            ? Diagnostic.Create(DiagnosticDescriptors.IncompatibleRuntimeAbi, roots[0].Location, abi,
+                RuntimeGeneratedCodeAbi.MinimumVersion, RuntimeGeneratedCodeAbi.MaximumVersion)
+            : RuntimeGeneratedCodeAbi.GetUnsupportedSidecarVersion(compilation) is { } sidecarAbi
+                ? Diagnostic.Create(DiagnosticDescriptors.IncompatibleSidecarRuntimeAbi, roots[0].Location,
+                    sidecarAbi, RuntimeGeneratedCodeAbi.SidecarVersion)
+                : null;
+        if (abiDiagnostic is not null)
         {
             return new(hintName, null,
-                ImmutableArray.Create(Diagnostic.Create(DiagnosticDescriptors.IncompatibleRuntimeAbi, roots[0].Location, abi,
-                    RuntimeGeneratedCodeAbi.MinimumVersion, RuntimeGeneratedCodeAbi.MaximumVersion)),
+                ImmutableArray.Create(abiDiagnostic),
                 roots.Select(static root => new SharpPackSidecarRootResult(root.Type, SharpPackFormatterSupport.Unsupported,
                         ImmutableArray<SharpPackSidecarWireShape>.Empty))
                     .ToImmutableArray());

@@ -49,7 +49,7 @@ jobs:
           "$RUNNER_TEMP/handwritten-aot/HandwrittenFactoryAot"
       - name: Read external metadata roots without dynamic code
         run: |
-          dotnet publish sandbox/SidecarAot -c Release -p:PublishAot=true -o "$RUNNER_TEMP/sidecar-aot"
+          dotnet publish sandbox/SidecarAot -c Release -p:SharpPackSidecarPublishMode=aot -o "$RUNNER_TEMP/sidecar-aot"
           "$RUNNER_TEMP/sidecar-aot/SidecarAot"
       - name: Verify the unused private method is trimmed
         run: |
@@ -76,6 +76,6 @@ jobs:
           "$RUNNER_TEMP/trimmed-jit/DeserializeOnlyAot"
           dotnet publish sandbox/HandwrittenFactoryAot -c Release -p:SharpPackTrimmedJit=true --self-contained true -r linux-x64 -o "$RUNNER_TEMP/handwritten-trimmed-jit"
           "$RUNNER_TEMP/handwritten-trimmed-jit/HandwrittenFactoryAot"
-          dotnet publish sandbox/SidecarAot -c Release -p:PublishTrimmed=true --self-contained true -r linux-x64 -o "$RUNNER_TEMP/sidecar-trimmed-jit"
+          dotnet publish sandbox/SidecarAot -c Release -p:SharpPackSidecarPublishMode=trim --self-contained true -r linux-x64 -o "$RUNNER_TEMP/sidecar-trimmed-jit"
           "$RUNNER_TEMP/sidecar-trimmed-jit/SidecarAot"
       - run: git diff --exit-code

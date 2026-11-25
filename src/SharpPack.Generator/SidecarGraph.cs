@@ -2,11 +2,14 @@ using Microsoft.CodeAnalysis;
 
 namespace SharpPack.Generator;
 
+internal enum TypeOwnedFactory { None, Default, Context }
+
 internal sealed record FormatterNode(
     ITypeSymbol Type,
     FormatterDependency[] Dependencies,
     SerializationPlan? Sidecar = null,
     string? BuiltInFormatter = null,
+    TypeOwnedFactory Factory = TypeOwnedFactory.None,
     UnsupportedFormatterShape? Error = null);
 
 internal sealed record FormatterGraphFailure(string Path, string Reason);
@@ -25,6 +28,7 @@ internal sealed class SidecarGraph
     readonly INamedTypeSymbol? contextFactory;
     readonly HashSet<ITypeSymbol> registeredTypes;
     readonly Dictionary<ITypeSymbol, FormatterNode> nodes = new(SymbolEqualityComparer.Default);
+    ReferenceSymbols? completeMetadata;
 
     internal SidecarGraph(Compilation compilation, IEnumerable<ITypeSymbol> registeredTypes)
     {
@@ -95,8 +99,11 @@ internal sealed class SidecarGraph
             return Unsupported("the type is not a named CLR type");
         if (registeredTypes.Contains(type)) return Existing();
 
-        if (HasSelfInterface(named, contextFactory) || HasSelfInterface(named, defaultFactory))
-            return Existing(); // A handwritten or previously compiled factory is authoritative.
+        // A handwritten or previously compiled factory is authoritative.
+        if (HasSelfInterface(named, contextFactory))
+            return Existing(factory: TypeOwnedFactory.Context);
+        if (HasSelfInterface(named, defaultFactory))
+            return Existing(factory: TypeOwnedFactory.Default);
 
         var declared = named.TryGetSharpPackableType(references, out var mode, out _);
         var isUnion = named.IsWillImplementSharpPackUnion(references);
@@ -110,25 +117,26 @@ internal sealed class SidecarGraph
                     .Where(static attribute => attribute.ConstructorArguments.Length == 2 && attribute.ConstructorArguments[1].Value is ITypeSymbol)
                     .Select(static attribute => (ITypeSymbol)attribute.ConstructorArguments[1].Value!)
                     .Select(static item => new FormatterDependency(" -> union case " + item.FullyQualifiedToString(), item));
-                return Existing(cases.ToArray());
+                return Existing(cases.ToArray(), factory: TypeOwnedFactory.Default);
             }
 
             if (mode == GenerateType.Collection)
             {
                 var (_, storage) = TypeMeta.ParseCollectionKind(named, references);
-                return Existing(storage is null ? [] : TypeArguments(storage));
+                return Existing(storage is null ? [] : TypeArguments(storage), factory: TypeOwnedFactory.Default);
             }
 
-            if (named.IsUnmanagedType) return Existing();
+            if (named.IsUnmanagedType) return Existing(factory: TypeOwnedFactory.Context);
             var metadata = new TypeMeta(named, references);
             return Existing(metadata.Members.Where(static member => member.Kind != MemberKind.CustomFormatter)
-                .Select(static member => new FormatterDependency("." + member.Name, member.MemberType)).ToArray());
+                .Select(static member => new FormatterDependency("." + member.Name, member.MemberType)).ToArray(),
+                factory: TypeOwnedFactory.Context);
         }
 
         if (HasSelfInterface(named, references.ISharpPackable.OriginalDefinition))
             return Existing(formatter: $"global::SharpPack.Formatters.SharpPackableFormatter<{named.FullyQualifiedToString()}>");
         if (references.KnownTypes.IsKnownLeaf(type))
-            return Existing();
+            return Existing(formatter: $"global::SharpPack.Formatters.{named.Name}Formatter");
 
         if (named.IsGenericType && references.KnownTypes.GetExactGenericFormatter(named) is { } genericFormatter)
             return Existing(TypeArguments(named), genericFormatter);
@@ -140,11 +148,15 @@ internal sealed class SidecarGraph
         if (type.SpecialType is SpecialType.System_Object or SpecialType.System_Array or SpecialType.System_Delegate or SpecialType.System_MulticastDelegate)
             return Unsupported("the type requires a registered formatter for runtime polymorphism");
 
+        if (CheckHiddenMetadata(named) is { } hidden)
+            return new(type, [], Error: hidden);
+
         var (plan, dependencies, error) = TypeMeta.PlanExternalObject(named, references);
         return new(type, dependencies, Sidecar: plan, Error: error);
 
-        FormatterNode Existing(FormatterDependency[]? dependencies = null, string? formatter = null)
-            => new(type, dependencies ?? [], BuiltInFormatter: formatter);
+        FormatterNode Existing(FormatterDependency[]? dependencies = null, string? formatter = null,
+            TypeOwnedFactory factory = TypeOwnedFactory.None)
+            => new(type, dependencies ?? [], BuiltInFormatter: formatter, Factory: factory);
         FormatterNode Unsupported(string reason) => new(type, [], Error: new(null, reason));
     }
 
@@ -164,16 +176,48 @@ internal sealed class SidecarGraph
             !named.TypeArguments.All(HasGlobalTypeName))
             return false;
 
-        var definition = named.OriginalDefinition;
-        var name = definition.MetadataName;
         for (var enclosing = named.ContainingType; enclosing is not null; enclosing = enclosing.ContainingType)
-        {
             if (!enclosing.TypeArguments.All(HasGlobalTypeName)) return false;
+        return SymbolEqualityComparer.Default.Equals(compilation.GetTypeByMetadataName(MetadataName(named)), named.OriginalDefinition);
+    }
+
+    static string MetadataName(INamedTypeSymbol named)
+    {
+        var name = named.MetadataName;
+        for (var enclosing = named.ContainingType; enclosing is not null; enclosing = enclosing.ContainingType)
             name = enclosing.MetadataName + "+" + name;
+        return named.ContainingNamespace.IsGlobalNamespace ? name : named.ContainingNamespace.ToDisplayString() + "." + name;
+    }
+
+    UnsupportedFormatterShape? CheckHiddenMetadata(INamedTypeSymbol type)
+    {
+        if (type.Locations.Any(static location => location.IsInSource)) return null;
+
+        // Public metadata import can hide private SharpPack annotations. Look
+        // at the reachable type definition, not all types of its assembly.
+        var all = completeMetadata ??= new ReferenceSymbols(
+            compilation.WithOptions(compilation.Options.WithMetadataImportOptions(MetadataImportOptions.All)));
+        var definition = all.Compilation.GetTypeByMetadataName(MetadataName(type));
+        if (definition is null) return null;
+
+        foreach (var member in definition.GetAllMembers())
+        {
+            if (member is not (IFieldSymbol or IPropertySymbol) || member.IsStatic || !member.CanBeReferencedByName ||
+                !member.ContainsAttribute(all.SharpPackIncludeAttribute) || member.ContainsAttribute(all.SharpPackIgnoreAttribute))
+                continue;
+            if (!all.Compilation.IsSymbolAccessibleWithin(member, all.Compilation.Assembly))
+                return new(member.Name, "the member marked SharpPackInclude is not accessible from the consuming assembly");
         }
-        if (!definition.ContainingNamespace.IsGlobalNamespace)
-            name = definition.ContainingNamespace.ToDisplayString() + "." + name;
-        return SymbolEqualityComparer.Default.Equals(compilation.GetTypeByMetadataName(name), definition);
+
+        if (definition.GetMembers().OfType<IMethodSymbol>().Any(method =>
+            method.ContainsAttribute(all.SharpPackOnSerializingAttribute) ||
+            method.ContainsAttribute(all.SharpPackOnSerializedAttribute) ||
+            method.ContainsAttribute(all.SharpPackOnDeserializingAttribute) ||
+            method.ContainsAttribute(all.SharpPackOnDeserializedAttribute)))
+        {
+            return new(null, "SharpPack callbacks require an existing formatter");
+        }
+        return null;
     }
 
     static bool IsClosed(ITypeSymbol type) => type switch

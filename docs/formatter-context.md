@@ -77,8 +77,8 @@ An ordinary external object uses SharpPack's existing object layout:
 
 - Public readable properties and fields participate, base type first, with
   SharpPack include/ignore attributes applied. An inaccessible included member
-  is an error. Each member needs an accessible setter (including `init`) or
-  one matching constructor parameter.
+  present in the referenced metadata is an error. Each member needs an
+  accessible setter (including `init`) or one matching constructor parameter.
 - Use a single callable constructor or select one with
   `[SharpPackConstructor]`. Parameters must match serialized member names and
   types. Positional records and structs containing managed references follow

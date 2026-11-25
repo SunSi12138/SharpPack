@@ -7,6 +7,7 @@ internal sealed partial class CSharpEmitter
 {
     internal static string EmitSidecarProvider(string providerName, FormatterNode[] nodes)
     {
+        const string registration = "global::SharpPack.CompilerServices.SharpPackSidecarRegistration";
         var source = new StringBuilder();
         AppendPreamble(source);
         source.AppendLine($$"""
@@ -21,28 +22,40 @@ namespace SharpPack.Generated
 """);
 
         var classes = new StringBuilder();
-        var index = 0;
         foreach (var node in nodes)
         {
             var target = node.Type.FullyQualifiedToString();
             if (node.Sidecar is { } plan)
             {
                 var name = SidecarName(target);
-                var variable = "formatter" + (index++).ToString(CultureInfo.InvariantCulture);
-                var hasInitializer = AppendObjectSidecar(classes, plan, name);
-                var initializer = hasInitializer ? $", initialize: {variable}.Initialize" : "";
-                source.AppendLine($"            var {variable} = new {name}();");
-                source.AppendLine($"            builder.RegisterGeneratedFormatter<{target}>({variable}, isSidecar: true{initializer});");
+                var creation = AppendObjectSidecar(classes, plan, name)
+                    ? $"static context => new {name}(context)" : $"static _ => new {name}()";
+                source.AppendLine($"            {registration}.Register<{target}>(builder, {creation});");
             }
             else if (node.BuiltInFormatter is { } formatter)
             {
-                source.AppendLine($"            builder.RegisterGeneratedFormatter<{target}>(new {formatter}(), isSidecar: false);");
+                source.AppendLine($"            {registration}.RegisterBuiltIn<{target}>(builder, static () => new {formatter}());");
+            }
+            else if (node.Factory != TypeOwnedFactory.None)
+            {
+                var method = node.Factory == TypeOwnedFactory.Context ? "ContextFactory" : "DefaultFactory";
+                source.AppendLine($"            {registration}.Register<{target}>(builder, {method}<{target}>);");
             }
         }
 
         source.AppendLine("""
             return builder;
         }
+""");
+        if (nodes.Any(static node => node.Factory == TypeOwnedFactory.Context))
+            source.AppendLine("""
+        static global::SharpPack.SharpPackFormatter<T> ContextFactory<T>(global::SharpPack.SharpPackSerializerContext context)
+            where T : global::SharpPack.ISharpPackContextFormatterFactory<T> => T.CreateFormatter(context);
+""");
+        if (nodes.Any(static node => node.Factory == TypeOwnedFactory.Default))
+            source.AppendLine("""
+        static global::SharpPack.SharpPackFormatter<T> DefaultFactory<T>(global::SharpPack.SharpPackSerializerContext _)
+            where T : global::SharpPack.ISharpPackFormatterFactory<T> => T.CreateFormatter();
 """);
         source.Append(classes);
         source.AppendLine("""
@@ -85,8 +98,8 @@ namespace SharpPack.Generated
             .ToArray();
         var hasInitializer = checks.Length != 0;
         var initialize = hasInitializer ? $$"""
-            private bool useOverrides;
-            internal void Initialize(global::SharpPack.SharpPackSerializerContext context)
+            private readonly bool useOverrides;
+            internal {{formatterName}}(global::SharpPack.SharpPackSerializerContext context)
             {
                 useOverrides = {{string.Join(" || ", checks)}};
             }
@@ -108,7 +121,8 @@ namespace SharpPack.Generated
 
         source.AppendLine($$"""
 
-        private sealed class {{formatterName}} : global::SharpPack.SharpPackFormatter<{{typeName}}>
+        private sealed class {{formatterName}} : global::SharpPack.SharpPackFormatter<{{typeName}}>,
+            global::SharpPack.ISharpPackContextOverrideFormatter
         {
 {{initialize}}
             public override void Serialize<TBufferWriter>(

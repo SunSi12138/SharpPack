@@ -1045,7 +1045,8 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
     }
 
     string EmitConstructor(MemberShape[] members)
-        => $"new {TypeName}({string.Join(", ", plan.ConstructorArgumentSlots.Select(slot => $"__{members[slot].Name}"))})";
+        => $"new {TypeName}({string.Join(", ", plan.ConstructorArgumentSlots.Select((slot, index) =>
+            $"{(Shape.ConstructorParameters[index].PassByIn ? "in " : "")}__{members[slot].Name}"))})";
 
     static string EmitDeserializeConstruction(MemberShape[] members, string indent)
     {

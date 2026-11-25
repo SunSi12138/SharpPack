@@ -96,6 +96,8 @@ public partial class TypeMeta
         {
             GenerateType = GenerateType.Object,
             Layout = explicitOrder ? SerializeLayout.Explicit : SerializeLayout.Sequential,
+            ConstructorParameters = new EquatableArray<ParameterShape>(constructor.Parameters.Select(static parameter =>
+                new ParameterShape(parameter.Name, parameter.Type.FullyQualifiedToString(), parameter.RefKind == RefKind.In))),
         };
         return (SerializationPlanner.Plan(shape),
             members.Select(static member => new FormatterDependency("." + member.Name, member.MemberType)).ToArray(), null);

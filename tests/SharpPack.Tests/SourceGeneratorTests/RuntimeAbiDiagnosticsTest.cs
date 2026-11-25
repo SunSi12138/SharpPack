@@ -120,6 +120,18 @@ public class RuntimeAbiDiagnosticsTest
     }
 
     [Fact]
+    public void OrdinaryAbiOneRuntimeCannotSilentlyAcceptTheNewSidecarProvider()
+    {
+        var compilation = CreateCompilation(CreateRuntime("public const int Version = 1;"), "public class OrdinaryModel { }");
+        var root = compilation.GetSpecialType(SpecialType.System_Int32);
+        var result = SharpPackSidecarGenerator.Generate(compilation, [new(root)], "MyProvider");
+        Assert.Null(result.Source);
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("SHARPPACK046", diagnostic.Id);
+        Assert.Contains("sidecar ABI 'missing'", diagnostic.GetMessage());
+    }
+
+    [Fact]
     public void StandaloneNoGenerateContract_DoesNotRequireRuntimeAbi()
     {
         const string source = """
