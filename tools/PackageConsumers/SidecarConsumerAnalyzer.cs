@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using SharpPack.Generator;
@@ -18,8 +19,16 @@ public sealed class SidecarConsumerAnalyzer : IIncrementalGenerator
             if (result is null) return;
             foreach (var diagnostic in result.Diagnostics)
                 output.ReportDiagnostic(diagnostic);
-            if (result.Source is not null)
-                output.AddSource(result.HintName, result.Source);
+            if (result.Source is not { } source) return;
+
+            var root = result.Roots[0];
+            var shape = root.Sidecars[0];
+            if (!SymbolEqualityComparer.Default.Equals(shape.Type, root.Type) ||
+                shape.Members[0].Type.SpecialType != SpecialType.System_Int32 ||
+                shape.Members[1].Type.SpecialType != SpecialType.System_String)
+                throw new InvalidOperationException("The packaged planner did not expose the ordered wire type symbols.");
+
+            output.AddSource(result.HintName, source);
         });
     }
 }

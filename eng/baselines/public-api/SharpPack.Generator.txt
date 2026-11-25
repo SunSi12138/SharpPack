@@ -35,11 +35,10 @@ type public sealed class SharpPack.Generator.SharpPackSidecarRootResult
   property System.Collections.Immutable.ImmutableArray<SharpPack.Generator.SharpPackSidecarWireShape> Sidecars { get:public; }
 
 type public readonly struct SharpPack.Generator.SharpPackSidecarWireMember
+  property Microsoft.CodeAnalysis.ITypeSymbol Type { get:public; }
   property System.Int32 Position { get:public; }
   property System.String Name { get:public; }
-  property System.String TypeName { get:public; }
 
 type public sealed class SharpPack.Generator.SharpPackSidecarWireShape
-  property System.Boolean IsValueType { get:public; }
+  property Microsoft.CodeAnalysis.ITypeSymbol Type { get:public; }
   property System.Collections.Immutable.ImmutableArray<SharpPack.Generator.SharpPackSidecarWireMember> Members { get:public; }
-  property System.String TypeName { get:public; }
