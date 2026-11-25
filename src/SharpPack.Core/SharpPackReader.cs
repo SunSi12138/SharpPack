@@ -60,6 +60,9 @@ public ref partial struct SharpPackReader
         this.optionalState = optionalState;
     }
 
+    internal SharpPackReader CreateNestedReader(in ReadOnlySequence<byte> sequence)
+        => new SharpPackReader(sequence, optionalState) { depth = this.depth };
+
     // buffer operations
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
