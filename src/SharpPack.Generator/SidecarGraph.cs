@@ -111,6 +111,11 @@ internal sealed class SidecarGraph
         var sourceOwned = SymbolEqualityComparer.Default.Equals(named.ContainingAssembly, compilation.Assembly);
         if (sourceOwned && declared && (mode != GenerateType.NoGenerate || isUnion))
         {
+            if (NativeUnionAnalysis.IsSourceUnion(named))
+                return Existing(NativeUnionAnalysis.GetCases(named, references).Select(static entry =>
+                    new FormatterDependency(" -> union case " + entry.Type.FullyQualifiedToString(), entry.Type)).ToArray(),
+                    factory: TypeOwnedFactory.Default);
+
             if (isUnion)
                 return Existing(UnionDependencies(named, named), factory: TypeOwnedFactory.Default);
 

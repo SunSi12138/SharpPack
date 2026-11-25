@@ -46,7 +46,7 @@ public partial class SharpPackGenerator : IIncrementalGenerator
 
         var models = context.SyntaxProvider.ForAttributeWithMetadataName(
                 SharpPackableAttributeFullName,
-                static (node, _) => node is ClassDeclarationSyntax or StructDeclarationSyntax or RecordDeclarationSyntax or InterfaceDeclarationSyntax,
+                static (node, _) => node is TypeDeclarationSyntax,
                 static (context, _) => (Declaration: (TypeDeclarationSyntax)context.TargetNode,
                     HasGenerationIntent: HasModelGenerationIntent(context)));
         var unions = context.SyntaxProvider.ForAttributeWithMetadataName(

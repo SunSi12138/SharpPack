@@ -14,7 +14,8 @@ restricts SharpPack packages to the local feed while allowing .NET tool and
 runtime packs from NuGet.org.
 
 The .NET 11 consumers exercise the new numeric scalars, nullable values,
-arrays, and generated dictionary keys. Artifact generation runs on both
+arrays, generated dictionary keys, and C# 15 unions with stable tags and
+nested cases. Artifact generation runs on both
 frameworks; the .NET 10 tooling executable can roll forward to .NET 11
 when .NET 10 is absent.
 

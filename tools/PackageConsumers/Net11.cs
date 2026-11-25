@@ -18,6 +18,38 @@ internal static class Net11
             Decimal64.NaN, Decimal64.PositiveInfinity, "000000000000C0B1");
         Check(context, Decimal128.Parse("1.25000000000000000000000000000000", CultureInfo.InvariantCulture),
             Decimal128.NegativeZero, Decimal128.NaN, Decimal128.PositiveInfinity, "000000000000000000000000000040B0");
+
+        VerifyNativeUnion(context);
+    }
+
+    static void VerifyNativeUnion(SharpPackSerializerContext context)
+    {
+        Net11Reading number = new(42);
+        var payload = SharpPackSerializer.Serialize(number);
+        if (!payload.AsSpan().SequenceEqual(new byte[] { 7, 42, 0, 0, 0 }) ||
+            SharpPackSerializer.Deserialize<Net11ReorderedReading>(payload).Value is not 42)
+            throw new InvalidOperationException("Native union tags changed when cases were reordered.");
+
+        var model = new Net11UnionModel { Reading = new("text"), Optional = new((int?)17) };
+        var restored = SharpPackSerializer.Deserialize<Net11UnionModel>(
+            SharpPackSerializer.Serialize(model, context), context);
+        if (restored?.Reading.Value is not "text" || restored.Optional.Value is not 17)
+            throw new InvalidOperationException("Generated model lost a reference or nullable-value union case.");
+
+        var empty = SharpPackSerializer.Serialize(default(Net11Reading));
+        if (SharpPackSerializer.Deserialize<Net11Reading>(empty).Value is not null)
+            throw new InvalidOperationException("The empty union acquired a value.");
+
+        Net11Token token = new(new Net11Token.Word { Text = "nested" });
+        var tokenCopy = SharpPackSerializer.Deserialize<Net11Token>(SharpPackSerializer.Serialize(token));
+        if (tokenCopy.Value is not Net11Token.Word { Text: "nested" })
+            throw new InvalidOperationException("A case declared inside its union did not round trip.");
+
+        var overrideContext = new SharpPackSerializerContextBuilder().Register(new OffsetIntFormatter()).Build();
+        var overridden = SharpPackSerializer.Serialize(number, overrideContext);
+        if (!overridden.AsSpan().SequenceEqual(new byte[] { 7, 43, 0, 0, 0 }) ||
+            SharpPackSerializer.Deserialize<Net11Reading>(overridden, overrideContext).Value is not 42)
+            throw new InvalidOperationException("The native union did not honor its case's context formatter.");
     }
 
     static void Check<T>(SharpPackSerializerContext context, T finite, T negativeZero, T nan, T infinity,
@@ -54,6 +86,18 @@ internal static class Net11
             MemoryMarshal.AsBytes(new[] { actual }.AsSpan())))
             throw new InvalidOperationException($"{typeof(T).Name} changed its floating-point bits.");
     }
+
+    sealed class OffsetIntFormatter : SharpPackFormatter<int>
+    {
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref int value)
+            => writer.WriteUnmanaged(value + 1);
+
+        public override void Deserialize(ref SharpPackReader reader, scoped ref int value)
+        {
+            reader.ReadUnmanaged(out value);
+            value--;
+        }
+    }
 }
 
 [SharpPackable]
@@ -61,4 +105,30 @@ internal partial class Net11NumericModel<T> where T : unmanaged
 {
     public T Value { get; set; }
     public Dictionary<T, T> Keys { get; set; } = new();
+}
+
+[SharpPackable, SharpPackUnion(7, typeof(int)), SharpPackUnion(300, typeof(string))]
+internal partial union Net11Reading(int, string);
+
+[SharpPackable, SharpPackUnion(300, typeof(string)), SharpPackUnion(7, typeof(int))]
+internal partial union Net11ReorderedReading(string, int);
+
+[SharpPackable, SharpPackUnion(12, typeof(int?)), SharpPackUnion(99, typeof(bool))]
+internal partial union Net11Optional(int?, bool);
+
+[SharpPackable]
+internal partial class Net11UnionModel
+{
+    public Net11Reading Reading { get; set; }
+    public Net11Optional Optional { get; set; }
+}
+
+[SharpPackable, SharpPackUnion(2, typeof(Net11Token.Word)), SharpPackUnion(11, typeof(bool))]
+internal partial union Net11Token(Net11Token.Word, bool)
+{
+    [SharpPackable]
+    public partial class Word
+    {
+        public string? Text { get; set; }
+    }
 }

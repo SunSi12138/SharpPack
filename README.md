@@ -334,6 +334,31 @@ public partial class Person3
 }
 ```
 
+### C# 15 unions on .NET 11
+
+Mark a compiler-declared `partial union` with `[SharpPackable]` and assign an
+explicit `[SharpPackUnion]` tag to every case:
+
+```csharp
+[SharpPackable]
+[SharpPackUnion(7, typeof(int))]
+[SharpPackUnion(300, typeof(string))]
+public partial union Reading(int, string);
+```
+
+```csharp
+Reading reading = new(42);
+byte[] bytes = SharpPackSerializer.Serialize(reading);
+Reading restored = SharpPackSerializer.Deserialize<Reading>(bytes);
+```
+
+The tag is part of the binary schema; reordering cases does not change it.
+Cases need distinct concrete runtime types and supported formatters. A
+nullable value case uses its underlying type when boxed, so `int` and `int?`
+cannot both be cases in the same union. Empty contents, including a null case
+value, use the empty union representation. Existing interface and abstract
+class unions keep their current format.
+
 ### Serialization callbacks
 
 When serializing/deserializing, SharpPack can invoke a before/after event using the `[SharpPackOnSerializing]`, `[SharpPackOnSerialized]`, `[SharpPackOnDeserializing]`, `[SharpPackOnDeserialized]` attributes. It can annotate both static and instance (non-static) methods, and public and private methods.

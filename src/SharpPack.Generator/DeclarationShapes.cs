@@ -3,10 +3,12 @@ using Microsoft.CodeAnalysis;
 namespace SharpPack.Generator;
 
 internal sealed record PartialTypeShape(
-    string Name, TypeKind Kind, bool IsRecord, bool IsValueType, EquatableArray<TypeParameterShape> TypeParameters)
+    string Name, TypeKind Kind, bool IsRecord, bool IsValueType, EquatableArray<TypeParameterShape> TypeParameters,
+    bool IsNativeUnion)
 {
     internal static PartialTypeShape Capture(INamedTypeSymbol type)
-        => new(type.Name, type.TypeKind, type.IsRecord, type.IsValueType, TypeParameterShape.CaptureAll(type));
+        => new(type.Name, type.TypeKind, type.IsRecord, type.IsValueType, TypeParameterShape.CaptureAll(type),
+            NativeUnionAnalysis.IsSourceUnion(type));
 
     internal static EquatableArray<PartialTypeShape> CaptureContainers(INamedTypeSymbol type, bool useOriginalDefinitions = false)
     {
@@ -49,7 +51,8 @@ internal sealed record CollectionShape(CollectionKind Kind, EquatableArray<strin
     }
 }
 
-internal sealed record UnionCaseShape(ushort Tag, string TypeName, bool UsePackablePath, string SimpleName);
+internal sealed record UnionCaseShape(
+    ushort Tag, string TypeName, bool UsePackablePath, string SimpleName, string? RuntimeTypeName = null);
 
 internal sealed record ExternalUnionFormatterShape(
     string Name, string Namespace, string QualifiedName, EquatableArray<TypeParameterShape> TypeParameters)
@@ -68,7 +71,8 @@ internal sealed record ExternalUnionFormatterShape(
 }
 
 internal sealed record UnionShape(
-    string TypeName, EquatableArray<UnionCaseShape> Cases, ExternalUnionFormatterShape? ExternalFormatter)
+    string TypeName, EquatableArray<UnionCaseShape> Cases, ExternalUnionFormatterShape? ExternalFormatter,
+    bool IsNative = false)
 {
     internal EquatableArray<TypeScriptUnionCase> ProjectTypeScriptCases()
         => new(Cases.Select(static item => new TypeScriptUnionCase(item.Tag, item.SimpleName)));

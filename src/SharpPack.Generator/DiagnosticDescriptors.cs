@@ -372,4 +372,12 @@ internal static class DiagnosticDescriptors
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    internal static readonly DiagnosticDescriptor UnsupportedNativeUnion = new(
+        id: "SHARPPACK048",
+        title: "Unsupported native union",
+        messageFormat: "Native union '{0}' cannot be generated: {1}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }

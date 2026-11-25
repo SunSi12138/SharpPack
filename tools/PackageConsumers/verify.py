@@ -525,6 +525,28 @@ def pin_sdk(path, sdk, env):
         raise RuntimeError(f"Could not select SDK {sdk} for {path.name}")
 
 
+def verify_native_union_diagnostics(path, feed, version, env):
+    project(path, package_references({AGGREGATE: version}), "<OutputType>Library</OutputType>", framework="net11.0")
+    (path / "BadContracts.cs").write_text("""using SharpPack;
+[SharpPackable, SharpPackUnion(7, typeof(int))]
+partial union MissingTag(int, string);
+
+[SharpPackable, SharpPackUnion(7, typeof(int)), SharpPackUnion(7, typeof(string))]
+partial union DuplicateTag(int, string);
+
+[SharpPackable, SharpPackUnion(1, typeof(int)), SharpPackUnion(2, typeof(int?))]
+partial union SameBox(int, int?);
+""")
+    config = nuget_config(path / "NuGet.Config", feed)
+    local_env = dict(env, NUGET_PACKAGES=str(path / "packages"))
+    log = run(["dotnet", "build", "-c", "Release", "--configfile", str(config)], path, local_env, expected_success=False)
+    errors = {line.split("error SHARPPACK048: ", 1)[1] for line in log.splitlines() if "error SHARPPACK048: " in line}
+    if len(errors) != 3 or not all(any(item in error for error in errors) for item in (
+            "each declared case needs an explicit", "wire tag 7 is duplicated", "same boxed type")):
+        raise RuntimeError(f"Expected native union schema diagnostics:\n{log}")
+    print("Invalid native union case tags and boxed overlaps diagnosed at compile time", flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--feed", type=Path, required=True)
@@ -574,6 +596,7 @@ def main():
         consumer(net11 / "aggregate-aot", feed, aggregate, runtime | aggregate, env, args.architecture,
                  framework="net11.0", aot=True)
         verify_artifact_tooling(net11 / "artifact-tooling", feed, version, env, framework="net11.0", smoke_only=True)
+        verify_native_union_diagnostics(net11 / "native-union-diagnostics", feed, version, env)
 
         if args.compatibility:
             verify_sidecar_integration(work, feed, current_cache, version, env)

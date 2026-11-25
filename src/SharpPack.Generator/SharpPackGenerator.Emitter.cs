@@ -177,9 +177,10 @@ using SharpPack;
         var shape = plan.Shape;
         if (shape.Union is { } union)
         {
-            writer.AppendLine(union.ExternalFormatter is { } formatter
-                ? EmitUnionFormatterTemplate(union, formatter, includeExternalRegistration)
-                : EmitUnionTemplate(union));
+            writer.AppendLine(union.IsNative ? EmitNativeUnionTemplate(union)
+                : union.ExternalFormatter is { } formatter
+                    ? EmitUnionFormatterTemplate(union, formatter, includeExternalRegistration)
+                    : EmitUnionTemplate(union));
             return;
         }
 
@@ -1193,7 +1194,7 @@ public static class {{formatter.Name}}SharpPackContextExtensions
 
     internal static string EmitPartialTypeDeclaration(PartialTypeShape type)
     {
-        var kind = (type.Kind, type.IsRecord, type.IsValueType) switch
+        var kind = type.IsNativeUnion ? "union" : (type.Kind, type.IsRecord, type.IsValueType) switch
         {
             (TypeKind.Interface, _, _) => "interface",
             (_, true, true) => "record struct",

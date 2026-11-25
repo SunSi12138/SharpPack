@@ -9,12 +9,15 @@ internal readonly record struct AotDependencyFacts(
     EquatableArray<string> ClosedFormatters)
 {
     internal static AotDependencyFacts Capture(MemberMeta[] members, ReferenceSymbols references)
+        => Capture(members.Select(static member => member.MemberType), references);
+
+    internal static AotDependencyFacts Capture(IEnumerable<ITypeSymbol> types, ReferenceSymbols references)
     {
         var factories = new List<AotFactoryRoot>();
         var formatters = new List<string>();
         var contextFactory = references.Compilation.GetTypeByMetadataName("SharpPack.ISharpPackContextFormatterFactory`1");
-        foreach (var member in members)
-            Visit(member.MemberType);
+        foreach (var type in types)
+            Visit(type);
         return new(new EquatableArray<AotFactoryRoot>(factories), new EquatableArray<string>(formatters));
 
         void Visit(ITypeSymbol type)
