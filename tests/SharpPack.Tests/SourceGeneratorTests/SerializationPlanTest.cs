@@ -63,6 +63,15 @@ public class SerializationPlanTest
     }
 
     [Fact]
+    public void SequentialVersionedDuplicateUsesTheFirstDeclaredMember()
+    {
+        var shape = TypeShapeTest.Analyze(SparseModel("VersionTolerant", "Sequential", 0), "Sparse");
+        Assert.Equal(2, shape.Members.Length);
+        Assert.Equal("First", shape.Members[0].Name);
+        Assert.Equal(new WireSlot(0, 0), Assert.Single(SerializationPlanner.Plan(shape).WireSlots));
+    }
+
+    [Fact]
     public void NonVersionedLayoutUsesDenseWirePositions()
     {
         const string source = """
@@ -92,6 +101,27 @@ public class SerializationPlanTest
         Assert.Contains("orders 0 through 248", diagnostic.GetMessage());
         Assert.Equal("Last", diagnostic.Location.SourceTree!.GetText().ToString(diagnostic.Location.SourceSpan));
         Assert.DoesNotContain(output.SyntaxTrees, tree => tree.FilePath.EndsWith(".SharpPackFormatter.g.cs"));
+    }
+
+    [Fact]
+    public void UnmanagedCircularReferenceKeepsItsRawWirePath()
+    {
+        const string source = """
+            using SharpPack;
+            [SharpPackable(GenerateType.CircularReference)]
+            public partial struct RawModel
+            {
+                [SharpPackOrder(249)] public int Value;
+            }
+            """;
+        var shape = TypeShapeTest.Analyze(source, "RawModel");
+        Assert.True(shape.IsUnmanaged);
+        Assert.Empty(SerializationPlanner.Plan(shape).WireSlots);
+        var (output, diagnostics) = CSharpGeneratorRunner.RunGenerator(source);
+        Assert.Empty(diagnostics);
+        Assert.DoesNotContain(output.GetDiagnostics(), diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var generated = output.SyntaxTrees.Single(tree => tree.FilePath.EndsWith(".SharpPackFormatter.g.cs"));
+        Assert.Contains("writer.WriteUnmanaged(value);", generated.ToString());
     }
 
     [Fact]

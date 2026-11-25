@@ -18,9 +18,10 @@ change when moving a decision between phases.
 The C# emitter renders the chosen interfaces and methods instead of repeating
 eligibility checks. The remaining C# body templates still use `TypeMeta`; wire
 slots are now explicit in the plan, including unoccupied slots for versioned
-models. Analysis rejects orders that cannot fit the object header before
-the planner creates those slots. The emitter takes the slot sequence without
-changing the declared members.
+models. When a model uses a versioned object header, analysis rejects orders
+that cannot fit before the planner creates those slots. Raw unmanaged values
+have no slots. The emitter uses the slot sequence without changing the declared
+members.
 
 Wire member operations, context dependencies, AOT roots, and other wire
 strategies move to the plan next. An unchanged shape can skip planning and

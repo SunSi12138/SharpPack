@@ -478,7 +478,7 @@ public partial class TypeMeta
             }
         }
 
-        if (GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference)
+        if (!IsUnmanagedType && GenerateType is (GenerateType.VersionTolerant or GenerateType.CircularReference))
         {
             foreach (var item in Members)
             {

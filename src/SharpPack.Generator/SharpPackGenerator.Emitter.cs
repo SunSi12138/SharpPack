@@ -1084,7 +1084,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : ISharpPackable<{{TypeName}}>{{f
                 sb.Append(indent);
                 if (i == 0 && writeObjectHeader)
                 {
-                    sb.AppendLine($"{writer}.WriteObjectHeader({Members.Length});");
+                    sb.AppendLine($"{writer}.WriteObjectHeader({members.Length});");
                     sb.Append(indent);
                 }
 
