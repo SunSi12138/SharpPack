@@ -9,6 +9,10 @@ AssertModel(SharpPackSerializer.Deserialize<PackageModel>(SharpPackSerializer.Se
 var wrapped = new Envelope { Payload = expected };
 AssertModel(SharpPackSerializer.Deserialize<Envelope>(SharpPackSerializer.Serialize(wrapped))?.Payload);
 
+#if NET11_0_OR_GREATER
+Net11.Verify();
+#endif
+
 #if STREAMING
 var pipe = new System.IO.Pipelines.Pipe();
 await SharpPack.Streaming.SharpPackStreamingSerializer.SerializeLengthPrefixedAsync(pipe.Writer, expected);

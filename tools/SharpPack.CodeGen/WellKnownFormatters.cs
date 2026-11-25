@@ -12,6 +12,7 @@ internal static class WellKnownFormatters
             "Complex", "Plane", "Quaternion", "Matrix3x2", "Matrix4x4", "Vector2", "Vector3", "Vector4",
             "Rune", "DateOnly", "TimeOnly", "Half", "Int128", "UInt128",
         ];
+        string[] net11UnmanagedTypes = ["BFloat16", "Decimal32", "Decimal64", "Decimal128"];
         string[] customTypes =
         [
             "String", "Version", "Uri", "TimeZoneInfo", "BigInteger", "BitArray", "StringBuilder", "Type", "CultureInfo",
@@ -32,21 +33,29 @@ internal static class WellKnownFormatters
                 {
             """);
         foreach (var type in unmanagedTypes)
-        {
-            source.AppendLine($"        if (type == typeof({type})) return new UnmanagedFormatter<{type}>();");
-            source.AppendLine($"        if (type == typeof({type}[])) return new UnmanagedArrayFormatter<{type}>();");
-            source.AppendLine($"        if (type == typeof({type}?)) return new NullableFormatter<{type}>();");
-        }
+            AppendUnmanagedFormatters(type);
         foreach (var type in customTypes)
         {
             source.AppendLine($"        if (type == typeof({type})) return new {type}Formatter();");
             source.AppendLine($"        if (type == typeof({type}[])) return new ArrayFormatter<{type}>();");
         }
 
+        source.AppendLine("#if NET11_0_OR_GREATER");
+        foreach (var type in net11UnmanagedTypes)
+            AppendUnmanagedFormatters(type);
+        source.AppendLine("#endif");
+
         return source.AppendLine("""
                     return null;
                 }
             }
             """).ToString();
+
+        void AppendUnmanagedFormatters(string type)
+        {
+            source.AppendLine($"        if (type == typeof({type})) return new UnmanagedFormatter<{type}>();");
+            source.AppendLine($"        if (type == typeof({type}[])) return new UnmanagedArrayFormatter<{type}>();");
+            source.AppendLine($"        if (type == typeof({type}?)) return new NullableFormatter<{type}>();");
+        }
     }
 }
