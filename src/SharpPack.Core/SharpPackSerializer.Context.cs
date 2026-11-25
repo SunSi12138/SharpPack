@@ -159,7 +159,7 @@ public static partial class SharpPackSerializer
     {
         var state = AcquireReaderOptionalState();
         state.Init(context);
-        var reader = new SharpPackReader(buffer, state);
+        var reader = new SharpPackReader(buffer, state, context.MaxReadDepth, context.MaxCollectionLength);
         try
         {
             reader.ReadRootValue(ref value);
@@ -204,7 +204,7 @@ public static partial class SharpPackSerializer
     {
         var state = AcquireReaderOptionalState();
         state.Init(context);
-        var reader = new SharpPackReader(buffer, state);
+        var reader = new SharpPackReader(buffer, state, context.MaxReadDepth, context.MaxCollectionLength);
         try
         {
             reader.ReadRootValue(ref value);

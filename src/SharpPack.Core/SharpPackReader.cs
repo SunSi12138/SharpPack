@@ -33,11 +33,13 @@ public ref partial struct SharpPackReader
     public SharpPackReaderOptionalState OptionalState => optionalState;
 
     public SharpPackReader(in ReadOnlySequence<byte> sequence, SharpPackReaderOptionalState optionalState)
-        : this(sequence, optionalState, optionalState.MaxDepth, optionalState.MaxCollectionLength)
+        : this(sequence, optionalState,
+            optionalState.SerializerContext?.MaxReadDepth ?? SharpPackReadLimits.CurrentCompatibleMaxDepth,
+            optionalState.SerializerContext?.MaxCollectionLength ?? int.MaxValue)
     {
     }
 
-    SharpPackReader(
+    internal SharpPackReader(
         in ReadOnlySequence<byte> sequence,
         SharpPackReaderOptionalState optionalState,
         int maxDepth,
@@ -59,6 +61,17 @@ public ref partial struct SharpPackReader
     }
 
     public SharpPackReader(ReadOnlySpan<byte> buffer, SharpPackReaderOptionalState optionalState)
+        : this(buffer, optionalState,
+            optionalState.SerializerContext?.MaxReadDepth ?? SharpPackReadLimits.CurrentCompatibleMaxDepth,
+            optionalState.SerializerContext?.MaxCollectionLength ?? int.MaxValue)
+    {
+    }
+
+    internal SharpPackReader(
+        ReadOnlySpan<byte> buffer,
+        SharpPackReaderOptionalState optionalState,
+        int maxDepth,
+        int maxCollectionLength)
     {
         this.bufferSource = ReadOnlySequence<byte>.Empty;
         this.bufferReference = ref MemoryMarshal.GetReference(buffer);
@@ -69,8 +82,8 @@ public ref partial struct SharpPackReader
         this.rentBuffer = null;
         this.smallBuffer = default;
         this.totalLength = buffer.Length;
-        this.maxDepth = optionalState.MaxDepth;
-        this.maxCollectionLength = optionalState.MaxCollectionLength;
+        this.maxDepth = maxDepth;
+        this.maxCollectionLength = maxCollectionLength;
         this.optionalState = optionalState;
     }
 

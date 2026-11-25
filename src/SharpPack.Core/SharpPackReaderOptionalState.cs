@@ -87,8 +87,6 @@ public sealed class SharpPackReaderOptionalState : IDisposable
 
     List<object>? sequentialReferences;
     Dictionary<uint, object>? sparseReferences;
-    int referenceCount;
-    int maxReferenceCount = int.MaxValue;
     bool isInUse;
     bool requiresReset;
     long leaseGeneration;
@@ -96,9 +94,6 @@ public sealed class SharpPackReaderOptionalState : IDisposable
 
     internal SharpPackSerializerContext? SerializerContext { get; private set; }
     internal FormatterGraph? FormatterGraph { get; private set; }
-    internal int MaxDepth { get; private set; } =
-        SharpPackReadLimits.CurrentCompatibleMaxDepth;
-    internal int MaxCollectionLength { get; private set; } = int.MaxValue;
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     public bool HasFormatterOverrides => FormatterGraph is not null;
@@ -114,9 +109,6 @@ public sealed class SharpPackReaderOptionalState : IDisposable
         requiresReset = true;
         SerializerContext = context;
         FormatterGraph = context.OverrideGraph;
-        MaxDepth = context.MaxReadDepth;
-        MaxCollectionLength = context.MaxCollectionLength;
-        maxReferenceCount = context.MaxReferenceCount;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -187,50 +179,33 @@ public sealed class SharpPackReaderOptionalState : IDisposable
     {
         requiresReset = true;
         sequentialReferences ??= [];
-        if (id == (uint)sequentialReferences.Count)
-        {
-            if (sparseReferences?.ContainsKey(id) == true)
-            {
-                ThrowDuplicateReferenceId(id);
-            }
-
-            ThrowIfReferenceLimitExceeded();
-            sequentialReferences.Add(value);
-            referenceCount++;
-            return;
-        }
-
-        if (id < (uint)sequentialReferences.Count)
+        var sequentialCount = (uint)sequentialReferences.Count;
+        if (id < sequentialCount ||
+            (id == sequentialCount && sparseReferences?.ContainsKey(id) == true))
         {
             ThrowDuplicateReferenceId(id);
         }
 
-        if (referenceCount >= maxReferenceCount)
+        // Only circular-reference reads need a table size and its limit.
+        var count = (long)sequentialCount + (sparseReferences?.Count ?? 0);
+        var maxCount = SerializerContext?.MaxReferenceCount ?? int.MaxValue;
+        if (count >= maxCount)
         {
-            // Only the rejection path needs an extra lookup to preserve
-            // duplicate-ID classification. Successful inserts retain TryAdd.
-            if (sparseReferences?.ContainsKey(id) == true)
+            if (id > sequentialCount && sparseReferences?.ContainsKey(id) == true)
             {
                 ThrowDuplicateReferenceId(id);
             }
-            ThrowIfReferenceLimitExceeded();
+            SharpPackSerializationException.ThrowReadLimitExceeded(
+                SharpPackReadLimitKind.ReferenceCount, maxCount, count + 1);
+        }
+        if (id == sequentialCount)
+        {
+            sequentialReferences.Add(value);
+            return;
         }
         if (!(sparseReferences ??= []).TryAdd(id, value))
         {
             ThrowDuplicateReferenceId(id);
-        }
-        referenceCount++;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    void ThrowIfReferenceLimitExceeded()
-    {
-        if (referenceCount >= maxReferenceCount)
-        {
-            SharpPackSerializationException.ThrowReadLimitExceeded(
-                SharpPackReadLimitKind.ReferenceCount,
-                maxReferenceCount,
-                (long)referenceCount + 1);
         }
     }
 
@@ -260,10 +235,6 @@ public sealed class SharpPackReaderOptionalState : IDisposable
 
         SerializerContext = null;
         FormatterGraph = null;
-        referenceCount = 0;
-        maxReferenceCount = int.MaxValue;
-        MaxDepth = SharpPackReadLimits.CurrentCompatibleMaxDepth;
-        MaxCollectionLength = int.MaxValue;
         requiresReset = false;
     }
 
