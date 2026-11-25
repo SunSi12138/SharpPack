@@ -55,9 +55,10 @@ dotnet add package SharpPack --version 1.1.0
 Versioned packages and symbols are also attached to
 [GitHub Releases](https://github.com/SunSi12138/SharpPack/releases).
 
-The runtime packages target `net10.0`. `SharpPack.Generator` targets
-`netstandard2.0` only because Roslyn analyzers are loaded by the compiler host;
-that target does not add a `netstandard` runtime support promise.
+The runtime packages target `net10.0`. For source generation, use a C# 14
+compiler (.NET 10 SDK or Visual Studio 2026 / Roslyn 5.0 or newer).
+`SharpPack.Generator` targets `netstandard2.0` to load in the compiler host;
+that is not a runtime target for serialized applications.
 
 Quick Start
 ---
@@ -428,6 +429,10 @@ Packages
 * `SharpPack.Core` — runtime primitives and formatter graph
 * `SharpPack.Generator` — Roslyn incremental source generator
 * `SharpPack.Streaming` — `PipeReader`/`PipeWriter` and streaming APIs
+
+When using the split packages, upgrade Core and Generator together. Starting
+with SharpPack 2.0, Streaming's package requires the exact matching Core
+version because it uses Core internals.
 
 TypeScript
 ---

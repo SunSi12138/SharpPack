@@ -73,18 +73,6 @@ failures leave this nullable property unset. Structural header checks still prec
 where the reader has enough information; a failure is classified at the first
 boundary reached, not by a second whole-payload verification pass.
 
-## BitArray wire and runtime layout
-
-BitArray retains the logical wire shape `[bitLength, int32 words]`. Its formatter
-uses public `Length` and .NET 10 `CollectionsMarshal.AsBytes` APIs instead of reinterpreting private fields: .NET 10 stores backing bytes,
-not an `int[]`. Writers emit the minimum word count and clear unused high bits.
-Readers accept legacy extra words while enforcing both logical bit count and
-encoded word-table limits, then ignore words outside the logical value. The
-original corpus remains unchanged. Old private-layout-dependent extra bytes
-were already marked nondeterministic; exact unsafe backing-buffer output is
-not preserved. The writer copies the public byte span directly into its output,
-zeros word padding, masks unused high bits, and preserves native-endian int-word
-encoding without a temporary word array. Byte equivalence is tested against
-public `CopyTo(int[])`, including prefilled output and dirty unused bits.
-BitArray-specific allocation/performance must still be measured separately;
-source-level removal of an allocation is not a benchmark result.
+For `BitArray`, the same collection limit bounds both the logical bit count and
+the encoded Int32 word count. Legacy extra words are ignored after validation,
+but still count against the word limit.

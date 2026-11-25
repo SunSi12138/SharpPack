@@ -101,6 +101,22 @@ public class ReadLimitsBoundaryTest
     }
 
     [Fact]
+    public void BitArray_LegacyWordCountHasItsOwnCollectionBoundary()
+    {
+        var payload = SharpPackSerializer.Serialize(new BitArray(2, true));
+        Array.Resize(ref payload, payload.Length + 2 * sizeof(int));
+        BitConverter.GetBytes(3).CopyTo(payload, 1 + sizeof(int)); // Legacy extra words.
+
+        var exact = SharpPackSerializer.Deserialize<BitArray>(payload, Context(maxCollection: 3))!;
+        Assert.Equal(2, exact.Length);
+        Assert.True(exact[1]);
+        var failure = Assert.Throws<SharpPackSerializationException>(() =>
+            SharpPackSerializer.Deserialize<BitArray>(payload, Context(maxCollection: 2)));
+        Assert.Equal(SharpPackReadLimitKind.CollectionLength, failure.ReadLimitKind);
+        Assert.Equal(SharpPackErrorCode.ResourceLimitExceeded, failure.ErrorCode);
+    }
+
+    [Fact]
     public void SparseReferenceLimit_PreservesDuplicateClassification_AndLeaseReset()
     {
         var context = new SharpPackSerializerContext(

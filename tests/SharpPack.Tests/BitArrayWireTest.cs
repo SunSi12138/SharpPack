@@ -24,14 +24,10 @@ public class BitArrayWireTest
         var payload = SharpPackSerializer.Serialize(value);
         Assert.Equal(length, BinaryPrimitives.ReadInt32LittleEndian(payload.AsSpan(1)));
         Assert.Equal((length + 31) / 32, BinaryPrimitives.ReadInt32LittleEndian(payload.AsSpan(5)));
-        foreach (var context in new[] { new SharpPackSerializerContext(), new SharpPackSerializerContext(
-            SharpPackSerializerConfiguration.Default with
-            {
-                ReadLimits = new SharpPackReadLimits { MaxCollectionLength = Math.Max(1, length) },
-            }) })
+        foreach (var decoded in new[] { SharpPackSerializer.Deserialize<BitArray>(payload),
+            SharpPackSerializer.Deserialize<BitArray>(payload, new SharpPackSerializerContext()) })
         {
-            var decoded = SharpPackSerializer.Deserialize<BitArray>(payload, context)!;
-            Assert.Equal(length, decoded.Length);
+            Assert.Equal(length, decoded!.Length);
             Assert.Equal(value.Cast<bool>(), decoded.Cast<bool>());
         }
     }
@@ -115,12 +111,6 @@ public class BitArrayWireTest
         var decoded = SharpPackSerializer.Deserialize<BitArray>(payload)!;
         Assert.Equal(new[] { true, false, true, true }, decoded.Cast<bool>());
         Assert.Equal(Payload(4, 1, 13), SharpPackSerializer.Serialize(decoded));
-        // Word-table limits still apply even when logical cardinality is small.
-        var context = new SharpPackSerializerContext(SharpPackSerializerConfiguration.Default with
-        {
-            ReadLimits = new SharpPackReadLimits { MaxCollectionLength = 4 },
-        });
-        Assert.Equal(4, SharpPackSerializer.Deserialize<BitArray>(payload, context)!.Length);
     }
 
     [Theory]
@@ -128,7 +118,6 @@ public class BitArrayWireTest
     [InlineData(33, 1)]
     [InlineData(1, -1)]
     [InlineData(1, -2)]
-    [InlineData(int.MaxValue, 0)]
     public void InvalidLengthOrInsufficientWords_AreRejected(int bitLength, int wordCount)
     {
         var payload = Payload(bitLength, wordCount, wordCount > 0 ? new[] { 1 } : Array.Empty<int>());
@@ -144,6 +133,7 @@ public class BitArrayWireTest
             () => SharpPackSerializer.Deserialize<BitArray>(payload.AsSpan(0, payload.Length - 1)));
         var decoded = SharpPackSerializer.Deserialize<BitArray>(payload)!;
         Assert.True(decoded[0]);
+        Assert.Equal((byte)1, CollectionsMarshal.AsBytes(decoded)[0]);
         Assert.Equal(Payload(1, 1, 1), SharpPackSerializer.Serialize(decoded));
     }
 

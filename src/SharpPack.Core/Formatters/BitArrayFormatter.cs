@@ -1,6 +1,5 @@
 using SharpPack.Internal;
 using System.Collections;
-using System;
 using System.Runtime.InteropServices;
 
 namespace SharpPack.Formatters;
