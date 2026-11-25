@@ -31,6 +31,12 @@
   rather than re-entering the wrapper. `BrotliFormatter<T>.Default` is now
   typed; use `BrotliFormatter.Default` for the non-generic byte-array formatter.
 
+### BitArray on .NET 10
+
+- Read and write `BitArray` through its supported byte view. The wire format
+  still carries the logical bit length and Int32 words. Writers clear unused
+  bits and omit redundant words; readers still accept legacy extra words.
+
 ## 1.1.0
 
 ### MemoryPack-compatible unmanaged semantics
