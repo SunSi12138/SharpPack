@@ -24,6 +24,11 @@
 
 ### What's new
 
+- **.NET 11 and native C# 15 unions.** .NET 10 remains supported. The .NET 11
+  Core asset adds `BFloat16`, `Decimal32`, `Decimal64`, and `Decimal128`.
+  Annotate C# 15 `partial union` cases with explicit tags to keep their
+  binary IDs stable when you reorder them. Existing interface and class
+  unions keep their wire format.
 - **Compile-time formatters for third-party types.** Declare closed roots and
   register one generated provider on the context builder. Unsupported shapes
   report the nested path at build time. Integrations can call the same planner
@@ -47,6 +52,13 @@
   builders release startup registrations after building. `BitArray` reads
   still accept legacy extra words; writes preserve the logical bit length
   and clear unused bits.
+- **Generated models and covariant arrays.** Nested collections and union
+  cases are emitted in the correct generic scope. Ambiguous constructor
+  bindings and unusable includes report diagnostics; covariant arrays use
+  the declared element formatter without writing through incompatible slots.
+- **Legacy .NET timestamp import.** Use `DotNetDateTimeOffsetFormatter` in
+  a migration context to import .NET 9 values and write the .NET 10 layout
+  without changing the default wire. See [timestamp migration][dto-v2].
 
 [aot-v2]: https://github.com/SunSi12138/SharpPack/blob/v2.0.0/docs/aot-factory-migration.md
 [type-v2]: https://github.com/SunSi12138/SharpPack/blob/v2.0.0/docs/formatter-context.md#systemtype-payload-capability
@@ -54,6 +66,7 @@
 [streaming-v2]: https://github.com/SunSi12138/SharpPack/blob/v2.0.0/docs/architecture/streaming-boundaries.md
 [limits-v2]: https://github.com/SunSi12138/SharpPack/blob/v2.0.0/docs/read-limits.md
 [errors-v2]: https://github.com/SunSi12138/SharpPack/blob/v2.0.0/docs/architecture/error-codes.md
+[dto-v2]: https://github.com/SunSi12138/SharpPack/blob/v2.0.0/README.md#importing-legacy-net-datetimeoffset-data
 
 ## 1.1.0
 

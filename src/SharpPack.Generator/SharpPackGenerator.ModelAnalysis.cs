@@ -39,6 +39,9 @@ partial class SharpPackGenerator
         }
 
         var references = new ReferenceSymbols(compilation);
+        if (NativeUnionAnalysis.IsDeclaration(syntax))
+            return NativeUnionAnalysis.Analyze(syntax, symbol, references, cancellationToken, reportDiagnostic);
+
         INamedTypeSymbol? union = null;
         if (symbol.GetAttribute(references.SharpPackUnionFormatterAttribute) is { } unionFormatter)
         {

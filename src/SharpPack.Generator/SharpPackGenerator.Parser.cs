@@ -364,16 +364,26 @@ public partial class TypeMeta
         }
         else
         {
+            var wireMembers = GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference
+                ? Members.DistinctBy(static member => member.Order).ToArray()
+                : Members;
+
             // check ctor members
             if (this.Constructor != null)
             {
                 foreach (var parameter in Constructor.Parameters)
                 {
-                    if (!Members.ContainsConstructorParameter(parameter))
+                    var matches = Extensions.FindConstructorBindings(wireMembers, static member => member.ConstructorParameterName, parameter.Name);
+                    var location = Constructor.Locations.FirstOrDefault() ?? syntax.Identifier.GetLocation();
+                    if (matches.Length == 0)
                     {
-                        var location = Constructor.Locations.FirstOrDefault() ?? syntax.Identifier.GetLocation();
-
                         reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.ConstructorHasNoMatchedParameter, location, Symbol.Name, parameter.Name));
+                        noError = false;
+                    }
+                    else if (matches.Length > 1)
+                    {
+                        reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.AmbiguousConstructorParameter, location,
+                            Symbol.Name, parameter.Name, string.Join(", ", matches.Select(static member => member.Name))));
                         noError = false;
                     }
                 }
@@ -389,6 +399,21 @@ public partial class TypeMeta
                 else if (item is { SuppressDefaultInitialization: true, IsAssignable: false })
                 {
                     reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.SuppressDefaultInitializationMustBeSettable, item.GetLocation(syntax), Symbol.Name, item.Name));
+                    noError = false;
+                }
+            }
+
+            foreach (var item in wireMembers)
+            {
+                if (!item.IsConstructorParameter && item.Symbol is IPropertySymbol property &&
+                    property.ContainsAttribute(reference.SharpPackIncludeAttribute) &&
+                    reference.Compilation.IsSymbolAccessibleWithin(property, Symbol, throughType: Symbol) &&
+                    (property.SetMethod is not { } setter ||
+                     GenerateType is GenerateType.CircularReference && !item.IsAssignable ||
+                     !reference.Compilation.IsSymbolAccessibleWithin(setter, Symbol, throughType: Symbol)))
+                {
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.IncludedPropertyCannotBePopulated,
+                        item.GetLocation(syntax), Symbol.Name, item.Name));
                     noError = false;
                 }
             }
@@ -577,15 +602,18 @@ public partial class TypeMeta
 
             foreach (var item in UnionTags)
             {
-                // type does not derived target symbol
+                var openExternalCase = unionFormatter && item.Type.IsGenericType;
+                var caseType = unionFormatter
+                    ? (openExternalCase ? item.Type.OriginalDefinition : item.Type)
+                    : UnionShape.BindSourceCase(item.Type, Symbol);
+                bool IsUnionTarget(INamedTypeSymbol type) => openExternalCase
+                    ? type.EqualsUnconstructedGenericType(Symbol)
+                    : SymbolEqualityComparer.Default.Equals(type, Symbol);
+
                 if (Symbol.TypeKind == TypeKind.Interface)
                 {
                     // interface, check interfaces.
-                    var check = item.Type.IsGenericType
-                        ? item.Type.OriginalDefinition.AllInterfaces.Any(x => x.EqualsUnconstructedGenericType(Symbol))
-                        : item.Type.AllInterfaces.Any(x => SymbolEqualityComparer.Default.Equals(x, Symbol));
-
-                    if (!check)
+                    if (!caseType.AllInterfaces.Any(IsUnionTarget))
                     {
                         reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberTypeNotImplementBaseType, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
                         noError = false;
@@ -594,11 +622,7 @@ public partial class TypeMeta
                 else
                 {
                     // abstract type, check base.
-                    var check = item.Type.IsGenericType
-                        ? item.Type.OriginalDefinition.GetAllBaseTypes().Any(x => x.EqualsUnconstructedGenericType(Symbol))
-                        : item.Type.GetAllBaseTypes().Any(x => SymbolEqualityComparer.Default.Equals(x, Symbol));
-
-                    if (!check)
+                    if (!caseType.GetAllBaseTypes().Any(IsUnionTarget))
                     {
                         reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberTypeNotDerivedBaseType, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
                         noError = false;

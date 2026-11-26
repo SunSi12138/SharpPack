@@ -24,6 +24,7 @@ internal sealed class SidecarGraph
 
     readonly ReferenceSymbols references;
     readonly Compilation compilation;
+    readonly ISymbol accessibleWithin;
     readonly INamedTypeSymbol? defaultFactory;
     readonly INamedTypeSymbol? contextFactory;
     readonly HashSet<ITypeSymbol> registeredTypes;
@@ -31,9 +32,11 @@ internal sealed class SidecarGraph
     Dictionary<INamedTypeSymbol, List<SharpPackGenerator.ExternalUnionFactoryEntry>>? externalUnions;
     ReferenceSymbols? completeMetadata;
 
-    internal SidecarGraph(Compilation compilation, IEnumerable<ITypeSymbol> registeredTypes)
+    internal SidecarGraph(Compilation compilation, IEnumerable<ITypeSymbol> registeredTypes,
+        INamedTypeSymbol? accessibleWithin = null)
     {
         this.compilation = compilation;
+        this.accessibleWithin = (ISymbol?)accessibleWithin ?? compilation.Assembly;
         references = new ReferenceSymbols(compilation);
         defaultFactory = compilation.GetTypeByMetadataName("SharpPack.ISharpPackFormatterFactory`1");
         contextFactory = compilation.GetTypeByMetadataName("SharpPack.ISharpPackContextFormatterFactory`1");
@@ -111,6 +114,11 @@ internal sealed class SidecarGraph
         var sourceOwned = SymbolEqualityComparer.Default.Equals(named.ContainingAssembly, compilation.Assembly);
         if (sourceOwned && declared && (mode != GenerateType.NoGenerate || isUnion))
         {
+            if (NativeUnionAnalysis.IsSourceUnion(named))
+                return Existing(NativeUnionAnalysis.GetCases(named, references).Select(static entry =>
+                    new FormatterDependency(" -> union case " + entry.Type.FullyQualifiedToString(), entry.Type)).ToArray(),
+                    factory: TypeOwnedFactory.Default);
+
             if (isUnion)
                 return Existing(UnionDependencies(named, named), factory: TypeOwnedFactory.Default);
 
@@ -178,14 +186,17 @@ internal sealed class SidecarGraph
     FormatterDependency[] UnionDependencies(INamedTypeSymbol target, INamedTypeSymbol declaration)
     {
         var typeArguments = target.TypeArguments.ToArray();
-        return TypeMeta.GetUnionTags(declaration, references).Select(item => UnionShape.Bind(item.Type, typeArguments))
+        var sourceUnion = SymbolEqualityComparer.Default.Equals(target, declaration);
+        return TypeMeta.GetUnionTags(declaration, references).Select(item => sourceUnion
+                ? UnionShape.BindSourceCase(item.Type, target)
+                : UnionShape.Bind(item.Type, typeArguments))
             .Select(static type => new FormatterDependency(" -> union case " + type.FullyQualifiedToString(), type)).ToArray();
     }
 
     static FormatterDependency[] TypeArguments(INamedTypeSymbol named)
         => named.TypeArguments.Select(static (type, index) => new FormatterDependency($" -> type argument {index + 1}", type)).ToArray();
 
-    static bool HasSelfInterface(INamedTypeSymbol type, INamedTypeSymbol? definition)
+    internal static bool HasSelfInterface(INamedTypeSymbol type, INamedTypeSymbol? definition)
         => definition is not null && type.AllInterfaces.Any(candidate =>
             SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, definition) &&
             SymbolEqualityComparer.Default.Equals(candidate.TypeArguments[0], type));
@@ -194,7 +205,7 @@ internal sealed class SidecarGraph
     {
         if (type is IArrayTypeSymbol array) return HasGlobalTypeName(array.ElementType);
         if (CanonicalType(type) is not INamedTypeSymbol named || !named.CanBeReferencedByName ||
-            !compilation.IsSymbolAccessibleWithin(named, compilation.Assembly) ||
+            !compilation.IsSymbolAccessibleWithin(named, accessibleWithin) ||
             !named.TypeArguments.All(HasGlobalTypeName))
             return false;
 

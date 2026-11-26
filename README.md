@@ -10,7 +10,7 @@ modern .NET.
 SharpPack is an independently maintained fork of
 [Cysharp/MemoryPack](https://github.com/Cysharp/MemoryPack). It retains the
 original MemoryPack binary wire format for non-`System.Type` payloads while using a fully renamed API,
-context-owned formatter graphs, modern .NET 10 runtime targets, and aggressive
+context-owned formatter graphs, .NET 10 and .NET 11 targets, and aggressive
 performance optimizations. See [NOTICE](NOTICE) for attribution.
 
 Starting in SharpPack 2.0, `System.Type` payloads are disabled by default.
@@ -44,7 +44,8 @@ Other than performance, SharpPack has these features.
 
 Installation
 ---
-SharpPack 2.0 targets .NET 10 and uses C# 14.
+SharpPack 2.0 supports .NET 10 and .NET 11. `SharpPack.Core` contains an asset
+for each runtime.
 
 Install the aggregate runtime and source-generator package from NuGet:
 
@@ -55,8 +56,10 @@ dotnet add package SharpPack --version 2.0.0
 Versioned packages and symbols are also attached to
 [GitHub Releases](https://github.com/SunSi12138/SharpPack/releases).
 
-The runtime packages target `net10.0`. For source generation, use a C# 14
-compiler (.NET 10 SDK or Visual Studio 2026 / Roslyn 5.0 or newer).
+For source generation on .NET 10, use a C# 14 compiler (.NET 10 SDK or
+Visual Studio 2026 / Roslyn 5.0 or newer). Native `union` declarations require
+C# 15. Building this repository
+requires the .NET 11 SDK; running its .NET 10 checks also needs .NET 10.
 `SharpPack.Generator` targets `netstandard2.0` to load in the compiler host;
 that is not a runtime target for serialized applications.
 
@@ -189,6 +192,10 @@ These types can be serialized by default:
 * Unmanaged types (Any `enum`, Any user-defined `struct` which doesn't contain reference types)
 * `string`, `decimal`, `Half`, `Int128`, `UInt128`, `Guid`, `Rune`, `BigInteger`
 * `TimeSpan`,  `DateTime`, `DateTimeOffset`, `TimeOnly`, `DateOnly`, `TimeZoneInfo`
+* On .NET 11 with SharpPack 2.0: `BFloat16`, `Decimal32`, `Decimal64`, and
+  `Decimal128`. Like other unmanaged scalars, they preserve the runtime
+  representation (2, 4, 8, and 16 bytes respectively), including signed
+  zero and NaN encodings.
 * `Complex`, `Plane`, `Quaternion` `Matrix3x2`, `Matrix4x4`, `Vector2`, `Vector3`, `Vector4`
 * `Uri`, `Version`, `StringBuilder`, `Type`, `BitArray`, `CultureInfo`
 * `T[]`, `T[,]`, `T[,,]`, `T[,,,]`, `Memory<>`, `ReadOnlyMemory<>`, `ArraySegment<>`, `ReadOnlySequence<>`
@@ -200,6 +207,31 @@ These types can be serialized by default:
 * `IDictionary<,>`, `IReadOnlyDictionary<,>`, `ILookup<,>`, `IGrouping<,>`,
 * `ConcurrentBag<>`, `ConcurrentQueue<>`, `ConcurrentStack<>`, `ConcurrentDictionary<,>`, `BlockingCollection<>`
 * Immutable collections (`ImmutableList<>`, etc.) and interfaces (`IImmutableList<>`, etc.)
+
+### Importing legacy .NET `DateTimeOffset` data
+
+Use a dedicated context when reading little-endian .NET 9 data. .NET 9 stored
+the offset in two bytes; .NET 10 and later use four. The opt-in formatter
+reads both layouts and writes the .NET 10 layout, without changing default
+serialization.
+
+```csharp
+using SharpPack.Formatters;
+
+var migration = new SharpPackSerializerContextBuilder()
+    .Register(new DotNetDateTimeOffsetFormatter())
+    .Build();
+DateTimeOffset value = SharpPackSerializer.Deserialize<DateTimeOffset>(legacyBytes, migration);
+byte[] updatedBytes = SharpPackSerializer.Serialize(value, migration);
+```
+
+The same context works for `DateTimeOffset[]`, `List<DateTimeOffset>` and
+direct `DateTimeOffset` members in generated classes when you keep the original
+schema. For data stored as a raw `DateTimeOffset?` or inside another raw
+unmanaged struct, migrate that whole shape on the original runtime or with an
+explicit formatter for its layout. The scalar override does not decode those
+raw layouts or the Unity layout. See the
+[reported .NET 9 wire sample](https://github.com/Cysharp/MemoryPack/issues/473).
 
 Define `[SharpPackable]` `class` / `struct` / `record` / `record struct`
 ---
@@ -287,7 +319,11 @@ SharpPack supports both parameterized and parameterless constructors. The select
 * If there is no explicit constructor (including private), use a parameterless one.
 * If there is one parameterless/parameterized constructor (including private), use it.
 * If there are multiple constructors, then the `[SharpPackConstructor]` attribute must be applied to the desired constructor (the generator will not automatically choose one), otherwise the generator will emit an error.
-* If using a parameterized constructor, all parameter names must match corresponding member names (case-insensitive).
+* Each parameter must match one serialized member. Exact names are preferred; case-insensitive matching and the `_` backing-field prefix are supported. Ambiguous matches are errors.
+
+A property explicitly marked `[SharpPackInclude]` needs an accessible setter or
+a matching constructor parameter. An ordinary computed property can still be
+serialized without being populated on a read.
 
 ```csharp
 [SharpPackable]
@@ -326,6 +362,32 @@ public partial class Person3
     }
 }
 ```
+
+### C# 15 unions on .NET 11
+
+Mark a compiler-declared `partial union` with `[SharpPackable]` and assign an
+explicit `[SharpPackUnion]` tag to every case:
+
+```csharp
+[SharpPackable]
+[SharpPackUnion(7, typeof(int))]
+[SharpPackUnion(300, typeof(string))]
+public partial union Reading(int, string);
+```
+
+```csharp
+Reading reading = new(42);
+byte[] bytes = SharpPackSerializer.Serialize(reading);
+Reading restored = SharpPackSerializer.Deserialize<Reading>(bytes);
+```
+
+The tag is part of the binary schema; reordering cases does not change it.
+Cases need distinct concrete runtime types and supported formatters. A reference
+case is serialized only when its value has the exact declared runtime type. A
+nullable value case uses its underlying type when boxed, so `int` and `int?`
+cannot both be cases in the same union. Empty contents, including a null case
+value, use the empty union representation. Existing interface and abstract
+class unions keep their current format.
 
 ### Serialization callbacks
 
