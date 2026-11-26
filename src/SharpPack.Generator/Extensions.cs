@@ -263,4 +263,38 @@ internal static class Extensions
         return exact.Length != 0 ? exact : candidates.Where(candidate =>
             string.Equals(getBinding(candidate), parameter, StringComparison.OrdinalIgnoreCase)).ToArray();
     }
+
+    internal static bool HasGlobalTypeName(this ITypeSymbol type, Compilation compilation, ISymbol accessibleWithin,
+        CancellationToken token, Func<INamedTypeSymbol, bool>? canUseType = null)
+    {
+        if (type is IArrayTypeSymbol array)
+            return array.ElementType.HasGlobalTypeName(compilation, accessibleWithin, token, canUseType);
+        if (type is INamedTypeSymbol { TupleUnderlyingType: { } tuple })
+            type = tuple;
+
+        if (type is not INamedTypeSymbol named || !named.CanBeReferencedByName ||
+            !compilation.IsSymbolAccessibleWithin(named, accessibleWithin))
+            return false;
+
+        for (var current = named; current is not null; current = current.ContainingType)
+        {
+            if (canUseType?.Invoke(current) == false ||
+                current.DeclaringSyntaxReferences.Any(declaration => declaration.GetSyntax(token) is TypeDeclarationSyntax syntax &&
+                    syntax.Modifiers.Any(static modifier => modifier.ValueText == "file")) ||
+                !current.TypeArguments.All(argument => argument.HasGlobalTypeName(compilation, accessibleWithin, token, canUseType)))
+                return false;
+        }
+
+        // Metadata lookup excludes alias-only references and reports ambiguity;
+        // a global name must bind back to this exact definition.
+        return SymbolEqualityComparer.Default.Equals(compilation.GetTypeByMetadataName(named.GetFullMetadataName()), named.OriginalDefinition);
+    }
+
+    internal static string GetFullMetadataName(this INamedTypeSymbol named)
+    {
+        var name = named.MetadataName;
+        for (var enclosing = named.ContainingType; enclosing is not null; enclosing = enclosing.ContainingType)
+            name = enclosing.MetadataName + "+" + name;
+        return named.ContainingNamespace.IsGlobalNamespace ? name : named.ContainingNamespace.ToDisplayString() + "." + name;
+    }
 }

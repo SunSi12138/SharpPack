@@ -45,6 +45,8 @@ public partial class SharpPackGenerator
                     [global::System.Diagnostics.CodeAnalysis.DynamicDependency(nameof(PreserveFactories))]
                     internal static void Initialize() { }
 
+                    // Existing obsolete contracts are legal inputs from obsolete callers.
+                    [global::System.Obsolete("This method is preserved for trimming, not invoked.")]
                     static void PreserveFactories()
                     {
                 {{string.Join("\n", calls)}}
@@ -61,13 +63,18 @@ public partial class SharpPackGenerator
             method.TypeArguments.Length != 1 ||
             method.TypeArguments[0] is not IArrayTypeSymbol { IsSZArray: true, ElementType: INamedTypeSymbol element } ||
             !SymbolEqualityComparer.Default.Equals(method.ContainingType, compilation.GetTypeByMetadataName("SharpPack.SharpPackSerializer")) ||
-            element.IsUnmanagedType || !CanReference(element))
+            element.IsUnmanagedType)
         {
             return null;
         }
 
-        var hasContextFactory = ImplementsFactory("SharpPack.ISharpPackContextFormatterFactory`1");
-        if (!ImplementsFactory("SharpPack.ISharpPackFormatterFactory`1"))
+        var experimental = compilation.GetTypeByMetadataName("System.Diagnostics.CodeAnalysis.ExperimentalAttribute");
+        if (!element.HasGlobalTypeName(compilation, compilation.Assembly, token, CanUseWithoutCallerOptIn))
+            return null;
+
+        var hasContextFactory = SidecarGraph.HasSelfInterface(element,
+            compilation.GetTypeByMetadataName("SharpPack.ISharpPackContextFormatterFactory`1"));
+        if (!SidecarGraph.HasSelfInterface(element, compilation.GetTypeByMetadataName("SharpPack.ISharpPackFormatterFactory`1")))
         {
             // Source models in this compilation have not received their generated interfaces yet.
             if (!SymbolEqualityComparer.Default.Equals(element.ContainingAssembly, compilation.Assembly))
@@ -75,7 +82,7 @@ public partial class SharpPackGenerator
 
             var references = new ReferenceSymbols(compilation);
             if (!element.TryGetSharpPackableType(references, out var mode, out _) ||
-                mode == GenerateType.NoGenerate)
+                mode == GenerateType.NoGenerate && !element.IsWillImplementSharpPackUnion(references))
             {
                 return null;
             }
@@ -86,23 +93,9 @@ public partial class SharpPackGenerator
 
         return new(element.WithNullableAnnotation(NullableAnnotation.NotAnnotated).FullyQualifiedToString(), hasContextFactory);
 
-        bool ImplementsFactory(string metadataName)
-        {
-            var factory = compilation.GetTypeByMetadataName(metadataName);
-            return factory is not null && element.AllInterfaces.Any(candidate =>
-                SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, factory) &&
-                SymbolEqualityComparer.Default.Equals(candidate.TypeArguments[0], element));
-        }
-
-        bool CanReference(ITypeSymbol type) => type switch
-        {
-            IArrayTypeSymbol array => CanReference(array.ElementType),
-            INamedTypeSymbol named => !named.IsUnboundGenericType &&
-                compilation.IsSymbolAccessibleWithin(named, compilation.Assembly) &&
-                !named.DeclaringSyntaxReferences.Any(declaration => declaration.GetSyntax(token) is TypeDeclarationSyntax syntax &&
-                    syntax.Modifiers.Any(static modifier => modifier.ValueText == "file")) &&
-                (named.ContainingType is null || CanReference(named.ContainingType)) && named.TypeArguments.All(CanReference),
-            _ => false,
-        };
+        // A different source file may accept a custom experimental diagnostic
+        // with a local pragma. Emission cannot inherit that opt-in.
+        bool CanUseWithoutCallerOptIn(INamedTypeSymbol type)
+            => experimental is null || !type.ContainsAttribute(experimental) && !type.ContainingAssembly.ContainsAttribute(experimental);
     }
 }

@@ -19,8 +19,9 @@ and the generated `Item` factory in a trimmed build. The generator can do this
 when it can name the closed, single-dimensional array's managed element type
 from generated code in that project. No startup registration is needed.
 
-For an open generic wrapper or an inaccessible element type, keep the closed
-formatter and model factory from reachable code that names the element type:
+For an open generic wrapper or an element type needing a caller-local alias,
+access, or experimental opt-in, keep the closed formatter and model factory
+from reachable code that names the element type:
 
 ```csharp
 SharpPackSerializer.PreserveFormatterFactory<Item>();
