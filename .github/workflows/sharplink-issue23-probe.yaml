@@ -33,6 +33,7 @@ jobs:
         run: |
           feed="$RUNNER_TEMP/probe-feed"
           echo "PROBE_FEED=$feed" >> "$GITHUB_ENV"
+          dotnet build src/SharpPack.Core/SharpPack.Core.csproj -c Release -p:Version="$SHARPPACK_VERSION"
           dotnet build src/SharpPack/SharpPack.csproj -c Release -p:Version="$SHARPPACK_VERSION"
           dotnet build src/SharpPack.Streaming/SharpPack.Streaming.csproj -c Release -p:Version="$SHARPPACK_VERSION"
           bash tools/PackageConsumers/pack.sh "$SHARPPACK_VERSION" "$feed"
