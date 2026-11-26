@@ -295,6 +295,8 @@ internal static class Extensions
         var name = named.MetadataName;
         for (var enclosing = named.ContainingType; enclosing is not null; enclosing = enclosing.ContainingType)
             name = enclosing.MetadataName + "+" + name;
-        return named.ContainingNamespace.IsGlobalNamespace ? name : named.ContainingNamespace.ToDisplayString() + "." + name;
+        for (var space = named.ContainingNamespace; !space.IsGlobalNamespace; space = space.ContainingNamespace)
+            name = space.MetadataName + "." + name;
+        return name;
     }
 }

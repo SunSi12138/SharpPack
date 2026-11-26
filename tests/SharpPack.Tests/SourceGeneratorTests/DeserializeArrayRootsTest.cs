@@ -116,4 +116,22 @@ public class DeserializeArrayRootsTest
         Assert.DoesNotContain("PreserveContextFormatterFactory", source);
         Assert.DoesNotContain("ExperimentalItem", source);
     }
+
+    [Fact]
+    public void RootsTypesInEscapedNamespaces()
+    {
+        var (compilation, diagnostics) = CSharpGeneratorRunner.RunGenerator("""
+            namespace @class;
+            [SharpPackable] public partial class @event { public int Value { get; set; } }
+            public static class Reader
+            {
+                public static @event[]? Read(byte[] bytes) => SharpPackSerializer.Deserialize<@event[]>(bytes);
+            }
+            """);
+
+        Assert.Empty(diagnostics);
+        Assert.Empty(compilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var root = Assert.Single(compilation.SyntaxTrees, static tree => tree.FilePath.EndsWith("SharpPackDeserializeArrayRoots.g.cs"));
+        Assert.Contains("PreserveFormatterFactory<global::@class.@event>()", root.GetText().ToString());
+    }
 }
