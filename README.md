@@ -208,6 +208,31 @@ These types can be serialized by default:
 * `ConcurrentBag<>`, `ConcurrentQueue<>`, `ConcurrentStack<>`, `ConcurrentDictionary<,>`, `BlockingCollection<>`
 * Immutable collections (`ImmutableList<>`, etc.) and interfaces (`IImmutableList<>`, etc.)
 
+### Importing legacy .NET `DateTimeOffset` data
+
+Use a dedicated context when reading little-endian .NET 9 data. .NET 9 stored
+the offset in two bytes; .NET 10 and later use four. The opt-in formatter
+reads both layouts and writes the .NET 10 layout, without changing default
+serialization.
+
+```csharp
+using SharpPack.Formatters;
+
+var migration = new SharpPackSerializerContextBuilder()
+    .Register(new DotNetDateTimeOffsetFormatter())
+    .Build();
+DateTimeOffset value = SharpPackSerializer.Deserialize<DateTimeOffset>(legacyBytes, migration);
+byte[] updatedBytes = SharpPackSerializer.Serialize(value, migration);
+```
+
+The same context works for `DateTimeOffset[]`, `List<DateTimeOffset>` and
+direct `DateTimeOffset` members in generated classes when you keep the original
+schema. For data stored as a raw `DateTimeOffset?` or inside another raw
+unmanaged struct, migrate that whole shape on the original runtime or with an
+explicit formatter for its layout. The scalar override does not decode those
+raw layouts or the Unity layout. See the
+[reported .NET 9 wire sample](https://github.com/Cysharp/MemoryPack/issues/473).
+
 Define `[SharpPackable]` `class` / `struct` / `record` / `record struct`
 ---
 `[SharpPackable]` can annotate any `class`, `struct`, `record`, `record struct`
