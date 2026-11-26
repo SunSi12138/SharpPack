@@ -1,0 +1,64 @@
+name: Stack formatter benchmarks
+
+on:
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - '.github/workflows/stack-benchmarks.yaml'
+      - 'sandbox/Benchmark/Benchmarks/StackFormatterBenchmark.cs'
+      - 'src/SharpPack.Core/Formatters/CollectionFormatters.cs'
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: '10.0.102'
+      - name: Compare base and candidate on the same runner
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          case_file=sandbox/Benchmark/Benchmarks/StackFormatterBenchmark.cs
+          base="$RUNNER_TEMP/stack-baseline"
+          git worktree add --detach "$base" "$BASE"
+          cp "$case_file" "$base/$case_file"
+          measure() (
+            cd "$1"
+            layout=public
+            if grep -q 'class StackView<' src/SharpPack.Core/Internal/CollectionsMarshalEx.cs; then layout=private; fi
+            echo "Measuring $2 ($layout Stack layout)"
+            SHARPPACK_STACK_BENCHMARK_LAYOUT="$layout" dotnet run --project sandbox/Benchmark -c Release -- \
+              --filter '*StackFormatterBenchmark*' --job Short --exporters json \
+              --artifacts "$RUNNER_TEMP/stack-$2" --stopOnFirstError
+          )
+          measure "$base" base
+          measure "$GITHUB_WORKSPACE" candidate
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+
+          def read(label):
+              results = Path(os.environ['RUNNER_TEMP']) / f'stack-{label}/results'
+              report, = results.glob('*-report-full-compressed.json')
+              return {(case['Method'], case['Parameters']): case
+                      for case in json.loads(report.read_text())['Benchmarks']}
+
+          base, candidate = read('base'), read('candidate')
+          assert base.keys() == candidate.keys() and len(base) == 4
+          for name, prior in base.items():
+              current = candidate[name]
+              before = prior['Statistics']['Mean']
+              after = current['Statistics']['Mean']
+              allocated = [case['Memory']['BytesAllocatedPerOperation'] for case in (prior, current)]
+              print(f'{name}: {before:.1f} -> {after:.1f} ns ({after / before:.2f}x), {allocated} bytes')
+              assert allocated[0] == allocated[1], 'Unexpected steady-state allocation change'
+          PY

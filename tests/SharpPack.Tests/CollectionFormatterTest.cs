@@ -130,6 +130,8 @@ public class CollectionFormatterTest
         var stack = new Stack<int>();
         Push(stack, 1, 2, 3, 4, 5);
         var bin = SharpPackSerializer.Serialize(stack);
+        Assert.Equal(SharpPackSerializer.Serialize(new[] { 1, 2, 3, 4, 5 }), bin);
+        Assert.Equal(new[] { 5, 4, 3, 2, 1 }, stack);
 
         // no ref
         SharpPackSerializer.Deserialize<Stack<int>>(bin).Should().Equal(stack);
@@ -137,7 +139,9 @@ public class CollectionFormatterTest
         // ref and same length
         var stack2 = new Stack<int>();
         Push(stack2, 10, 20, 30, 40, 50);
+        var existing = stack2;
         SharpPackSerializer.Deserialize(bin, ref stack2);
+        Assert.Same(existing, stack2);
         stack2.Should().Equal(stack);
 
         // ref and differenct length
@@ -145,6 +149,48 @@ public class CollectionFormatterTest
         Push(stack3, 99, 98, 97);
         SharpPackSerializer.Deserialize(bin, ref stack3);
         stack3.Should().Equal(stack);
+    }
+
+    [Fact]
+    public void StackOfReferencesKeepsLegacyWireOrderAndNullHeader()
+    {
+        string?[] pushed = ["bottom", null, "top"];
+        var stack = new Stack<string?>(pushed);
+        var context = new SharpPackSerializerContextBuilder().Build();
+
+        var bytes = SharpPackSerializer.Serialize(stack, context);
+        Assert.Equal(SharpPackSerializer.Serialize(pushed, context), bytes);
+        Assert.Equal(SharpPackSerializer.Serialize(stack), bytes);
+        Assert.Equal(new[] { "top", null, "bottom" }, SharpPackSerializer.Deserialize<Stack<string?>>(bytes, context));
+        Assert.Equal(new byte[4], SharpPackSerializer.Serialize(new Stack<string?>()));
+        Assert.Null(SharpPackSerializer.Deserialize<Stack<string?>>(SharpPackSerializer.Serialize<Stack<string?>>(null)));
+    }
+
+    [Fact]
+    public void StackItemOverrideWritesInPushOrderWithoutReplacingOriginalSlots()
+    {
+        var stack = new Stack<int>([1, 2, 3]);
+        var context = new SharpPackSerializerContextBuilder().Register(new StackItemOffsetFormatter()).Build();
+
+        var bytes = SharpPackSerializer.Serialize(stack, context);
+        Assert.Equal(SharpPackSerializer.Serialize(new[] { 11, 12, 13 }), bytes);
+        Assert.Equal(new[] { 3, 2, 1 }, stack);
+        Assert.Equal(new[] { 3, 2, 1 }, SharpPackSerializer.Deserialize<Stack<int>>(bytes, context));
+    }
+
+    sealed class StackItemOffsetFormatter : SharpPackFormatter<int>
+    {
+        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref int value)
+        {
+            value += 10;
+            writer.WriteUnmanaged(value);
+        }
+
+        public override void Deserialize(ref SharpPackReader reader, scoped ref int value)
+        {
+            reader.ReadUnmanaged(out value);
+            value -= 10;
+        }
     }
 
     [Fact]
