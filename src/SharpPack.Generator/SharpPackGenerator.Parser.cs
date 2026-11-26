@@ -50,6 +50,9 @@ public partial class TypeMeta
     DiagnosticDescriptor? ctorInvalid = null;
 
     readonly ReferenceSymbols reference;
+    readonly MemberMeta[] circularWireMembers = [];
+    readonly ISymbol[] circularRequiredMembers = [];
+    readonly bool circularConstructorSetsRequiredMembers;
     public INamedTypeSymbol Symbol { get; set; }
     public GenerateType GenerateType { get; }
     public SerializeLayout SerializeLayout { get; }
@@ -69,6 +72,22 @@ public partial class TypeMeta
     public (ushort Tag, INamedTypeSymbol Type)[] UnionTags { get; }
     public bool IsUseEmptyConstructor => Constructor == null || Constructor.Parameters.IsEmpty;
 
+    internal CircularReadShape? DescribeCircularRead()
+    {
+        if (GenerateType != GenerateType.CircularReference || Symbol.TypeKind != TypeKind.Class)
+            return null;
+
+        var hasInitOnlyMembers = circularWireMembers.Any(static member => member.IsInitOnly);
+        if (!hasInitOnlyMembers && !circularRequiredMembers.Any(IsSerialized))
+            return null;
+
+        return new(NeedsImplicitConstructor: Constructor is null,
+            SetsRequiredMembers: circularRequiredMembers.Length != 0 || circularConstructorSetsRequiredMembers,
+            ReplacesExistingValue: hasInitOnlyMembers);
+    }
+
+    bool IsSerialized(ISymbol member) => circularWireMembers.Any(serialized => serialized.Name == member.Name);
+
     public TypeMeta(INamedTypeSymbol symbol, ReferenceSymbols reference)
         : this(symbol, reference, constructorCandidate: null)
     {
@@ -85,6 +104,17 @@ public partial class TypeMeta
 
         this.TypeName = symbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
         this.Constructor = ChooseConstructor(symbol, reference, constructorCandidate);
+        if (generateType == GenerateType.CircularReference && symbol.TypeKind == TypeKind.Class)
+        {
+            // An override can add required without changing the inherited wire slot.
+            // C# does not allow required members to be hidden.
+            circularRequiredMembers = symbol.GetAllBaseTypes().Prepend(symbol)
+                .SelectMany(static type => type.GetMembers())
+                .Where(static member => member is IPropertySymbol { IsRequired: true } or IFieldSymbol { IsRequired: true })
+                .DistinctBy(static member => member.Name).ToArray();
+            var attribute = reference.Compilation.GetTypeByMetadataName("System.Diagnostics.CodeAnalysis.SetsRequiredMembersAttribute");
+            circularConstructorSetsRequiredMembers = attribute is not null && Constructor?.ContainsAttribute(attribute) == true;
+        }
 
         this.Members = symbol.GetAllMembers() // iterate includes parent type
             .Where(x => x is (IFieldSymbol or IPropertySymbol) and { IsStatic: false, IsImplicitlyDeclared: false, CanBeReferencedByName: true })
@@ -115,6 +145,12 @@ public partial class TypeMeta
             .Select((x, i) => new MemberMeta(x, Constructor, reference, i))
             .OrderBy(x => x.Order)
             .ToArray();
+
+        if (generateType == GenerateType.CircularReference && symbol.TypeKind == TypeKind.Class)
+        {
+            // Match the wire-slot planner: sequential models keep the first member at a duplicate order.
+            circularWireMembers = Members.DistinctBy(static member => member.Order).ToArray();
+        }
 
         this.IsValueType = symbol.IsValueType;
         this.IsUnmanagedType = symbol.IsUnmanagedType;
@@ -281,6 +317,33 @@ public partial class TypeMeta
                 reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CircularReferenceOnlyAllowsParameterlessConstructor, syntax.Identifier.GetLocation(), Symbol.Name));
                 return false;
             }
+
+            if (!IsUnion && Symbol.TypeKind == TypeKind.Class)
+            {
+                foreach (var member in circularWireMembers.Where(static member => member.IsInitOnly))
+                {
+                    var setter = ((IPropertySymbol)member.Symbol).SetMethod!;
+                    if (!reference.Compilation.IsSymbolAccessibleWithin(setter, Symbol, throughType: Symbol))
+                        ReportUninitializableCircularMember(member.Symbol, "the init accessor is not accessible from the generated class");
+                }
+
+                if (!circularConstructorSetsRequiredMembers)
+                {
+                    foreach (var required in circularRequiredMembers)
+                    {
+                        if (!IsSerialized(required))
+                            ReportUninitializableCircularMember(required, "include the required member or initialize it in a parameterless constructor annotated with SetsRequiredMembers");
+                    }
+                }
+            }
+        }
+
+        void ReportUninitializableCircularMember(ISymbol member, string reason)
+        {
+            reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CircularMemberCannotBeInitialized,
+                member.Locations.FirstOrDefault(static location => location.IsInSource) ?? syntax.Identifier.GetLocation(),
+                Symbol.Name, member.Name, reason));
+            noError = false;
         }
 
         // GenerateType.Objector VersionTorelant validation
@@ -364,9 +427,13 @@ public partial class TypeMeta
         }
         else
         {
-            var wireMembers = GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference
-                ? Members.DistinctBy(static member => member.Order).ToArray()
-                : Members;
+            var circularClass = GenerateType == GenerateType.CircularReference && Symbol.TypeKind == TypeKind.Class;
+            var wireMembers = GenerateType switch
+            {
+                GenerateType.CircularReference when circularClass => circularWireMembers,
+                GenerateType.VersionTolerant or GenerateType.CircularReference => Members.DistinctBy(static member => member.Order).ToArray(),
+                _ => Members,
+            };
 
             // check ctor members
             if (this.Constructor != null)
@@ -406,10 +473,11 @@ public partial class TypeMeta
             foreach (var item in wireMembers)
             {
                 if (!item.IsConstructorParameter && item.Symbol is IPropertySymbol property &&
+                    !(circularClass && item.IsInitOnly) &&
                     property.ContainsAttribute(reference.SharpPackIncludeAttribute) &&
                     reference.Compilation.IsSymbolAccessibleWithin(property, Symbol, throughType: Symbol) &&
                     (property.SetMethod is not { } setter ||
-                     GenerateType is GenerateType.CircularReference && !item.IsAssignable ||
+                     GenerateType == GenerateType.CircularReference && !circularClass && !item.IsAssignable ||
                      !reference.Compilation.IsSymbolAccessibleWithin(setter, Symbol, throughType: Symbol)))
                 {
                     reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.IncludedPropertyCannotBePopulated,
@@ -664,6 +732,7 @@ partial class MemberMeta
     public bool IsProperty { get; }
     public bool IsSettable { get; }
     public bool IsAssignable { get; }
+    internal bool IsInitOnly { get; }
     public bool HasExactSizeSafeAccessor { get; }
     public bool IsConstructorParameter { get; }
     public string? ConstructorParameterName { get; }
@@ -741,11 +810,12 @@ partial class MemberMeta
             IsProperty = true;
             IsField = false;
             IsSettable = !p.IsReadOnly;
+            IsInitOnly = p.SetMethod?.IsInitOnly == true;
             IsAssignable = IsSettable
 #if !ROSLYN3
                 && !p.IsRequired
 #endif
-                && (p.SetMethod != null && !p.SetMethod.IsInitOnly);
+                && (p.SetMethod != null && !IsInitOnly);
             MemberType = p.Type;
         }
         else
