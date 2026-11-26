@@ -1,5 +1,4 @@
 diff --git a/Directory.Packages.props b/Directory.Packages.props
-index 7aed96a..dee4cd1 100644
 --- a/Directory.Packages.props
 +++ b/Directory.Packages.props
 @@ -19,7 +19,8 @@
@@ -7,8 +6,8 @@ index 7aed96a..dee4cd1 100644
      <PackageVersion Include="System.Threading.RateLimiting" Version="10.0.14" />
      <!--  第三方依赖  -->
 -    <PackageVersion Include="SharpPack" Version="[1.1.0]" />
-+      <PackageVersion Include="SharpPack" Version="[2.0.0-wireid.1]" />
-+      <PackageVersion Include="SharpPack.Generator" Version="[2.0.0-wireid.1]" />
++    <PackageVersion Include="SharpPack" Version="[2.0.0]" />
++    <PackageVersion Include="SharpPack.Generator" Version="[2.0.0]" />
      <PackageVersion Include="ZstdSharp.Port" Version="[0.8.8]" />
      <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
      <PackageVersion Include="PublicApiGenerator" Version="11.5.4" />

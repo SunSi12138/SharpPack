@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 22
     env:
-      SHARPPACK_VERSION: 2.0.0-wireid.1
+      SHARPPACK_VERSION: 2.0.0
       SHARPLINK_VERSION: 3.0.0-wireid.1
       TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'
     steps:
@@ -32,17 +32,37 @@ jobs:
       - name: Build a private candidate feed and apply the adapter probe
         run: |
           feed="$RUNNER_TEMP/probe-feed"
-          echo "PROBE_FEED=$feed" >> "$GITHUB_ENV"
+          config="$RUNNER_TEMP/probe.NuGet.Config"
           dotnet build src/SharpPack.Core/SharpPack.Core.csproj -c Release -p:Version="$SHARPPACK_VERSION"
           dotnet build src/SharpPack/SharpPack.csproj -c Release -p:Version="$SHARPPACK_VERSION"
           dotnet build src/SharpPack.Streaming/SharpPack.Streaming.csproj -c Release -p:Version="$SHARPPACK_VERSION"
           bash tools/PackageConsumers/pack.sh "$SHARPPACK_VERSION" "$feed"
           git -C sharplink-probe apply --index "$GITHUB_WORKSPACE/eng/validation/sharplink-issue23.patch"
+          cat > "$config" <<EOF
+          <configuration>
+            <packageSources>
+              <clear />
+              <add key="probe" value="$feed" />
+              <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+            </packageSources>
+            <packageSourceMapping>
+              <packageSource key="probe">
+                <package pattern="SharpPack" />
+                <package pattern="SharpPack.*" />
+                <package pattern="SharpLink.Sdk" />
+                <package pattern="SharpLink.Abstractions" />
+              </packageSource>
+              <packageSource key="nuget.org"><package pattern="*" /></packageSource>
+            </packageSourceMapping>
+          </configuration>
+          EOF
+          printf 'PROBE_FEED=%s\nPROBE_NUGET_CONFIG=%s\nNUGET_PACKAGES=%s\n' \
+            "$feed" "$config" "$RUNNER_TEMP/probe-package-cache" >> "$GITHUB_ENV"
       - name: Verify SharpLink codec identity, cross-build wire, routing and diagnostics
         working-directory: sharplink-probe
         run: |
           project=test/SharpLink.Generator.Tests/SharpLink.Generator.Tests.csproj
-          dotnet build "$project" -c Release -p:RestoreAdditionalProjectSources="$PROBE_FEED"
+          dotnet build "$project" -c Release -p:RestoreConfigFile="$PROBE_NUGET_CONFIG"
           for test in \
             TupleLabelsDoNotChangeTheSharpPackCodecIdentity \
             SharpPackSidecarWireShapeShouldAffectCodecHash \
@@ -56,7 +76,7 @@ jobs:
         working-directory: sharplink-probe
         run: |
           dotnet build src/SharpLink.Sdk/SharpLink.Sdk.csproj -c Release \
-            -p:Version="$SHARPLINK_VERSION" -p:RestoreAdditionalProjectSources="$PROBE_FEED"
+            -p:Version="$SHARPLINK_VERSION" -p:RestoreConfigFile="$PROBE_NUGET_CONFIG"
           for name in SharpLink.Abstractions SharpLink.Sdk; do
             dotnet pack "src/$name/$name.csproj" -c Release --no-build \
               -p:Version="$SHARPLINK_VERSION" -o "$PROBE_FEED"
@@ -75,7 +95,7 @@ jobs:
           </Project>
           EOF
           echo 'using SharpLink.Sdk; [RpcSerializable] public sealed partial class PlainDto { public int Count { get; set; } }' > "$app/Probe.cs"
-          dotnet build "$app/SdkProbe.csproj" -c Release -p:RestoreAdditionalProjectSources="$PROBE_FEED"
+          dotnet build "$app/SdkProbe.csproj" -c Release -p:RestoreConfigFile="$PROBE_NUGET_CONFIG"
           test -n "$(find "$app/obj" -name SharpLink.GeneratedCodecs.g.cs -print -quit)"
           ! grep -q '"SharpPack\(\.\|/\)' "$app/obj/project.assets.json"
       - name: Publish and run the real routed RPC NativeAOT smoke
@@ -83,5 +103,5 @@ jobs:
         run: |
           output="$RUNNER_TEMP/sharplink-aot"
           dotnet publish test/SharpLink.SharpPackAotSmoke/SharpLink.SharpPackAotSmoke.csproj \
-            -c Release -r linux-x64 -o "$output" -p:RestoreAdditionalProjectSources="$PROBE_FEED"
+            -c Release -r linux-x64 -o "$output" -p:RestoreConfigFile="$PROBE_NUGET_CONFIG"
           "$output/SharpLink.SharpPackAotSmoke"
