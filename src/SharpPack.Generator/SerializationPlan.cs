@@ -27,7 +27,11 @@ internal sealed record GeneratedNames(
     string WriteWithOverrides,
     string ReadWithOverrides,
     string EnsureAotRoots,
-    string? SelfFactoryRoot);
+    string? SelfFactoryRoot,
+    string CircularReadTag,
+    string CircularFormatter,
+    string WriteCircular,
+    string ReadCircular);
 
 internal sealed record SerializationPlan(
     TypeShape Shape,
@@ -65,7 +69,11 @@ internal static class SerializationPlanner
             AvailableMember("__SharpPackEnsureAotFormatterRoots", facts.MembersAndParameters),
             facts.HasUserStaticInitialization
                 ? null
-                : AvailableFactoryName(GeneratedNameFacts.SelfRootStem, facts.SelfRootIdentifiers));
+                : AvailableFactoryName(GeneratedNameFacts.SelfRootStem, facts.SelfRootIdentifiers),
+            AvailableMember(GeneratedNameFacts.CircularPrefix + "ReadTag", facts.CircularIdentifiers),
+            AvailableMember(GeneratedNameFacts.CircularPrefix + "Formatter", facts.CircularIdentifiers),
+            AvailableMember(GeneratedNameFacts.CircularPrefix + "Serialize", facts.CircularIdentifiers),
+            AvailableMember(GeneratedNameFacts.CircularPrefix + "Deserialize", facts.CircularIdentifiers));
 
     static string AvailableMember(string stem, EquatableArray<string> names)
     {

@@ -7,9 +7,11 @@ namespace SharpPack.Generator;
 internal readonly record struct GeneratedNameFacts(
     EquatableArray<string> MembersAndParameters,
     EquatableArray<string> SelfRootIdentifiers,
+    EquatableArray<string> CircularIdentifiers,
     bool HasUserStaticInitialization)
 {
     internal const string SelfRootStem = "__SharpPackPreserveSelfFactoryRoots";
+    internal const string CircularPrefix = "__SharpPackCircular";
 
     internal static string ChooseWriterTypeParameter(INamedTypeSymbol type)
     {
@@ -32,7 +34,7 @@ internal readonly record struct GeneratedNameFacts(
     internal static GeneratedNameFacts CaptureForNativeUnion(INamedTypeSymbol type)
         => default(GeneratedNameFacts) with { SelfRootIdentifiers = CaptureFactoryIdentifiers(type, SelfRootStem) };
 
-    internal static GeneratedNameFacts Capture(INamedTypeSymbol type, MemberMeta[] members)
+    internal static GeneratedNameFacts Capture(INamedTypeSymbol type, MemberMeta[] members, bool hasCircularCodec)
     {
         var memberNames = type.GetAllMembers().Select(static member => member.Name)
             .Where(IsReservedHelperName).ToArray();
@@ -42,6 +44,7 @@ internal readonly record struct GeneratedNameFacts(
             OrderedNames(memberNames.Concat(type.TypeParameters.Select(static parameter => parameter.Name)
                 .Where(IsReservedHelperName))),
             hasStaticInitialization ? default : CaptureFactoryIdentifiers(type, SelfRootStem, memberNames),
+            hasCircularCodec ? CaptureFactoryIdentifiers(type, CircularPrefix, memberNames) : default,
             hasStaticInitialization);
     }
 
@@ -56,6 +59,10 @@ internal readonly record struct GeneratedNameFacts(
             StringComparer.Ordinal);
         if (type.Name.StartsWith(stem, StringComparison.Ordinal))
             names.Add(type.Name);
+        for (INamedTypeSymbol? enclosing = type; enclosing is not null; enclosing = enclosing.ContainingType)
+            foreach (var parameter in enclosing.TypeParameters)
+                if (parameter.Name.StartsWith(stem, StringComparison.Ordinal))
+                    names.Add(parameter.Name);
         foreach (var reference in type.DeclaringSyntaxReferences)
         foreach (var token in reference.GetSyntax().DescendantTokens())
         {
