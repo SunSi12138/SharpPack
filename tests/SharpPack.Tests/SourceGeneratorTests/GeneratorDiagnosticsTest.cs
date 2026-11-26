@@ -771,5 +771,13 @@ public partial struct Tester
             }
             [SharpPackable] public partial class Child : Parent;
             """);
+
+        Compile(50, """
+            [SharpPackable(GenerateType.CircularReference, SerializeLayout.Sequential)]
+            public partial record struct CircularValue
+            {
+                [SharpPackInclude] public required string Label { get; set; }
+            }
+            """);
     }
 }

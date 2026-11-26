@@ -427,9 +427,10 @@ public partial class TypeMeta
         }
         else
         {
+            var circularClass = GenerateType == GenerateType.CircularReference && Symbol.TypeKind == TypeKind.Class;
             var wireMembers = GenerateType switch
             {
-                GenerateType.CircularReference when Symbol.TypeKind == TypeKind.Class => circularWireMembers,
+                GenerateType.CircularReference when circularClass => circularWireMembers,
                 GenerateType.VersionTolerant or GenerateType.CircularReference => Members.DistinctBy(static member => member.Order).ToArray(),
                 _ => Members,
             };
@@ -472,10 +473,11 @@ public partial class TypeMeta
             foreach (var item in wireMembers)
             {
                 if (!item.IsConstructorParameter && item.Symbol is IPropertySymbol property &&
-                    !(GenerateType == GenerateType.CircularReference && Symbol.TypeKind == TypeKind.Class && item.IsInitOnly) &&
+                    !(circularClass && item.IsInitOnly) &&
                     property.ContainsAttribute(reference.SharpPackIncludeAttribute) &&
                     reference.Compilation.IsSymbolAccessibleWithin(property, Symbol, throughType: Symbol) &&
                     (property.SetMethod is not { } setter ||
+                     GenerateType == GenerateType.CircularReference && !circularClass && !item.IsAssignable ||
                      !reference.Compilation.IsSymbolAccessibleWithin(setter, Symbol, throughType: Symbol)))
                 {
                     reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.IncludedPropertyCannotBePopulated,
