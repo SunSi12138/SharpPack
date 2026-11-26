@@ -87,7 +87,7 @@ internal sealed class SidecarGraph
             return Unsupported("the type must be closed, non-ref-like, and usable as a generic argument");
         }
 
-        if (!HasGlobalTypeName(type))
+        if (!type.HasGlobalTypeName(compilation, accessibleWithin, cancellationToken))
             return Unsupported("the type has no unambiguous, accessible global C# name");
 
         if (type is IArrayTypeSymbol array)
@@ -201,27 +201,6 @@ internal sealed class SidecarGraph
             SymbolEqualityComparer.Default.Equals(candidate.OriginalDefinition, definition) &&
             SymbolEqualityComparer.Default.Equals(candidate.TypeArguments[0], type));
 
-    bool HasGlobalTypeName(ITypeSymbol type)
-    {
-        if (type is IArrayTypeSymbol array) return HasGlobalTypeName(array.ElementType);
-        if (CanonicalType(type) is not INamedTypeSymbol named || !named.CanBeReferencedByName ||
-            !compilation.IsSymbolAccessibleWithin(named, accessibleWithin) ||
-            !named.TypeArguments.All(HasGlobalTypeName))
-            return false;
-
-        for (var enclosing = named.ContainingType; enclosing is not null; enclosing = enclosing.ContainingType)
-            if (!enclosing.TypeArguments.All(HasGlobalTypeName)) return false;
-        return SymbolEqualityComparer.Default.Equals(compilation.GetTypeByMetadataName(MetadataName(named)), named.OriginalDefinition);
-    }
-
-    static string MetadataName(INamedTypeSymbol named)
-    {
-        var name = named.MetadataName;
-        for (var enclosing = named.ContainingType; enclosing is not null; enclosing = enclosing.ContainingType)
-            name = enclosing.MetadataName + "+" + name;
-        return named.ContainingNamespace.IsGlobalNamespace ? name : named.ContainingNamespace.ToDisplayString() + "." + name;
-    }
-
     UnsupportedFormatterShape? CheckHiddenMetadata(INamedTypeSymbol type)
     {
         if (type.Locations.Any(static location => location.IsInSource)) return null;
@@ -230,7 +209,7 @@ internal sealed class SidecarGraph
         // at the reachable type definition, not all types of its assembly.
         var all = completeMetadata ??= new ReferenceSymbols(
             compilation.WithOptions(compilation.Options.WithMetadataImportOptions(MetadataImportOptions.All)));
-        var definition = all.Compilation.GetTypeByMetadataName(MetadataName(type));
+        var definition = all.Compilation.GetTypeByMetadataName(type.GetFullMetadataName());
         if (definition is null) return null;
 
         if (definition.InstanceConstructors.Any(constructor =>
