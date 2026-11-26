@@ -179,13 +179,13 @@ def assets(path, expected, *, core_framework=None):
 
 
 def consumer(path, feed, references, expected, env, architecture, *, aot=False, mismatch=False,
-             framework="net10.0"):
+             framework="net10.0", sources=None):
     project(path, package_references(references),
             "<DefineConstants>STREAMING</DefineConstants>" if STREAMING in references else "", framework=framework)
-    for name in ("Model.cs", "Program.cs"):
+    if sources is None:
+        sources = ("Model.cs", "Program.cs", "Net11.cs") if framework == "net11.0" else ("Model.cs", "Program.cs")
+    for name in sources:
         shutil.copyfile(HERE / name, path / name)
-    if framework == "net11.0":
-        shutil.copyfile(HERE / "Net11.cs", path / "Net11.cs")
     cache = path / "packages"
     local_env = dict(env, NUGET_PACKAGES=str(cache))
     config = nuget_config(path / "NuGet.Config", feed, network=aot)
@@ -610,6 +610,10 @@ def main():
                  framework="net11.0", aot=True)
         verify_artifact_tooling(net11 / "artifact-tooling", feed, version, env, framework="net11.0", smoke_only=True)
         verify_native_union_diagnostics(net11 / "native-union-diagnostics", feed, version, env)
+        consumer(work / "deserialize-array-aot", feed, runtime, runtime, env, args.architecture,
+                 aot=True, sources=("DeserializeArray.cs",))
+        consumer(net11 / "deserialize-array-aot", feed, aggregate, runtime | aggregate, env, args.architecture,
+                 framework="net11.0", aot=True, sources=("DeserializeArray.cs",))
 
         if args.compatibility:
             verify_sidecar_integration(work, feed, current_cache, version, env)
