@@ -1,0 +1,49 @@
+name: External formatter benchmarks
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - '.github/workflows/sidecar-benchmarks.yaml'
+      - 'sandbox/Benchmark/Benchmarks/SidecarFormatterBenchmark.cs'
+      - 'sandbox/SidecarFixture/**'
+      - 'src/SharpPack.Generator/**Sidecar**'
+      - 'src/SharpPack.Generator/ExternalObjectModel.cs'
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: '10.0.102'
+      - name: Compare registered sidecar and generated source type
+        run: |
+          dotnet run --project sandbox/Benchmark -c Release -- \
+            --filter '*SidecarFormatterBenchmark*' --job Short --exporters json \
+            --artifacts "$RUNNER_TEMP/sidecar-bdn" --stopOnFirstError
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          reports = list((Path(os.environ["RUNNER_TEMP"]) / "sidecar-bdn/results").glob("*-report-full-compressed.json"))
+          cases = {case["Method"]: case for report in reports for case in json.loads(report.read_text())["Benchmarks"]}
+          assert set(cases) == {"SourceRead", "SidecarRead", "SourceWrite", "SidecarWrite"}, cases.keys()
+          for operation in ("Read", "Write"):
+              source, sidecar = cases["Source" + operation], cases["Sidecar" + operation]
+              assert source["Statistics"]["N"] > 0 and sidecar["Statistics"]["N"] > 0
+              source_alloc, sidecar_alloc = (case["Memory"]["BytesAllocatedPerOperation"] for case in (source, sidecar))
+              print(f"{operation}: sidecar/source mean={sidecar['Statistics']['Mean'] / source['Statistics']['Mean']:.3f}; "
+                    f"allocated bytes={sidecar_alloc}/{source_alloc}")
+              assert sidecar_alloc == source_alloc, "Unexpected dispatch allocation difference"
+          PY

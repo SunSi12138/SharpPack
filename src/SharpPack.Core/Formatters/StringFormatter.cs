@@ -171,7 +171,7 @@ public sealed class BrotliStringFormatter : SharpPackFormatter<string>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override void Deserialize(ref SharpPackReader reader, scoped ref string? value)
     {
-        if (!reader.DangerousTryReadCollectionHeader(out var length))
+        if (!reader.TryReadLengthHeader(out var length))
         {
             value = null;
             return;
@@ -215,11 +215,11 @@ public sealed class BrotliStringFormatter : SharpPackFormatter<string>
                         var status = decoder.Decompress(src, destination, out var bytesConsumed, out var bytesWritten);
                         if (status != OperationStatus.Done)
                         {
-                            SharpPackSerializationException.ThrowCompressionFailed(status);
+                            SharpPackSerializationException.ThrowInvalidCompressedPayload(status);
                         }
                         if (bytesWritten != state.byteLength)
                         {
-                            SharpPackSerializationException.ThrowCompressionFailed();
+                            SharpPackSerializationException.ThrowInvalidCompressedPayload();
                         }
 
                         *(int*)state.Item4 = bytesConsumed;
@@ -253,11 +253,11 @@ public sealed class BrotliStringFormatter : SharpPackFormatter<string>
                     }
                     if (status != OperationStatus.Done)
                     {
-                        SharpPackSerializationException.ThrowCompressionFailed(status);
+                        SharpPackSerializationException.ThrowInvalidCompressedPayload(status);
                     }
                     if (!destination.IsEmpty)
                     {
-                        SharpPackSerializationException.ThrowCompressionFailed();
+                        SharpPackSerializationException.ThrowInvalidCompressedPayload();
                     }
 
                     *(int*)state.Item2 = totalConsumed;

@@ -1,0 +1,624 @@
+#!/usr/bin/env python3
+"""Verify the already-packed release directory. No package publication."""
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import tarfile
+import tempfile
+import xml.etree.ElementTree as ET
+from xml.sax.saxutils import escape
+import zipfile
+
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
+CORE = "SharpPack.Core"
+GENERATOR = "SharpPack.Generator"
+STREAMING = "SharpPack.Streaming"
+AGGREGATE = "SharpPack"
+RUNTIME_FRAMEWORKS = {CORE: ("net10.0", "net11.0"), STREAMING: ("net10.0",)}
+SYMBOLS = tuple(RUNTIME_FRAMEWORKS)
+PACKAGES = (CORE, GENERATOR, STREAMING, AGGREGATE)
+PREVIOUS = "1.1.0"
+ROSLYN_HOSTS = ("5.0.0", "5.6.0")
+NUGET = "https://api.nuget.org/v3/index.json"
+
+
+def run(args, cwd, env, expected_success=True):
+    result = subprocess.run(args, cwd=cwd, env=env, text=True,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if (result.returncode == 0) != expected_success:
+        print(result.stdout[-12000:], flush=True)
+        raise RuntimeError(f"Unexpected exit {result.returncode} in {cwd.name}: {' '.join(args)}")
+    return result.stdout
+
+
+def normalized_version(version):
+    # NuGet removes build metadata, normalizes zero padding, and compares
+    # prerelease identifiers case-insensitively.
+    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+){0,3})(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?", version)
+    if match is None:
+        raise RuntimeError(f"Invalid NuGet version: {version}")
+    number, suffix = match.groups()
+    parts = [int(part) for part in number.split(".")]
+    parts += [0] * (3 - len(parts))
+    if len(parts) == 4 and parts[-1] == 0:
+        parts.pop()
+    return ".".join(map(str, parts)) + (f"-{suffix.lower()}" if suffix else "")
+
+
+def inspect_feed(feed, version):
+    expected = {(name, ".nupkg") for name in PACKAGES} | {(name, ".snupkg") for name in SYMBOLS}
+    found = {}
+    for path in sorted(feed.iterdir()):
+        if not path.is_file() or path.is_symlink() or path.suffix not in {".nupkg", ".snupkg"}:
+            raise RuntimeError(f"Unexpected entry in release feed: {path.name}")
+        with zipfile.ZipFile(path) as archive:
+            names = archive.namelist()
+            manifests = [name for name in names if name.endswith(".nuspec")]
+            if len(names) != len(set(names)) or len(manifests) != 1:
+                raise RuntimeError(f"Invalid package inventory: {path.name}")
+            metadata = ET.fromstring(archive.read(manifests[0])).find("{*}metadata")
+            if metadata is None:
+                raise RuntimeError(f"Missing package metadata: {path.name}")
+            name = metadata.findtext("{*}id")
+            identity = (name, path.suffix)
+            if (identity not in expected or identity in found or
+                    normalized_version(metadata.findtext("{*}version", default="")) != version):
+                raise RuntimeError(f"Unexpected package identity or version: {path.name}")
+            if name == STREAMING:
+                dependencies = metadata.findall(".//{*}dependency")
+                core = dependencies[0] if len(dependencies) == 1 and dependencies[0].get("id") == CORE else None
+                exact = None if core is None else re.fullmatch(r"\[([^,\[\]]+)\]", core.get("version", ""))
+                if exact is None or normalized_version(exact[1]) != version:
+                    raise RuntimeError(f"{path.name} must depend on {CORE} [{version}]")
+
+            payload = {item for item in names if item != manifests[0]
+                       and item not in {"[Content_Types].xml", "_rels/.rels"}
+                       and not item.startswith("package/services/metadata/core-properties/")}
+            if path.suffix == ".snupkg":
+                symbols = runtime_paths(name, "pdb")
+                if payload != symbols or any(archive.getinfo(pdb).file_size == 0 for pdb in symbols):
+                    raise RuntimeError(f"Missing or unexpected symbol payload: {path.name}")
+            else:
+                validate_package_payload(name, payload, metadata)
+                if name == GENERATOR:
+                    tool = json.loads(archive.read("tools/net10.0/SharpPack.Tooling.runtimeconfig.json"))
+                    if tool["runtimeOptions"].get("rollForward") != "Major":
+                        raise RuntimeError("Artifact tooling must run when only a newer .NET runtime is installed")
+            found[identity] = path
+    if set(found) != expected:
+        raise RuntimeError(f"Missing release packages: {sorted(expected - set(found))}")
+    print(f"Verified package identity, analyzer/runtime layout, symbols and Streaming lockstep: {version}", flush=True)
+    return {name: found[(name, ".nupkg")] for name in PACKAGES}
+
+
+def runtime_paths(name, extension):
+    return {f"lib/{framework}/{name}.{extension}" for framework in RUNTIME_FRAMEWORKS.get(name, ())}
+
+
+def validate_package_payload(name, payload, metadata):
+    required = {"README.md", "Icon.png", "NOTICE"}
+    assemblies = {item for item in payload if item.endswith(".dll")}
+    expected_runtime = runtime_paths(name, "dll")
+    required |= expected_runtime | runtime_paths(name, "xml")
+    if name == GENERATOR:
+        tool = "tools/net10.0/SharpPack.Tooling"
+        required |= {f"buildTransitive/{name}.targets", f"buildMultiTargeting/{name}.targets", f"{tool}.dll",
+                     f"{tool}.deps.json", f"{tool}.runtimeconfig.json"}
+        analyzers = assemblies - {f"{tool}.dll"}
+        if f"analyzers/dotnet/cs/{name}.dll" not in analyzers or not all(
+                item.startswith("analyzers/dotnet/cs/") for item in analyzers):
+            raise RuntimeError("Generator does not have the expected analyzer placement")
+    elif assemblies != expected_runtime:
+        raise RuntimeError(f"{name} contains unexpected runtime assemblies")
+    if (not required <= payload or any(item.endswith(".pdb") for item in payload)
+            or metadata.findtext("{*}license") != "MIT"):
+        raise RuntimeError(f"{name} is missing package content or contains loose symbols")
+
+
+def nuget_config(path, feed=None, network=False):
+    config = ET.Element("configuration")
+    sources = ET.SubElement(config, "packageSources")
+    ET.SubElement(sources, "clear")
+    ET.SubElement(ET.SubElement(config, "fallbackPackageFolders"), "clear")
+    if feed is not None:
+        ET.SubElement(sources, "add", key="artifact", value=str(feed))
+    if network:
+        ET.SubElement(sources, "add", key="nuget", value=NUGET)
+    if feed is not None and network:
+        mapping = ET.SubElement(config, "packageSourceMapping")
+        ET.SubElement(ET.SubElement(mapping, "packageSource", key="artifact"),
+                      "package", pattern="SharpPack*")
+        ET.SubElement(ET.SubElement(mapping, "packageSource", key="nuget"),
+                      "package", pattern="*")
+    ET.ElementTree(config).write(path, encoding="unicode")
+    return path
+
+
+def project(path, items, properties="", targets="", *, framework="net10.0"):
+    path.mkdir()
+    language = "15.0" if framework == "net11.0" else "14.0"
+    (path / "Consumer.csproj").write_text(f"""<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>{framework}</TargetFramework><OutputType>Exe</OutputType>
+    <LangVersion>{language}</LangVersion><ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks><Nullable>enable</Nullable>
+    {properties}
+  </PropertyGroup>
+  <ItemGroup>{items}</ItemGroup>
+  {targets}
+</Project>
+""")
+
+
+def package_references(versions):
+    return "".join(f'<PackageReference Include="{name}" Version="[{version}]" />'
+                   for name, version in versions.items())
+
+
+def assets(path, expected, *, core_framework=None):
+    lock = json.loads((path / "obj/project.assets.json").read_text())
+    if {Path(root).resolve() for root in lock["packageFolders"]} != {(path / "packages").resolve()}:
+        raise RuntimeError(f"{path.name} used a package folder outside its isolated cache")
+    libraries = lock["libraries"]
+    packages = (key.split("/", 1) for key in libraries if key.startswith("SharpPack"))
+    resolved = {(name, normalized_version(version)) for name, version in packages}
+    if any(item["type"] != "package" for item in libraries.values()) or resolved != set(expected.items()):
+        raise RuntimeError(f"{path.name} resolved unexpected dependencies: {libraries.keys()}")
+    if core_framework is not None:
+        core_key = next(key for key in libraries if key.split("/", 1)[0] == CORE)
+        core = lock["targets"][core_framework][core_key]
+        selected = f"lib/{core_framework}/{CORE}.dll"
+        if set(core.get("compile", {})) != {selected} or set(core.get("runtime", {})) != {selected}:
+            raise RuntimeError(f"{path.name} did not select the {core_framework} Core asset")
+
+
+def consumer(path, feed, references, expected, env, architecture, *, aot=False, mismatch=False,
+             framework="net10.0", sources=None):
+    project(path, package_references(references),
+            "<DefineConstants>STREAMING</DefineConstants>" if STREAMING in references else "", framework=framework)
+    if sources is None:
+        sources = ("Model.cs", "Program.cs", "Net11.cs") if framework == "net11.0" else ("Model.cs", "Program.cs")
+    for name in sources:
+        shutil.copyfile(HERE / name, path / name)
+    cache = path / "packages"
+    local_env = dict(env, NUGET_PACKAGES=str(cache))
+    config = nuget_config(path / "NuGet.Config", feed, network=aot)
+    if aot:
+        output = path / "native"
+        log = run(["dotnet", "publish", "-c", "Release", "-p:PublishAot=true",
+                   "--configfile", str(config), "-o", str(output)], path, local_env)
+        for warning in sorted({line for line in log.splitlines() if re.search(r"\bwarning IL\d+", line)}):
+            print(f"{path.name}: {warning}", flush=True)
+        assets(path, expected, core_framework=framework)
+        executable = output / ("Consumer.exe" if os.name == "nt" else "Consumer")
+        run([str(executable), architecture], path, local_env)
+    else:
+        run(["dotnet", "restore", "--configfile", str(config)], path, local_env)
+        assets(path, expected, core_framework=framework)
+        if mismatch:
+            log = run(["dotnet", "build", "-c", "Release", "--no-restore", "--nologo"],
+                      path, local_env, expected_success=False)
+            diagnostics = {line.split(" : ", 1)[0] for line in log.splitlines()
+                           if "error SHARPPACK043" in line}
+            if (len(diagnostics) != 1 or "Model.cs(" not in next(iter(diagnostics))
+                    or "ABI 'missing'" not in log or "[1, 1]" not in log
+                    or re.search(r"\b(?:error|warning) CS\d+\b", log)):
+                raise RuntimeError(f"Expected a single ABI error on the model:\n{log}")
+        else:
+            run(["dotnet", "run", "-c", "Release", "--no-restore", "--", architecture], path, local_env)
+    print(f"{framework} {path.name}: {'SHARPPACK043 as expected' if mismatch else 'packaged round trip passed'}",
+          flush=True)
+    return cache
+
+
+def verify_artifact_tooling(path, feed, version, env, *, framework="net10.0", smoke_only=False):
+    options = {
+        "TypeScriptOutputDirectory": "$(ArtifactOutput)",
+        "SerializationInfoOutputDirectory": "$(ArtifactOutput)",
+        "TypeScriptImportExtension": ".mjs",
+        "TypeScriptConvertPropertyName": "false",
+        "TypeScriptEnableNullableTypes": "true",
+    }
+    project(path, package_references({AGGREGATE: version}), targets="""
+    <Target Name="DisableFixturePlan" AfterTargets="_SharpPackPrepareArtifacts" Condition="'$(DisableFixturePlan)' == 'true'">
+      <PropertyGroup><SharpPackGenerator_ArtifactMode>none</SharpPackGenerator_ArtifactMode></PropertyGroup>
+    </Target>
+    """, framework=framework)
+    artifact_options = "".join(f"<SharpPackGenerator_{name}>{value}</SharpPackGenerator_{name}>"
+                               for name, value in options.items())
+    (path / "Directory.Build.targets").write_text(f"""<Project>
+    <PropertyGroup>
+        {artifact_options}
+        <SharpPackToolingEnabled Condition="'$(DisableFixtureArtifacts)' == 'true' and '$(SharpPackToolingEnabled)' == ''">false</SharpPackToolingEnabled>
+    </PropertyGroup>
+</Project>
+""")
+    shutil.copyfile(HERE / "ArtifactModel.cs", path / "Model.cs")
+    (path / "Program.cs").write_text("""using SharpPack;
+var value = new ArtifactFixture.Delivery { DeliveryNote = "sent" };
+if (SharpPackSerializer.Deserialize<ArtifactFixture.Delivery>(SharpPackSerializer.Serialize(value))?.DeliveryNote != "sent")
+    throw new InvalidOperationException();
+""")
+    extra = path / "Extra.cs"
+    extra.write_text("""using SharpPack;
+namespace ArtifactFixture;
+[SharpPackable, GenerateTypeScript] public partial class Retired { public int Count { get; set; } }
+[SharpPackable, GenerateTypeScript] public partial class Edited { public int Count { get; set; } }
+""")
+    local_env = dict(env, NUGET_PACKAGES=str(path / "packages"))
+    config = nuget_config(path / "NuGet.Config", feed)
+    run(["dotnet", "restore", "--configfile", str(config)], path, local_env)
+    assets(path, {name: version for name in (CORE, GENERATOR, AGGREGATE)})
+
+    def build(output, *properties, error=None):
+        log = run(["dotnet", "build", "-c", "Release", "--no-restore", "--nologo",
+                   f"-p:ArtifactOutput={output}", *properties],
+                  path, local_env, expected_success=error is None)
+        if error is not None and error not in log:
+            raise RuntimeError(f"Expected artifact build failure '{error}':\n{log}")
+
+    def files(output):
+        return {item.name: item.read_bytes() for item in output.iterdir() if not item.name.startswith(".")}
+
+    disabled = path / "Disabled 输出"
+    build(disabled, "-p:DisableFixtureArtifacts=true",
+          f"-p:SharpPackGenerator_SerializationInfoOutputDirectory={disabled}")
+    if disabled.exists():
+        raise RuntimeError("An ordinary C# build with artifact tooling disabled wrote artifacts")
+
+    output = path / "Build 输出"
+    build(output)
+    baseline = files(output)
+    expected = {"Delivery.ts", "DeliveryState.ts", "INotice.ts", "Edited.ts", "Retired.ts",
+                "SharpPackReader.ts", "SharpPackWriter.ts", "ArtifactFixture.Delivery.txt",
+                "ArtifactFixture.Edited.txt", "ArtifactFixture.Retired.txt"}
+    if (baseline.keys() != expected or b"SharpPackReader.mjs" not in baseline["Delivery.ts"]
+            or any(not contents or contents.startswith(b"\xef\xbb\xbf") for contents in baseline.values())):
+        raise RuntimeError(f"Default tooling produced unexpected files or encoding: {baseline.keys()}")
+    run(["dotnet", str(path / f"bin/Release/{framework}/Consumer.dll")], path, local_env)
+    if smoke_only:
+        print(f"{framework} packaged artifact tooling generated files and ran", flush=True)
+        return
+
+    journal = output / ".sharppack-artifacts.json"
+    timestamps = {item.name: item.stat().st_mtime_ns for item in output.iterdir()}
+    build(output)
+    if files(output) != baseline or timestamps != {item.name: item.stat().st_mtime_ns for item in output.iterdir()}:
+        raise RuntimeError("An unchanged build rewrote its generated artifacts")
+
+    plan, = (path / "obj").rglob("SharpPack.ToolingArtifacts.g.cs")
+    plan.unlink()
+    (output / "Delivery.ts").unlink()
+    manifest = json.loads(journal.read_text(encoding="utf-8"))
+    journal.write_text(json.dumps(dict(manifest, Pending=manifest["Committed"])), encoding="utf-8")
+    custom_runtime = b"// custom runtime\n"
+    (output / "SharpPackReader.ts").write_bytes(custom_runtime)
+    build(output)
+    recovered = {**baseline, "SharpPackReader.ts": custom_runtime}
+    if not plan.is_file() or json.loads(journal.read_text(encoding="utf-8"))["Pending"] is not None or files(output) != recovered:
+        raise RuntimeError("A missing plan or interrupted artifact write did not recover")
+
+    build(output, "-p:DisableFixturePlan=true", error="did not write a fresh artifact plan")
+    if plan.exists() or files(output) != recovered:
+        raise RuntimeError("The build used a stale plan from an earlier compilation")
+
+    # Copy only generated files, not ownership state, to simulate an existing output directory.
+    legacy = path / "Legacy 输出"
+    legacy.mkdir()
+    for name, contents in baseline.items():
+        (legacy / name).write_bytes(contents)
+    build(legacy, error="is not owned by SharpPack")
+    build(legacy, "-p:SharpPackToolingAdoptExisting=true")
+    if files(legacy) != baseline:
+        raise RuntimeError("Explicit adoption changed matching legacy output")
+
+    (output / "Edited.ts").write_bytes(b"// edited by the user\n")
+    (output / "Unrelated.ts").write_bytes(b"// never owned by SharpPack\n")
+    extra.unlink()
+    build(output)
+    retained = files(output)
+    if ({"Retired.ts", "ArtifactFixture.Retired.txt", "ArtifactFixture.Edited.txt"} & retained.keys()
+            or retained.get("Edited.ts") != b"// edited by the user\n"
+            or retained.get("SharpPackReader.ts") != custom_runtime
+            or retained.get("Unrelated.ts") != b"// never owned by SharpPack\n"):
+        raise RuntimeError("Stale cleanup did not honor file ownership and edits")
+
+    design = path / "Design time 输出"
+    build(design, "-p:DesignTimeBuild=true", "-p:SkipCompilerExecution=true")
+    if design.exists():
+        raise RuntimeError("A design-time build wrote tooling artifacts")
+    previous_manifest = journal.read_bytes()
+    extra.write_text("#error Artifact fixture intentionally does not compile\n")
+    build(output, error="error CS1029")
+    if files(output) != retained or journal.read_bytes() != previous_manifest:
+        raise RuntimeError("A failed compilation changed tooling artifacts")
+    print("Default artifact tooling: output, reproducible rebuilds, ownership and recovery verified", flush=True)
+
+
+def verify_multitargeted_artifacts(path, feed, version, env):
+    project(path, f"""<PackageReference Include="{AGGREGATE}" Version="[{version}]"
+             Condition="'$(TargetFramework)' == 'net10.0'" />""", """
+    <TargetFramework />
+    <TargetFrameworks>net10.0;net10.0-windows</TargetFrameworks>
+    <OutputType>Library</OutputType>
+    """, targets="""
+    <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0' and '$(DisableFixtureArtifacts)' != 'true'">
+      <SharpPackGenerator_TypeScriptOutputDirectory>Generated 输出</SharpPackGenerator_TypeScriptOutputDirectory>
+    </PropertyGroup>
+    """)
+    model = path / "Model.cs"
+    model.write_text("#if !WINDOWS\n" + (HERE / "ArtifactModel.cs").read_text() + "\n#endif\n")
+    error = path / "OnlyWindows.cs"
+    fail_windows = "#if WINDOWS\n#error Windows framework fixture intentionally fails\n#endif\n"
+    error.write_text(fail_windows)
+    local_env = dict(env, NUGET_PACKAGES=str(path / "packages"))
+    config = nuget_config(path / "NuGet.Config", feed)
+    run(["dotnet", "restore", "--configfile", str(config)], path, local_env)
+    output = path / "Generated 输出"
+    build = ["dotnet", "build", "-c", "Release", "--no-restore", "--nologo", "-m:1"]
+
+    def failed_multi_build():
+        log = run(build, path, local_env, expected_success=False)
+        if "error CS1029" not in log or "Windows framework fixture intentionally fails" not in log:
+            raise RuntimeError(f"Expected only the Windows framework to fail:\n{log}")
+
+    failed_multi_build()
+    if output.exists():
+        raise RuntimeError("The selected framework published before the full build succeeded")
+    error.unlink()
+    run(build, path, local_env)
+    artifact = output / "Delivery.ts"
+    previous = artifact.read_bytes()
+    model.write_text(model.read_text().replace("DeliveryNote", "UpdatedNote"))
+    error.write_text(fail_windows)
+    failed_multi_build()
+    if artifact.read_bytes() != previous:
+        raise RuntimeError("A failed multi-target build changed the previous artifacts")
+    run([*build, "-f", "net10.0"], path, local_env)
+    if b"updatedNote" not in artifact.read_bytes():
+        raise RuntimeError("An explicit successful framework build did not write artifacts")
+    error.unlink()
+    run([*build, "-p:DisableFixtureArtifacts=true"], path, local_env)
+    if b"updatedNote" not in artifact.read_bytes():
+        raise RuntimeError("The outer build changed artifacts despite no configured inner output")
+    print("Artifact tooling: full-build and explicit-framework commit boundaries verified", flush=True)
+
+
+def pack(name, version, feed, env, *, source=ROOT, existing_build=False):
+    options = ["--no-build"] if existing_build else []
+    run(["dotnet", "pack", str(source / "src" / name / f"{name}.csproj"),
+         "-c", "Release", f"-p:Version={version}", "-o", str(feed), *options], source, env)
+
+
+def previous_packages(work, feed, env):
+    source = work / "previous"
+    archive = work / "previous.tar"
+    with archive.open("wb") as stream:
+        subprocess.run(["git", "archive", f"v{PREVIOUS}"], cwd=ROOT, stdout=stream, check=True)
+    with tarfile.open(archive) as tree:
+        tree.extractall(source, filter="data")
+    for name in (CORE, GENERATOR):
+        pack(name, PREVIOUS, feed, env, source=source)
+
+
+def verify_roslyn_hosts(work, current_cache, previous_cache, version, env):
+    core_library = f"lib/net10.0/{CORE}.dll"
+    current_core = current_cache / CORE.lower() / version / core_library
+    previous_core = previous_cache / CORE.lower() / PREVIOUS / core_library
+    generator = current_cache / GENERATOR.lower() / version / f"analyzers/dotnet/cs/{GENERATOR}.dll"
+    config = nuget_config(work / "Roslyn.NuGet.Config", network=True)
+    sources = []
+    for host in ROSLYN_HOSTS:
+        path = work / f"roslyn-{host}"
+        references = (
+            package_references({"Microsoft.CodeAnalysis.CSharp": host})
+            + f'<Reference Include="{GENERATOR}"><HintPath>{escape(str(generator))}</HintPath></Reference>'
+        )
+        project(path, references)
+        shutil.copyfile(HERE / "RoslynHost.cs", path / "Program.cs")
+        local_env = dict(env, NUGET_PACKAGES=str(path / "packages"))
+        run(["dotnet", "restore", "--configfile", str(config)], path, local_env)
+        run(["dotnet", "build", "-c", "Release", "--no-restore"], path, local_env)
+        cmd = ["dotnet", str(path / "bin/Release/net10.0/Consumer.dll"), f"{host}.0"]
+        output = path / "generated.txt"
+        print(run([*cmd, str(current_core), str(HERE / "Model.cs"), str(output)], path, local_env).strip(), flush=True)
+        print(run([*cmd, str(previous_core), str(HERE / "Model.cs"), "mismatch"], path, local_env).strip(), flush=True)
+        sources.append(output.read_text())
+    if sources[0] != sources[1]:
+        raise RuntimeError("The isolated Roslyn hosts generated different source")
+    print("Minimum and current Roslyn hosts generated identical source", flush=True)
+
+
+def verify_sidecar_integration(work, feed, current_cache, version, env):
+    generator = current_cache / GENERATOR.lower() / version / f"analyzers/dotnet/cs/{GENERATOR}.dll"
+    vendor = work / "sidecar-vendor"
+    project(vendor, "", "<OutputType>Library</OutputType><AssemblyName>SidecarFixture</AssemblyName>")
+    shutil.copyfile(ROOT / "sandbox/SidecarFixture/ExternalModels.cs", vendor / "ExternalModels.cs")
+    config = nuget_config(vendor / "NuGet.Config", feed)
+    run(["dotnet", "build", "-c", "Release", "--configfile", str(config)], vendor, env)
+    vendor_assembly = vendor / "bin/Release/net10.0/SidecarFixture.dll"
+
+    analyzer = work / "sidecar-integration-analyzer"
+    project(analyzer, package_references({"Microsoft.CodeAnalysis.CSharp": ROSLYN_HOSTS[0]}) +
+            f'<Reference Include="{GENERATOR}"><HintPath>{escape(str(generator))}</HintPath></Reference>',
+            "<TargetFramework>netstandard2.0</TargetFramework><OutputType>Library</OutputType>"
+            "<AssemblyName>SidecarConsumerAnalyzer</AssemblyName>")
+    shutil.copyfile(HERE / "SidecarConsumerAnalyzer.cs", analyzer / "SidecarConsumerAnalyzer.cs")
+    config = nuget_config(analyzer / "NuGet.Config", network=True)
+    run(["dotnet", "build", "-c", "Release", "--configfile", str(config)], analyzer, env)
+    analyzer_assembly = analyzer / "bin/Release/netstandard2.0/SidecarConsumerAnalyzer.dll"
+
+    path = work / "sidecar-integration"
+    project(path, package_references({AGGREGATE: version}) +
+            f'<Reference Include="SidecarFixture"><HintPath>{escape(str(vendor_assembly))}</HintPath></Reference>'
+            f'<Analyzer Include="{escape(str(analyzer_assembly))}" />')
+    (path / "Program.cs").write_text("""using SharpPack;
+using SharpPack.Generated;
+using SidecarFixture;
+
+var context = PackageRoute.Register(new SharpPackSerializerContextBuilder()).Build();
+var original = new ExternalNote { Count = 4, Text = "package route" };
+var roundTrip = SharpPackSerializer.Deserialize<ExternalNote>(SharpPackSerializer.Serialize(original, context), context);
+if (roundTrip is not { Count: 4, Text: "package route" })
+    throw new InvalidOperationException("Packaged generator integration did not round-trip.");
+""")
+    config = nuget_config(path / "NuGet.Config", feed)
+    local_env = dict(env, NUGET_PACKAGES=str(path / "packages"))
+    run(["dotnet", "restore", "--configfile", str(config)], path, local_env)
+    assets(path, {name: version for name in (CORE, GENERATOR, AGGREGATE)})
+    run(["dotnet", "run", "-c", "Release", "--no-restore"], path, local_env)
+    print("A separate compiler integration used the packaged SharpPack analyzer and external metadata", flush=True)
+
+
+def verify_lockstep(work, feed, streaming_package, version, env):
+    # A resolver-only alternate package, from the same build, is never run or published.
+    newer = f"{int(version.split('.')[0]) + 1}.0.0"
+    alternate = work / "without-matching-core"
+    alternate.mkdir()
+    pack(CORE, newer, alternate, env, existing_build=True)
+    for package in alternate.glob("*.nupkg"):
+        shutil.copyfile(package, feed / package.name)
+    shutil.copyfile(streaming_package, alternate / streaming_package.name)
+    for name, source, versions, error in (
+        ("lockstep-with-newer", feed, {STREAMING: version}, None),
+        ("lockstep-missing-exact", alternate, {STREAMING: version}, "NU1102"),
+        ("lockstep-direct-override", feed, {STREAMING: version, CORE: newer}, "NU1608"),
+    ):
+        path = work / name
+        project(path, package_references(versions), "<WarningsAsErrors>NU1608</WarningsAsErrors>")
+        config = nuget_config(path / "NuGet.Config", source)
+        run(["dotnet", "restore", "--configfile", str(config)], path,
+            dict(env, NUGET_PACKAGES=str(path / "packages")), expected_success=error is None)
+        if error is None:
+            assets(path, {STREAMING: version, CORE: version})
+        else:
+            diagnostics = json.loads((path / "obj/project.assets.json").read_text()).get("logs", [])
+            if not any(item.get("code") == error and item.get("level") == "Error" for item in diagnostics):
+                raise RuntimeError(f"Expected NuGet error {error}; found {diagnostics}")
+        print(f"{name}: {'exact version resolved' if error is None else error + ' as expected'}", flush=True)
+
+
+def verify_compatibility(work, packages, current_cache, version, env, architecture):
+    mixed = work / "mixed-feed"
+    mixed.mkdir()
+    for name in (CORE, GENERATOR, STREAMING):
+        shutil.copyfile(packages[name], mixed / packages[name].name)
+    previous_packages(work, mixed, env)
+    versions = {CORE: version, GENERATOR: PREVIOUS}
+    consumer(work / "previous-generator", mixed, versions, versions, env, architecture)
+    versions = {CORE: PREVIOUS, GENERATOR: version}
+    previous_cache = consumer(work / "previous-runtime", mixed, versions, versions,
+                              env, architecture, mismatch=True)
+    verify_roslyn_hosts(work, current_cache, previous_cache, version, env)
+    verify_lockstep(work, mixed, packages[STREAMING], version, env)
+
+
+def pin_sdk(path, sdk, env):
+    (path / "global.json").write_text(json.dumps({"sdk": {"version": sdk, "rollForward": "disable"}}))
+    if sdk != run(["dotnet", "--version"], path, env).strip():
+        raise RuntimeError(f"Could not select SDK {sdk} for {path.name}")
+
+
+def verify_native_union_diagnostics(path, feed, version, env):
+    project(path, package_references({AGGREGATE: version}), "<OutputType>Library</OutputType>", framework="net11.0")
+    (path / "BadContracts.cs").write_text("""using SharpPack;
+[SharpPackable, SharpPackUnion(7, typeof(int))]
+partial union MissingTag(int, string);
+
+[SharpPackable, SharpPackUnion(7, typeof(int)), SharpPackUnion(7, typeof(string))]
+partial union DuplicateTag(int, string);
+
+[SharpPackable, SharpPackUnion(1, typeof(int)), SharpPackUnion(2, typeof(int?))]
+partial union SameBox(int, int?);
+
+sealed class NoFormatter;
+[SharpPackable, SharpPackUnion(3, typeof(NoFormatter[])), SharpPackUnion(10, typeof(bool))]
+partial union MissingDependency(NoFormatter[], bool);
+
+sealed class ContextOnly : ISharpPackContextFormatterFactory<ContextOnly>
+{
+    public static SharpPackFormatter<ContextOnly> CreateFormatter(SharpPackSerializerContext context)
+        => throw new System.NotImplementedException();
+}
+[SharpPackable, SharpPackUnion(3, typeof(ContextOnly)), SharpPackUnion(4, typeof(bool))]
+partial union MissingDefaultFactory(ContextOnly, bool);
+""")
+    config = nuget_config(path / "NuGet.Config", feed)
+    local_env = dict(env, NUGET_PACKAGES=str(path / "packages"))
+    log = run(["dotnet", "build", "-c", "Release", "--configfile", str(config)], path, local_env, expected_success=False)
+    errors = {line.split("error SHARPPACK048: ", 1)[1] for line in log.splitlines() if "error SHARPPACK048: " in line}
+    if len(errors) != 5 or not all(any(item in error for error in errors) for item in (
+            "each declared case needs an explicit", "wire tag 7 is duplicated", "same boxed type",
+            "NoFormatter' needs a built-in or type-owned formatter", "needs a default formatter factory")):
+        raise RuntimeError(f"Expected native union schema diagnostics:\n{log}")
+    print("Invalid native union case tags, boxed overlaps and missing formatters diagnosed at compile time", flush=True)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--feed", type=Path, required=True)
+    parser.add_argument("--version", required=True)
+    parser.add_argument("--architecture", choices=["X64", "Arm64"], required=True)
+    parser.add_argument("--compatibility", action="store_true",
+                        help="Also pack the pinned predecessor and run host/version-pair checks")
+    args = parser.parse_args()
+    feed = args.feed.resolve()
+    version = normalized_version(args.version)
+    packages = inspect_feed(feed, version)
+    with tempfile.TemporaryDirectory(prefix="sharppack-package-") as directory:
+        work = Path(directory)
+        env = os.environ.copy()
+        env.pop("NUGET_FALLBACK_PACKAGES", None)
+        sdk11 = run(["dotnet", "--version"], ROOT, env).strip()
+        if not re.fullmatch(r"11\.0\.\d{3}", sdk11):
+            raise RuntimeError(f"Expected the repository .NET 11 SDK, got {sdk11}")
+        installed = run(["dotnet", "--list-sdks"], ROOT, env)
+        sdk10 = max(re.findall(r"^(10\.0\.\d{3}) \[", installed, re.MULTILINE), default=None)
+        if sdk10 is None:
+            raise RuntimeError("Install a .NET 10 SDK to verify the lower consumer floor")
+        pin_sdk(work, sdk10, env)
+        print(f".NET 10 SDK {sdk10}, C# 14; .NET 11 SDK {sdk11}, C# 15; {args.architecture}", flush=True)
+
+        runtime = {CORE: version, GENERATOR: version}
+        consumers = (
+            ("aggregate", {AGGREGATE: version}),
+            ("split", runtime),
+            ("streaming", {STREAMING: version, GENERATOR: version}),
+        )
+        for name, refs in consumers:
+            cache = consumer(work / name, feed, refs, runtime | refs, env, args.architecture)
+            if name == "split":
+                current_cache = cache
+            if name != "streaming":
+                consumer(work / f"{name}-aot", feed, refs, runtime | refs, env, args.architecture, aot=True)
+        verify_artifact_tooling(work / "artifact-tooling", feed, version, env)
+        verify_multitargeted_artifacts(work / "artifact-multitarget", feed, version, env)
+
+        net11 = work / "net11"
+        net11.mkdir()
+        pin_sdk(net11, sdk11, env)
+        for name, refs in consumers:
+            consumer(net11 / name, feed, refs, runtime | refs, env, args.architecture, framework="net11.0")
+        aggregate = {AGGREGATE: version}
+        consumer(net11 / "aggregate-aot", feed, aggregate, runtime | aggregate, env, args.architecture,
+                 framework="net11.0", aot=True)
+        verify_artifact_tooling(net11 / "artifact-tooling", feed, version, env, framework="net11.0", smoke_only=True)
+        verify_native_union_diagnostics(net11 / "native-union-diagnostics", feed, version, env)
+        consumer(work / "deserialize-array-aot", feed, runtime, runtime, env, args.architecture,
+                 aot=True, sources=("DeserializeArray.cs",))
+        consumer(net11 / "deserialize-array-aot", feed, aggregate, runtime | aggregate, env, args.architecture,
+                 framework="net11.0", aot=True, sources=("DeserializeArray.cs",))
+
+        if args.compatibility:
+            verify_sidecar_integration(work, feed, current_cache, version, env)
+            verify_compatibility(work, packages, current_cache, version, env, args.architecture)
+
+
+if __name__ == "__main__":
+    main()

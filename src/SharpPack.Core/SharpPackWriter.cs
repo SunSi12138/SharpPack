@@ -67,6 +67,10 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         this.optionalState = optionalState;
     }
 
+    internal SharpPackWriter<TNestedWriter> CreateNestedWriter<TNestedWriter>(ref TNestedWriter writer)
+        where TNestedWriter : IBufferWriter<byte>
+        => new SharpPackWriter<TNestedWriter>(ref writer, optionalState) { depth = this.depth };
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ref byte GetSpanReference(int sizeHint)
     {
@@ -107,7 +111,7 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         var rest = bufferLength - count;
         if (rest < 0)
         {
-            SharpPackSerializationException.ThrowInvalidAdvance();
+            SharpPackSerializationException.ThrowInvalidWriteAdvance();
         }
 
         bufferLength = rest;
@@ -501,6 +505,18 @@ public ref partial struct SharpPackWriter<TBufferWriter>
 
         var formatter = GetFormatter<T>();
         WriteCollectionHeader(value.Length);
+
+        // A covariant array can be read as T[], but its slots cannot be passed by ref as T.
+        if (value.GetType() != typeof(T[]))
+        {
+            for (int i = 0; i < value.Length; i++)
+            {
+                var element = value[i];
+                formatter.Serialize(ref this, ref element);
+            }
+            return;
+        }
+
         for (int i = 0; i < value.Length; i++)
         {
             formatter.Serialize(ref this, ref value[i]);
@@ -567,6 +583,16 @@ public ref partial struct SharpPackWriter<TBufferWriter>
         }
 
         WriteCollectionHeader(value.Length);
+        if (value.GetType() != typeof(T[]))
+        {
+            for (int i = 0; i < value.Length; i++)
+            {
+                var element = value[i];
+                T.Serialize(ref this, ref element);
+            }
+            return;
+        }
+
         for (int i = 0; i < value.Length; i++)
         {
             T.Serialize(ref this, ref value[i]);

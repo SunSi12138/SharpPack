@@ -35,17 +35,29 @@ public sealed class GenericCollectionFormatter<TCollection, TElement> : SharpPac
             return;
         }
 
-        var formatter = reader.GetFormatter<TElement?>();
-
-        var collection = new TCollection();
-        for (int i = 0; i < length; i++)
+        if (length == 0)
         {
-            TElement? v = default;
-            formatter.Deserialize(ref reader, ref v);
-            collection.Add(v);
+            value = new TCollection();
+            return;
         }
 
-        value = collection;
+        reader.EnterDepth<TElement>();
+        try
+        {
+            var formatter = reader.GetFormatter<TElement?>();
+            var collection = new TCollection();
+            for (int i = 0; i < length; i++)
+            {
+                TElement? v = default;
+                formatter.Deserialize(ref reader, ref v);
+                collection.Add(v);
+            }
+            value = collection;
+        }
+        finally
+        {
+            reader.ExitDepth();
+        }
     }
 }
 
@@ -84,17 +96,29 @@ public abstract class GenericSetFormatterBase<TSet, TElement> : SharpPackFormatt
             return;
         }
 
-        var formatter = reader.GetFormatter<TElement?>();
-
-        var collection = CreateSet();
-        for (int i = 0; i < length; i++)
+        if (length == 0)
         {
-            TElement? v = default;
-            formatter.Deserialize(ref reader, ref v);
-            collection.Add(v);
+            value = CreateSet();
+            return;
         }
 
-        value = collection;
+        reader.EnterDepth<TElement>();
+        try
+        {
+            var formatter = reader.GetFormatter<TElement?>();
+            var collection = CreateSet();
+            for (int i = 0; i < length; i++)
+            {
+                TElement? v = default;
+                formatter.Deserialize(ref reader, ref v);
+                collection.Add(v);
+            }
+            value = collection;
+        }
+        finally
+        {
+            reader.ExitDepth();
+        }
     }
 }
 
@@ -144,16 +168,21 @@ public abstract class GenericDictionaryFormatterBase<TDictionary, TKey, TValue> 
             return;
         }
 
+        if (length == 0)
+        {
+            value = CreateDictionary();
+            return;
+        }
+
+        using var entries = KeyValuePairFormatter.EnterReadScope<TKey, TValue>(ref reader, length, out var unmanagedEntries);
         var keyFormatter = reader.GetFormatter<TKey>();
         var valueFormatter = reader.GetFormatter<TValue>();
-
         var dict = CreateDictionary();
         for (int i = 0; i < length; i++)
         {
-            KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
+            KeyValuePairFormatter.DeserializeEntry(keyFormatter, valueFormatter, ref reader, unmanagedEntries, out var k, out var v);
             dict.Add(k!, v);
         }
-
         value = dict;
     }
 }

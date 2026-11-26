@@ -1,0 +1,86 @@
+name: Deserialize-only trimming
+
+on:
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - '.github/workflows/aot-deserialize-only.yaml'
+      - 'sandbox/DeserializeOnlyAot/**'
+      - 'sandbox/DeserializeOnlyAot.Contracts/**'
+      - 'sandbox/HandwrittenFactoryAot/**'
+      - 'sandbox/NativeAot/**'
+      - 'sandbox/SidecarAot/**'
+      - 'sandbox/SidecarFixture/**'
+      - 'src/**'
+      - 'Directory.Build.props'
+      - 'global.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deserialize-only:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: '10.0.102'
+      - name: Verify deserialize-only NativeAOT
+        run: |
+          dotnet publish sandbox/DeserializeOnlyAot -c Release -o "$RUNNER_TEMP/deserialize-only"
+          "$RUNNER_TEMP/deserialize-only/DeserializeOnlyAot"
+          stat -c '%n %s bytes' "$RUNNER_TEMP/deserialize-only/DeserializeOnlyAot"
+      - name: Verify object, Type and circular-reference samples on .NET 10 and .NET 11 NativeAOT
+        run: |
+          set -o pipefail
+          for framework in net10.0 net11.0; do
+            echo "Verifying $framework"
+            output="$RUNNER_TEMP/original-aot-$framework"
+            dotnet publish sandbox/NativeAot -c Release -p:SharpPackSmokeTarget="$framework" -o "$output" 2>&1 | tee "$output.log"
+            if grep -q 'IL2111' "$output.log"; then exit 1; fi
+            "$output/NativeAot"
+          done
+      - name: Check application-owned roots in NativeAOT
+        run: |
+          dotnet publish sandbox/HandwrittenFactoryAot -c Release -o "$RUNNER_TEMP/handwritten-aot"
+          "$RUNNER_TEMP/handwritten-aot/HandwrittenFactoryAot"
+      - name: Read external metadata roots without dynamic code
+        run: |
+          dotnet publish sandbox/SidecarAot -c Release -p:SharpPackSidecarPublishMode=aot -o "$RUNNER_TEMP/sidecar-aot"
+          "$RUNNER_TEMP/sidecar-aot/SidecarAot"
+      - name: Verify the unused private method is trimmed
+        run: |
+          set -o pipefail
+          dotnet publish sandbox/DeserializeOnlyAot -c Release -p:DefineConstants=FACTORY_ROOT_POSITIVE_CONTROL -o "$RUNNER_TEMP/positive-control"
+          "$RUNNER_TEMP/positive-control/DeserializeOnlyAot" | tee "$RUNNER_TEMP/positive-output.txt"
+          grep -q 'SHARPPACK_UNUSED_PRIVATE_METHOD_SHOULD_BE_TRIMMED_31' "$RUNNER_TEMP/positive-output.txt"
+          python3 - <<'PY'
+          import os, subprocess
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP'])
+          def has_unused_method(variant):
+              symbols = root / variant / 'DeserializeOnlyAot.dbg'
+              text = subprocess.check_output(['nm', '-a', str(symbols)], text=True)
+              return any('UnusedPrivateMethod' in parts[-1] and parts[-2] in ('t', 'T')
+                         for line in text.splitlines() if len(parts := line.split()) >= 3)
+          assert not has_unused_method('deserialize-only'), 'Unexpected unused private method'
+          assert has_unused_method('positive-control'), 'The executed control has no native method symbol'
+          PY
+      - name: Verify generated and application-owned roots in trimmed JIT
+        if: matrix.runner == 'ubuntu-24.04'
+        run: |
+          dotnet publish sandbox/DeserializeOnlyAot -c Release -p:SharpPackTrimmedJit=true --self-contained true -r linux-x64 -o "$RUNNER_TEMP/trimmed-jit"
+          "$RUNNER_TEMP/trimmed-jit/DeserializeOnlyAot"
+          dotnet publish sandbox/HandwrittenFactoryAot -c Release -p:SharpPackTrimmedJit=true --self-contained true -r linux-x64 -o "$RUNNER_TEMP/handwritten-trimmed-jit"
+          "$RUNNER_TEMP/handwritten-trimmed-jit/HandwrittenFactoryAot"
+          dotnet publish sandbox/SidecarAot -c Release -p:SharpPackSidecarPublishMode=trim --self-contained true -r linux-x64 -o "$RUNNER_TEMP/sidecar-trimmed-jit"
+          "$RUNNER_TEMP/sidecar-trimmed-jit/SidecarAot"
+      - run: git diff --exit-code

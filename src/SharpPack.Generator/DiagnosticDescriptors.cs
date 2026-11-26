@@ -340,4 +340,68 @@ internal static class DiagnosticDescriptors
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor IncompatibleRuntimeAbi = new(
+        id: "SHARPPACK043",
+        title: "Incompatible SharpPack Generator and Runtime",
+        messageFormat: "Detected SharpPack Runtime ABI '{0}'; this Generator requires ABI [{1}, {2}]. Align SharpPack.Core and SharpPack.Generator package versions.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor VersionedMemberOrderOutOfRange = new(
+        id: "SHARPPACK044",
+        title: "Versioned member order is outside the wire header",
+        messageFormat: "The SharpPackable object '{0}' member '{1}' has order '{2}'; this wire format supports orders 0 through {3}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    internal static readonly DiagnosticDescriptor UnsupportedSidecarRoot = new(
+        id: "SHARPPACK045",
+        title: "No compile-time SharpPack formatter",
+        messageFormat: "Cannot use SharpPack for '{0}' at '{1}': {2}. Use a supported DTO or supply an explicit formatter.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    internal static readonly DiagnosticDescriptor IncompatibleSidecarRuntimeAbi = new(
+        id: "SHARPPACK046",
+        title: "Incompatible SharpPack external formatter runtime",
+        messageFormat: "Detected SharpPack sidecar ABI '{0}'; this Generator requires sidecar ABI {1}. Upgrade SharpPack.Core and SharpPack.Generator together.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    internal static readonly DiagnosticDescriptor CircularMemberCannotBeInitialized = new(
+        id: "SHARPPACK047",
+        title: "Circular-reference member cannot be initialized",
+        messageFormat: "Circular-reference type '{0}' cannot initialize member '{1}': {2}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    internal static readonly DiagnosticDescriptor UnsupportedNativeUnion = new(
+        id: "SHARPPACK048",
+        title: "Unsupported native union",
+        messageFormat: "Native union '{0}' cannot be generated: {1}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    internal static readonly DiagnosticDescriptor AmbiguousConstructorParameter = new(
+        id: "SHARPPACK049",
+        title: "Ambiguous SharpPack constructor parameter",
+        messageFormat: "Constructor parameter '{1}' on '{0}' matches multiple serialized members: {2}. Use distinct member names or ignore a member.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    internal static readonly DiagnosticDescriptor IncludedPropertyCannotBePopulated = new(
+        id: "SHARPPACK050",
+        title: "Included property cannot be populated",
+        messageFormat: "Included property '{1}' on '{0}' needs a setter usable during deserialization or a matching constructor parameter.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }

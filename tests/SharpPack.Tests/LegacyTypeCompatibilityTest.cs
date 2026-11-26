@@ -4,18 +4,15 @@ namespace SharpPack.Tests;
 
 public class LegacyTypeCompatibilityTest
 {
-    [Fact]
-    public void RenamedLibraryTypePayloadResolvesToSharpPackType()
+    [Theory]
+    [InlineData("MemoryPack.MemoryPackSerializer, MemoryPack.Core")]
+    [InlineData("System.String, System.Private.CoreLib")]
+    public void LegacyClrNamesAreRejectedWithoutFallback(string legacyTypeName)
     {
-        const string legacyTypeName =
-            "MemoryPack.MemoryPackSerializer, MemoryPack.Core";
-        var originalPayload = SharpPackSerializer.Serialize(legacyTypeName);
-
-        SharpPackSerializer.Deserialize<Type>(originalPayload)
-            .Should().Be(typeof(SharpPackSerializer));
-
-        var context = new SharpPackSerializerContext();
-        SharpPackSerializer.Deserialize<Type>(originalPayload, context)
-            .Should().Be(typeof(SharpPackSerializer));
+        var payload = SharpPackSerializer.Serialize(legacyTypeName);
+        var context = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+            .RegisterType<string>("string").RegisterType<SharpPackSerializerContext>("context").Build();
+        Assert.Throws<SharpPackSerializationException>(() => SharpPackSerializer.Deserialize<Type>(payload));
+        Assert.Throws<SharpPackSerializationException>(() => SharpPackSerializer.Deserialize<Type>(payload, context));
     }
 }

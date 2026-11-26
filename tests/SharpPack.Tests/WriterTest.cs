@@ -1,3 +1,4 @@
+using SharpPack.Internal;
 using System;
 using System.Buffers;
 
@@ -40,8 +41,9 @@ public class WriterTest
             {
                 writer.Advance(9999);
             }
-            catch (SharpPackSerializationException)
+            catch (SharpPackSerializationException exception)
             {
+                exception.ErrorCode.Should().Be(SharpPackErrorCode.Unknown);
                 error = true;
             }
             error.Should().BeTrue();
@@ -191,6 +193,34 @@ public class WriterTest
         buffer.Buffer3.AsSpan().SequenceEqual(v2.Buffer3).Should().BeTrue();
         buffer.Buffer4.AsSpan().SequenceEqual(v2!.Buffer4).Should().BeTrue();
         buffer.Buffer5.AsSpan().SequenceEqual(v2!.Buffer5).Should().BeTrue();
+    }
+
+    [Fact]
+    public void GetSpanWithZeroHintAfterFullSegmentReturnsWritableSpace()
+    {
+        var writer = ReusableLinkedArrayBufferWriterPool.Rent(out var lease);
+        try
+        {
+            IBufferWriter<byte> buffer = writer;
+            var segment = buffer.GetSpan(1);
+            segment.Fill(0x5a);
+            var length = segment.Length;
+            buffer.Advance(length);
+
+            var next = buffer.GetSpan(0);
+            Assert.False(next.IsEmpty);
+            next[0] = 0x3c;
+            buffer.Advance(1);
+
+            var bytes = writer.ToArrayAndReset();
+            Assert.Equal(length + 1, bytes.Length);
+            Assert.Equal((byte)0x5a, bytes[length - 1]);
+            Assert.Equal((byte)0x3c, bytes[length]);
+        }
+        finally
+        {
+            ReusableLinkedArrayBufferWriterPool.Return(writer, lease);
+        }
     }
 
     public class SpanControlWriter : IBufferWriter<byte>

@@ -15,7 +15,7 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static T? Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(ReadOnlySpan<byte> buffer)
     {
         T? value = default;
@@ -25,7 +25,7 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(ReadOnlySpan<byte> buffer, ref T? value)
         => !RuntimeHelpers.IsReferenceOrContainsReferences<T>()
             ? DeserializeUnmanaged(buffer, ref value)
@@ -33,15 +33,15 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static int DeserializeReference<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(ReadOnlySpan<byte> buffer, ref T? value)
     {
         var state = AcquireReaderOptionalState();
 
-        var reader = new SharpPackReader(buffer, state);
+        var reader = new SharpPackReader(buffer, state, SharpPackReadLimits.CurrentCompatibleMaxDepth, int.MaxValue);
         try
         {
-            reader.ReadValue(ref value);
+            reader.ReadRootValue(ref value);
             return reader.Consumed;
         }
         finally
@@ -53,7 +53,7 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static int DeserializeUnmanaged<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(ReadOnlySpan<byte> buffer, ref T? value)
     {
         if (buffer.Length < Unsafe.SizeOf<T>())
@@ -68,7 +68,7 @@ public static partial class SharpPackSerializer
     }
 
     public static T? Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(in ReadOnlySequence<byte> buffer)
     {
         T? value = default;
@@ -77,7 +77,7 @@ public static partial class SharpPackSerializer
     }
 
     public static int Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(in ReadOnlySequence<byte> buffer, ref T? value)
         => !RuntimeHelpers.IsReferenceOrContainsReferences<T>()
             ? DeserializeUnmanaged(buffer, ref value)
@@ -85,15 +85,15 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static int DeserializeReference<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(in ReadOnlySequence<byte> buffer, ref T? value)
     {
         var state = AcquireReaderOptionalState();
 
-        var reader = new SharpPackReader(buffer, state);
+        var reader = new SharpPackReader(buffer, state, SharpPackReadLimits.CurrentCompatibleMaxDepth, int.MaxValue);
         try
         {
-            reader.ReadValue(ref value);
+            reader.ReadRootValue(ref value);
             return reader.Consumed;
         }
         finally
@@ -105,7 +105,7 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     static int DeserializeUnmanaged<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(in ReadOnlySequence<byte> buffer, ref T? value)
     {
         int sizeOfT = Unsafe.SizeOf<T>();
@@ -154,15 +154,22 @@ public static partial class SharpPackSerializer
     /// Deserializes from the stream's remaining contents.
     /// </summary>
     /// <remarks>
+    /// The caller owns <paramref name="stream"/> and SharpPack leaves it open.
     /// A buffer-backed <see cref="MemoryStream"/> advances by the bytes consumed
     /// by one value. Other streams are read through end-of-stream because a
     /// general <see cref="Stream"/> cannot return bytes read past that value.
-    /// Use the payload-length overload for framed or concatenated messages.
+    /// This read-to-end overload has no declared payload boundary, so it does
+    /// not require the formatter to consume every byte read from the stream.
+    /// Use the payload-length overload for framed or concatenated messages and
+    /// deterministic exact-consumption enforcement.
     /// </remarks>
     public static async ValueTask<T?> DeserializeAsync<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(Stream stream, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(stream);
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (stream is MemoryStream ms && ms.TryGetBuffer(out ArraySegment<byte> streamBuffer))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -241,8 +248,14 @@ public static partial class SharpPackSerializer
     /// Deserializes exactly one length-delimited payload without consuming
     /// bytes from a following message.
     /// </summary>
+    /// <remarks>
+    /// The caller owns <paramref name="stream"/> and SharpPack leaves it open.
+    /// Exactly <paramref name="payloadLength"/> bytes are read for this payload.
+    /// Deserialization fails if the formatter does not consume exactly that
+    /// payload length.
+    /// </remarks>
     public static ValueTask<T?> DeserializeAsync<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(
         Stream stream,
         int payloadLength,
@@ -254,7 +267,7 @@ public static partial class SharpPackSerializer
             cancellationToken);
 
     static async ValueTask<T?> DeserializeLengthDelimitedAsync<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(
         Stream stream,
         int payloadLength,
@@ -263,6 +276,8 @@ public static partial class SharpPackSerializer
     {
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentOutOfRangeException.ThrowIfNegative(payloadLength);
+        EnsurePayloadWithinLimit(payloadLength, context);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (stream is MemoryStream memoryStream &&
             memoryStream.TryGetBuffer(out var segment))
@@ -279,8 +294,8 @@ public static partial class SharpPackSerializer
             var payload = segment.AsSpan(position, payloadLength);
             var consumed = context is null
                 ? Deserialize(payload, ref value)
-                : Deserialize(payload, ref value, context);
-            EnsureFrameConsumed(payloadLength, consumed);
+                : DeserializeWithContext(payload, ref value, context);
+            EnsurePayloadConsumed(payloadLength, consumed);
             memoryStream.Seek(payloadLength, SeekOrigin.Current);
             return value;
         }
@@ -330,8 +345,8 @@ public static partial class SharpPackSerializer
             T? value = default;
             var consumed = context is null
                 ? Deserialize(sequence, ref value)
-                : Deserialize(sequence, ref value, context);
-            EnsureFrameConsumed(payloadLength, consumed);
+                : DeserializeWithContext(sequence, ref value, context);
+            EnsurePayloadConsumed(payloadLength, consumed);
             return value;
         }
         finally
@@ -342,11 +357,26 @@ public static partial class SharpPackSerializer
         }
     }
 
-    static void EnsureFrameConsumed(int payloadLength, int consumed)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static void EnsurePayloadWithinLimit(
+        long payloadLength,
+        SharpPackSerializerContext? context)
+    {
+        var maxPayloadBytes = context?.MaxPayloadBytes ?? long.MaxValue;
+        if (payloadLength > maxPayloadBytes)
+        {
+            SharpPackSerializationException.ThrowReadLimitExceeded(
+                SharpPackReadLimitKind.PayloadBytes,
+                maxPayloadBytes,
+                payloadLength);
+        }
+    }
+
+    internal static void EnsurePayloadConsumed(int payloadLength, int consumed)
     {
         if (payloadLength != consumed)
         {
-            throw new SharpPackSerializationException(
+            throw new SharpPackSerializationException(SharpPackErrorCode.FrameLengthMismatch,
                 $"The formatter consumed {consumed} of the " +
                 $"{payloadLength}-byte payload.");
         }

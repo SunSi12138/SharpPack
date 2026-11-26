@@ -108,17 +108,18 @@ namespace SharpPack.Formatters
                 return;
             }
 
-            if (value == null || value.Length != length)
+            reader.EnterDepth<T>();
+            try
             {
-                value = new T[length];
+                if (value == null || value.Length != length)
+                {
+                    value = new T[length];
+                }
+                reader.ReadElements<T>((T?[])value);
             }
-
-            var formatter = reader.GetFormatter<T>();
-            for (int i = 0; i < length; i++)
+            finally
             {
-                formatter.Deserialize(
-                    ref reader,
-                    ref Unsafe.As<T, T?>(ref value[i]));
+                reader.ExitDepth();
             }
         }
     }
@@ -241,26 +242,37 @@ namespace SharpPack.Formatters
 
         [Preserve]
         public override void Deserialize(ref SharpPackReader reader, scoped ref Memory<T?> value)
+            => value = ReadPooledMemory(ref reader);
+
+        internal static Memory<T?> ReadPooledMemory(ref SharpPackReader reader)
         {
             if (!reader.TryReadCollectionHeader(out var length))
             {
-                value = null;
-                return;
+                return default;
             }
 
             if (length == 0)
             {
-                value = Memory<T?>.Empty;
-                return;
+                return Memory<T?>.Empty;
             }
 
+            var unmanaged = !RuntimeHelpers.IsReferenceOrContainsReferences<T?>() && !reader.HasFormatterOverride<T>();
+            using var elements = reader.EnterCollectionDepth<T>(!unmanaged);
+            var byteCount = unmanaged ? reader.GetValidatedUnmanagedByteCount<T>(length) : 0;
             var array = ArrayPool<T?>.Shared.Rent(length);
             try
             {
                 var memory = array.AsMemory(0, length);
                 var span = memory.Span;
-                reader.ReadSpanWithoutReadLengthHeader(length, ref span);
-                value = memory;
+                if (unmanaged)
+                {
+                    reader.DangerousReadUnmanagedSpanWithoutReadLengthHeader(length, byteCount, ref span);
+                }
+                else
+                {
+                    reader.ReadElements(span);
+                }
+                return memory;
             }
             catch
             {
@@ -284,35 +296,6 @@ namespace SharpPack.Formatters
 
         [Preserve]
         public override void Deserialize(ref SharpPackReader reader, scoped ref ReadOnlyMemory<T?> value)
-        {
-            if (!reader.TryReadCollectionHeader(out var length))
-            {
-                value = null;
-                return;
-            }
-
-            if (length == 0)
-            {
-                value = Memory<T?>.Empty;
-                return;
-            }
-
-            var array = ArrayPool<T?>.Shared.Rent(length);
-            try
-            {
-                var memory = array.AsMemory(0, length);
-                var span = memory.Span;
-                reader.ReadSpanWithoutReadLengthHeader(length, ref span);
-                value = memory;
-            }
-            catch
-            {
-                ArrayPool<T?>.Shared.Return(
-                    array,
-                    clearArray:
-                        RuntimeHelpers.IsReferenceOrContainsReferences<T?>());
-                throw;
-            }
-        }
+            => value = MemoryPoolFormatter<T>.ReadPooledMemory(ref reader);
     }
 }

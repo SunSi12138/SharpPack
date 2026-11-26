@@ -31,9 +31,26 @@ public static class KeyValuePairFormatter
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Deserialize<TKey, TValue>(ISharpPackFormatter<TKey> keyFormatter, ISharpPackFormatter<TValue> valueFormatter, ref SharpPackReader reader, out TKey? key, out TValue? value)
     {
-        if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<KeyValuePair<TKey?, TValue?>>() &&
-            !reader.HasFormatterOverride<TKey>() &&
-            !reader.HasFormatterOverride<TValue>())
+        using var entry = EnterReadScope<TKey, TValue>(ref reader, 1, out var unmanaged);
+        DeserializeEntry(keyFormatter, valueFormatter, ref reader, unmanaged, out key, out value);
+    }
+
+    // Dictionary formatters choose the entry representation and enter its
+    // depth scope once, before allocating or mutating the destination.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static SharpPackReader.CollectionDepthScope EnterReadScope<TKey, TValue>(ref SharpPackReader reader, int length, out bool unmanaged)
+    {
+        unmanaged = length != 0 &&
+            !RuntimeHelpers.IsReferenceOrContainsReferences<KeyValuePair<TKey?, TValue?>>() &&
+            !reader.HasFormatterOverride<TKey>() && !reader.HasFormatterOverride<TValue>();
+        return reader.EnterCollectionDepth<KeyValuePair<TKey, TValue>>(length != 0 && !unmanaged);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static void DeserializeEntry<TKey, TValue>(ISharpPackFormatter<TKey> keyFormatter, ISharpPackFormatter<TValue> valueFormatter,
+        ref SharpPackReader reader, bool unmanaged, out TKey? key, out TValue? value)
+    {
+        if (unmanaged)
         {
             reader.DangerousReadUnmanaged(out KeyValuePair<TKey?, TValue?> kvp);
             key = kvp.Key;

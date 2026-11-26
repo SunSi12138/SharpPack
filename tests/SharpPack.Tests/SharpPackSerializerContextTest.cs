@@ -174,10 +174,11 @@ public class SharpPackSerializerContextTest
     }
 
     [Fact]
-    public void FreshContext_ResolvesRootTypePayload()
+    public void RegisteredContext_ResolvesTypeIdPayload()
     {
-        var payload = SharpPackSerializer.Serialize<Type>(typeof(ContextGraph));
-        var context = new SharpPackSerializerContext();
+        var context = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+            .RegisterType<ContextGraph>("graph").Build();
+        var payload = SharpPackSerializer.Serialize<Type>(typeof(ContextGraph), context);
 
         SharpPackSerializer.Deserialize<Type>(payload, context)
             .Should().Be(typeof(ContextGraph));

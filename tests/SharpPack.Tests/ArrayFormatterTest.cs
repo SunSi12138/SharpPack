@@ -232,10 +232,24 @@ public class ArrayFormatterTest
             overflow.AsSpan(1 + sizeof(int)),
             2);
 
-        Assert.Throws<SharpPackSerializationException>(
-            () => SharpPackSerializer.Deserialize<int[,]>(negative));
-        Assert.Throws<SharpPackSerializationException>(
-            () => SharpPackSerializer.Deserialize<int[,]>(overflow));
+        Assert.Equal(SharpPackErrorCode.InvalidLength, Assert.Throws<SharpPackSerializationException>(
+            () => SharpPackSerializer.Deserialize<int[,]>(negative)).ErrorCode);
+        Assert.Equal(SharpPackErrorCode.SizeOverflow, Assert.Throws<SharpPackSerializationException>(
+            () => SharpPackSerializer.Deserialize<int[,]>(overflow)).ErrorCode);
+    }
+
+    [Fact]
+    public void MultiDimensionalPreservesEmptyShapes()
+    {
+        AssertShape(this.Convert(new int[2, 3, 0]), 2, 3, 0);
+        AssertShape(this.Convert(new int[2, 3, 0, 4]), 2, 3, 0, 4);
+        AssertShape(this.Convert(new int[2, 3, 4, 0]), 2, 3, 4, 0);
+
+        static void AssertShape(Array array, params int[] dimensions)
+        {
+            Assert.Empty(array);
+            Assert.Equal(dimensions, Enumerable.Range(0, array.Rank).Select(array.GetLength));
+        }
     }
 }
 

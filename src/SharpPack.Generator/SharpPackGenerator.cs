@@ -1,7 +1,8 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Text;
+using Microsoft.CodeAnalysis.Diagnostics;
+using System.Collections.Immutable;
 
 namespace SharpPack.Generator;
 
@@ -37,285 +38,216 @@ public partial class SharpPackGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        // no need RegisterPostInitializationOutput
+        RegisterExternalFormatters(context);
 
-        RegisterSharpPackable(context);
-        RegisterTypeScript(context);
-    }
+        var unsupportedAbi = context.CompilationProvider
+            .Select(static (compilation, _) => RuntimeGeneratedCodeAbi.GetUnsupportedVersion(compilation))
+            .WithTrackingName("SharpPack.RuntimeAbi");
+        RegisterDeserializeArrayRoots(context, unsupportedAbi);
 
-    void RegisterSharpPackable(IncrementalGeneratorInitializationContext context)
-    {
-        // return dir of info output or null .
-        var logProvider = context.AnalyzerConfigOptionsProvider
-            .Select((configOptions, token) =>
-            {
-                if (configOptions.GlobalOptions.TryGetValue("build_property.SharpPackGenerator_SerializationInfoOutputDirectory", out var path))
-                {
-                    return path;
-                }
-
-                return (string?)null;
-            })
-            .WithTrackingName("SharpPack.SharpPackable.0_AnalyzerConfigOptionsProvider"); // annotate for IncrementalGeneratorTest
-
-        var parseOptions = context.ParseOptionsProvider
-            .Select((parseOptions, token) =>
-            {
-                var csOptions = (CSharpParseOptions)parseOptions;
-                var langVersion = csOptions.LanguageVersion;
-                return langVersion;
-            })
-            .WithTrackingName("SharpPack.SharpPackable.0_ParseOptionsProvider");
-
-        var typeDeclarations = context.SyntaxProvider.ForAttributeWithMetadataName(
+        var models = context.SyntaxProvider.ForAttributeWithMetadataName(
                 SharpPackableAttributeFullName,
-                predicate: static (node, token) =>
-                {
-                    // search [SharpPackable] class or struct or interface or record
-                    return (node is ClassDeclarationSyntax
-                                 or StructDeclarationSyntax
-                                 or RecordDeclarationSyntax
-                                 or InterfaceDeclarationSyntax);
-                },
-                transform: static (context, token) =>
-                {
-                    return (TypeDeclarationSyntax)context.TargetNode;
-                })
-                .WithTrackingName("SharpPack.SharpPackable.1_ForAttributeSharpPackableAttribute");
-
-        var typeDeclarations2 = context.SyntaxProvider.ForAttributeWithMetadataName(
+                static (node, _) => node is TypeDeclarationSyntax,
+                static (context, _) => (Declaration: (TypeDeclarationSyntax)context.TargetNode,
+                    HasGenerationIntent: HasModelGenerationIntent(context)));
+        var unions = context.SyntaxProvider.ForAttributeWithMetadataName(
                 SharpPackUnionFormatterAttributeFullName,
-                predicate: static (node, token) =>
-                {
-                    return (node is ClassDeclarationSyntax);
-                },
-                transform: static (context, token) =>
-                {
-                    return (TypeDeclarationSyntax)context.TargetNode;
-                })
-                .WithTrackingName("SharpPack.SharpPackable.1_ForAttributeSharpPackUnion");
+                static (node, _) => node is ClassDeclarationSyntax,
+                static (context, _) => (TypeDeclarationSyntax)context.TargetNode);
+        var typeScript = context.SyntaxProvider.ForAttributeWithMetadataName(
+            GenerateTypeScriptAttributeFullName,
+            static (node, _) => node is ClassDeclarationSyntax or RecordDeclarationSyntax or InterfaceDeclarationSyntax,
+            static (context, _) => (TypeDeclarationSyntax)context.TargetNode)
+            .Combine(GetTypeScriptOptions(context))
+            .Where(static pair => pair.Right is not null)
+            .Select(static (pair, _) => (Declaration: pair.Left, Options: pair.Right!));
 
+        var runtimeAbiMismatch = ReportRuntimeAbiMismatch(
+            context,
+            models.Where(static model => model.HasGenerationIntent).Select(static (model, _) => model.Declaration),
+            unions,
+            typeScript.Select(static (model, _) => model.Declaration),
+            unsupportedAbi);
+        var tooling = context.AnalyzerConfigOptionsProvider.Select(static (config, _) =>
         {
-            var source = typeDeclarations
-                .Combine(context.CompilationProvider)
-                .Combine(logProvider)
-                .Combine(parseOptions)
-                .WithTrackingName("SharpPack.SharpPackable.2_SharpPackableCombined");
+            var options = config.GlobalOptions;
+            var emit = EmitsArtifactPlan(options);
+            return new ArtifactOptions(emit, emit &&
+                options.TryGetValue("build_property.SharpPackGenerator_SerializationInfoOutputDirectory", out var logDirectory) &&
+                !string.IsNullOrEmpty(logDirectory));
+        });
+        var info = RegisterSharpPackable(context,
+            CompatibleDeclarations(models.Select(static (model, _) => model.Declaration), unsupportedAbi),
+            CompatibleDeclarations(unions, unsupportedAbi), tooling);
+        var scripts = RegisterTypeScript(context, CompatibleDeclarations(typeScript, unsupportedAbi));
 
-            context.RegisterSourceOutput(source, static (context, source) =>
-            {
-                var (typeDeclaration, compilation) = source.Left.Item1;
-                var logPath = source.Left.Item2;
-                var langVersion = source.Right;
-
-                Generate(typeDeclaration, compilation, logPath, new GeneratorContext(context, langVersion));
-            });
-        }
-        {
-            var source = typeDeclarations2
-                .Combine(context.CompilationProvider)
-                .Combine(logProvider)
-                .Combine(parseOptions)
-                .WithTrackingName("SharpPack.SharpPackable.2_SharpPackUnionCombined");
-
-            context.RegisterSourceOutput(source, static (context, source) =>
-            {
-                var (typeDeclaration, compilation) = source.Left.Item1;
-                var logPath = source.Left.Item2;
-                var langVersion = source.Right;
-
-                Generate(typeDeclaration, compilation, logPath, new GeneratorContext(context, langVersion));
-            });
-        }
-        {
-            var source = typeDeclarations2
-                .Collect()
-                .Combine(context.CompilationProvider)
-                .Combine(parseOptions)
-                .WithTrackingName(
-                    "SharpPack.SharpPackable.2_ExternalUnionFactoriesCombined");
-
-            context.RegisterSourceOutput(source, static (context, source) =>
-            {
-                var declarations = source.Left.Left;
-                var compilation = source.Left.Right;
-                var langVersion = source.Right;
-
-                GenerateExternalUnionTargetFactories(
-                    declarations,
-                    compilation,
-                    new GeneratorContext(context, langVersion));
-            });
-        }
+        var emitArtifacts = tooling.Combine(runtimeAbiMismatch).Select(static (input, _) => input.Left.EmitPlan && !input.Right);
+        var artifacts = scripts.Combine(info).Combine(emitArtifacts)
+            .SelectMany(static (input, _) => input.Right
+                ? ImmutableArray.Create(ArtifactSchema.WriteSource(new(input.Left.Left, input.Left.Right)))
+                : ImmutableArray<string>.Empty);
+        context.RegisterSourceOutput(artifacts, static (output, source) => output.AddSource(ArtifactSchema.FileName, source));
     }
 
-    void RegisterTypeScript(IncrementalGeneratorInitializationContext context)
+    static bool EmitsArtifactPlan(AnalyzerConfigOptions options)
+        => options.TryGetValue("build_property.SharpPackGenerator_ArtifactMode", out var mode) && mode == "plan" &&
+           !(options.TryGetValue("build_property.DesignTimeBuild", out var design) && string.Equals(design, "true", StringComparison.OrdinalIgnoreCase));
+
+    static bool HasModelGenerationIntent(GeneratorAttributeSyntaxContext context)
     {
-        var typeScriptEnabled = context.AnalyzerConfigOptionsProvider
-            .Select((configOptions, token) =>
+        var attribute = context.Attributes[0];
+        if (!attribute.IsSharpPackableNoGenerate()) return true;
+
+        // NoGenerate is often used for an external union contract. An actual
+        // in-assembly union still emits even when its model opts out.
+        var union = attribute.AttributeClass?.ContainingAssembly.GetTypeByMetadataName("SharpPack.SharpPackUnionAttribute");
+        return union is not null && context.TargetSymbol.ContainsAttribute(union);
+    }
+
+    static IncrementalValuesProvider<T> CompatibleDeclarations<T>(
+        IncrementalValuesProvider<T> declarations, IncrementalValueProvider<string?> unsupportedAbi)
+        => declarations.Combine(unsupportedAbi)
+            .Where(static pair => pair.Right is null)
+            .Select(static (pair, _) => pair.Left);
+
+    static IncrementalValueProvider<bool> ReportRuntimeAbiMismatch(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValuesProvider<TypeDeclarationSyntax> models,
+        IncrementalValuesProvider<TypeDeclarationSyntax> unions,
+        IncrementalValuesProvider<TypeDeclarationSyntax> typeScript,
+        IncrementalValueProvider<string?> unsupportedAbi)
+    {
+        IncrementalValuesProvider<(TypeDeclarationSyntax Left, string? Right)> Incompatible(
+            IncrementalValuesProvider<TypeDeclarationSyntax> declarations)
+            => declarations.Combine(unsupportedAbi).Where(static pair => pair.Right is not null);
+
+        var uses = Incompatible(models).Collect().Combine(Incompatible(unions).Collect())
+            .Combine(Incompatible(typeScript).Collect());
+        var firstMismatch = uses.Select(static (declarations, _) =>
+            declarations.Left.Left.Concat(declarations.Left.Right).Concat(declarations.Right)
+                .OrderBy(static item => item.Left.SyntaxTree.FilePath, StringComparer.Ordinal)
+                .ThenBy(static item => item.Left.SpanStart)
+                .FirstOrDefault());
+        context.RegisterSourceOutput(firstMismatch, static (output, first) =>
+        {
+            if (first.Left is not null)
             {
-                // https://github.com/dotnet/project-system/blob/main/docs/design-time-builds.md
-                var isDesignTimeBuild = configOptions.GlobalOptions.TryGetValue("build_property.DesignTimeBuild", out var designTimeBuild) && designTimeBuild == "true";
+                output.ReportDiagnostic(Diagnostic.Create(
+                    DiagnosticDescriptors.IncompatibleRuntimeAbi,
+                    first.Left.Identifier.GetLocation(),
+                    first.Right,
+                    RuntimeGeneratedCodeAbi.MinimumVersion,
+                    RuntimeGeneratedCodeAbi.MaximumVersion));
+            }
+        });
+        return firstMismatch.Select(static (first, _) => first.Left is not null);
+    }
 
-                string? path;
-                if (!configOptions.GlobalOptions.TryGetValue("build_property.SharpPackGenerator_TypeScriptOutputDirectory", out path))
+    static IncrementalValueProvider<EquatableArray<SerializationInfoFile>> RegisterSharpPackable(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValuesProvider<TypeDeclarationSyntax> models,
+        IncrementalValuesProvider<TypeDeclarationSyntax> unions,
+        IncrementalValueProvider<ArtifactOptions> tooling)
+    {
+        var fileScopedNamespace = context.ParseOptionsProvider
+            .Select(static (options, _) => ((CSharpParseOptions)options).LanguageVersion >= LanguageVersion.CSharp10);
+
+        var regularInfo = RegisterModelEmission(context, models, tooling, fileScopedNamespace);
+        var unionInfo = RegisterModelEmission(context, unions, tooling, fileScopedNamespace);
+
+        var externalFactories = unions.Collect()
+            .Combine(context.CompilationProvider)
+            .Select(static (input, token) => PlanExternalUnionTargetFactories(input.Left, input.Right, token))
+            .WithTrackingName("SharpPack.ExternalUnionFactoryPlans")
+            .SelectMany(static (plans, _) => plans)
+            .Combine(fileScopedNamespace)
+            .Select(static (input, _) => CSharpEmitter.EmitExternalUnionTargetFactory(input.Left, input.Right))
+            .WithTrackingName("SharpPack.ExternalUnionFactoryEmission");
+        context.RegisterSourceOutput(externalFactories, AddGeneratedSource);
+        return regularInfo.Collect().Combine(unionInfo.Collect())
+            .Select(static (info, _) => new EquatableArray<SerializationInfoFile>(info.Left.Concat(info.Right)));
+    }
+
+    static IncrementalValuesProvider<SerializationInfoFile> RegisterModelEmission(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValuesProvider<TypeDeclarationSyntax> declarations,
+        IncrementalValueProvider<ArtifactOptions> tooling,
+        IncrementalValueProvider<bool> fileScopedNamespace)
+    {
+        var analysis = declarations.Combine(context.CompilationProvider)
+            .Select(static (input, token) => AnalyzeModel(input.Left, input.Right, token))
+            .WithTrackingName("SharpPack.ModelAnalysis");
+        context.RegisterSourceOutput(analysis.Where(static result => !result.Diagnostics.IsEmpty), static (output, result) =>
+        {
+            foreach (var diagnostic in result.Diagnostics)
+                output.ReportDiagnostic(diagnostic);
+        });
+
+        var shapes = analysis.Where(static result => result.Shape is not null)
+            .Select(static (result, _) => result.Shape!)
+            .WithTrackingName("SharpPack.TypeShape");
+        var sources = shapes.Select(static (shape, _) => SerializationPlanner.Plan(shape))
+            .WithTrackingName("SharpPack.SerializationPlan")
+            .Combine(fileScopedNamespace)
+            .Select(static (input, _) => new CSharpEmitter(input.Left).EmitModel(input.Right))
+            .WithTrackingName("SharpPack.CSharpEmission");
+        context.RegisterSourceOutput(sources, AddGeneratedSource);
+
+        return shapes.Where(CSharpEmitter.HasSerializationInfo).Combine(tooling)
+            .Where(static input => input.Right.IncludeSerializationInfo)
+            .Select(static (input, _) => new SerializationInfoFile(
+                $"{CSharpEmitter.ModelFileStem(input.Left)}.txt", CSharpEmitter.EmitSerializationInfo(input.Left)));
+    }
+
+    static void AddGeneratedSource(SourceProductionContext output, GeneratedSource source)
+        => output.AddSource(source.HintName, source.Text);
+
+    static IncrementalValueProvider<TypeScriptGenerateOptions?> GetTypeScriptOptions(
+        IncrementalGeneratorInitializationContext context)
+        => context.AnalyzerConfigOptionsProvider
+            .Select(static (configOptions, _) =>
+            {
+                var options = configOptions.GlobalOptions;
+                if (!EmitsArtifactPlan(options) ||
+                    !options.TryGetValue("build_property.SharpPackGenerator_TypeScriptOutputDirectory", out var path) || string.IsNullOrEmpty(path))
                 {
-                    path = null;
+                    return null;
                 }
-                string ext;
-                if (!configOptions.GlobalOptions.TryGetValue("build_property.SharpPackGenerator_TypeScriptImportExtension", out ext!))
-                {
-                    ext = ".js";
-                }
-
-                string convertProp;
-                if (!configOptions.GlobalOptions.TryGetValue("build_property.SharpPackGenerator_TypeScriptConvertPropertyName", out convertProp!))
-                {
-                    convertProp = "true";
-                }
-
-                if (!configOptions.GlobalOptions.TryGetValue("build_property.SharpPackGenerator_TypeScriptEnableNullableTypes", out var enableNullableTypes))
-                {
-                    enableNullableTypes = "false";
-                }
-
-                if (!bool.TryParse(convertProp, out var convert)) convert = true;
-
-                if (path == null) return null;
 
                 return new TypeScriptGenerateOptions
                 {
                     OutputDirectory = path,
-                    ImportExtension = ext,
-                    ConvertPropertyName = convert,
-                    EnableNullableTypes = bool.TryParse(enableNullableTypes, out var enabledNullableTypesParsed) && enabledNullableTypesParsed,
-                    IsDesignTimeBuild = isDesignTimeBuild
+                    ImportExtension = options.TryGetValue("build_property.SharpPackGenerator_TypeScriptImportExtension", out var extension)
+                        ? extension : ".js",
+                    ConvertPropertyName = !options.TryGetValue("build_property.SharpPackGenerator_TypeScriptConvertPropertyName", out var convert)
+                        || !bool.TryParse(convert, out var convertParsed) || convertParsed,
+                    EnableNullableTypes = options.TryGetValue("build_property.SharpPackGenerator_TypeScriptEnableNullableTypes", out var nullable)
+                        && bool.TryParse(nullable, out var nullableParsed) && nullableParsed,
                 };
             });
 
-        var typeScriptDeclarations = context.SyntaxProvider.ForAttributeWithMetadataName(
-                GenerateTypeScriptAttributeFullName,
-                predicate: static (node, token) =>
-                {
-                    return (node is ClassDeclarationSyntax
-                                 or RecordDeclarationSyntax
-                                 or InterfaceDeclarationSyntax);
-                },
-                transform: static (context, token) =>
-                {
-                    return (TypeDeclarationSyntax)context.TargetNode;
-                });
-
-        var typeScriptGenerateSource = typeScriptDeclarations
-            .Combine(context.CompilationProvider)
-            .Combine(typeScriptEnabled)
-            .Where(x => x.Right != null) // filter
-            .Collect();
-
-        context.RegisterSourceOutput(typeScriptGenerateSource, static (context, source) =>
-        {
-            ReferenceSymbols? reference = null;
-            string? generatePath = null;
-
-            var unionMap = new Dictionary<ITypeSymbol, ITypeSymbol>(SymbolEqualityComparer.Default); // <impl, base>
-            foreach (var item in source)
-            {
-                var tsOptions = item.Right;
-                if (tsOptions == null) continue;
-                if (tsOptions.IsDesignTimeBuild) continue; // designtime build(in IDE), do nothing.
-
-                var syntax = item.Left.Item1;
-                var compilation = item.Left.Item2;
-                var semanticModel = compilation.GetSemanticModel(syntax.SyntaxTree);
-                var typeSymbol = semanticModel.GetDeclaredSymbol(syntax, context.CancellationToken) as ITypeSymbol;
-                if (typeSymbol == null) continue;
-                if (reference == null)
-                {
-                    reference = new ReferenceSymbols(compilation);
-                }
-
-                if (generatePath is null && item.Right is { } options)
-                {
-                    generatePath = options.OutputDirectory;
-                }
-
-                var isUnion = typeSymbol.ContainsAttribute(reference.SharpPackUnionAttribute);
-
-                if (isUnion)
-                {
-                    var unionTags = typeSymbol.GetAttributes()
-                        .Where(x => SymbolEqualityComparer.Default.Equals(x.AttributeClass, reference.SharpPackUnionAttribute))
-                        .Where(x => x.ConstructorArguments.Length == 2)
-                        .Select(x => (INamedTypeSymbol)x.ConstructorArguments[1].Value!);
-                    foreach (var implType in unionTags)
-                    {
-                        unionMap[implType] = typeSymbol;
-                    }
-                }
-            }
-
-            if (generatePath != null)
-            {
-                var collector = new TypeCollector();
-                foreach (var item in source)
-                {
-                    var typeDeclaration = item.Left.Item1;
-                    var compilation = item.Left.Item2;
-
-                    if (reference == null)
-                    {
-                        reference = new ReferenceSymbols(compilation);
-                    }
-
-                    var meta = GenerateTypeScript(typeDeclaration, compilation, item.Right!, context, reference, unionMap);
-                    if (meta != null)
-                    {
-                        collector.Visit(meta, false);
-                    }
-                }
-
-                GenerateEnums(collector.GetEnums(), generatePath);
-
-                // generate runtime
-                var runtime = new[]{
-                    ("SharpPackWriter.ts", TypeScriptRuntime.SharpPackWriter),
-                    ("SharpPackReader.ts", TypeScriptRuntime.SharpPackReader),
-                };
-
-                foreach (var item in runtime)
-                {
-                    var filePath = Path.Combine(generatePath, item.Item1);
-                    if (!File.Exists(filePath))
-                    {
-                        File.WriteAllText(filePath, item.Item2, new UTF8Encoding(false));
-                    }
-                }
-            }
-        });
-    }
-
-    class GeneratorContext : IGeneratorContext
+    static IncrementalValueProvider<TypeScriptArtifactPlan?> RegisterTypeScript(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValuesProvider<(TypeDeclarationSyntax Declaration, TypeScriptGenerateOptions Options)> typeScript)
     {
-        SourceProductionContext context;
+        var results = typeScript.Collect().Combine(context.CompilationProvider)
+            .Select(static (input, token) =>
+            {
+                if (input.Left.IsEmpty) return new TypeScriptResult(null, ImmutableArray<Diagnostic>.Empty);
+                var options = input.Left[0].Options;
+                var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+                var plan = PlanTypeScript(input.Left.Select(static item => item.Declaration), input.Right, options, token, diagnostics.Add);
+                return new TypeScriptResult(plan, diagnostics.ToImmutable());
+            });
 
-        public GeneratorContext(SourceProductionContext context, LanguageVersion languageVersion)
+        context.RegisterSourceOutput(results, static (output, result) =>
         {
-            this.context = context;
-            this.LanguageVersion = languageVersion;
-        }
-
-        public CancellationToken CancellationToken => context.CancellationToken;
-
-        public Microsoft.CodeAnalysis.CSharp.LanguageVersion LanguageVersion { get; }
-
-        public void AddSource(string hintName, string source)
-        {
-            context.AddSource(hintName, source);
-        }
-
-        public void ReportDiagnostic(Diagnostic diagnostic)
-        {
-            context.ReportDiagnostic(diagnostic);
-        }
+            foreach (var diagnostic in result.Diagnostics) output.ReportDiagnostic(diagnostic);
+        });
+        return results.Select(static (result, _) => result.Plan);
     }
+
+    readonly record struct TypeScriptResult(TypeScriptArtifactPlan? Plan, ImmutableArray<Diagnostic> Diagnostics);
+
+    readonly record struct ArtifactOptions(bool EmitPlan, bool IncludeSerializationInfo);
 }

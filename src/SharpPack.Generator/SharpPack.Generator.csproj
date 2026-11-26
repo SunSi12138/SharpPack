@@ -22,7 +22,8 @@
 
     <ItemGroup>
         <!-- https://learn.microsoft.com/en-us/visualstudio/extensibility/roslyn-version-support?view=vs-2022 -->
-        <!-- require to support SyntaxValueProvider.ForAttributeWithMetadataName(Roslyn 4.3.0, VS2022 17.3) -->
+        <!-- Roslyn 4.3 is the generator's API reference, not the consumer compiler floor.
+             Supported .NET 10/C# 14 hosts are verified by the packaged-consumer gate. -->
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.3.0" PrivateAssets="all" />
         <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.3">
             <PrivateAssets>all</PrivateAssets>
@@ -30,12 +31,29 @@
         </PackageReference>
     </ItemGroup>
 
+    <ItemGroup>
+        <InternalsVisibleTo Include="SharpPack.Tests;SharpPack.Baselines" Key="00240000048000009400000006020000002400005253413100040000010001000144ec28f1e9ef7b17dacc47425a7a153aea0a7baa590743a2d1a86f4b3e10a8a12712c6e647966bfd8bd6e830048b23bd42bbc56f179585c15b8c19cf86c0eed1b73c993dd7a93a30051dd50fdda0e4d6b65e6874e30f1c37cf8bcbc7fe02c7f2e6a0a3327c0ccc1631bf645f40732521fa0b41a30c178d08f7dd779d42a1ee" />
+        <None Update="build/SharpPack.Generator.targets" Pack="true" PackagePath="buildTransitive/SharpPack.Generator.targets;buildMultiTargeting/SharpPack.Generator.targets" />
+    </ItemGroup>
+
     <!-- for nuget publish -->
     <Target Name="PackBuildOutputs" DependsOnTargets="SatelliteDllsProjectOutputGroup;DebugSymbolsProjectOutputGroup">
+        <PropertyGroup>
+            <_ToolProject>$(MSBuildThisFileDirectory)../SharpPack.Tooling/SharpPack.Tooling.csproj</_ToolProject>
+            <_ToolRemoveProperties>TargetFramework;TargetFrameworks;RuntimeIdentifier;SelfContained;PublishAot;PublishTrimmed</_ToolRemoveProperties>
+        </PropertyGroup>
+        <MSBuild Projects="$(_ToolProject)" Targets="Restore;Build" Condition="'$(NoBuild)' != 'true'"
+                 RemoveProperties="$(_ToolRemoveProperties)" />
+        <MSBuild Projects="$(_ToolProject)" Targets="GetTargetPath" RemoveProperties="$(_ToolRemoveProperties)">
+            <Output TaskParameter="TargetOutputs" ItemName="_ToolAssembly" />
+        </MSBuild>
         <ItemGroup>
             <TfmSpecificPackageFile Include="$(TargetDir)\*.dll" PackagePath="analyzers\dotnet\cs" />
             <TfmSpecificPackageFile Include="@(SatelliteDllsProjectOutputGroupOutput->'%(FinalOutputPath)')" PackagePath="analyzers\dotnet\cs\%(SatelliteDllsProjectOutputGroupOutput.Culture)\" />
+            <_ToolFile Include="@(_ToolAssembly);@(_ToolAssembly->'%(RootDir)%(Directory)%(Filename).deps.json');@(_ToolAssembly->'%(RootDir)%(Directory)%(Filename).runtimeconfig.json')" />
+            <TfmSpecificPackageFile Include="@(_ToolFile)" PackagePath="tools/net10.0/" />
         </ItemGroup>
+        <Error Condition="!Exists('%(_ToolFile.Identity)')" Text="Build SharpPack.Tooling before packing with --no-build. Missing '%(_ToolFile.Identity)'." />
     </Target>
 
 </Project>

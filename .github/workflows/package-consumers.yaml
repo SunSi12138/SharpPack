@@ -1,0 +1,51 @@
+name: Packaged consumers
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            architecture: X64
+            version: '2.0.0'
+          - runner: ubuntu-24.04-arm
+            architecture: Arm64
+            version: '2.0.0-Package.CI'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 22
+    env:
+      VERSION: ${{ matrix.version }}
+      ARCHITECTURE: ${{ matrix.architecture }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: '10.0.102'
+      - name: Build and pack using the release commands
+        run: |
+          dotnet build src/SharpPack.Core/SharpPack.Core.csproj -c Release -p:Version="$VERSION"
+          dotnet build src/SharpPack/SharpPack.csproj -c Release -p:Version="$VERSION"
+          dotnet build src/SharpPack.Streaming/SharpPack.Streaming.csproj -c Release -p:Version="$VERSION"
+          bash tools/PackageConsumers/pack.sh "$VERSION" "$RUNNER_TEMP/sharppack-packages"
+      - name: Verify the packaged assets
+        run: |
+          options=()
+          if [[ "$ARCHITECTURE" == X64 ]]; then options=(--compatibility); fi
+          python3 tools/PackageConsumers/verify.py --feed "$RUNNER_TEMP/sharppack-packages" \
+            --version "$VERSION" --architecture "$ARCHITECTURE" "${options[@]}"
+      - if: always()
+        run: git diff --exit-code

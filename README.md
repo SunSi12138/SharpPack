@@ -9,9 +9,21 @@ modern .NET.
 
 SharpPack is an independently maintained fork of
 [Cysharp/MemoryPack](https://github.com/Cysharp/MemoryPack). It retains the
-original MemoryPack binary wire format while using a fully renamed API,
-context-owned formatter graphs, modern .NET 10 runtime targets, and aggressive
+original MemoryPack binary wire format for non-`System.Type` payloads while using a fully renamed API,
+context-owned formatter graphs, .NET 10 and .NET 11 targets, and aggressive
 performance optimizations. See [NOTICE](NOTICE) for attribution.
+
+Starting in SharpPack 2.0, `System.Type` payloads are disabled by default.
+When enabled, they use explicitly registered, context-owned stable IDs instead
+of the Type names written by 1.1.0.
+See [Type payload migration](docs/formatter-context.md#systemtype-payload-capability)
+before upgrading applications that exchange Type values.
+
+NativeAOT and trimming now preserve generated formatter factories precisely.
+Upgrade Core and Generator together and rebuild generated model assemblies.
+Handwritten factory implementations require explicit startup preservation or
+formatter registration. See [AOT factory migration](docs/aot-factory-migration.md)
+before upgrading deserialize-only applications.
 
 Its speed comes from a C#-specific binary format, modern .NET APIs, generic
 static formatter dispatch, and an incremental source generator. The format
@@ -32,20 +44,24 @@ Other than performance, SharpPack has these features.
 
 Installation
 ---
-SharpPack 1.x targets .NET 10 and uses C# 14.
+SharpPack 2.0 supports .NET 10 and .NET 11. `SharpPack.Core` contains an asset
+for each runtime.
 
 Install the aggregate runtime and source-generator package from NuGet:
 
 ```shell
-dotnet add package SharpPack --version 1.1.0
+dotnet add package SharpPack --version 2.0.0
 ```
 
 Versioned packages and symbols are also attached to
 [GitHub Releases](https://github.com/SunSi12138/SharpPack/releases).
 
-The runtime packages target `net10.0`. `SharpPack.Generator` targets
-`netstandard2.0` only because Roslyn analyzers are loaded by the compiler host;
-that target does not add a `netstandard` runtime support promise.
+For source generation on .NET 10, use a C# 14 compiler (.NET 10 SDK or
+Visual Studio 2026 / Roslyn 5.0 or newer). Native `union` declarations require
+C# 15. Building this repository
+requires the .NET 11 SDK; running its .NET 10 checks also needs .NET 10.
+`SharpPack.Generator` targets `netstandard2.0` to load in the compiler host;
+that is not a runtime target for serialized applications.
 
 Quick Start
 ---
@@ -153,6 +169,10 @@ for lifecycle rules, migration details and architecture. A complete executable
 example is available in
 [`sandbox/CollectibleAlcSample`](sandbox/CollectibleAlcSample).
 
+To serialize a third-party type without changing it or writing a formatter,
+declare its closed type at compile time and add the generated provider to your
+context. See [Generate formatters for external types](docs/formatter-context.md#generate-formatters-for-external-types).
+
 See [SharpPack versus MemoryPack benchmarks](docs/benchmarks.md) for the
 reproducible NuGet-only comparison and current latency, throughput and
 allocation results. SharpPack 1.1.0 matches MemoryPack 1.21.4 for unmanaged
@@ -172,6 +192,10 @@ These types can be serialized by default:
 * Unmanaged types (Any `enum`, Any user-defined `struct` which doesn't contain reference types)
 * `string`, `decimal`, `Half`, `Int128`, `UInt128`, `Guid`, `Rune`, `BigInteger`
 * `TimeSpan`,  `DateTime`, `DateTimeOffset`, `TimeOnly`, `DateOnly`, `TimeZoneInfo`
+* On .NET 11 with SharpPack 2.0: `BFloat16`, `Decimal32`, `Decimal64`, and
+  `Decimal128`. Like other unmanaged scalars, they preserve the runtime
+  representation (2, 4, 8, and 16 bytes respectively), including signed
+  zero and NaN encodings.
 * `Complex`, `Plane`, `Quaternion` `Matrix3x2`, `Matrix4x4`, `Vector2`, `Vector3`, `Vector4`
 * `Uri`, `Version`, `StringBuilder`, `Type`, `BitArray`, `CultureInfo`
 * `T[]`, `T[,]`, `T[,,]`, `T[,,,]`, `Memory<>`, `ReadOnlyMemory<>`, `ArraySegment<>`, `ReadOnlySequence<>`
@@ -183,6 +207,31 @@ These types can be serialized by default:
 * `IDictionary<,>`, `IReadOnlyDictionary<,>`, `ILookup<,>`, `IGrouping<,>`,
 * `ConcurrentBag<>`, `ConcurrentQueue<>`, `ConcurrentStack<>`, `ConcurrentDictionary<,>`, `BlockingCollection<>`
 * Immutable collections (`ImmutableList<>`, etc.) and interfaces (`IImmutableList<>`, etc.)
+
+### Importing legacy .NET `DateTimeOffset` data
+
+Use a dedicated context when reading little-endian .NET 9 data. .NET 9 stored
+the offset in two bytes; .NET 10 and later use four. The opt-in formatter
+reads both layouts and writes the .NET 10 layout, without changing default
+serialization.
+
+```csharp
+using SharpPack.Formatters;
+
+var migration = new SharpPackSerializerContextBuilder()
+    .Register(new DotNetDateTimeOffsetFormatter())
+    .Build();
+DateTimeOffset value = SharpPackSerializer.Deserialize<DateTimeOffset>(legacyBytes, migration);
+byte[] updatedBytes = SharpPackSerializer.Serialize(value, migration);
+```
+
+The same context works for `DateTimeOffset[]`, `List<DateTimeOffset>` and
+direct `DateTimeOffset` members in generated classes when you keep the original
+schema. For data stored as a raw `DateTimeOffset?` or inside another raw
+unmanaged struct, migrate that whole shape on the original runtime or with an
+explicit formatter for its layout. The scalar override does not decode those
+raw layouts or the Unity layout. See the
+[reported .NET 9 wire sample](https://github.com/Cysharp/MemoryPack/issues/473).
 
 Define `[SharpPackable]` `class` / `struct` / `record` / `record struct`
 ---
@@ -270,7 +319,18 @@ SharpPack supports both parameterized and parameterless constructors. The select
 * If there is no explicit constructor (including private), use a parameterless one.
 * If there is one parameterless/parameterized constructor (including private), use it.
 * If there are multiple constructors, then the `[SharpPackConstructor]` attribute must be applied to the desired constructor (the generator will not automatically choose one), otherwise the generator will emit an error.
-* If using a parameterized constructor, all parameter names must match corresponding member names (case-insensitive).
+* Each parameter must match one serialized member. Exact names are preferred; case-insensitive matching and the `_` backing-field prefix are supported. Ambiguous matches are errors.
+
+A property explicitly marked `[SharpPackInclude]` needs an accessible setter or
+a matching constructor parameter. An ordinary computed property can still be
+serialized without being populated on a read.
+
+Classes using `GenerateType.CircularReference` require a parameterless
+constructor. They can restore accessible `init` and `required` members while
+preserving shared references. Serialized `init` members require a fresh
+instance on a `ref` read; writable `required` members without `init` members
+can reuse the destination. For these class layouts, missing wire slots keep
+the values from the constructor or the reused instance.
 
 ```csharp
 [SharpPackable]
@@ -309,6 +369,37 @@ public partial class Person3
     }
 }
 ```
+
+### C# 15 unions on .NET 11
+
+Mark a compiler-declared `partial union` with `[SharpPackable]` and assign an
+explicit `[SharpPackUnion]` tag to every case:
+
+```csharp
+[SharpPackable]
+[SharpPackUnion(7, typeof(int))]
+[SharpPackUnion(300, typeof(string))]
+public partial union Reading(int, string);
+```
+
+```csharp
+Reading reading = new(42);
+byte[] bytes = SharpPackSerializer.Serialize(reading);
+Reading restored = SharpPackSerializer.Deserialize<Reading>(bytes);
+```
+
+The tag is part of the binary schema; reordering cases does not change it.
+Cases need distinct concrete runtime types and supported formatters. A reference
+case is serialized only when its value has the exact declared runtime type. A
+nullable value case uses its underlying type when boxed, so `int` and `int?`
+cannot both be cases in the same union. Empty contents, including a null case
+value, use the empty union representation. Existing interface and abstract
+class unions keep their current format.
+
+C# 15 `closed` class and record hierarchies also use `[SharpPackUnion]` on the
+base type and `[SharpPackable]` on each serialized concrete subtype. Assign
+explicit tags as for other class unions; `closed` does not change the wire
+format or assign tags automatically.
 
 ### Serialization callbacks
 
@@ -417,19 +508,19 @@ Packages
 * `SharpPack.Generator` — Roslyn incremental source generator
 * `SharpPack.Streaming` — `PipeReader`/`PipeWriter` and streaming APIs
 
+When using the split packages, upgrade Core and Generator together. Starting
+with SharpPack 2.0, Streaming's package requires the exact matching Core
+version because it uses Core internals.
+
 TypeScript
 ---
-SharpPack supports TypeScript code generation. It generates class and serialization code from C#, In other words, you can share types with the Browser without using OpenAPI, proto, etc.
-
-Code generation is integrated with Source Generator, the following options(`SharpPackGenerator_TypeScriptOutputDirectory`) set the output directory for TypeScript code. Runtime code is output at the same time, so no additional dependencies are required.
+Share C# types with a browser by setting the TypeScript output directory in
+your project file. A successful `dotnet build` writes the model and TypeScript
+runtime files there; no additional TypeScript package is needed.
 
 ```xml
-<!-- output sharppack TypeScript code to directory -->
-<ItemGroup>
-    <CompilerVisibleProperty Include="SharpPackGenerator_TypeScriptOutputDirectory" />
-</ItemGroup>
 <PropertyGroup>
-    <SharpPackGenerator_TypeScriptOutputDirectory>$(MSBuildProjectDirectory)\wwwroot\js\sharppack</SharpPackGenerator_TypeScriptOutputDirectory>
+    <SharpPackGenerator_TypeScriptOutputDirectory>$(MSBuildProjectDirectory)/wwwroot/js/sharppack</SharpPackGenerator_TypeScriptOutputDirectory>
 </PropertyGroup>
 ```
 
@@ -568,46 +659,99 @@ There are a few restrictions on the types that can be generated. Among the primi
 | `[SharpPackable]` | `class` | Supports class only
 | `[SharpPackUnion]` | `abstract class` |
 
-`[GenerateTypeScript]` can only be applied to classes and is currently not supported by struct.
+`[GenerateTypeScript]` supports classes, record classes, and union interfaces,
+not structs.
 
 ### Configure import file extension and member name casing
 
-In default, SharpPack generates file extension as `.js` like `import { SharpPackWriter } from "./SharpPackWriter.js";`. If you want to change other extension or empty, use `SharpPackGenerator_TypeScriptImportExtension` to configure it.
-Also the member name is automatically converted to camelCase. If you want to use original name, use `SharpPackGenerator_TypeScriptConvertPropertyName` to `false`.
+Imports use `.js` and member names use camelCase by default. Change these
+settings to match your TypeScript project:
 
 ```xml
-<ItemGroup>
-    <CompilerVisibleProperty Include="SharpPackGenerator_TypeScriptOutputDirectory" />
-    <CompilerVisibleProperty Include="SharpPackGenerator_TypeScriptImportExtension" />
-    <CompilerVisibleProperty Include="SharpPackGenerator_TypeScriptConvertPropertyName" />
-    <CompilerVisibleProperty Include="SharpPackGenerator_TypeScriptEnableNullableTypes" />
-</ItemGroup>
 <PropertyGroup>
-    <SharpPackGenerator_TypeScriptOutputDirectory>$(MSBuildProjectDirectory)\wwwroot\js\sharppack</SharpPackGenerator_TypeScriptOutputDirectory>
-    <!-- allows empty -->
-    <SharpPackGenerator_TypeScriptImportExtension></SharpPackGenerator_TypeScriptImportExtension>
-    <!-- default is true -->
+    <SharpPackGenerator_TypeScriptImportExtension>.mjs</SharpPackGenerator_TypeScriptImportExtension>
     <SharpPackGenerator_TypeScriptConvertPropertyName>false</SharpPackGenerator_TypeScriptConvertPropertyName>
-    <!-- default is false -->
     <SharpPackGenerator_TypeScriptEnableNullableTypes>true</SharpPackGenerator_TypeScriptEnableNullableTypes>
 </PropertyGroup>
 ```
 
-`SharpPackGenerator_TypeScriptEnableNullableTypes` allows C# nullable annotations to be reflected in TypeScript code. The default is false, making everything nullable.
+`SharpPackGenerator_TypeScriptEnableNullableTypes` copies C# nullable reference
+annotations into TypeScript; otherwise generated reference types allow null.
+For extensionless imports, leave the extension property empty and explicitly
+include it as a `CompilerVisibleProperty`. Without that item, an omitted or
+empty property uses `.js`.
+
+### Manage generated files and serialization logs
+
+To also write a text description of the serialization layout, configure the
+serialization-info output directory:
+
+```xml
+<PropertyGroup>
+    <SharpPackGenerator_SerializationInfoOutputDirectory>$(BaseIntermediateOutputPath)SharpPackLogs</SharpPackGenerator_SerializationInfoOutputDirectory>
+</PropertyGroup>
+```
+
+Use one output directory per project (the two SharpPack outputs in the same
+project may share a directory). SharpPack keeps an ownership file next to the
+generated files and removes only unchanged files it previously generated and
+no longer needs. It leaves unrelated files and customized TypeScript runtime
+files alone. IDE design-time builds do not write artifacts. A multi-targeted
+build writes artifacts only after all frameworks succeed. The first framework
+supplies the artifacts; set `SharpPackToolingTargetFramework` to pick another.
+Set `SharpPackToolingEnabled=false` to turn off both artifact outputs without
+disabling C# formatter generation.
+
+For a directory created by the legacy generator, build into a new directory or
+run one build with `-p:SharpPackToolingAdoptExisting=true`. Adoption claims only
+files that exactly match the current output. Move any edited model or log file
+out of the directory before retrying a build that reports a conflict.
 
 Streaming Serialization
 ---
-`SharpPack.Streaming` provides `SharpPackStreamingSerializer`, which adds additional support for serializing and deserializing collections with streams.
+`SharpPack.Streaming` provides `SharpPackStreamingSerializer` for collection streaming and framed item transports.
+
+The collection `SerializeAsync<T>(..., int count, IEnumerable<T> source, ...)` overloads require `count` to match the source exactly. The destination, source, non-negative `count`, and positive `flushRate` are validated before the collection header is written. When the source exposes a count without enumeration, a mismatch also fails before the first output byte. Arbitrary lazy `IEnumerable<T>` sources are not pre-enumerated or buffered: SharpPack writes at most the declared number of items, probes once for a `(count + 1)`th item without serializing it, and fails if the source ends early or contains an extra item.
+
+Collection output is caller-owned and non-transactional. For a lazy source, an underflow, enumeration exception, cancellation, or other failure may leave a partial collection payload already written to the destination; SharpPack does not roll it back. For truly lazy item streams whose count is not a protocol fact known in advance, prefer the framed item streaming APIs rather than declaring a normal collection count.
+
+The legacy `DeserializeAsync<T>` collection API is unframed. It can safely make progress when an item is known to be complete from the payload shape, but buffer occupancy alone cannot prove completeness for arbitrary variable-size items such as large strings, nested collections, custom formatters, or reference-aware objects. Do not use `bufferAtLeast` or `readMinimumSize` as message-boundary controls.
+
+For arbitrary variable-size items, use the additive length-prefixed transport APIs. Each frame is:
+
+```text
+uint32 payloadLength (little endian)
+SharpPack payload bytes
+```
+
+The 4-byte prefix belongs to `SharpPack.Streaming`; it is not part of the standard SharpPack/MemoryPack-compatible payload. The sender buffers one item to determine its payload length, and the receiver waits for the complete declared payload before invoking Core deserialization. Multiple frames can be read with `DeserializeLengthPrefixedItemsAsync<T>`.
+
+Cancellation before a frame header is consumed leaves the reader aligned and the length-prefixed APIs can be called again. If cancellation interrupts payload collection after the frame header has been consumed, the remaining frame boundary cannot be recovered without resumable per-frame state. SharpPack therefore treats that `PipeReader` as terminal for the length-prefixed APIs: the canceled call throws `OperationCanceledException`, and subsequent length-prefixed reads throw `InvalidOperationException`. The caller still owns and completes the `PipeReader`; start a new framed transport before resuming framed deserialization.
 
 ```csharp
-public static class SharpPackStreamingSerializer
+await SharpPackStreamingSerializer.SerializeLengthPrefixedAsync(
+    pipe.Writer,
+    message,
+    context,
+    cancellationToken);
+
+MyMessage? single = await SharpPackStreamingSerializer
+    .DeserializeLengthPrefixedAsync<MyMessage>(
+        pipe.Reader,
+        context: context,
+        cancellationToken: cancellationToken);
+
+await foreach (var item in SharpPackStreamingSerializer
+                   .DeserializeLengthPrefixedItemsAsync<MyMessage>(
+                       pipe.Reader,
+                       context: context,
+                       cancellationToken: cancellationToken))
 {
-    public static async ValueTask SerializeAsync<T>(PipeWriter pipeWriter, int count, IEnumerable<T> source, int flushRate = 4096, CancellationToken cancellationToken = default)
-    public static async ValueTask SerializeAsync<T>(Stream stream, int count, IEnumerable<T> source, int flushRate = 4096, CancellationToken cancellationToken = default)
-    public static async IAsyncEnumerable<T?> DeserializeAsync<T>(PipeReader pipeReader, int bufferAtLeast = 4096, int readMinimumSize = 8192, [EnumeratorCancellation] CancellationToken cancellationToken = default)
-    public static IAsyncEnumerable<T?> DeserializeAsync<T>(Stream stream, int bufferAtLeast = 4096, int readMinimumSize = 8192, CancellationToken cancellationToken = default)
+    // one complete frame per item
 }
 ```
+
+The existing `SerializeFrameAsync` / `DeserializeFrameAsync` pair remains available when an outer protocol already owns and supplies the payload length. Those methods do not write or read the 4-byte SharpPack.Streaming length prefix.
 
 Custom formatter API
 ---
@@ -623,17 +767,20 @@ var context = new SharpPackSerializerContextBuilder()
 
 RPC
 ---
-For length-prefixed transports, `SharpPack.Streaming` exposes `SerializeFrameAsync` and `DeserializeFrameAsync`. The frame boundary is transport metadata and does not alter the SharpPack payload.
+For transports that already know the payload length, `SerializeFrameAsync` and `DeserializeFrameAsync` operate on exactly that caller-owned payload boundary. For a self-contained SharpPack.Streaming frame with its own 4-byte little-endian length prefix, use `SerializeLengthPrefixedAsync`, `DeserializeLengthPrefixedAsync`, or `DeserializeLengthPrefixedItemsAsync`. In both cases, transport framing is outside the SharpPack payload and does not alter Core wire bytes.
 
 Native AOT
 ---
 Generated formatters and the generic runtime path are designed for Native AOT. Reflection-based cold shape discovery must be preserved when trimming an application that relies on runtime generic shapes.
 
-Closed generic shapes used only as serializer roots, such as a custom
-`T[]`, may not otherwise have native generic code rooted by a generated
-model. Reference their closed formatter statically, or register it through a
-Context during startup. For example, a custom public factory can be rooted
-without reflection by using
+With the generator in the calling project, a direct `Deserialize<MyModel[]>`
+keeps the array formatter and the generated element factory when the model
+has an accessible global name. See the [array rooting guide](docs/aot-factory-migration.md#deserialize-an-array-without-an-earlier-write)
+for generic wrappers and other cases that need an explicit root.
+
+Other closed generic shapes used only as serializer roots may need a static
+formatter reference or context registration. A custom public factory can be
+rooted without reflection by using
 `SharpPackSerializerContextBuilder.RegisterFactory<T, TFactory>()`. The
 default generated factories are explicit static interface implementations and
 are preserved automatically. A public `CreateFormatter` discovered only by
@@ -709,3 +856,4 @@ First unsigned byte is tag that for discriminated value type or flag, `0` to `24
 License
 ---
 This library is licensed under the MIT License.
+

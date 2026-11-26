@@ -10,7 +10,6 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography.X509Certificates;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace SharpPack.Tests;
@@ -31,20 +30,21 @@ public partial class GeneratorDiagnosticsTest
         }
     }
 
-    string CompileAndRead(string code, string fileName, bool enableNullableTypes = true)
+    string CompileAndRead(string code, string fileName, bool enableNullableTypes = true, bool convertPropertyName = true)
     {
-        var outputDir = Path.GetTempPath();
         var optionProvider = new TypeScriptOptionProvider();
-
-        optionProvider["build_property.SharpPackGenerator_TypeScriptOutputDirectory"] = outputDir;
         optionProvider["build_property.SharpPackGenerator_TypeScriptEnableNullableTypes"] = enableNullableTypes ? "true" : "false";
+        optionProvider["build_property.SharpPackGenerator_TypeScriptConvertPropertyName"] = convertPropertyName ? "true" : "false";
 
-        CSharpGeneratorRunner.RunGenerator(code, options: optionProvider);
-
-        var outputFilePath = Path.Combine(outputDir, fileName);
-
-        return File.ReadAllText(outputFilePath);
+        var (compilation, diagnostics) = CSharpGeneratorRunner.RunGenerator(code, options: optionProvider);
+        Assert.Empty(diagnostics);
+        using var reader = new StringReader(ArtifactSource(compilation).ToString());
+        var plan = Assert.IsType<TypeScriptArtifactPlan>(ArtifactSchema.ReadSource(reader).TypeScript);
+        return Assert.Single(TypeScriptEmitter.RenderFiles(plan), file => file.Name == fileName).Source;
     }
+
+    static SyntaxTree ArtifactSource(Compilation compilation)
+        => Assert.Single(compilation.SyntaxTrees, tree => tree.FilePath.EndsWith(ArtifactSchema.FileName, StringComparison.Ordinal));
 
     [Fact]
     public void SHARPPACK027_GenerateTypeScriptMustBeSharpPackable()
@@ -218,10 +218,76 @@ public partial class Hoge
             """);
     }
 
-
-    class TypeScriptOptionProvider : AnalyzerConfigOptionsProvider
+    [Fact]
+    public void GenerateTypeScriptCanPreservePropertyNames()
     {
-        readonly Dictionary<string, string> _values = new();
+        var code = CompileAndRead("""
+            [SharpPackable, GenerateTypeScript] public partial class Counters
+            {
+                public int URLCount { get; set; }
+            }
+            """, "Counters.ts", convertPropertyName: false);
+
+        Assert.Contains("URLCount: number;", code);
+        Assert.Contains("writer.writeInt32(value.URLCount);", code);
+        Assert.Contains("value.URLCount = reader.readInt32();", code);
+    }
+
+
+    [Fact]
+    public void CompilerEmitsACompleteArtifactPlanWithoutWritingToTheDestination()
+    {
+        const string source = """
+            [SharpPackable, GenerateTypeScript, SharpPackUnion(19, typeof(Update))]
+            public partial interface IEvent;
+
+            [SharpPackable, GenerateTypeScript]
+            public partial class Update : IEvent
+            {
+                public string? Description { get; set; }
+                public State Status { get; set; }
+            }
+
+            public enum State : byte { Active = 1, Closed = 4 }
+            """;
+
+        var destination = Path.Combine(Path.GetTempPath(), $"SharpPack artifact plan 测试 {Guid.NewGuid():N}");
+        var tooling = new TypeScriptOptionProvider
+        {
+            ["build_property.SharpPackGenerator_TypeScriptOutputDirectory"] = destination,
+            ["build_property.SharpPackGenerator_TypeScriptImportExtension"] = ".mjs",
+            ["build_property.SharpPackGenerator_SerializationInfoOutputDirectory"] = destination,
+        };
+        var (compilation, diagnostics) = CSharpGeneratorRunner.RunGenerator(source, options: tooling);
+        Assert.Empty(diagnostics);
+        Assert.False(Directory.Exists(destination));
+
+        var text = ArtifactSource(compilation).ToString();
+        using var reader = new StringReader(text);
+        var plan = ArtifactSchema.ReadSource(reader);
+        Assert.Equal(text, ArtifactSchema.WriteSource(plan));
+        var script = Assert.IsType<TypeScriptArtifactPlan>(plan.TypeScript);
+        Assert.Equal(["IEvent.ts", "SharpPackReader.ts", "SharpPackWriter.ts", "State.ts", "Update.ts"],
+            TypeScriptEmitter.RenderFiles(script).Select(file => file.Name).OrderBy(name => name, StringComparer.Ordinal));
+        Assert.Equal("Update.txt", Assert.Single(plan.SerializationInfo).FileName);
+
+        foreach (var (mode, designTime) in new[] { ("plan", "true"), ("none", "false") })
+        {
+            tooling["build_property.SharpPackGenerator_ArtifactMode"] = mode;
+            tooling["build_property.DesignTimeBuild"] = designTime;
+            var (disabled, _) = CSharpGeneratorRunner.RunGenerator(source, options: tooling);
+            Assert.DoesNotContain(disabled.SyntaxTrees, tree => tree.FilePath.EndsWith(ArtifactSchema.FileName, StringComparison.Ordinal));
+            Assert.False(Directory.Exists(destination));
+        }
+    }
+
+    internal sealed class TypeScriptOptionProvider : AnalyzerConfigOptionsProvider
+    {
+        readonly Dictionary<string, string> _values = new()
+        {
+            ["build_property.SharpPackGenerator_ArtifactMode"] = "plan",
+            ["build_property.SharpPackGenerator_TypeScriptOutputDirectory"] = "typescript",
+        };
 
         public string this[string key]
         {
@@ -254,23 +320,7 @@ public partial class Hoge
             public override IEnumerable<string> Keys => _configValues.Keys;
 
             public override bool TryGetValue(string key, [NotNullWhen(true)] out string? value)
-            {
-                if (_configValues.ContainsKey(key))
-                {
-                    value = _configValues[key];
-
-                    return true;
-                }
-
-                if (key == "build_property.SharpPackGenerator_TypeScriptOutputDirectory")
-                {
-                    value = Path.GetTempPath();
-                    return true;
-                }
-
-                value = null;
-                return false;
-            }
+                => _configValues.TryGetValue(key, out value);
         }
     }
 }

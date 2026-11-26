@@ -1,8 +1,3 @@
-
-#pragma warning disable CS8618
-#pragma warning disable CS0649
-
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace SharpPack.Internal;
@@ -18,20 +13,5 @@ internal static class CollectionsMarshalEx
         list.EnsureCapacity(length);
         CollectionsMarshal.SetCount(list, length);
         return CollectionsMarshal.AsSpan(list);
-    }
-
-    public static Span<T?> AsSpan<T>(Stack<T?> stack)
-    {
-        ref var view = ref Unsafe.As<Stack<T?>, StackView<T?>>(ref stack);
-        return view._items.AsSpan(0, view._size);
-    }
-
-    // NOTE: These structure depndent on .NET 7, if changed, require to keep same structure.
-
-    internal sealed class StackView<T>
-    {
-        public T[] _items;
-        public int _size;
-        public int _version;
     }
 }

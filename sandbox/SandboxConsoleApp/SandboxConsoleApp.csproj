@@ -16,16 +16,13 @@
 
     <ItemGroup>
         <PackageReference Include="ConsoleAppFramework" Version="4.2.3" />
-        <PackageReference Include="MessagePack" Version="3.1.8" />
+        <PackageReference Include="MessagePack" Version="3.1.9" />
         <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
     </ItemGroup>
 
-    <!-- output memoerypack serialization info to directory -->
-    <ItemGroup>
-        <CompilerVisibleProperty Include="SharpPackGenerator_SerializationInfoOutputDirectory" />
-    </ItemGroup>
     <PropertyGroup>
         <SharpPackGenerator_SerializationInfoOutputDirectory>$(MSBuildProjectDirectory)\SharpPackLogs</SharpPackGenerator_SerializationInfoOutputDirectory>
+        <SharpPackToolingAdoptExisting>true</SharpPackToolingAdoptExisting>
     </PropertyGroup>
 
 
@@ -36,6 +33,9 @@
             <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         </ProjectReference>
         <ProjectReference Include="..\..\src\SharpPack.Streaming\SharpPack.Streaming.csproj" />
+        <ProjectReference Include="..\..\src\SharpPack.Tooling\SharpPack.Tooling.csproj"
+                          ReferenceOutputAssembly="false" OutputItemType="_SharpPackToolingAssembly" />
     </ItemGroup>
+    <Import Project="..\..\src\SharpPack.Generator\build\SharpPack.Generator.targets" />
 
 </Project>

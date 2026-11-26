@@ -160,48 +160,14 @@ internal static class Extensions
     }
 
     public static bool IsSharpPackableNoGenerate(this ITypeSymbol symbol, ReferenceSymbols references)
-    {
-        var memPackAttr = symbol.GetAttribute(references.SharpPackableAttribute);
-        var packableCtorArgs = memPackAttr?.ConstructorArguments;
-        if (memPackAttr == null || packableCtorArgs == null)
-        {
-            return false;
-        }
-        else if (packableCtorArgs.Value.Length != 0)
-        {
-            // SharpPackable has three attribtues
-            // [GenerateType generateType]
-            // [SerializeLayout serializeLayout]
-            // [GenerateType generateType, SerializeLayout serializeLayout]
+        => symbol.GetAttribute(references.SharpPackableAttribute) is { } attribute &&
+            attribute.IsSharpPackableNoGenerate();
 
-            if (packableCtorArgs.Value.Length == 1)
-            {
-                var ctorValue = packableCtorArgs.Value[0];
-
-                // check which constructor was used
-                var attrConstructor = memPackAttr.AttributeConstructor;
-                var isSerializeLayout = attrConstructor!.Parameters[0].Type.Name == nameof(SerializeLayout);
-                if (isSerializeLayout)
-                {
-                    return false;
-                }
-                else
-                {
-
-                    var generateType = (GenerateType)(ctorValue.Value!);
-                    return generateType is GenerateType.NoGenerate;
-                }
-            }
-            else
-            {
-                var generateType = (GenerateType)(packableCtorArgs.Value[0].Value ?? GenerateType.Object);
-
-                return generateType is GenerateType.NoGenerate;
-            }
-        }
-
-        return false;
-    }
+    public static bool IsSharpPackableNoGenerate(this AttributeData attribute)
+        => attribute.AttributeConstructor?.Parameters is { Length: > 0 } parameters &&
+            parameters[0].Type.Name == nameof(GenerateType) &&
+            attribute.ConstructorArguments is { Length: > 0 } arguments &&
+            arguments[0].Value is int mode && mode == (int)GenerateType.NoGenerate;
 
     public static bool IsWillImplementSharpPackUnion(this ITypeSymbol symbol, ReferenceSymbols references)
     {
@@ -284,11 +250,53 @@ internal static class Extensions
 
         return constructorParameter != null;
 
-        static IParameterSymbol? GetConstructorParameter(IMethodSymbol constructor, string name) => constructor.Parameters.FirstOrDefault(x => x.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        static IParameterSymbol? GetConstructorParameter(IMethodSymbol constructor, string name)
+            => constructor.Parameters.FirstOrDefault(parameter => parameter.Name == name)
+                ?? constructor.Parameters.FirstOrDefault(parameter => parameter.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
     }
 
-    public static bool ContainsConstructorParameter(this IEnumerable<MemberMeta> members, IParameterSymbol constructorParameter) =>
-        members.Any(x =>
-            x.IsConstructorParameter &&
-            string.Equals(constructorParameter.Name, x.ConstructorParameterName, StringComparison.OrdinalIgnoreCase));
+    internal static T[] FindConstructorBindings<T>(IEnumerable<T> candidates, Func<T, string?> getBinding, string parameter)
+    {
+        var exact = candidates.Where(candidate => getBinding(candidate) == parameter).ToArray();
+        // A single legacy slot can supply parameters that differ only by case. If each
+        // spelling has its own slot, the exact match takes precedence.
+        return exact.Length != 0 ? exact : candidates.Where(candidate =>
+            string.Equals(getBinding(candidate), parameter, StringComparison.OrdinalIgnoreCase)).ToArray();
+    }
+
+    internal static bool HasGlobalTypeName(this ITypeSymbol type, Compilation compilation, ISymbol accessibleWithin,
+        CancellationToken token, Func<INamedTypeSymbol, bool>? canUseType = null)
+    {
+        if (type is IArrayTypeSymbol array)
+            return array.ElementType.HasGlobalTypeName(compilation, accessibleWithin, token, canUseType);
+        if (type is INamedTypeSymbol { TupleUnderlyingType: { } tuple })
+            type = tuple;
+
+        if (type is not INamedTypeSymbol named || !named.CanBeReferencedByName ||
+            !compilation.IsSymbolAccessibleWithin(named, accessibleWithin))
+            return false;
+
+        for (var current = named; current is not null; current = current.ContainingType)
+        {
+            if (canUseType?.Invoke(current) == false ||
+                current.DeclaringSyntaxReferences.Any(declaration => declaration.GetSyntax(token) is TypeDeclarationSyntax syntax &&
+                    syntax.Modifiers.Any(static modifier => modifier.ValueText == "file")) ||
+                !current.TypeArguments.All(argument => argument.HasGlobalTypeName(compilation, accessibleWithin, token, canUseType)))
+                return false;
+        }
+
+        // Metadata lookup excludes alias-only references and reports ambiguity;
+        // a global name must bind back to this exact definition.
+        return SymbolEqualityComparer.Default.Equals(compilation.GetTypeByMetadataName(named.GetFullMetadataName()), named.OriginalDefinition);
+    }
+
+    internal static string GetFullMetadataName(this INamedTypeSymbol named)
+    {
+        var name = named.MetadataName;
+        for (var enclosing = named.ContainingType; enclosing is not null; enclosing = enclosing.ContainingType)
+            name = enclosing.MetadataName + "+" + name;
+        for (var space = named.ContainingNamespace; !space.IsGlobalNamespace; space = space.ContainingNamespace)
+            name = space.MetadataName + "." + name;
+        return name;
+    }
 }

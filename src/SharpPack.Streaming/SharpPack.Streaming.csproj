@@ -10,12 +10,31 @@
         <!-- NuGet -->
         <IsPackable>true</IsPackable>
         <PackageId>SharpPack.Streaming</PackageId>
-        <PackageTags>serializer;streaming;pipelines;zero-copy;memorypack-compatible</PackageTags>
+        <PackageTags>serializer streaming pipelines zero-copy memorypack-compatible</PackageTags>
         <Description>PipeReader, PipeWriter, and framed streaming support for SharpPack.</Description>
+        <NuspecFile>$(MSBuildProjectDirectory)/SharpPack.Streaming.nuspec</NuspecFile>
+        <NuspecBasePath>$(MSBuildProjectDirectory)</NuspecBasePath>
     </PropertyGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\SharpPack.Core\SharpPack.Core.csproj" />
     </ItemGroup>
+
+    <!-- Unlike the SDK's minimum-version project dependency, Streaming needs the
+         exact Core it was built against: it calls Core internals. -->
+    <Target Name="SetStreamingPackIdentity" BeforeTargets="_GetOutputItemsFromPack">
+        <!-- NuGet 11 reads the custom nuspec identity to compute output paths
+             before GenerateNuspec (which sets the full metadata and file list). -->
+        <PropertyGroup>
+            <NuspecProperties>id=$(PackageId);version=$(PackageVersion)</NuspecProperties>
+        </PropertyGroup>
+    </Target>
+
+    <Target Name="SetStreamingPackProperties" BeforeTargets="GenerateNuspec">
+        <PropertyGroup>
+            <StreamingSymbolExclusion Condition="'$(IncludeSymbols)' != 'true'">$(TargetDir)SharpPack.Streaming.pdb</StreamingSymbolExclusion>
+            <NuspecProperties>id=$(PackageId);version=$(PackageVersion);authors=$(Authors);description=$(Description);copyright=$([MSBuild]::Escape('$(Copyright)'));tags=$(PackageTags);projectUrl=$(PackageProjectUrl);repositoryUrl=$(RepositoryUrl);repositoryType=$(RepositoryType);commit=$(RepositoryCommit);branch=$(RepositoryBranch);output=$(TargetDir);root=$(MSBuildProjectDirectory)/../../;symbolExclusion=$(StreamingSymbolExclusion)</NuspecProperties>
+        </PropertyGroup>
+    </Target>
 
 </Project>

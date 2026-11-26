@@ -244,7 +244,43 @@ public class StreamingSerializer
     }
 
     [Fact]
-    public async Task DeserializeRegistersFreshContextRootType()
+    public async Task DeserializeLegacyCollection_LeavesInputAvailableAfterLimitRejection()
+    {
+        var payload = SharpPackSerializer.Serialize(new[] { 1, 2, 3 });
+        var pipe = new Pipe();
+        await pipe.Writer.WriteAsync(payload.AsMemory(0, sizeof(int)));
+        var context = new SharpPackSerializerContext(
+            SharpPackSerializerConfiguration.Default with
+            {
+                ReadLimits = SharpPackReadLimits.Default with
+                {
+                    MaxCollectionLength = 2,
+                },
+            });
+
+        var error = await Assert.ThrowsAsync<SharpPackSerializationException>(async () =>
+        {
+            await foreach (var _ in SharpPackStreamingSerializer
+                               .DeserializeAsync<int>(
+                                   pipe.Reader,
+                                   bufferAtLeast: 4,
+                                   readMinimumSize: 4,
+                                   context))
+            {
+            }
+        });
+        Assert.Equal(SharpPackReadLimitKind.CollectionLength, error.ReadLimitKind);
+        await pipe.Writer.WriteAsync(payload.AsMemory(sizeof(int)));
+        await pipe.Writer.CompleteAsync();
+        Assert.True(pipe.Reader.TryRead(out var retry));
+        Assert.Equal(payload, retry.Buffer.ToArray());
+        pipe.Reader.AdvanceTo(retry.Buffer.End);
+
+        await pipe.Reader.CompleteAsync();
+    }
+
+    [Fact]
+    public async Task DeserializeUsesExplicitTypeRegistry()
     {
         var expected = new[]
         {
@@ -253,11 +289,12 @@ public class StreamingSerializer
                 Value = typeof(StreamingSerializer),
             },
         };
+        var context = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+            .RegisterType<StreamingSerializer>("streaming-test").Build();
         var pipe = new Pipe();
-        pipe.Writer.Write(SharpPackSerializer.Serialize(expected));
+        pipe.Writer.Write(SharpPackSerializer.Serialize(expected, context));
         await pipe.Writer.CompleteAsync();
 
-        var context = new SharpPackSerializerContext();
         var actual = new List<StreamingTypeValue?>();
         await foreach (var item in SharpPackStreamingSerializer
                            .DeserializeAsync<StreamingTypeValue>(
@@ -315,6 +352,62 @@ public class StreamingSerializer
                 pipe.Reader,
                 payload.Length + 1));
     }
+
+    [Fact]
+    public async Task SerializeAwaitsPipeBackpressure()
+    {
+        var pipe = new Pipe(new PipeOptions(
+            pauseWriterThreshold: 64,
+            resumeWriterThreshold: 32,
+            minimumSegmentSize: 16,
+            useSynchronizationContext: false));
+        var values = Enumerable.Range(0, 256).ToArray();
+
+        var serialization = SharpPackStreamingSerializer.SerializeAsync(
+            pipe.Writer,
+            values.Length,
+            values,
+            flushRate: 16).AsTask();
+
+        var writerCompletion = CompleteWriterAfterSerializationAsync();
+        try
+        {
+            serialization.IsCompleted.Should().BeFalse(
+                "the writer must await a blocked FlushAsync once the pipe reaches its pause threshold");
+
+            var read = await pipe.Reader.ReadAsync();
+            read.Buffer.Length.Should().BeGreaterThanOrEqualTo(64);
+            while (true)
+            {
+                pipe.Reader.AdvanceTo(read.Buffer.End);
+                if (read.IsCompleted)
+                {
+                    break;
+                }
+
+                read = await pipe.Reader.ReadAsync();
+            }
+        }
+        finally
+        {
+            await pipe.Reader.CompleteAsync();
+            await writerCompletion;
+        }
+
+        async Task CompleteWriterAfterSerializationAsync()
+        {
+            try
+            {
+                await serialization;
+            }
+            finally
+            {
+                // Wake the reader even if serialization fails after its last flush.
+                await pipe.Writer.CompleteAsync();
+            }
+        }
+    }
+
 }
 
 

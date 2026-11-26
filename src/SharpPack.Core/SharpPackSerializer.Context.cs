@@ -39,6 +39,15 @@ public static partial class SharpPackSerializer
         }
     }
 
+    /// <summary>
+    /// Serializes one value into a caller-owned <c>IBufferWriter&lt;byte&gt;</c>.
+    /// </summary>
+    /// <remarks>
+    /// The caller retains ownership of <paramref name="bufferWriter"/>. Output
+    /// is non-transactional: if serialization fails after writing has started,
+    /// the destination may contain a partial payload. SharpPack does not roll
+    /// back caller-owned writers, pipes, or streams.
+    /// </remarks>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Serialize<T, TBufferWriter>(
         ref TBufferWriter bufferWriter,
@@ -64,6 +73,15 @@ public static partial class SharpPackSerializer
         }
     }
 
+    /// <summary>
+    /// Serializes one value into a caller-owned <c>IBufferWriter&lt;byte&gt;</c>.
+    /// </summary>
+    /// <remarks>
+    /// The caller retains ownership of <paramref name="bufferWriter"/>. Output
+    /// is non-transactional: if serialization fails after writing has started,
+    /// the destination may contain a partial payload. SharpPack does not roll
+    /// back caller-owned writers, pipes, or streams.
+    /// </remarks>
     public static int Serialize<T, TBufferWriter>(
         TBufferWriter bufferWriter,
         scoped in T? value,
@@ -71,6 +89,17 @@ public static partial class SharpPackSerializer
         where TBufferWriter : class, IBufferWriter<byte>
         => Serialize(ref bufferWriter, value, context);
 
+    /// <summary>
+    /// Serializes one value to a caller-owned stream using the supplied
+    /// serializer context.
+    /// </summary>
+    /// <remarks>
+    /// SharpPack writes the payload, performs a final
+    /// <see cref="Stream.FlushAsync(CancellationToken)"/>, and leaves the stream
+    /// open. If serialization fails after writing has started, the destination
+    /// may contain a partial payload. SharpPack does not roll back caller-owned
+    /// writers, pipes, or streams.
+    /// </remarks>
     public static async ValueTask SerializeAsync<T>(
         Stream stream,
         T? value,
@@ -78,6 +107,9 @@ public static partial class SharpPackSerializer
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(stream);
+        cancellationToken.ThrowIfCancellationRequested();
+
         var tempWriter = ReusableLinkedArrayBufferWriterPool.Rent(
             out var tempWriterLeaseId);
         try
@@ -96,7 +128,7 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static T? Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(ReadOnlySpan<byte> buffer, SharpPackSerializerContext context)
     {
         T? value = default;
@@ -106,20 +138,32 @@ public static partial class SharpPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(
         ReadOnlySpan<byte> buffer,
         ref T? value,
         SharpPackSerializerContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        context.EnsureRootType<T>();
+        EnsurePayloadWithinLimit(buffer.Length, context);
+        return DeserializeWithContext(buffer, ref value, context);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static int DeserializeWithContext<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+        T>(
+        ReadOnlySpan<byte> buffer,
+        ref T? value,
+        SharpPackSerializerContext context)
+    {
         var state = AcquireReaderOptionalState();
         state.Init(context);
-        var reader = new SharpPackReader(buffer, state);
+        var reader = new SharpPackReader(buffer, state, context.MaxReadDepth, context.MaxCollectionLength);
         try
         {
-            reader.ReadValue(ref value);
+            reader.BeginRootRead();
+            context.GetFormatter<T>().Deserialize(ref reader, ref value);
             return reader.Consumed;
         }
         finally
@@ -130,7 +174,7 @@ public static partial class SharpPackSerializer
     }
 
     public static T? Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(
         in ReadOnlySequence<byte> buffer,
         SharpPackSerializerContext context)
@@ -141,20 +185,31 @@ public static partial class SharpPackSerializer
     }
 
     public static int Deserialize<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(
         in ReadOnlySequence<byte> buffer,
         ref T? value,
         SharpPackSerializerContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        context.EnsureRootType<T>();
+        EnsurePayloadWithinLimit(buffer.Length, context);
+        return DeserializeWithContext(buffer, ref value, context);
+    }
+
+    internal static int DeserializeWithContext<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+        T>(
+        in ReadOnlySequence<byte> buffer,
+        ref T? value,
+        SharpPackSerializerContext context)
+    {
         var state = AcquireReaderOptionalState();
         state.Init(context);
-        var reader = new SharpPackReader(buffer, state);
+        var reader = new SharpPackReader(buffer, state, context.MaxReadDepth, context.MaxCollectionLength);
         try
         {
-            reader.ReadValue(ref value);
+            reader.BeginRootRead();
+            context.GetFormatter<T>().Deserialize(ref reader, ref value);
             return reader.Consumed;
         }
         finally
@@ -169,93 +224,124 @@ public static partial class SharpPackSerializer
     /// serializer context.
     /// </summary>
     /// <remarks>
+    /// The caller owns <paramref name="stream"/> and SharpPack leaves it open.
     /// A buffer-backed <see cref="MemoryStream"/> advances by the bytes consumed
     /// by one value. Other streams are read through end-of-stream because a
     /// general <see cref="Stream"/> cannot return bytes read past that value.
-    /// Use the payload-length overload for framed or concatenated messages.
+    /// This read-to-end overload has no declared payload boundary, so it does
+    /// not require the formatter to consume every byte read from the stream.
+    /// Use the payload-length overload for framed or concatenated messages and
+    /// deterministic exact-consumption enforcement.
     /// </remarks>
     public static async ValueTask<T?> DeserializeAsync<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(
         Stream stream,
         SharpPackSerializerContext context,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
-        context.EnsureRootType<T>();
+        ArgumentNullException.ThrowIfNull(stream);
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (stream is MemoryStream memoryStream && memoryStream.TryGetBuffer(out var segment))
         {
             cancellationToken.ThrowIfCancellationRequested();
             T? value = default;
-            var consumed = Deserialize(
+            var consumed = DeserializeWithContext(
                 segment.AsSpan(checked((int)memoryStream.Position)),
                 ref value,
                 context);
+            EnsurePayloadWithinLimit(consumed, context);
             memoryStream.Seek(consumed, SeekOrigin.Current);
             return value;
         }
 
         var builder = ReusableReadOnlySequenceBuilderPool.Rent(
             out var builderLeaseId);
+        byte[]? pendingBuffer = null;
         try
         {
-            var buffer = ArrayPool<byte>.Shared.Rent(65536);
+            var maxPayloadBytes = context.MaxPayloadBytes;
+            pendingBuffer = ArrayPool<byte>.Shared.Rent(AllowProbeByte(65536, maxPayloadBytes));
             var offset = 0;
+            long totalRead = 0;
             while (true)
             {
-                if (offset == buffer.Length)
+                if (offset == pendingBuffer.Length)
                 {
-                    builder.Add(buffer, returnToPool: true);
-                    buffer = ArrayPool<byte>.Shared.Rent(
-                        Math.Min(
-                            MathEx.NewArrayCapacity(buffer.Length),
-                            MaximumStreamSegmentSize));
+                    var nextRequest = AllowProbeByte(
+                        Math.Min(MathEx.NewArrayCapacity(pendingBuffer.Length), MaximumStreamSegmentSize),
+                        maxPayloadBytes - totalRead);
+                    builder.Add(pendingBuffer, returnToPool: true);
+                    pendingBuffer = null; // Ownership transferred only after Add succeeds.
+                    pendingBuffer = ArrayPool<byte>.Shared.Rent(nextRequest);
                     offset = 0;
                 }
 
-                int read;
-                try
-                {
-                    read = await stream.ReadAsync(
-                        buffer.AsMemory(offset, buffer.Length - offset),
-                        cancellationToken).ConfigureAwait(false);
-                }
-                catch
-                {
-                    ArrayPool<byte>.Shared.Return(buffer);
-                    throw;
-                }
-
+                // A pool bucket can exceed the requested size. Bound the slice,
+                // including one probe byte to distinguish exact-limit EOF.
+                var read = await stream.ReadAsync(
+                    pendingBuffer.AsMemory(offset, AllowProbeByte(
+                        pendingBuffer.Length - offset,
+                        maxPayloadBytes - totalRead)),
+                    cancellationToken).ConfigureAwait(false);
                 offset += read;
+                totalRead += read;
+                EnsurePayloadWithinLimit(totalRead, context);
                 if (read == 0)
                 {
-                    builder.Add(buffer.AsMemory(0, offset), returnToPool: true);
+                    builder.Add(pendingBuffer.AsMemory(0, offset), returnToPool: true);
+                    pendingBuffer = null;
                     break;
                 }
             }
 
             if (builder.TryGetSingleMemory(out var memory))
             {
-                return Deserialize<T>(memory.Span, context);
+                T? singleValue = default;
+                _ = DeserializeWithContext(
+                    memory.Span,
+                    ref singleValue,
+                    context);
+                return singleValue;
             }
 
             var sequence = builder.Build();
-            return Deserialize<T>(sequence, context);
+            T? sequenceValue = default;
+            _ = DeserializeWithContext(
+                sequence,
+                ref sequenceValue,
+                context);
+            return sequenceValue;
         }
         finally
         {
+            if (pendingBuffer is not null)
+            {
+                ArrayPool<byte>.Shared.Return(pendingBuffer);
+            }
             ReusableReadOnlySequenceBuilderPool.Return(
                 builder,
                 builderLeaseId);
         }
+
+        static int AllowProbeByte(int bufferLimit, long remainingBudget)
+            => (int)Math.Min(bufferLimit - 1L, remainingBudget) + 1;
     }
 
     /// <summary>
     /// Deserializes exactly one length-delimited payload using the supplied
     /// serializer context.
     /// </summary>
+    /// <remarks>
+    /// The caller owns <paramref name="stream"/> and SharpPack leaves it open.
+    /// Exactly <paramref name="payloadLength"/> bytes are read for this payload.
+    /// Deserialization fails if the formatter does not consume exactly that
+    /// payload length.
+    /// </remarks>
     public static ValueTask<T?> DeserializeAsync<
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         T>(
         Stream stream,
         int payloadLength,

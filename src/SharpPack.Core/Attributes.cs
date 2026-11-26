@@ -1,5 +1,12 @@
 namespace SharpPack;
 
+/// <summary>Includes a closed type and its serialization dependencies in the generated external formatter provider.</summary>
+[AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
+public sealed class SharpPackExternalTypeAttribute(Type type) : Attribute
+{
+    public Type Type { get; } = type;
+}
+
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
 public sealed class SharpPackableAttribute : Attribute
 {
@@ -52,7 +59,7 @@ public enum SerializeLayout
     Explicit
 }
 
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface, AllowMultiple = true, Inherited = false)]
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface | AttributeTargets.Struct, AllowMultiple = true, Inherited = false)]
 public sealed class SharpPackUnionAttribute : Attribute
 {
     public ushort Tag { get; }

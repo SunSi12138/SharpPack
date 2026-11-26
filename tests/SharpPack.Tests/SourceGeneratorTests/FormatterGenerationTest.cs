@@ -1,4 +1,6 @@
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Linq;
 
@@ -651,11 +653,117 @@ public partial class Model
                         ".g.cs",
                         StringComparison.Ordinal))
                 .Select(static tree => tree.ToString()));
-        generated.Should().NotContain("System.Reflection");
+        var generatedNodes = compilation.SyntaxTrees
+            .Where(static tree => tree.FilePath.EndsWith(".g.cs", StringComparison.Ordinal))
+            .SelectMany(static tree => tree.GetRoot().DescendantNodes())
+            .ToArray();
+        var attributeField = generatedNodes.OfType<FieldDeclarationSyntax>()
+            .Single(static field => field.Declaration.Variables
+                .Any(static variable => variable.Identifier.ValueText == "__ValueFormatter"));
+        attributeField.ToString().Should().NotContain("System.Reflection");
+        generated.Should().NotContain(".GetCustomAttribute");
+        generated.Should().NotContain(".GetProperty(");
+        generated.Should().NotContain(".GetField(");
+        generated.Should().NotContain(".GetMethods(");
+        generated.Should().NotContain(".GetMethod(");
+        generated.Should().Contain("SharpPackSerializer.PreserveFormatterFactory<Model>();");
+        generated.Should().Contain("SharpPackSerializer.PreserveContextFormatterFactory<Model>();");
         generated.Should().Contain(
             "new global::Generated.CustomIntFormatterAttribute(" +
             "7, typeof(global::Generated.Model), \"marker\", " +
             "new int[] { 2, 3 }) " +
             "{ @Enabled = true }.GetFormatter()");
     }
+
+    [Fact]
+    public void FrozenGeneratedCodeAbi_CompilesAgainstCurrentRuntime()
+    {
+        // This is intentionally a frozen copy of generated-code shapes rather
+        // than output from the current generator. It proves that runtime ABI
+        // changes cannot be hidden by updating the generator in the same PR.
+        var source = """
+#nullable enable
+namespace GeneratedCodeAbiFixture;
+
+public sealed class FrozenModel :
+    global::SharpPack.ISharpPackable<FrozenModel>,
+    global::SharpPack.ISharpPackFormatterFactory<FrozenModel>,
+    global::SharpPack.ISharpPackContextFormatterFactory<FrozenModel>,
+    global::SharpPack.ISharpPackExactSizeSerializable<FrozenModel>
+{
+    [global::SharpPack.Internal.Preserve]
+    static global::SharpPack.SharpPackFormatter<FrozenModel>
+        global::SharpPack.ISharpPackFormatterFactory<FrozenModel>.CreateFormatter()
+        => new global::SharpPack.Formatters.SharpPackableFormatter<FrozenModel>();
+
+    [global::SharpPack.Internal.Preserve]
+    static global::SharpPack.SharpPackFormatter<FrozenModel>
+        global::SharpPack.ISharpPackContextFormatterFactory<FrozenModel>.CreateFormatter(
+            global::SharpPack.SharpPackSerializerContext context)
+    {
+        _ = context.HasFormatterOverrideDependency<int>();
+        return new global::SharpPack.Formatters.SharpPackableFormatter<FrozenModel>();
+    }
+
+    [global::SharpPack.Internal.Preserve]
+    byte[] global::SharpPack.ISharpPackExactSizeSerializable<FrozenModel>.SerializeExact()
+    {
+        var buffer = new byte[1];
+        var bufferWriter =
+            new global::SharpPack.Internal.SharpPackExactArrayBufferWriter(buffer);
+        var writer = global::SharpPack.SharpPackSerializer.CreateExactWriter(
+            ref bufferWriter);
+
+        if (global::System.Array.MaxLength < 0)
+        {
+            global::SharpPack.SharpPackSerializationException.ThrowSizeOverflow();
+        }
+
+        return buffer;
+    }
+
+    [global::SharpPack.Internal.Preserve]
+    static void global::SharpPack.ISharpPackable<FrozenModel>.Serialize<TBufferWriter>(
+        ref global::SharpPack.SharpPackWriter<TBufferWriter> writer,
+        scoped ref FrozenModel? value)
+    {
+    }
+
+    [global::SharpPack.Internal.Preserve]
+    static void global::SharpPack.ISharpPackable<FrozenModel>.Deserialize(
+        ref global::SharpPack.SharpPackReader reader,
+        scoped ref FrozenModel? value)
+    {
+    }
 }
+""";
+
+        var references = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(static assembly =>
+                !assembly.IsDynamic &&
+                !string.IsNullOrWhiteSpace(assembly.Location))
+            .Distinct()
+            .Select(static assembly =>
+                MetadataReference.CreateFromFile(assembly.Location))
+            .ToArray();
+        var parseOptions = new CSharpParseOptions(LanguageVersion.CSharp14);
+        var compilation = CSharpCompilation.Create(
+            "generated-code-abi",
+            syntaxTrees:
+            [
+                CSharpSyntaxTree.ParseText(source, parseOptions),
+            ],
+            references: references,
+            options: new CSharpCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                allowUnsafe: true));
+
+        compilation.GetDiagnostics()
+            .Where(static diagnostic =>
+                diagnostic.Severity == DiagnosticSeverity.Error)
+            .Should()
+            .BeEmpty();
+    }
+
+}
+

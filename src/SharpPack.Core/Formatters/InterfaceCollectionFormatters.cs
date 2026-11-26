@@ -250,6 +250,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var entries = KeyValuePairFormatter.EnterReadScope<TKey, TValue>(ref reader, length, out var unmanagedEntries);
             var dict = new Dictionary<TKey, TValue?>(
                 Math.Min(length, 4096),
                 equalityComparer);
@@ -258,7 +259,7 @@ namespace SharpPack.Formatters
             var valueFormatter = reader.GetFormatter<TValue>();
             for (int i = 0; i < length; i++)
             {
-                KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
+                KeyValuePairFormatter.DeserializeEntry(keyFormatter, valueFormatter, ref reader, unmanagedEntries, out var k, out var v);
                 dict.Add(k!, v);
             }
 
@@ -311,6 +312,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var entries = KeyValuePairFormatter.EnterReadScope<TKey, TValue>(ref reader, length, out var unmanagedEntries);
             var dict = new Dictionary<TKey, TValue?>(
                 Math.Min(length, 4096),
                 equalityComparer);
@@ -319,7 +321,7 @@ namespace SharpPack.Formatters
             var valueFormatter = reader.GetFormatter<TValue>();
             for (int i = 0; i < length; i++)
             {
-                KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
+                KeyValuePairFormatter.DeserializeEntry(keyFormatter, valueFormatter, ref reader, unmanagedEntries, out var k, out var v);
                 dict.Add(k!, v);
             }
 
@@ -372,6 +374,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<IGrouping<TKey, TElement>>(length != 0);
             var dict = new Dictionary<TKey, IGrouping<TKey, TElement>>(
                 Math.Min(length, 4096),
                 equalityComparer);
@@ -474,6 +477,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>(length != 0);
             var set = new HashSet<T?>(
                 FormatterValidation.InitialCapacity(length),
                 equalityComparer);
@@ -533,6 +537,7 @@ namespace SharpPack.Formatters
                 return;
             }
 
+            using var elements = reader.EnterCollectionDepth<T>(length != 0);
             var set = new HashSet<T?>(
                 FormatterValidation.InitialCapacity(length),
                 equalityComparer);

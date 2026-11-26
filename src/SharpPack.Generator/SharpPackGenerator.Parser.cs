@@ -45,15 +45,20 @@ public enum MemberKind
 
 public partial class TypeMeta
 {
+    const int MaximumObjectMembers = 249; // SharpPackCode.Reserved1 - 1
+
     DiagnosticDescriptor? ctorInvalid = null;
 
     readonly ReferenceSymbols reference;
+    readonly MemberMeta[] circularWireMembers = [];
+    readonly ISymbol[] circularRequiredMembers = [];
+    readonly bool circularConstructorSetsRequiredMembers;
     public INamedTypeSymbol Symbol { get; set; }
     public GenerateType GenerateType { get; }
     public SerializeLayout SerializeLayout { get; }
     /// <summary>MinimallyQualifiedFormat(include generics T)</summary>
     public string TypeName { get; }
-    public MemberMeta[] Members { get; private set; }
+    public MemberMeta[] Members { get; }
     public bool IsValueType { get; set; }
     public bool IsUnmanagedType { get; }
     public bool IsUnion { get; }
@@ -67,7 +72,28 @@ public partial class TypeMeta
     public (ushort Tag, INamedTypeSymbol Type)[] UnionTags { get; }
     public bool IsUseEmptyConstructor => Constructor == null || Constructor.Parameters.IsEmpty;
 
+    internal CircularReadShape? DescribeCircularRead()
+    {
+        if (GenerateType != GenerateType.CircularReference || Symbol.TypeKind != TypeKind.Class)
+            return null;
+
+        var hasInitOnlyMembers = circularWireMembers.Any(static member => member.IsInitOnly);
+        if (!hasInitOnlyMembers && !circularRequiredMembers.Any(IsSerialized))
+            return null;
+
+        return new(NeedsImplicitConstructor: Constructor is null,
+            SetsRequiredMembers: circularRequiredMembers.Length != 0 || circularConstructorSetsRequiredMembers,
+            ReplacesExistingValue: hasInitOnlyMembers);
+    }
+
+    bool IsSerialized(ISymbol member) => circularWireMembers.Any(serialized => serialized.Name == member.Name);
+
     public TypeMeta(INamedTypeSymbol symbol, ReferenceSymbols reference)
+        : this(symbol, reference, constructorCandidate: null)
+    {
+    }
+
+    TypeMeta(INamedTypeSymbol symbol, ReferenceSymbols reference, Func<IMethodSymbol, bool>? constructorCandidate)
     {
         this.reference = reference;
         this.Symbol = symbol;
@@ -77,7 +103,18 @@ public partial class TypeMeta
         this.SerializeLayout = serializeLayout;
 
         this.TypeName = symbol.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
-        this.Constructor = ChooseConstructor(symbol, reference);
+        this.Constructor = ChooseConstructor(symbol, reference, constructorCandidate);
+        if (generateType == GenerateType.CircularReference && symbol.TypeKind == TypeKind.Class)
+        {
+            // An override can add required without changing the inherited wire slot.
+            // C# does not allow required members to be hidden.
+            circularRequiredMembers = symbol.GetAllBaseTypes().Prepend(symbol)
+                .SelectMany(static type => type.GetMembers())
+                .Where(static member => member is IPropertySymbol { IsRequired: true } or IFieldSymbol { IsRequired: true })
+                .DistinctBy(static member => member.Name).ToArray();
+            var attribute = reference.Compilation.GetTypeByMetadataName("System.Diagnostics.CodeAnalysis.SetsRequiredMembersAttribute");
+            circularConstructorSetsRequiredMembers = attribute is not null && Constructor?.ContainsAttribute(attribute) == true;
+        }
 
         this.Members = symbol.GetAllMembers() // iterate includes parent type
             .Where(x => x is (IFieldSymbol or IPropertySymbol) and { IsStatic: false, IsImplicitlyDeclared: false, CanBeReferencedByName: true })
@@ -109,6 +146,12 @@ public partial class TypeMeta
             .OrderBy(x => x.Order)
             .ToArray();
 
+        if (generateType == GenerateType.CircularReference && symbol.TypeKind == TypeKind.Class)
+        {
+            // Match the wire-slot planner: sequential models keep the first member at a duplicate order.
+            circularWireMembers = Members.DistinctBy(static member => member.Order).ToArray();
+        }
+
         this.IsValueType = symbol.IsValueType;
         this.IsUnmanagedType = symbol.IsUnmanagedType;
         this.IsInterfaceOrAbstract = symbol.IsAbstract;
@@ -119,17 +162,19 @@ public partial class TypeMeta
         this.OnDeserializing = CollectMethod(reference.SharpPackOnDeserializingAttribute, IsValueType, isReader: true);
         this.OnDeserialized = CollectMethod(reference.SharpPackOnDeserializedAttribute, IsValueType, isReader: true);
 
-        if (IsUnion)
+        this.UnionTags = IsUnion ? GetUnionTags(symbol, reference).ToArray() : [];
+    }
+
+    internal static IEnumerable<(ushort Tag, INamedTypeSymbol Type)> GetUnionTags(INamedTypeSymbol symbol, ReferenceSymbols references)
+    {
+        foreach (var attribute in symbol.GetAttributes())
         {
-            this.UnionTags = symbol.GetAttributes()
-                .Where(x => SymbolEqualityComparer.Default.Equals(x.AttributeClass, reference.SharpPackUnionAttribute))
-                .Where(x => x.ConstructorArguments.Length == 2)
-                .Select(x => ((ushort)x.ConstructorArguments[0].Value!, (INamedTypeSymbol)x.ConstructorArguments[1].Value!))
-                .ToArray();
-        }
-        else
-        {
-            this.UnionTags = Array.Empty<(ushort, INamedTypeSymbol)>();
+            if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, references.SharpPackUnionAttribute) &&
+                attribute.ConstructorArguments is { Length: 2 } arguments &&
+                arguments[0].Value is ushort tag && arguments[1].Value is INamedTypeSymbol type)
+            {
+                yield return (tag, type);
+            }
         }
     }
 
@@ -137,10 +182,11 @@ public partial class TypeMeta
     // If has no explicit constrtucotr, use parameterless one(includes private).
     // If has a one parameterless/parameterized constructor, choose it.
     // If has multiple construcotrs, should apply [SharpPackConstructor] attribute(no automatically choose one), otherwise generator error it.
-    IMethodSymbol? ChooseConstructor(INamedTypeSymbol symbol, ReferenceSymbols reference)
+    IMethodSymbol? ChooseConstructor(INamedTypeSymbol symbol, ReferenceSymbols reference, Func<IMethodSymbol, bool>? constructorCandidate)
     {
         var ctors = symbol.InstanceConstructors
             .Where(x => !x.IsImplicitlyDeclared) // remove empty ctor(struct always generate it), record's clone ctor
+            .Where(x => constructorCandidate is null || constructorCandidate(x))
             .ToArray();
 
         if (ctors.Length == 0)
@@ -230,6 +276,9 @@ public partial class TypeMeta
     }
 
     public bool Validate(TypeDeclarationSyntax syntax, IGeneratorContext context, bool unionFormatter)
+        => Validate(syntax, context.ReportDiagnostic, unionFormatter);
+
+    internal bool Validate(TypeDeclarationSyntax syntax, Action<Diagnostic> reportDiagnostic, bool unionFormatter)
     {
         var noError = true;
         if (unionFormatter) goto UNION_VALIDATIONS;
@@ -239,14 +288,14 @@ public partial class TypeMeta
         {
             if (Symbol.IsAbstract)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CollectionGenerateIsAbstract, syntax.Identifier.GetLocation(), Symbol.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CollectionGenerateIsAbstract, syntax.Identifier.GetLocation(), Symbol.Name));
                 return false;
             }
 
             var (kind, symbol) = ParseCollectionKind(Symbol, reference);
             if (kind == CollectionKind.None)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CollectionGenerateNotImplementedInterface, syntax.Identifier.GetLocation(), Symbol.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CollectionGenerateNotImplementedInterface, syntax.Identifier.GetLocation(), Symbol.Name));
                 return false;
             }
 
@@ -255,7 +304,7 @@ public partial class TypeMeta
                 .Any(x => x.Parameters.Length == 0);
             if (!hasParameterlessConstructor)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CollectionGenerateNoParameterlessConstructor, syntax.Identifier.GetLocation(), Symbol.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CollectionGenerateNoParameterlessConstructor, syntax.Identifier.GetLocation(), Symbol.Name));
                 return false;
             }
 
@@ -265,9 +314,36 @@ public partial class TypeMeta
         {
             if (!this.IsUseEmptyConstructor)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CircularReferenceOnlyAllowsParameterlessConstructor, syntax.Identifier.GetLocation(), Symbol.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CircularReferenceOnlyAllowsParameterlessConstructor, syntax.Identifier.GetLocation(), Symbol.Name));
                 return false;
             }
+
+            if (!IsUnion && Symbol.TypeKind == TypeKind.Class)
+            {
+                foreach (var member in circularWireMembers.Where(static member => member.IsInitOnly))
+                {
+                    var setter = ((IPropertySymbol)member.Symbol).SetMethod!;
+                    if (!reference.Compilation.IsSymbolAccessibleWithin(setter, Symbol, throughType: Symbol))
+                        ReportUninitializableCircularMember(member.Symbol, "the init accessor is not accessible from the generated class");
+                }
+
+                if (!circularConstructorSetsRequiredMembers)
+                {
+                    foreach (var required in circularRequiredMembers)
+                    {
+                        if (!IsSerialized(required))
+                            ReportUninitializableCircularMember(required, "include the required member or initialize it in a parameterless constructor annotated with SetsRequiredMembers");
+                    }
+                }
+            }
+        }
+
+        void ReportUninitializableCircularMember(ISymbol member, string reason)
+        {
+            reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.CircularMemberCannotBeInitialized,
+                member.Locations.FirstOrDefault(static location => location.IsInSource) ?? syntax.Identifier.GetLocation(),
+                Symbol.Name, member.Name, reason));
+            noError = false;
         }
 
         // GenerateType.Objector VersionTorelant validation
@@ -275,21 +351,21 @@ public partial class TypeMeta
         // ref strcut
         if (this.Symbol.IsRefLikeType)
         {
-            context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.TypeIsRefStruct, syntax.Identifier.GetLocation(), Symbol.Name));
+            reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.TypeIsRefStruct, syntax.Identifier.GetLocation(), Symbol.Name));
             return false;
         }
 
         // interface/abstract but not union
         if (IsInterfaceOrAbstract && !IsUnion)
         {
-            context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.AbstractMustUnion, syntax.Identifier.GetLocation(), Symbol.Name));
+            reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.AbstractMustUnion, syntax.Identifier.GetLocation(), Symbol.Name));
             noError = false;
         }
 
         // ctor
         if (ctorInvalid != null)
         {
-            context.ReportDiagnostic(Diagnostic.Create(ctorInvalid, syntax.Identifier.GetLocation(), Symbol.Name));
+            reportDiagnostic(Diagnostic.Create(ctorInvalid, syntax.Identifier.GetLocation(), Symbol.Name));
             noError = false;
         }
 
@@ -297,7 +373,7 @@ public partial class TypeMeta
         {
             if (GenerateType is GenerateType.VersionTolerant)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.VersionTolerantOnUnmanagedStruct, syntax.Identifier.GetLocation(), Symbol.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.VersionTolerantOnUnmanagedStruct, syntax.Identifier.GetLocation(), Symbol.Name));
                 noError = false;
             }
 
@@ -351,16 +427,30 @@ public partial class TypeMeta
         }
         else
         {
+            var circularClass = GenerateType == GenerateType.CircularReference && Symbol.TypeKind == TypeKind.Class;
+            var wireMembers = GenerateType switch
+            {
+                GenerateType.CircularReference when circularClass => circularWireMembers,
+                GenerateType.VersionTolerant or GenerateType.CircularReference => Members.DistinctBy(static member => member.Order).ToArray(),
+                _ => Members,
+            };
+
             // check ctor members
             if (this.Constructor != null)
             {
                 foreach (var parameter in Constructor.Parameters)
                 {
-                    if (!Members.ContainsConstructorParameter(parameter))
+                    var matches = Extensions.FindConstructorBindings(wireMembers, static member => member.ConstructorParameterName, parameter.Name);
+                    var location = Constructor.Locations.FirstOrDefault() ?? syntax.Identifier.GetLocation();
+                    if (matches.Length == 0)
                     {
-                        var location = Constructor.Locations.FirstOrDefault() ?? syntax.Identifier.GetLocation();
-
-                        context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.ConstructorHasNoMatchedParameter, location, Symbol.Name, parameter.Name));
+                        reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.ConstructorHasNoMatchedParameter, location, Symbol.Name, parameter.Name));
+                        noError = false;
+                    }
+                    else if (matches.Length > 1)
+                    {
+                        reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.AmbiguousConstructorParameter, location,
+                            Symbol.Name, parameter.Name, string.Join(", ", matches.Select(static member => member.Name))));
                         noError = false;
                     }
                 }
@@ -370,12 +460,28 @@ public partial class TypeMeta
             {
                 if (item.IsField && ((IFieldSymbol)item.Symbol).IsReadOnly && !item.IsConstructorParameter)
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.ReadOnlyFieldMustBeConstructorMember, item.GetLocation(syntax), Symbol.Name, item.Name));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.ReadOnlyFieldMustBeConstructorMember, item.GetLocation(syntax), Symbol.Name, item.Name));
                     noError = false;
                 }
                 else if (item is { SuppressDefaultInitialization: true, IsAssignable: false })
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.SuppressDefaultInitializationMustBeSettable, item.GetLocation(syntax), Symbol.Name, item.Name));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.SuppressDefaultInitializationMustBeSettable, item.GetLocation(syntax), Symbol.Name, item.Name));
+                    noError = false;
+                }
+            }
+
+            foreach (var item in wireMembers)
+            {
+                if (!item.IsConstructorParameter && item.Symbol is IPropertySymbol property &&
+                    !(circularClass && item.IsInitOnly) &&
+                    property.ContainsAttribute(reference.SharpPackIncludeAttribute) &&
+                    reference.Compilation.IsSymbolAccessibleWithin(property, Symbol, throughType: Symbol) &&
+                    (property.SetMethod is not { } setter ||
+                     GenerateType == GenerateType.CircularReference && !circularClass && !item.IsAssignable ||
+                     !reference.Compilation.IsSymbolAccessibleWithin(setter, Symbol, throughType: Symbol)))
+                {
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.IncludedPropertyCannotBePopulated,
+                        item.GetLocation(syntax), Symbol.Name, item.Name));
                     noError = false;
                 }
             }
@@ -389,7 +495,7 @@ public partial class TypeMeta
 
             if (IsUnmanagedType)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.OnMethodInUnamannagedType, item.GetLocation(syntax), Symbol.Name, item.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.OnMethodInUnamannagedType, item.GetLocation(syntax), Symbol.Name, item.Name));
                 noError = false;
                 continue;
             }
@@ -406,7 +512,7 @@ public partial class TypeMeta
                     }
                 }
 
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.OnMethodHasParameter, item.GetLocation(syntax), Symbol.Name, item.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.OnMethodHasParameter, item.GetLocation(syntax), Symbol.Name, item.Name));
                 noError = false;
             }
         }
@@ -425,7 +531,7 @@ public partial class TypeMeta
                         var location = item.Locations.FirstOrDefault() ?? syntax.Identifier.GetLocation();
 
                         var attr = include ? "SharpPackInclude" : "SharpPackIgnore";
-                        context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.OverrideMemberCantAddAnnotation, location, Symbol.Name, item.Name, attr));
+                        reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.OverrideMemberCantAddAnnotation, location, Symbol.Name, item.Name, attr));
                         noError = false;
                     }
                 }
@@ -439,16 +545,16 @@ public partial class TypeMeta
                 if (include && item.DeclaredAccessibility == Accessibility.Private)
                 {
                     var location = item.Locations.FirstOrDefault() ?? syntax.Identifier.GetLocation();
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.InheritTypeCanNotIncludeParentPrivateMember, location, Symbol.Name, item.Name));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.InheritTypeCanNotIncludeParentPrivateMember, location, Symbol.Name, item.Name));
                     noError = false;
                 }
             }
         }
 
         // ALl Members
-        if (Members.Length >= 250) // SharpPackCode.Reserved1
+        if (Members.Length > MaximumObjectMembers)
         {
-            context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MembersCountOver250, syntax.Identifier.GetLocation(), Symbol.Name, Members.Length));
+            reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MembersCountOver250, syntax.Identifier.GetLocation(), Symbol.Name, Members.Length));
             noError = false;
         }
 
@@ -460,19 +566,32 @@ public partial class TypeMeta
             {
                 if (item.MemberType.SpecialType is SpecialType.System_Object or SpecialType.System_Array or SpecialType.System_Delegate or SpecialType.System_MulticastDelegate || item.MemberType.TypeKind == TypeKind.Delegate)
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MemberCantSerializeType, item.GetLocation(syntax), Symbol.Name, item.Name, item.MemberType.FullyQualifiedToString()));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MemberCantSerializeType, item.GetLocation(syntax), Symbol.Name, item.Name, item.MemberType.FullyQualifiedToString()));
                     noError = false;
                 }
                 else
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MemberIsNotSharpPackable, item.GetLocation(syntax), Symbol.Name, item.Name, item.MemberType.FullyQualifiedToString()));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MemberIsNotSharpPackable, item.GetLocation(syntax), Symbol.Name, item.Name, item.MemberType.FullyQualifiedToString()));
                     noError = false;
                 }
             }
             else if (item.Kind == MemberKind.RefLike)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MemberIsRefStruct, item.GetLocation(syntax), Symbol.Name, item.Name, item.MemberType.FullyQualifiedToString()));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.MemberIsRefStruct, item.GetLocation(syntax), Symbol.Name, item.Name, item.MemberType.FullyQualifiedToString()));
                 noError = false;
+            }
+        }
+
+        if (!IsUnmanagedType && GenerateType is (GenerateType.VersionTolerant or GenerateType.CircularReference))
+        {
+            foreach (var item in Members)
+            {
+                if ((uint)item.Order >= MaximumObjectMembers)
+                {
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.VersionedMemberOrderOutOfRange,
+                        item.GetLocation(syntax), Symbol.Name, item.Name, item.Order, MaximumObjectMembers - 1));
+                    noError = false;
+                }
             }
         }
 
@@ -484,7 +603,7 @@ public partial class TypeMeta
             {
                 if (!item.HasExplicitOrder)
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.AllMembersMustAnnotateOrder, item.GetLocation(syntax), Symbol.Name, item.Name));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.AllMembersMustAnnotateOrder, item.GetLocation(syntax), Symbol.Name, item.Name));
                     noError = false;
                 }
             }
@@ -495,7 +614,7 @@ public partial class TypeMeta
             {
                 if (orderSet.TryGetValue(item.Order, out var duplicateMember))
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.DuplicateOrderDoesNotAllow, item.GetLocation(syntax), Symbol.Name, item.Name, duplicateMember.Name));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.DuplicateOrderDoesNotAllow, item.GetLocation(syntax), Symbol.Name, item.Name, duplicateMember.Name));
                     noError = false;
                 }
                 else
@@ -512,7 +631,7 @@ public partial class TypeMeta
                 {
                     if (item.Order != expectedOrder)
                     {
-                        context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.AllMembersMustBeContinuousNumber, item.GetLocation(syntax), Symbol.Name, item.Name));
+                        reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.AllMembersMustBeContinuousNumber, item.GetLocation(syntax), Symbol.Name, item.Name));
                         noError = false;
                         break;
                     }
@@ -527,67 +646,66 @@ public partial class TypeMeta
         {
             if (Symbol.IsSealed)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.SealedTypeCantBeUnion, syntax.Identifier.GetLocation(), Symbol.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.SealedTypeCantBeUnion, syntax.Identifier.GetLocation(), Symbol.Name));
                 noError = false;
             }
 
             if (!Symbol.IsAbstract)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.ConcreteTypeCantBeUnion, syntax.Identifier.GetLocation(), Symbol.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.ConcreteTypeCantBeUnion, syntax.Identifier.GetLocation(), Symbol.Name));
                 noError = false;
             }
 
             if (GenerateType != GenerateType.Union)
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.GenerateTypeCannotSpeciyToUnionBaseType, syntax.Identifier.GetLocation(), Symbol.Name, GenerateType));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.GenerateTypeCannotSpeciyToUnionBaseType, syntax.Identifier.GetLocation(), Symbol.Name, GenerateType));
                 noError = false;
             }
 
             if (UnionTags.Select(x => x.Tag).HasDuplicate())
             {
-                context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionTagDuplicate, syntax.Identifier.GetLocation(), Symbol.Name));
+                reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionTagDuplicate, syntax.Identifier.GetLocation(), Symbol.Name));
                 noError = false;
             }
 
             foreach (var item in UnionTags)
             {
-                // type does not derived target symbol
+                var openExternalCase = unionFormatter && item.Type.IsGenericType;
+                var caseType = unionFormatter
+                    ? (openExternalCase ? item.Type.OriginalDefinition : item.Type)
+                    : UnionShape.BindSourceCase(item.Type, Symbol);
+                bool IsUnionTarget(INamedTypeSymbol type) => openExternalCase
+                    ? type.EqualsUnconstructedGenericType(Symbol)
+                    : SymbolEqualityComparer.Default.Equals(type, Symbol);
+
                 if (Symbol.TypeKind == TypeKind.Interface)
                 {
                     // interface, check interfaces.
-                    var check = item.Type.IsGenericType
-                        ? item.Type.OriginalDefinition.AllInterfaces.Any(x => x.EqualsUnconstructedGenericType(Symbol))
-                        : item.Type.AllInterfaces.Any(x => SymbolEqualityComparer.Default.Equals(x, Symbol));
-
-                    if (!check)
+                    if (!caseType.AllInterfaces.Any(IsUnionTarget))
                     {
-                        context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberTypeNotImplementBaseType, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
+                        reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberTypeNotImplementBaseType, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
                         noError = false;
                     }
                 }
                 else
                 {
                     // abstract type, check base.
-                    var check = item.Type.IsGenericType
-                        ? item.Type.OriginalDefinition.GetAllBaseTypes().Any(x => x.EqualsUnconstructedGenericType(Symbol))
-                        : item.Type.GetAllBaseTypes().Any(x => SymbolEqualityComparer.Default.Equals(x, Symbol));
-
-                    if (!check)
+                    if (!caseType.GetAllBaseTypes().Any(IsUnionTarget))
                     {
-                        context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberTypeNotDerivedBaseType, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
+                        reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberTypeNotDerivedBaseType, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
                         noError = false;
                     }
                 }
 
                 if (item.Type.IsValueType)
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberNotAllowStruct, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberNotAllowStruct, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
                     noError = false;
                 }
 
                 if (!item.Type.ContainsAttribute(reference.SharpPackableAttribute))
                 {
-                    context.ReportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberMustBeSharpPackable, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
+                    reportDiagnostic(Diagnostic.Create(DiagnosticDescriptors.UnionMemberMustBeSharpPackable, syntax.Identifier.GetLocation(), Symbol.Name, item.Type.Name));
                     noError = false;
                 }
             }
@@ -614,6 +732,7 @@ partial class MemberMeta
     public bool IsProperty { get; }
     public bool IsSettable { get; }
     public bool IsAssignable { get; }
+    internal bool IsInitOnly { get; }
     public bool HasExactSizeSafeAccessor { get; }
     public bool IsConstructorParameter { get; }
     public string? ConstructorParameterName { get; }
@@ -691,11 +810,12 @@ partial class MemberMeta
             IsProperty = true;
             IsField = false;
             IsSettable = !p.IsReadOnly;
+            IsInitOnly = p.SetMethod?.IsInitOnly == true;
             IsAssignable = IsSettable
 #if !ROSLYN3
                 && !p.IsRequired
 #endif
-                && (p.SetMethod != null && !p.SetMethod.IsInitOnly);
+                && (p.SetMethod != null && !IsInitOnly);
             MemberType = p.Type;
         }
         else

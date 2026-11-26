@@ -1,0 +1,187 @@
+using Microsoft.CodeAnalysis;
+
+namespace SharpPack.Generator;
+
+// A value snapshot of a validated declaration. Roslyn symbols and locations
+// remain with the analysis/diagnostics, not with these model facts.
+internal sealed record TypeShape(
+    string DeclarationName,
+    string TargetName,
+    TypeKind DeclarationKind,
+    TypeKind TargetKind,
+    string Namespace,
+    string ShortName,
+    string SimpleName,
+    GenerateType GenerateType,
+    SerializeLayout Layout,
+    bool IsValueType,
+    bool IsUnmanaged,
+    bool IsRecord,
+    EquatableArray<MemberShape> Members,
+    EquatableArray<ParameterShape> ConstructorParameters,
+    EquatableArray<CallbackShape> Callbacks,
+    EquatableArray<PartialTypeShape> ContainingTypes,
+    UnionShape? Union,
+    CollectionShape? Collection,
+    AotDependencyFacts AotDependencies,
+    CircularReadShape? CircularRead,
+    GeneratedNameFacts NameFacts,
+    string WriterTypeParameter)
+{
+    internal static TypeShape Create(
+        INamedTypeSymbol declaration, TypeMeta model, ReferenceSymbols references, bool isExternalFormatter = false)
+    {
+        var target = model.Symbol;
+        var isObject = !isExternalFormatter && !model.IsUnion && model.GenerateType != GenerateType.Collection;
+        var circularRead = isObject ? model.DescribeCircularRead() : null;
+        var hasCircularCodec = isObject && !model.IsUnmanagedType && model.GenerateType == GenerateType.CircularReference;
+        return new TypeShape(
+            declaration.FullyQualifiedToString(),
+            target.FullyQualifiedToString(),
+            declaration.TypeKind,
+            target.TypeKind,
+            target.ContainingNamespace.IsGlobalNamespace ? "" : target.ContainingNamespace.ToDisplayString(),
+            model.TypeName,
+            target.Name,
+            model.GenerateType,
+            model.SerializeLayout,
+            model.IsValueType,
+            model.IsUnmanagedType,
+            model.IsRecord,
+            new EquatableArray<MemberShape>(model.Members.Select(member =>
+                MemberShape.Create(member, isObject && !model.IsUnmanagedType ? references : null))),
+            model.Constructor is { } constructor
+                ? new EquatableArray<ParameterShape>(constructor.Parameters.Select(static parameter =>
+                    new ParameterShape(parameter.Name, parameter.Type.FullyQualifiedToString())))
+                : default,
+            new EquatableArray<CallbackShape>(
+                CallbacksFor(CallbackPhase.Serializing, model.OnSerializing)
+                    .Concat(CallbacksFor(CallbackPhase.Serialized, model.OnSerialized))
+                    .Concat(CallbacksFor(CallbackPhase.Deserializing, model.OnDeserializing))
+                    .Concat(CallbacksFor(CallbackPhase.Deserialized, model.OnDeserialized))),
+            isExternalFormatter ? default : PartialTypeShape.CaptureContainers(target),
+            model.IsUnion || isExternalFormatter
+                ? UnionShape.Capture(model, references, isExternalFormatter ? declaration : null) : null,
+            !isExternalFormatter && !model.IsUnion && model.GenerateType == GenerateType.Collection
+                ? CollectionShape.Capture(target, references) : null,
+            isObject ? AotDependencyFacts.Capture(model.Members, references) : default,
+            circularRead,
+            isExternalFormatter ? default : GeneratedNameFacts.Capture(target, model.Members, hasCircularCodec),
+            GeneratedNameFacts.ChooseWriterTypeParameter(declaration));
+
+        static IEnumerable<CallbackShape> CallbacksFor(CallbackPhase phase, IEnumerable<MethodMeta> callbacks)
+            => callbacks.Select(callback => new CallbackShape(phase, callback.Name, callback.IsStatic, callback.IsValueType,
+                callback.UseReaderArgument || callback.UseWriterArgument));
+    }
+}
+
+internal readonly record struct CircularReadShape(
+    bool NeedsImplicitConstructor,
+    bool SetsRequiredMembers,
+    bool ReplacesExistingValue);
+
+internal sealed record MemberShape(
+    string Name,
+    string TypeName,
+    string? ElementTypeName,
+    MemberKind Kind,
+    int Order,
+    bool HasExplicitOrder,
+    bool IsAssignable,
+    bool IsSettable,
+    bool IsInitOnly,
+    bool HasExactSizeSafeAccessor,
+    bool SuppressDefaultInitialization,
+    string? ConstructorParameter,
+    CustomFormatterShape? CustomFormatter,
+    EquatableArray<string> ContextDependencyTypes)
+{
+    internal static MemberShape Blank(int order)
+        => new("", "", null, MemberKind.Blank, order, false, false, false, false, false, false, null, null, default);
+
+    internal static MemberShape Create(MemberMeta member, ReferenceSymbols? contextReferences = null)
+        => member.Kind == MemberKind.Blank ? Blank(member.Order) :
+        new(member.Name, member.MemberType.FullyQualifiedToString(), ElementType(member), member.Kind, member.Order,
+            member.HasExplicitOrder, member.IsAssignable, member.IsSettable, member.IsInitOnly, member.HasExactSizeSafeAccessor,
+            member.SuppressDefaultInitialization, member.ConstructorParameterName,
+            member.CustomFormatterAttribute is { } attribute
+                ? new CustomFormatterShape(
+                    member.CustomFormatterName!,
+                    member.CustomFormatter!.FullyQualifiedToString(),
+                    new EquatableArray<AttributeValueShape>(attribute.ConstructorArguments.Select(AttributeValueShape.Create)),
+                    new EquatableArray<NamedAttributeValueShape>(attribute.NamedArguments.Select(static pair =>
+                        new NamedAttributeValueShape(pair.Key, AttributeValueShape.Create(pair.Value)))))
+                : null,
+            contextReferences is not null && member.Kind != MemberKind.CustomFormatter
+                ? ContextTypes(member.MemberType, contextReferences)
+                : default);
+
+    static string? ElementType(MemberMeta member) => member.Kind switch
+    {
+        MemberKind.UnmanagedArray or MemberKind.SharpPackableArray or MemberKind.Array =>
+            ((IArrayTypeSymbol)member.MemberType).ElementType.FullyQualifiedToString(),
+        MemberKind.SharpPackableList or MemberKind.SharpPackableUnmanagedList =>
+            ((INamedTypeSymbol)member.MemberType).TypeArguments[0].FullyQualifiedToString(),
+        _ => null,
+    };
+
+    static EquatableArray<string> ContextTypes(ITypeSymbol type, ReferenceSymbols references)
+    {
+        var names = new List<string>();
+        Add(type);
+        return new EquatableArray<string>(names);
+
+        void Add(ITypeSymbol current)
+        {
+            names.Add(current.FullyQualifiedToString());
+            if (current is IArrayTypeSymbol array)
+            {
+                Add(array.ElementType);
+            }
+            else if (current is INamedTypeSymbol { IsGenericType: true } named && references.KnownTypes.Contains(named))
+            {
+                foreach (var argument in named.TypeArguments)
+                    Add(argument);
+            }
+        }
+    }
+}
+
+internal sealed record ParameterShape(string Name, string TypeName, bool PassByIn = false);
+
+internal enum CallbackPhase { Serializing, Serialized, Deserializing, Deserialized }
+
+internal sealed record CallbackShape(CallbackPhase Phase, string Name, bool IsStatic, bool IsValueType, bool PassArguments);
+
+internal sealed record CustomFormatterShape(
+    string FormatterType, string AttributeType,
+    EquatableArray<AttributeValueShape> Arguments, EquatableArray<NamedAttributeValueShape> Initializers);
+
+internal sealed record NamedAttributeValueShape(string Name, AttributeValueShape Value);
+
+internal sealed record AttributeValueShape(
+    TypedConstantKind Kind, bool IsNull, string? TypeName, object? Scalar, long FloatingBits,
+    EquatableArray<AttributeValueShape> Elements)
+{
+    internal static AttributeValueShape Create(TypedConstant constant)
+    {
+        if (constant.IsNull)
+            return new(constant.Kind, true, constant.Type?.FullyQualifiedToString(), null, 0, default);
+        if (constant.Kind == TypedConstantKind.Array)
+            return new(constant.Kind, false, ((IArrayTypeSymbol)constant.Type!).ElementType.FullyQualifiedToString(),
+                null, 0, new EquatableArray<AttributeValueShape>(constant.Values.Select(Create)));
+        if (constant.Kind == TypedConstantKind.Type)
+            return new(constant.Kind, false, ((ITypeSymbol)constant.Value!).FullyQualifiedToString(), null, 0, default);
+
+        var scalar = constant.Value;
+        // Boxed floating point equality treats positive and negative zero as
+        // equal, but attribute values can make that difference observable.
+        var bits = scalar switch
+        {
+            float value => BitConverter.DoubleToInt64Bits(value),
+            double value => BitConverter.DoubleToInt64Bits(value),
+            _ => 0,
+        };
+        return new(constant.Kind, false, constant.Type?.FullyQualifiedToString(), scalar, bits, default);
+    }
+}

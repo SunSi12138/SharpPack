@@ -42,9 +42,12 @@ internal static class ContextFormatterSlot<T>
 
         return cache.GetValue(
             graph,
-            static graph => new Holder(
-                FormatterResolver<T>.Create(graph.Owner),
-                isExplicitRegistration: false)).Formatter;
+            static graph => new Holder(Create(graph), isExplicitRegistration: false)).Formatter;
+
+        static SharpPackFormatter<T> Create(FormatterGraph graph)
+            => graph.HasGeneratedFactories && GeneratedFormatterFactorySlot<T>.TryGet(graph, out var factory)
+                ? factory(graph.Owner)
+                : FormatterResolver<T>.Create(graph.Owner);
     }
 
     internal static void Register(FormatterGraph graph, SharpPackFormatter<T> formatter)
@@ -71,6 +74,20 @@ internal static class ContextFormatterSlot<T>
         internal SharpPackFormatter<T> Formatter { get; } = formatter;
         internal bool IsExplicitRegistration { get; } = isExplicitRegistration;
     }
+}
+
+// Generated factory descriptors are only read when the resolved formatter
+// slot misses. As with resolved formatters, their lifetime belongs to the graph.
+internal static class GeneratedFormatterFactorySlot<T>
+{
+    static readonly ConditionalWeakTable<FormatterGraph, Func<SharpPackSerializerContext, SharpPackFormatter<T>>> factories = new();
+
+    internal static void Register(FormatterGraph graph, Func<SharpPackSerializerContext, SharpPackFormatter<T>> factory)
+        => factories.TryAdd(graph, factory);
+
+    internal static bool TryGet(
+        FormatterGraph graph, [NotNullWhen(true)] out Func<SharpPackSerializerContext, SharpPackFormatter<T>>? factory)
+        => factories.TryGetValue(graph, out factory);
 }
 
 internal static class FormatterTypeTraits<T>
@@ -107,26 +124,6 @@ internal static class FormatterTypeTraits<T>
     }
 }
 
-internal static class ContextRootTypeRegistration<T>
-{
-    static readonly ConditionalWeakTable<SharpPackSerializerContext, object> registrations = new();
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static void Ensure(SharpPackSerializerContext context)
-    {
-        if (!registrations.TryGetValue(context, out _))
-        {
-            _ = registrations.GetValue(
-                context,
-                static context =>
-                {
-                    context.AddType(typeof(T));
-                    return new object();
-                });
-        }
-    }
-}
-
 internal static class FormatterResolver<T>
 {
     internal static SharpPackFormatter<T> CreateDefault()
@@ -151,8 +148,6 @@ internal static class FormatterResolver<T>
 
         try
         {
-            context?.AddType(type);
-
             if (type == typeof(Type))
             {
                 return (SharpPackFormatter<T>)(object)new TypeFormatter();
@@ -189,13 +184,13 @@ internal static class FormatterResolver<T>
                     : formatter.BindContext(context.Graph);
             }
 
-            if (typeof(ISharpPackable<>).MakeGenericType(type).IsAssignableFrom(type))
+            if (typeof(ISharpPackable<T>).IsAssignableFrom(type))
             {
                 return (SharpPackFormatter<T>)Activator.CreateInstance(
                     typeof(SharpPackableFormatter<>).MakeGenericType(type))!;
             }
 
-            var containsReferences = TypeHelpers.IsReferenceOrContainsReferences(type);
+            var containsReferences = RuntimeHelpers.IsReferenceOrContainsReferences<T>();
             if (FormatterResolver.CreateGenericFormatter(
                     type,
                     containsReferences,
@@ -213,7 +208,7 @@ internal static class FormatterResolver<T>
         {
             if (context is not null)
             {
-                throw new SharpPackSerializationException(
+                throw new SharpPackSerializationException(SharpPackSerializationException.ClassifyFormatterFailure(ex),
                     $"Failed to resolve a formatter for {type.FullName}.",
                     ex);
             }

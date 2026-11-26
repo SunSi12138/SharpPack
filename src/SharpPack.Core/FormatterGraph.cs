@@ -10,6 +10,7 @@ internal sealed class FormatterGraph
 {
     bool registrationsFrozen;
     bool hasRegistrations;
+    bool hasGeneratedFactories;
     readonly Lock formatterCreationLock = new();
     readonly HashSet<Type> creatingFormatterTypes = [];
 
@@ -20,17 +21,22 @@ internal sealed class FormatterGraph
 
     internal SharpPackSerializerContext Owner { get; }
     internal bool HasRegistrations => hasRegistrations;
+    internal bool HasGeneratedFactories => hasGeneratedFactories;
 
     internal void Register<T>(SharpPackFormatter<T> formatter)
     {
-        if (registrationsFrozen)
-        {
-            throw new InvalidOperationException(
-                "Formatter registrations are frozen after the context is built.");
-        }
-
+        ThrowIfFrozen();
         ContextFormatterSlot<T>.Register(this, formatter);
         hasRegistrations = true;
+    }
+
+    internal void RegisterGeneratedFactory<T>(Func<SharpPackSerializerContext, SharpPackFormatter<T>> factory)
+    {
+        ThrowIfFrozen();
+        if (ContextFormatterSlot<T>.HasExplicitRegistration(this)) return;
+        GeneratedFormatterFactorySlot<T>.Register(this, factory);
+        hasRegistrations = true;
+        hasGeneratedFactories = true;
     }
 
     internal SharpPackFormatter<T> GetFormatter<T>()
@@ -56,7 +62,7 @@ internal sealed class FormatterGraph
         var type = typeof(T);
         if (!creatingFormatterTypes.Add(type))
         {
-            throw new SharpPackSerializationException(
+            throw new SharpPackSerializationException(SharpPackErrorCode.RecursiveFormatterConstruction,
                 $"Recursive formatter construction was detected for {type.FullName}.");
         }
 
@@ -98,4 +104,10 @@ internal sealed class FormatterGraph
 
     internal void FreezeRegistrations()
         => registrationsFrozen = true;
+
+    void ThrowIfFrozen()
+    {
+        if (registrationsFrozen)
+            throw new InvalidOperationException("Formatter registrations are frozen after the context is built.");
+    }
 }

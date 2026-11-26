@@ -1,5 +1,6 @@
 using SharpPack;
 using SharpPack.Formatters;
+using System.Buffers;
 
 if (!System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)
 {
@@ -24,10 +25,51 @@ var value = new AotSharpPackModel
     Item = new AotUnionItem { Value = 123 },
 };
 
-var defaultPayload = SharpPackSerializer.Serialize(value);
+var typeContext = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+    .RegisterType<AotSharpPackModel>("aot-model").Build();
+try
+{
+    _ = SharpPackSerializer.Serialize<Type>(typeof(AotSharpPackModel));
+    throw new InvalidOperationException("Default Type serialization must be disabled under NativeAOT.");
+}
+catch (SharpPackSerializationException)
+{
+}
+try
+{
+    _ = SharpPackSerializer.Deserialize<Type>(SharpPackSerializer.Serialize("unknown-id"), typeContext);
+    throw new InvalidOperationException("Unknown Type IDs must be rejected under NativeAOT.");
+}
+catch (SharpPackSerializationException)
+{
+}
+var registeredPayload = SharpPackSerializer.Serialize(value, typeContext);
 AssertModel(
-    SharpPackSerializer.Deserialize<AotSharpPackModel>(defaultPayload),
+    SharpPackSerializer.Deserialize<AotSharpPackModel>(registeredPayload, typeContext),
     value);
+
+var readLimitsContext = new SharpPackSerializerContext(
+    SharpPackSerializerConfiguration.Default with
+    {
+        ReadLimits = new SharpPackReadLimits { MaxCollectionLength = 2 },
+        MaxPayloadBytes = 32,
+    });
+var limitedArray = SharpPackSerializer.Deserialize<int[]>(
+    SharpPackSerializer.Serialize(new[] { 1, 2 }), readLimitsContext);
+if (limitedArray is not [1, 2])
+{
+    throw new InvalidOperationException("Exact collection limit failed under NativeAOT.");
+}
+try
+{
+    _ = SharpPackSerializer.Deserialize<int[]>(
+        SharpPackSerializer.Serialize(new[] { 1, 2, 3 }), readLimitsContext);
+    throw new InvalidOperationException("Collection limit must reject under NativeAOT.");
+}
+catch (SharpPackSerializationException ex) when
+    (ex.ReadLimitKind == SharpPackReadLimitKind.CollectionLength)
+{
+}
 
 var exactValue = new AotExactSizeModel
 {
@@ -44,6 +86,37 @@ if (exactRoundTrip is not
     throw new InvalidOperationException(
         "The generated exact-size serializer failed under NativeAOT.");
 }
+
+var mutableCircular = new AotMutableCircularNode { Label = "circular-aot" };
+var leaf = SharpPackSerializer.Deserialize<AotMutableCircularNode>(SharpPackSerializer.Serialize(mutableCircular));
+if (leaf is not { Label: "circular-aot", Self: null })
+    throw new InvalidOperationException("An ordinary circular model's leaf did not round trip.");
+
+mutableCircular.Self = mutableCircular;
+var mutablePayload = SharpPackSerializer.Serialize(mutableCircular);
+var mutableCopy = SharpPackSerializer.Deserialize<AotMutableCircularNode>(mutablePayload);
+if (mutableCopy?.Label != "circular-aot" || !ReferenceEquals(mutableCopy, mutableCopy.Self))
+    throw new InvalidOperationException("Ordinary circular reference identity was lost under NativeAOT.");
+
+var callerBuffer = new ArrayBufferWriter<byte>();
+if (SharpPackSerializer.Serialize(callerBuffer, mutableCircular) != mutablePayload.Length ||
+    !callerBuffer.WrittenSpan.SequenceEqual(mutablePayload))
+    throw new InvalidOperationException("The caller-owned writer changed ordinary circular payload bytes.");
+
+var circular = new AotCircularNode { Label = "circular-aot", Count = 7 };
+circular.Self = circular;
+var circularPayload = SharpPackSerializer.Serialize(circular);
+var circularRoundTrip = SharpPackSerializer.Deserialize<AotCircularNode>(circularPayload);
+if (circularRoundTrip is not { Label: "circular-aot", Count: 7 } || !ReferenceEquals(circularRoundTrip, circularRoundTrip.Self))
+    throw new InvalidOperationException("Circular required init members or reference identity were lost under NativeAOT.");
+
+var circularContext = new SharpPackSerializerContextBuilder().Register(new AotPlusOneFormatter()).Build();
+var customizedCircular = SharpPackSerializer.Serialize(circular, circularContext);
+var customizedCopy = SharpPackSerializer.Deserialize<AotCircularNode>(customizedCircular, circularContext);
+if (customizedCircular.AsSpan().SequenceEqual(circularPayload) ||
+    customizedCopy is not { Label: "circular-aot", Count: 7 } || !ReferenceEquals(customizedCopy, customizedCopy.Self))
+    throw new InvalidOperationException("The circular NativeAOT formatter bypassed context overrides or lost reference identity.");
+Console.WriteLine("Circular reference tests passed with default and custom formatters.");
 
 var unmanagedFormatted = new AotUnmanagedFormatted
 {
@@ -235,12 +308,13 @@ if (formattedListRoundTrip is not { Count: 2 } ||
         "The unmanaged List raw-copy path failed under NativeAOT.");
 }
 
-var context = new SharpPackSerializerContext();
+var context = new SharpPackSerializerContextBuilder().EnableTypeSerialization()
+    .RegisterType<AotSharpPackModel>("aot-model").Build();
 var contextPayload = SharpPackSerializer.Serialize(value, context);
-if (!defaultPayload.AsSpan().SequenceEqual(contextPayload))
+if (!registeredPayload.AsSpan().SequenceEqual(contextPayload))
 {
     throw new InvalidOperationException(
-        "The empty Context changed the SharpPack wire format.");
+        "Equivalent explicit Type registries changed the SharpPack wire format.");
 }
 AssertModel(
     SharpPackSerializer.Deserialize<AotSharpPackModel>(
@@ -311,8 +385,9 @@ if (SharpPackSerializer.Deserialize<AotFactoryValue>(
         "The explicitly registered public factory failed under NativeAOT.");
 }
 
-var utf8Context = new SharpPackSerializerContext(
-    SharpPackSerializerConfiguration.Utf8);
+var utf8Context = new SharpPackSerializerContextBuilder()
+    .Configure(SharpPackSerializerConfiguration.Utf8).EnableTypeSerialization()
+    .RegisterType<AotSharpPackModel>("aot-model").Build();
 var utf8Payload = SharpPackSerializer.Serialize(value, utf8Context);
 AssertModel(
     SharpPackSerializer.Deserialize<AotSharpPackModel>(
@@ -386,6 +461,21 @@ public partial class AotExactSizeModel
     public int Id { get; set; }
     public string? Name { get; set; }
     public byte[]? Payload { get; set; }
+}
+
+[SharpPackable(GenerateType.CircularReference, SerializeLayout.Sequential)]
+public partial class AotCircularNode
+{
+    public required string Label { get; init; }
+    public int Count { get; init; }
+    public AotCircularNode? Self { get; set; }
+}
+
+[SharpPackable(GenerateType.CircularReference, SerializeLayout.Sequential)]
+public partial class AotMutableCircularNode
+{
+    public string? Label { get; set; }
+    public AotMutableCircularNode? Self { get; set; }
 }
 
 [SharpPackable]
@@ -545,9 +635,12 @@ public partial class AotExternalUnionItem : IAotExternalUnion
     public int Value { get; set; }
 }
 
-[SharpPackUnionFormatter(typeof(IAotExternalUnion))]
-[SharpPackUnion(3, typeof(AotExternalUnionItem))]
-public partial class AotExternalUnionFormatter;
+namespace AotFormatters
+{
+    [SharpPackUnionFormatter(typeof(IAotExternalUnion))]
+    [SharpPackUnion(3, typeof(AotExternalUnionItem))]
+    public partial class AotExternalUnionFormatter;
+}
 
 [SharpPackable(GenerateType.NoGenerate)]
 public partial interface IAotClosedExternalUnion<T>;

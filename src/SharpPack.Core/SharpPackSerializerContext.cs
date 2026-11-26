@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using SharpPack.Formatters;
@@ -11,9 +10,11 @@ namespace SharpPack;
 public sealed class SharpPackSerializerContext
 {
     readonly FormatterGraph graph;
-    readonly Dictionary<string, List<Assembly>> assemblies =
-        new(StringComparer.OrdinalIgnoreCase);
-    readonly Lock assemblyLock = new();
+    internal TypeRegistry TypeRegistry { get; }
+    internal readonly int MaxReadDepth;
+    internal readonly int MaxCollectionLength;
+    internal readonly int MaxReferenceCount;
+    readonly long maxPayloadBytes;
 
     public SharpPackSerializerConfiguration Configuration { get; }
 
@@ -29,13 +30,25 @@ public sealed class SharpPackSerializerContext
 
     internal SharpPackSerializerContext(
         SharpPackSerializerConfiguration configuration,
-        bool freezeRegistrations)
+        bool freezeRegistrations,
+        IReadOnlyDictionary<string, Type>? typeRegistrations = null)
     {
+        if (configuration.TypeSerializationMode is not TypeSerializationMode.Disabled and not TypeSerializationMode.RegisteredOnly)
+        {
+            throw new ArgumentOutOfRangeException(nameof(configuration), "Unknown Type serialization mode.");
+        }
         Configuration = configuration;
+        TypeRegistry = new TypeRegistry(configuration.TypeSerializationMode, typeRegistrations);
+        ArgumentOutOfRangeException.ThrowIfNegative(configuration.MaxPayloadBytes);
+        var limits = configuration.ReadLimits.Normalize();
+        MaxReadDepth = limits.MaxDepth;
+        MaxCollectionLength = limits.MaxCollectionLength;
+        MaxReferenceCount = limits.MaxReferenceCount;
+        maxPayloadBytes = configuration.MaxPayloadBytes == 0
+            ? long.MaxValue
+            : configuration.MaxPayloadBytes;
         graph = new FormatterGraph(this);
 
-        AddAssembly(typeof(object).Assembly);
-        AddAssembly(typeof(SharpPackSerializerContext).Assembly);
         if (freezeRegistrations)
         {
             graph.FreezeRegistrations();
@@ -58,96 +71,13 @@ public sealed class SharpPackSerializerContext
 
     internal FormatterGraph Graph => graph;
 
-    internal void EnsureRootType<T>()
-        => ContextRootTypeRegistration<T>.Ensure(this);
+    internal long MaxPayloadBytes => maxPayloadBytes;
 
     internal void Register<T>(SharpPackFormatter<T> formatter)
-    {
-        graph.Register(formatter);
-        AddType(typeof(T));
-    }
+        => graph.Register(formatter);
 
     internal void FreezeRegistrations()
         => graph.FreezeRegistrations();
-
-    internal Assembly? ResolveAssembly(AssemblyName name)
-    {
-        if (name.Name is null)
-        {
-            return null;
-        }
-
-        lock (assemblyLock)
-        {
-            if (!assemblies.TryGetValue(name.Name, out var candidates))
-            {
-                return null;
-            }
-
-            if (candidates.Count == 1)
-            {
-                return candidates[0];
-            }
-
-            Assembly? match = null;
-            foreach (var candidate in candidates)
-            {
-                if (!AssemblyName.ReferenceMatchesDefinition(
-                        candidate.GetName(),
-                        name))
-                {
-                    continue;
-                }
-                if (match is not null)
-                {
-                    return null;
-                }
-                match = candidate;
-            }
-            return match;
-        }
-    }
-
-    internal void AddType(Type type)
-    {
-        lock (assemblyLock)
-        {
-            AddTypeCore(type);
-        }
-    }
-
-    void AddTypeCore(Type type)
-    {
-        AddAssembly(type.Assembly);
-        if (type.HasElementType && type.GetElementType() is { } element)
-        {
-            AddTypeCore(element);
-        }
-
-        if (type.IsGenericType)
-        {
-            foreach (var argument in type.GetGenericArguments())
-            {
-                AddTypeCore(argument);
-            }
-        }
-    }
-
-    void AddAssembly(Assembly assembly)
-    {
-        var name = assembly.GetName().Name;
-        if (name is not null)
-        {
-            if (!assemblies.TryGetValue(name, out var candidates))
-            {
-                assemblies.Add(name, [assembly]);
-            }
-            else if (!candidates.Contains(assembly))
-            {
-                candidates.Add(assembly);
-            }
-        }
-    }
 }
 
 /// <summary>
@@ -156,7 +86,10 @@ public sealed class SharpPackSerializerContext
 public sealed class SharpPackSerializerContextBuilder
 {
     readonly List<Action<SharpPackSerializerContext>> registrations = [];
+    List<Action<SharpPackSerializerContext>>? generatedRegistrations;
     SharpPackSerializerConfiguration configuration = SharpPackSerializerConfiguration.Default;
+    readonly Dictionary<string, Type> typesById = new(StringComparer.Ordinal);
+    readonly HashSet<Type> registeredTypes = [];
     bool built;
 
     public SharpPackSerializerContextBuilder Configure(
@@ -164,6 +97,36 @@ public sealed class SharpPackSerializerContextBuilder
     {
         ThrowIfBuilt();
         configuration = value;
+        return this;
+    }
+
+    /// <summary>Enables explicitly registered System.Type payloads for this context.</summary>
+    public SharpPackSerializerContextBuilder EnableTypeSerialization()
+    {
+        ThrowIfBuilt();
+        configuration = configuration with { TypeSerializationMode = TypeSerializationMode.RegisteredOnly };
+        return this;
+    }
+
+    public SharpPackSerializerContextBuilder RegisterType<T>(string typeId)
+        => RegisterType(typeof(T), typeId);
+
+    /// <summary>Registers a stable, ordinal Type ID without enabling Type serialization.</summary>
+    public SharpPackSerializerContextBuilder RegisterType(Type type, string typeId)
+    {
+        ThrowIfBuilt();
+        ArgumentNullException.ThrowIfNull(type);
+        ArgumentException.ThrowIfNullOrWhiteSpace(typeId);
+        if (typesById.ContainsKey(typeId))
+        {
+            throw new ArgumentException("The Type ID is already registered.", nameof(typeId));
+        }
+        if (registeredTypes.Contains(type))
+        {
+            throw new ArgumentException("The Type is already registered.", nameof(type));
+        }
+        typesById.Add(typeId, type);
+        registeredTypes.Add(type);
         return this;
     }
 
@@ -178,6 +141,12 @@ public sealed class SharpPackSerializerContextBuilder
     public SharpPackSerializerContextBuilder RegisterFactory<T, TFactory>()
         where TFactory : ISharpPackFormatterFactory<T>
         => Register<T>(TFactory.CreateFormatter());
+
+    internal void RegisterGeneratedFactory<T>(Func<SharpPackSerializerContext, SharpPackFormatter<T>> factory)
+    {
+        ThrowIfBuilt();
+        (generatedRegistrations ??= []).Add(context => context.Graph.RegisterGeneratedFactory(factory));
+    }
 
     public SharpPackSerializerContextBuilder RegisterCollection<TCollection, TElement>()
         where TCollection : ICollection<TElement?>, new()
@@ -197,15 +166,29 @@ public sealed class SharpPackSerializerContextBuilder
         ThrowIfBuilt();
         built = true;
 
-        var context = new SharpPackSerializerContext(
-            configuration,
-            freezeRegistrations: false);
-        foreach (var registration in registrations)
+        try
         {
-            registration(context);
+            var context = new SharpPackSerializerContext(
+                configuration,
+                freezeRegistrations: false,
+                typeRegistrations: typesById);
+            foreach (var registration in registrations)
+            {
+                registration(context);
+            }
+            if (generatedRegistrations is not null)
+                foreach (var register in generatedRegistrations)
+                    register(context);
+            context.FreezeRegistrations();
+            return context;
         }
-        context.FreezeRegistrations();
-        return context;
+        finally
+        {
+            registrations.Clear();
+            generatedRegistrations?.Clear();
+            typesById.Clear();
+            registeredTypes.Clear();
+        }
     }
 
     void ThrowIfBuilt()

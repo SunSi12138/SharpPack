@@ -32,16 +32,22 @@ internal class NotSupportedTypeException : Exception
 public class TypeScriptMember
 {
     public MemberMeta Member { get; }
-    public string MemberName { get; }
-    public string TypeName { get; }
-    public string DefaultValue { get; }
-    public string WriteMethodTemplate { get; }
-    public string ReadMethodTemplate { get; }
+    internal TypeScriptMemberShape Shape { get; }
+    public string MemberName => Shape.MemberName;
+    public string TypeName => Shape.TypeName;
+    public string DefaultValue => Shape.DefaultValue;
+    public string WriteMethodTemplate => Shape.WriteMethodTemplate;
+    public string ReadMethodTemplate => Shape.ReadMethodTemplate;
 
     public TypeScriptMember(MemberMeta member, ReferenceSymbols references, TypeScriptGenerateOptions options)
     {
-        this.Member = member;
-        this.MemberName = options.ConvertPropertyName
+        Member = member;
+        Shape = Project(member, references, options);
+    }
+
+    internal static TypeScriptMemberShape Project(MemberMeta member, ReferenceSymbols references, TypeScriptGenerateOptions options)
+    {
+        var memberName = options.ConvertPropertyName
             ? Char.ToLowerInvariant(member.Name[0]) + member.Name.Substring(1)
             : member.Name;
 
@@ -56,13 +62,10 @@ public class TypeScriptMember
             throw;
         }
 
-        this.TypeName = tsType.TypeName;
-        this.DefaultValue = tsType.DefaultValue;
-        this.WriteMethodTemplate = tsType.WriteMethodTemplate;
-        this.ReadMethodTemplate = tsType.ReadMethodTemplate;
+        return new(memberName, tsType.TypeName, tsType.DefaultValue, tsType.WriteMethodTemplate, tsType.ReadMethodTemplate);
     }
 
-    TypeScriptType ConvertToTypeScriptType(ITypeSymbol symbol, ReferenceSymbols references, TypeScriptGenerateOptions options)
+    static TypeScriptType ConvertToTypeScriptType(ITypeSymbol symbol, ReferenceSymbols references, TypeScriptGenerateOptions options)
     {
         if (symbol.TypeKind == TypeKind.Enum)
         {
@@ -206,7 +209,7 @@ public class TypeScriptMember
         }
     }
 
-    TypeScriptTypeCore ConvertFromSymbol(ITypeSymbol typeSymbol, ReferenceSymbols reference, TypeScriptGenerateOptions options)
+    static TypeScriptTypeCore ConvertFromSymbol(ITypeSymbol typeSymbol, ReferenceSymbols reference, TypeScriptGenerateOptions options)
     {
         var isNullable =
             options.EnableNullableTypes &&
@@ -239,7 +242,7 @@ public class TypeScriptMember
         throw new NotSupportedTypeException(typeSymbol);
     }
 
-    TypeScriptTypeCore? ConvertFromSpecialType(
+    static TypeScriptTypeCore? ConvertFromSpecialType(
         SpecialType specialType,
         bool isNullable,
         bool allowNullableTypes)
