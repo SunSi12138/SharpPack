@@ -48,6 +48,10 @@ independently of the builder. A built context is safe to share between
 concurrent RPC calls. Different contexts may register different formatters for
 the same closed `T` without affecting each other.
 
+`Stack<T>` serialization copies the element slots, then writes them in push
+order. A formatter can replace a slot's value on the wire, but the replacement
+is not written back into the caller's stack.
+
 ### Generate formatters for external types
 
 Declare a root with `[assembly: SharpPackExternalType(typeof(T))]` when its
@@ -186,7 +190,7 @@ sandbox controlled by the built-in Type formatter.
 
 ### Migration from the 1.x Type-name contract
 
-This development change intentionally breaks previous `System.Type` payloads.
+SharpPack 2.0 cannot read the Type-name values written by 1.x.
 Choose stable protocol IDs on both endpoints and register each allowed Type
 explicitly. Do not use assembly-qualified names as protocol IDs. Legacy CLR-name
 payloads are not automatically resolved or converted, including the old

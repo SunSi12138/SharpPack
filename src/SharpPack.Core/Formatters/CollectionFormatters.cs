@@ -314,7 +314,26 @@ namespace SharpPack.Formatters
                 return;
             }
 
-            writer.WriteSpan(CollectionsMarshalEx.AsSpan(value));
+            var count = value.Count;
+            if (count == 0)
+            {
+                writer.WriteCollectionHeader(0);
+                return;
+            }
+
+            var items = ArrayPool<T?>.Shared.Rent(count);
+            try
+            {
+                // CopyTo returns pop order; the wire has always stored push order.
+                value.CopyTo(items, 0);
+                var ordered = items.AsSpan(0, count);
+                ordered.Reverse();
+                writer.WriteSpan(ordered);
+            }
+            finally
+            {
+                ArrayPool<T?>.Shared.Return(items, clearArray: RuntimeHelpers.IsReferenceOrContainsReferences<T?>());
+            }
         }
 
         [Preserve]

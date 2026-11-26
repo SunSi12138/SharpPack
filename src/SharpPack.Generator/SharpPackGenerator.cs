@@ -43,10 +43,11 @@ public partial class SharpPackGenerator : IIncrementalGenerator
         var unsupportedAbi = context.CompilationProvider
             .Select(static (compilation, _) => RuntimeGeneratedCodeAbi.GetUnsupportedVersion(compilation))
             .WithTrackingName("SharpPack.RuntimeAbi");
+        RegisterDeserializeArrayRoots(context, unsupportedAbi);
 
         var models = context.SyntaxProvider.ForAttributeWithMetadataName(
                 SharpPackableAttributeFullName,
-                static (node, _) => node is ClassDeclarationSyntax or StructDeclarationSyntax or RecordDeclarationSyntax or InterfaceDeclarationSyntax,
+                static (node, _) => node is TypeDeclarationSyntax,
                 static (context, _) => (Declaration: (TypeDeclarationSyntax)context.TargetNode,
                     HasGenerationIntent: HasModelGenerationIntent(context)));
         var unions = context.SyntaxProvider.ForAttributeWithMetadataName(

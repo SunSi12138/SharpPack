@@ -35,7 +35,7 @@ namespace BaselineFixtures;
 /// <b>int</b> Lives<br/>
 /// </code>
 /// </remarks>
-partial class Cat : ISharpPackable<Cat>, global::SharpPack.IFixedSizeSharpPackable, global::SharpPack.ISharpPackFormatterFactory<Cat>, global::SharpPack.ISharpPackContextFormatterFactory<Cat>
+partial class Cat : global::SharpPack.ISharpPackable<Cat>, global::SharpPack.IFixedSizeSharpPackable, global::SharpPack.ISharpPackFormatterFactory<Cat>, global::SharpPack.ISharpPackContextFormatterFactory<Cat>
 {
 
     static partial void StaticConstructor();
@@ -49,7 +49,7 @@ partial class Cat : ISharpPackable<Cat>, global::SharpPack.IFixedSizeSharpPackab
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    static int global::SharpPack.IFixedSizeSharpPackable.Size => 1 + System.Runtime.CompilerServices.Unsafe.SizeOf<int>();
+    static int global::SharpPack.IFixedSizeSharpPackable.Size => 1 + global::System.Runtime.CompilerServices.Unsafe.SizeOf<int>();
 
 
 
@@ -136,7 +136,7 @@ partial class Cat : ISharpPackable<Cat>, global::SharpPack.IFixedSizeSharpPackab
         }
         else if (count > 1)
         {
-            SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Cat), 1, count);
+            global::SharpPack.SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Cat), 1, count);
             goto READ_END;
         }
         else
@@ -201,7 +201,7 @@ partial class Cat : ISharpPackable<Cat>, global::SharpPack.IFixedSizeSharpPackab
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    static void ISharpPackable<Cat>.Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Cat? value) 
+    static void global::SharpPack.ISharpPackable<Cat>.Serialize<TBufferWriter>(ref global::SharpPack.SharpPackWriter<TBufferWriter> writer, scoped ref Cat? value)
     {
 
         if (value == null)
@@ -218,7 +218,7 @@ partial class Cat : ISharpPackable<Cat>, global::SharpPack.IFixedSizeSharpPackab
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    static void ISharpPackable<Cat>.Deserialize(ref SharpPackReader reader, scoped ref Cat? value)
+    static void global::SharpPack.ISharpPackable<Cat>.Deserialize(ref global::SharpPack.SharpPackReader reader, scoped ref Cat? value)
     {
 
         if (!reader.TryReadObjectHeader(out var count))
@@ -253,7 +253,7 @@ partial class Cat : ISharpPackable<Cat>, global::SharpPack.IFixedSizeSharpPackab
         }
         else if (count > 1)
         {
-            SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Cat), 1, count);
+            global::SharpPack.SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Cat), 1, count);
             goto READ_END;
         }
         else
@@ -334,7 +334,7 @@ namespace BaselineFixtures;
 /// <b>string</b> Name<br/>
 /// </code>
 /// </remarks>
-partial class Dog : ISharpPackable<Dog>, global::SharpPack.ISharpPackExactSizeSerializable<Dog>, global::SharpPack.ISharpPackFormatterFactory<Dog>, global::SharpPack.ISharpPackContextFormatterFactory<Dog>
+partial class Dog : global::SharpPack.ISharpPackable<Dog>, global::SharpPack.ISharpPackExactSizeSerializable<Dog>, global::SharpPack.ISharpPackFormatterFactory<Dog>, global::SharpPack.ISharpPackContextFormatterFactory<Dog>
 {
 
     static partial void StaticConstructor();
@@ -455,7 +455,7 @@ partial class Dog : ISharpPackable<Dog>, global::SharpPack.ISharpPackExactSizeSe
         }
         else if (count > 1)
         {
-            SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Dog), 1, count);
+            global::SharpPack.SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Dog), 1, count);
             goto READ_END;
         }
         else
@@ -520,7 +520,7 @@ partial class Dog : ISharpPackable<Dog>, global::SharpPack.ISharpPackExactSizeSe
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    static void ISharpPackable<Dog>.Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Dog? value) 
+    static void global::SharpPack.ISharpPackable<Dog>.Serialize<TBufferWriter>(ref global::SharpPack.SharpPackWriter<TBufferWriter> writer, scoped ref Dog? value)
     {
 
         if (value == null)
@@ -538,7 +538,7 @@ partial class Dog : ISharpPackable<Dog>, global::SharpPack.ISharpPackExactSizeSe
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    static void ISharpPackable<Dog>.Deserialize(ref SharpPackReader reader, scoped ref Dog? value)
+    static void global::SharpPack.ISharpPackable<Dog>.Deserialize(ref global::SharpPack.SharpPackReader reader, scoped ref Dog? value)
     {
 
         if (!reader.TryReadObjectHeader(out var count))
@@ -573,7 +573,7 @@ partial class Dog : ISharpPackable<Dog>, global::SharpPack.ISharpPackExactSizeSe
         }
         else if (count > 1)
         {
-            SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Dog), 1, count);
+            global::SharpPack.SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Dog), 1, count);
             goto READ_END;
         }
         else
@@ -655,7 +655,7 @@ namespace BaselineFixtures;
 /// <b>long</b> Stamp<br/>
 /// </code>
 /// </remarks>
-partial struct Fixed : ISharpPackable<Fixed>, global::SharpPack.ISharpPackFormatterFactory<Fixed>, global::SharpPack.ISharpPackContextFormatterFactory<Fixed>
+partial struct Fixed : global::SharpPack.ISharpPackable<Fixed>, global::SharpPack.ISharpPackFormatterFactory<Fixed>, global::SharpPack.ISharpPackContextFormatterFactory<Fixed>
 {
 
     static partial void StaticConstructor();
@@ -690,7 +690,7 @@ partial struct Fixed : ISharpPackable<Fixed>, global::SharpPack.ISharpPackFormat
 
 
     [global::SharpPack.CompilerServices.Preserve]
-    static void ISharpPackable<Fixed>.Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Fixed value) 
+    static void global::SharpPack.ISharpPackable<Fixed>.Serialize<TBufferWriter>(ref global::SharpPack.SharpPackWriter<TBufferWriter> writer, scoped ref Fixed value)
     {
 
         writer.WriteUnmanaged(value);
@@ -700,7 +700,7 @@ partial struct Fixed : ISharpPackable<Fixed>, global::SharpPack.ISharpPackFormat
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    static void ISharpPackable<Fixed>.Deserialize(ref SharpPackReader reader, scoped ref Fixed value)
+    static void global::SharpPack.ISharpPackable<Fixed>.Deserialize(ref global::SharpPack.SharpPackReader reader, scoped ref Fixed value)
     {
 
         reader.ReadUnmanaged(out value);
@@ -756,7 +756,7 @@ partial interface IAnimal : global::SharpPack.ISharpPackFormatterFactory<IAnimal
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    sealed class IAnimalFormatter : SharpPackFormatter<IAnimal>
+    sealed class IAnimalFormatter : global::SharpPack.SharpPackFormatter<IAnimal>
     {
         static readonly global::System.Collections.Generic.Dictionary<global::System.Type, ushort> __typeToTag = new(2)
         {
@@ -765,7 +765,7 @@ partial interface IAnimal : global::SharpPack.ISharpPackFormatterFactory<IAnimal
         };
 
         [global::SharpPack.CompilerServices.Preserve]
-        public override void Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref IAnimal? value)
+        public override void Serialize<TBufferWriter>(ref global::SharpPack.SharpPackWriter<TBufferWriter> writer, scoped ref IAnimal? value)
         {
 
             if (value == null)
@@ -795,7 +795,7 @@ partial interface IAnimal : global::SharpPack.ISharpPackFormatterFactory<IAnimal
         }
 
         [global::SharpPack.CompilerServices.Preserve]
-        public override void Deserialize(ref SharpPackReader reader, scoped ref IAnimal? value)
+        public override void Deserialize(ref global::SharpPack.SharpPackReader reader, scoped ref IAnimal? value)
         {
 
             if (!reader.TryReadUnionHeader(out var tag))
@@ -868,7 +868,7 @@ namespace BaselineFixtures;
 /// <b>BaselineFixtures.Node</b> Next<br/>
 /// </code>
 /// </remarks>
-partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatterFactory<Node>, global::SharpPack.ISharpPackContextFormatterFactory<Node>
+partial class Node : global::SharpPack.ISharpPackable<Node>, global::SharpPack.ISharpPackFormatterFactory<Node>, global::SharpPack.ISharpPackContextFormatterFactory<Node>
 {
 
     static partial void StaticConstructor();
@@ -934,8 +934,8 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
             out var tempBufferLeaseId);
         try
         {
-            Span<int> offsets = stackalloc int[2];
-            var tempWriter = new SharpPackWriter<global::SharpPack.Internal.ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
+            global::System.Span<int> offsets = stackalloc int[2];
+            var tempWriter = new global::SharpPack.SharpPackWriter<global::SharpPack.Internal.ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
 
             tempWriter.WriteValue(value.@Value); offsets[0] = tempWriter.WrittenCount;
             tempWriter.WriteValue(value.@Next); offsets[1] = tempWriter.WrittenCount;
@@ -984,26 +984,26 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
             goto END;
         }
         uint id;
-        if (count == SharpPackCode.ReferenceId)
+        if (count == global::SharpPack.SharpPackCode.ReferenceId)
         {
             id = reader.ReadVarIntUInt32();
             value = (Node)reader.OptionalState.GetObjectReference(id);
             goto END;
         }
-        Span<int> deltas = stackalloc int[count];
+        global::System.Span<int> deltas = stackalloc int[count];
         long totalDelta = 0;
         for (int i = 0; i < count; i++)
         {
             deltas[i] = reader.ReadVarIntInt32();
             if (deltas[i] < 0)
             {
-                SharpPackSerializationException.ThrowInvalidLength(deltas[i]);
+                global::SharpPack.SharpPackSerializationException.ThrowInvalidLength(deltas[i]);
             }
             totalDelta += deltas[i];
         }
         if (totalDelta > reader.Remaining)
         {
-            SharpPackSerializationException.ThrowInvalidAdvance();
+            global::SharpPack.SharpPackSerializationException.ThrowInvalidAdvance();
         }
         id = reader.ReadVarIntUInt32();
         if (value == null)
@@ -1039,7 +1039,7 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
         }
         // else if (count > 2)
         // {
-            // SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Node), 2, count);
+            // global::SharpPack.SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Node), 2, count);
             // goto READ_END;
         // }
         else
@@ -1114,7 +1114,7 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    static void ISharpPackable<Node>.Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Node? value) 
+    static void global::SharpPack.ISharpPackable<Node>.Serialize<TBufferWriter>(ref global::SharpPack.SharpPackWriter<TBufferWriter> writer, scoped ref Node? value)
     {
 
         if (value == null)
@@ -1132,8 +1132,8 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
             out var tempBufferLeaseId);
         try
         {
-            Span<int> offsets = stackalloc int[2];
-            var tempWriter = new SharpPackWriter<global::SharpPack.Internal.ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
+            global::System.Span<int> offsets = stackalloc int[2];
+            var tempWriter = new global::SharpPack.SharpPackWriter<global::SharpPack.Internal.ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
 
             tempWriter.WriteUnmanaged(value.@Value); offsets[0] = tempWriter.WrittenCount;
             tempWriter.WritePackable(value.@Next); offsets[1] = tempWriter.WrittenCount;
@@ -1170,7 +1170,7 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    static void ISharpPackable<Node>.Deserialize(ref SharpPackReader reader, scoped ref Node? value)
+    static void global::SharpPack.ISharpPackable<Node>.Deserialize(ref global::SharpPack.SharpPackReader reader, scoped ref Node? value)
     {
 
         if (!reader.TryReadObjectHeader(out var count))
@@ -1179,26 +1179,26 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
             goto END;
         }
         uint id;
-        if (count == SharpPackCode.ReferenceId)
+        if (count == global::SharpPack.SharpPackCode.ReferenceId)
         {
             id = reader.ReadVarIntUInt32();
             value = (Node)reader.OptionalState.GetObjectReference(id);
             goto END;
         }
-        Span<int> deltas = stackalloc int[count];
+        global::System.Span<int> deltas = stackalloc int[count];
         long totalDelta = 0;
         for (int i = 0; i < count; i++)
         {
             deltas[i] = reader.ReadVarIntInt32();
             if (deltas[i] < 0)
             {
-                SharpPackSerializationException.ThrowInvalidLength(deltas[i]);
+                global::SharpPack.SharpPackSerializationException.ThrowInvalidLength(deltas[i]);
             }
             totalDelta += deltas[i];
         }
         if (totalDelta > reader.Remaining)
         {
-            SharpPackSerializationException.ThrowInvalidAdvance();
+            global::SharpPack.SharpPackSerializationException.ThrowInvalidAdvance();
         }
         id = reader.ReadVarIntUInt32();
         if (value == null)
@@ -1234,7 +1234,7 @@ partial class Node : ISharpPackable<Node>, global::SharpPack.ISharpPackFormatter
         }
         // else if (count > 2)
         // {
-            // SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Node), 2, count);
+            // global::SharpPack.SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Node), 2, count);
             // goto READ_END;
         // }
         else
@@ -1327,9 +1327,8 @@ namespace BaselineFixtures;
 /// </code>
 /// </remarks>
 partial class Outer<T>
-
 {
-partial class Inner<U> : ISharpPackable<Inner<U>>, global::SharpPack.ISharpPackFormatterFactory<Inner<U>>, global::SharpPack.ISharpPackContextFormatterFactory<Inner<U>>
+partial class Inner<U> : global::SharpPack.ISharpPackable<Inner<U>>, global::SharpPack.ISharpPackFormatterFactory<Inner<U>>, global::SharpPack.ISharpPackContextFormatterFactory<Inner<U>>
 {
 
     static partial void StaticConstructor();
@@ -1438,7 +1437,7 @@ partial class Inner<U> : ISharpPackable<Inner<U>>, global::SharpPack.ISharpPackF
         }
         else if (count > 2)
         {
-            SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Inner<U>), 2, count);
+            global::SharpPack.SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Inner<U>), 2, count);
             goto READ_END;
         }
         else
@@ -1508,7 +1507,7 @@ partial class Inner<U> : ISharpPackable<Inner<U>>, global::SharpPack.ISharpPackF
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    static void ISharpPackable<Inner<U>>.Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Inner<U>? value) 
+    static void global::SharpPack.ISharpPackable<Inner<U>>.Serialize<TBufferWriter>(ref global::SharpPack.SharpPackWriter<TBufferWriter> writer, scoped ref Inner<U>? value)
     {
 
         if (value == null)
@@ -1527,7 +1526,7 @@ partial class Inner<U> : ISharpPackable<Inner<U>>, global::SharpPack.ISharpPackF
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    static void ISharpPackable<Inner<U>>.Deserialize(ref SharpPackReader reader, scoped ref Inner<U>? value)
+    static void global::SharpPack.ISharpPackable<Inner<U>>.Deserialize(ref global::SharpPack.SharpPackReader reader, scoped ref Inner<U>? value)
     {
 
         if (!reader.TryReadObjectHeader(out var count))
@@ -1566,7 +1565,7 @@ partial class Inner<U> : ISharpPackable<Inner<U>>, global::SharpPack.ISharpPackF
         }
         else if (count > 2)
         {
-            SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Inner<U>), 2, count);
+            global::SharpPack.SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Inner<U>), 2, count);
             goto READ_END;
         }
         else
@@ -1655,7 +1654,7 @@ namespace BaselineFixtures;
 /// <b>int</b> Score<br/>
 /// </code>
 /// </remarks>
-partial class Simple : ISharpPackable<Simple>, global::SharpPack.ISharpPackFormatterFactory<Simple>, global::SharpPack.ISharpPackContextFormatterFactory<Simple>
+partial class Simple : global::SharpPack.ISharpPackable<Simple>, global::SharpPack.ISharpPackFormatterFactory<Simple>, global::SharpPack.ISharpPackContextFormatterFactory<Simple>
 {
     static readonly global::BaselineFixtures.OffsetFormatter __ScoreFormatter = new global::BaselineFixtures.OffsetAttribute().GetFormatter();
 
@@ -1763,7 +1762,7 @@ partial class Simple : ISharpPackable<Simple>, global::SharpPack.ISharpPackForma
         }
         else if (count > 3)
         {
-            SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Simple), 3, count);
+            global::SharpPack.SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Simple), 3, count);
             goto READ_END;
         }
         else
@@ -1838,7 +1837,7 @@ partial class Simple : ISharpPackable<Simple>, global::SharpPack.ISharpPackForma
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    static void ISharpPackable<Simple>.Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Simple? value) 
+    static void global::SharpPack.ISharpPackable<Simple>.Serialize<TBufferWriter>(ref global::SharpPack.SharpPackWriter<TBufferWriter> writer, scoped ref Simple? value)
     {
 
         if (value == null)
@@ -1857,7 +1856,7 @@ partial class Simple : ISharpPackable<Simple>, global::SharpPack.ISharpPackForma
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    static void ISharpPackable<Simple>.Deserialize(ref SharpPackReader reader, scoped ref Simple? value)
+    static void global::SharpPack.ISharpPackable<Simple>.Deserialize(ref global::SharpPack.SharpPackReader reader, scoped ref Simple? value)
     {
 
         if (!reader.TryReadObjectHeader(out var count))
@@ -1900,7 +1899,7 @@ partial class Simple : ISharpPackable<Simple>, global::SharpPack.ISharpPackForma
         }
         else if (count > 3)
         {
-            SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Simple), 3, count);
+            global::SharpPack.SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Simple), 3, count);
             goto READ_END;
         }
         else
@@ -1992,7 +1991,7 @@ namespace BaselineFixtures;
 /// <b>string</b> Name<br/>
 /// </code>
 /// </remarks>
-partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPackFormatterFactory<Versioned>, global::SharpPack.ISharpPackContextFormatterFactory<Versioned>
+partial class Versioned : global::SharpPack.ISharpPackable<Versioned>, global::SharpPack.ISharpPackFormatterFactory<Versioned>, global::SharpPack.ISharpPackContextFormatterFactory<Versioned>
 {
 
     static partial void StaticConstructor();
@@ -2047,8 +2046,8 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
             out var tempBufferLeaseId);
         try
         {
-            Span<int> offsets = stackalloc int[2];
-            var tempWriter = new SharpPackWriter<global::SharpPack.Internal.ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
+            global::System.Span<int> offsets = stackalloc int[2];
+            var tempWriter = new global::SharpPack.SharpPackWriter<global::SharpPack.Internal.ReusableLinkedArrayBufferWriter>(ref tempBuffer, writer.OptionalState);
 
             tempWriter.WriteValue(value.@Id); offsets[0] = tempWriter.WrittenCount;
             tempWriter.WriteValue(value.@Name); offsets[1] = tempWriter.WrittenCount;
@@ -2097,20 +2096,20 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
             goto END;
         }
 
-        Span<int> deltas = stackalloc int[count];
+        global::System.Span<int> deltas = stackalloc int[count];
         long totalDelta = 0;
         for (int i = 0; i < count; i++)
         {
             deltas[i] = reader.ReadVarIntInt32();
             if (deltas[i] < 0)
             {
-                SharpPackSerializationException.ThrowInvalidLength(deltas[i]);
+                global::SharpPack.SharpPackSerializationException.ThrowInvalidLength(deltas[i]);
             }
             totalDelta += deltas[i];
         }
         if (totalDelta > reader.Remaining)
         {
-            SharpPackSerializationException.ThrowInvalidAdvance();
+            global::SharpPack.SharpPackSerializationException.ThrowInvalidAdvance();
         }
 
         int __Id;
@@ -2141,7 +2140,7 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
         }
         // else if (count > 2)
         // {
-            // SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Versioned), 2, count);
+            // global::SharpPack.SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Versioned), 2, count);
             // goto READ_END;
         // }
         else
@@ -2216,7 +2215,7 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    static void ISharpPackable<Versioned>.Serialize<TBufferWriter>(ref SharpPackWriter<TBufferWriter> writer, scoped ref Versioned? value) 
+    static void global::SharpPack.ISharpPackable<Versioned>.Serialize<TBufferWriter>(ref global::SharpPack.SharpPackWriter<TBufferWriter> writer, scoped ref Versioned? value)
     {
 
         if (value == null)
@@ -2226,7 +2225,7 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
         }
 
         writer.WriteObjectHeader(2);
-        writer.WriteVarInt(System.Runtime.CompilerServices.Unsafe.SizeOf<int>());
+        writer.WriteVarInt(global::System.Runtime.CompilerServices.Unsafe.SizeOf<int>());
         writer.WriteVarInt(writer.GetStringWriteLength(value.@Name));
 
         
@@ -2239,7 +2238,7 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    static void ISharpPackable<Versioned>.Deserialize(ref SharpPackReader reader, scoped ref Versioned? value)
+    static void global::SharpPack.ISharpPackable<Versioned>.Deserialize(ref global::SharpPack.SharpPackReader reader, scoped ref Versioned? value)
     {
 
         if (!reader.TryReadObjectHeader(out var count))
@@ -2248,20 +2247,20 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
             goto END;
         }
 
-        Span<int> deltas = stackalloc int[count];
+        global::System.Span<int> deltas = stackalloc int[count];
         long totalDelta = 0;
         for (int i = 0; i < count; i++)
         {
             deltas[i] = reader.ReadVarIntInt32();
             if (deltas[i] < 0)
             {
-                SharpPackSerializationException.ThrowInvalidLength(deltas[i]);
+                global::SharpPack.SharpPackSerializationException.ThrowInvalidLength(deltas[i]);
             }
             totalDelta += deltas[i];
         }
         if (totalDelta > reader.Remaining)
         {
-            SharpPackSerializationException.ThrowInvalidAdvance();
+            global::SharpPack.SharpPackSerializationException.ThrowInvalidAdvance();
         }
 
         int __Id;
@@ -2292,7 +2291,7 @@ partial class Versioned : ISharpPackable<Versioned>, global::SharpPack.ISharpPac
         }
         // else if (count > 2)
         // {
-            // SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Versioned), 2, count);
+            // global::SharpPack.SharpPackSerializationException.ThrowInvalidPropertyCount(typeof(Versioned), 2, count);
             // goto READ_END;
         // }
         else

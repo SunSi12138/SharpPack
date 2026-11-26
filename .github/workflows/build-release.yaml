@@ -20,6 +20,21 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
+          dotnet-version: '10.0.102'
+      - name: Verify version and extract its release notes
+        run: |
+          project_version=$(sed -n \
+            's:.*<VersionPrefix>\(.*\)</VersionPrefix>.*:\1:p' \
+            Directory.Build.props)
+          test "$project_version" = "$VERSION"
+          awk -v heading="## $VERSION" '
+            $0 == heading { active = 1; next }
+            /^## / && active { exit }
+            active { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          grep -q '[^[:space:]]' "$RUNNER_TEMP/release-notes.md"
+        env:
+          VERSION: ${{ inputs.version }}
       - name: Verify architecture baselines
         run: dotnet run --project tools/SharpPack.Baselines/SharpPack.Baselines.csproj -c Release -- verify
       - run: dotnet build -c Release -p:Version="$VERSION"
@@ -49,7 +64,7 @@ jobs:
           gh release create "v$VERSION" ./publish/*
           --target "$GITHUB_SHA"
           --title "SharpPack $VERSION"
-          --notes-file CHANGELOG.md
+          --notes-file "$RUNNER_TEMP/release-notes.md"
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}

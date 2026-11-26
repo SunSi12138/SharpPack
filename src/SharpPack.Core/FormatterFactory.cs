@@ -184,13 +184,13 @@ internal static class FormatterResolver<T>
                     : formatter.BindContext(context.Graph);
             }
 
-            if (typeof(ISharpPackable<>).MakeGenericType(type).IsAssignableFrom(type))
+            if (typeof(ISharpPackable<T>).IsAssignableFrom(type))
             {
                 return (SharpPackFormatter<T>)Activator.CreateInstance(
                     typeof(SharpPackableFormatter<>).MakeGenericType(type))!;
             }
 
-            var containsReferences = TypeHelpers.IsReferenceOrContainsReferences(type);
+            var containsReferences = RuntimeHelpers.IsReferenceOrContainsReferences<T>();
             if (FormatterResolver.CreateGenericFormatter(
                     type,
                     containsReferences,

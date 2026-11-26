@@ -34,8 +34,10 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
+          dotnet-version: '10.0.102'
       - name: Build and pack using the release commands
         run: |
+          dotnet build src/SharpPack.Core/SharpPack.Core.csproj -c Release -p:Version="$VERSION"
           dotnet build src/SharpPack/SharpPack.csproj -c Release -p:Version="$VERSION"
           dotnet build src/SharpPack.Streaming/SharpPack.Streaming.csproj -c Release -p:Version="$VERSION"
           bash tools/PackageConsumers/pack.sh "$VERSION" "$RUNNER_TEMP/sharppack-packages"

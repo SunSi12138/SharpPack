@@ -372,4 +372,28 @@ internal static class DiagnosticDescriptors
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
+
+    internal static readonly DiagnosticDescriptor UnsupportedNativeUnion = new(
+        id: "SHARPPACK048",
+        title: "Unsupported native union",
+        messageFormat: "Native union '{0}' cannot be generated: {1}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    internal static readonly DiagnosticDescriptor AmbiguousConstructorParameter = new(
+        id: "SHARPPACK049",
+        title: "Ambiguous SharpPack constructor parameter",
+        messageFormat: "Constructor parameter '{1}' on '{0}' matches multiple serialized members: {2}. Use distinct member names or ignore a member.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    internal static readonly DiagnosticDescriptor IncludedPropertyCannotBePopulated = new(
+        id: "SHARPPACK050",
+        title: "Included property cannot be populated",
+        messageFormat: "Included property '{1}' on '{0}' needs a setter usable during deserialization or a matching constructor parameter.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
 }

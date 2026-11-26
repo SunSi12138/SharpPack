@@ -113,6 +113,25 @@ public class SidecarPlanningTest
     }
 
     [Fact]
+    public void ExternalConstructorCanReuseOneSlotWithDifferentCase()
+    {
+        var compilation = Create("""
+            namespace Vendor;
+            public sealed class Payload(int value, int Value)
+            {
+                public int Value { get; } = Value;
+                public int GetLowercaseValue() => value;
+            }
+            """, """
+            [assembly: SharpPackExternalType(typeof(Vendor.Payload))]
+            """);
+        var (diagnostics, generated) = Run(compilation);
+        Assert.Empty(diagnostics);
+        Assert.Contains(generated.SyntaxTrees, static tree => tree.FilePath.EndsWith("SharpPackExternalFormatters.g.cs"));
+        Assert.Empty(generated.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Fact]
     public void DiagnosticNamesTheWholeNestedPathUnlessTheIntegrationSuppliesAnOverride()
     {
         var compilation = Create("""
