@@ -43,6 +43,7 @@ public partial class SharpPackGenerator : IIncrementalGenerator
         var unsupportedAbi = context.CompilationProvider
             .Select(static (compilation, _) => RuntimeGeneratedCodeAbi.GetUnsupportedVersion(compilation))
             .WithTrackingName("SharpPack.RuntimeAbi");
+        RegisterDeserializeArrayRoots(context, unsupportedAbi);
 
         var models = context.SyntaxProvider.ForAttributeWithMetadataName(
                 SharpPackableAttributeFullName,
