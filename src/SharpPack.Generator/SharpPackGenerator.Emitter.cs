@@ -272,17 +272,22 @@ using SharpPack;
         var contextFactoryInterface =
             $", global::SharpPack.ISharpPackFormatterFactory<{TypeName}>" +
             $", global::SharpPack.ISharpPackContextFormatterFactory<{TypeName}>";
+        // Diagnostic: use the already generated, model-specific formatter to
+        // separate factory dispatch from the generic adapter's static dispatch.
+        var defaultFormatter = plan.TracksReferences && plan.ContextDependencies.HasOverridableWireMembers
+            ? $"new {contextFormatterTypeName}()"
+            : $"new global::SharpPack.Formatters.SharpPackableFormatter<{TypeName}>()";
         var contextDependencyCondition = string.Join(" || ", plan.ContextDependencies.FactoryLookupTypes
             .Select(static type => $"context.HasFormatterOverrideDependency<{type}>()"));
         var contextFormatterSelection =
             contextDependencyCondition.Length == 0
-                ? $"return new global::SharpPack.Formatters.SharpPackableFormatter<{TypeName}>();"
+                ? $"return {defaultFormatter};"
                 : $$"""
         if ({{contextDependencyCondition}})
         {
             return new {{contextFormatterTypeName}}();
         }
-        return new global::SharpPack.Formatters.SharpPackableFormatter<{{TypeName}}>();
+        return {{defaultFormatter}};
 """;
         var selfFactoryRoot = plan.Names.SelfFactoryRoot;
         var selfFactoryRootRead = EmitFactoryRootRead(selfFactoryRoot);
@@ -308,7 +313,7 @@ using SharpPack;
     {
 {{selfFactoryRootRead}}
 {{aotRootCall}}
-        return new global::SharpPack.Formatters.SharpPackableFormatter<{{TypeName}}>();
+        return {{defaultFormatter}};
     }
 
     [global::SharpPack.CompilerServices.Preserve]
