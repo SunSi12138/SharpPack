@@ -21,7 +21,17 @@ internal static class Net11
             Decimal128.NegativeZero, Decimal128.NaN, Decimal128.PositiveInfinity, "000000000000000000000000000040B0");
 
         VerifyNativeUnion(context);
+        VerifyClosedHierarchy(context);
         VerifyDateTimeOffsetMigration();
+    }
+
+    static void VerifyClosedHierarchy(SharpPackSerializerContext context)
+    {
+        Net11JobState value = new Net11Running(37);
+        var payload = SharpPackSerializer.Serialize(value);
+        if (!payload.AsSpan().SequenceEqual(new byte[] { 17, 1, 37, 0, 0, 0 }) ||
+            SharpPackSerializer.Deserialize<Net11JobState>(payload, context) is not Net11Running(37))
+            throw new InvalidOperationException("The closed hierarchy changed its active case or its explicit wire tag.");
     }
 
     static void VerifyDateTimeOffsetMigration()
@@ -124,6 +134,15 @@ internal static class Net11
         }
     }
 }
+
+[SharpPackable, SharpPackUnion(2, typeof(Net11Waiting)), SharpPackUnion(17, typeof(Net11Running))]
+internal closed partial record Net11JobState;
+
+[SharpPackable]
+internal sealed partial record Net11Waiting : Net11JobState;
+
+[SharpPackable]
+internal sealed partial record Net11Running(int Percent) : Net11JobState;
 
 [SharpPackable]
 internal partial class Net11NumericModel<T> where T : unmanaged

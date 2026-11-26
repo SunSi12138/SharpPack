@@ -389,6 +389,11 @@ cannot both be cases in the same union. Empty contents, including a null case
 value, use the empty union representation. Existing interface and abstract
 class unions keep their current format.
 
+C# 15 `closed` class and record hierarchies also use `[SharpPackUnion]` on the
+base type and `[SharpPackable]` on each serialized concrete subtype. Assign
+explicit tags as for other class unions; `closed` does not change the wire
+format or assign tags automatically.
+
 ### Serialization callbacks
 
 When serializing/deserializing, SharpPack can invoke a before/after event using the `[SharpPackOnSerializing]`, `[SharpPackOnSerialized]`, `[SharpPackOnDeserializing]`, `[SharpPackOnDeserialized]` attributes. It can annotate both static and instance (non-static) methods, and public and private methods.

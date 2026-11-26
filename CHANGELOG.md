@@ -27,8 +27,8 @@
 - **.NET 11 and native C# 15 unions.** .NET 10 remains supported. The .NET 11
   Core asset adds `BFloat16`, `Decimal32`, `Decimal64`, and `Decimal128`.
   Annotate C# 15 `partial union` cases with explicit tags to keep their
-  binary IDs stable when you reorder them. Existing interface and class
-  unions keep their wire format.
+  binary IDs stable when you reorder them. C# 15 `closed` hierarchies use the
+  existing explicitly tagged class-union format.
 - **Compile-time formatters for third-party types.** Declare closed roots and
   register one generated provider on the context builder. Unsupported shapes
   report the nested path at build time. Integrations can call the same planner
@@ -45,8 +45,10 @@
   messages; transport and user-code exceptions keep their original types.
   See [read limits][limits-v2] and [error codes][errors-v2].
 - **More precise NativeAOT roots.** Generated models keep their own formatter
-  factories for deserialize-only applications. Core and Generator also check
-  the generated-code contract before emitting incompatible code.
+  factories for deserialize-only applications. The generator also roots
+  closed, nameable model arrays when the call directly names `Item[]`. Core
+  and Generator check the generated-code contract before emitting
+  incompatible code.
 - **Compatibility and lifecycle fixes.** Collection writes validate counts,
   transport reports failures at the appropriate boundary, and context
   builders release startup registrations after building. `BitArray` reads
