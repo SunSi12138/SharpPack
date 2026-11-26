@@ -61,6 +61,11 @@
 - **Legacy .NET timestamp import.** Use `DotNetDateTimeOffsetFormatter` in
   a migration context to import .NET 9 values and write the .NET 10 layout
   without changing the default wire. See [timestamp migration][dto-v2].
+- **Portable `Stack<T>` writes.** The formatter uses the public copy API and
+  keeps the same push-order bytes. It no longer writes slot replacements from
+  custom formatters back into the source stack. The extra copy can slow large
+  stacks; [the hosted comparison][stack-v2] measured no steady-state
+  allocation change.
 
 [aot-v2]: https://github.com/SunSi12138/SharpPack/blob/v2.0.0/docs/aot-factory-migration.md
 [type-v2]: https://github.com/SunSi12138/SharpPack/blob/v2.0.0/docs/formatter-context.md#systemtype-payload-capability
@@ -69,6 +74,7 @@
 [limits-v2]: https://github.com/SunSi12138/SharpPack/blob/v2.0.0/docs/read-limits.md
 [errors-v2]: https://github.com/SunSi12138/SharpPack/blob/v2.0.0/docs/architecture/error-codes.md
 [dto-v2]: https://github.com/SunSi12138/SharpPack/blob/v2.0.0/README.md#importing-legacy-net-datetimeoffset-data
+[stack-v2]: https://github.com/SunSi12138/SharpPack/actions/runs/45739261927
 
 ## 1.1.0
 

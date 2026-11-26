@@ -766,11 +766,14 @@ Native AOT
 ---
 Generated formatters and the generic runtime path are designed for Native AOT. Reflection-based cold shape discovery must be preserved when trimming an application that relies on runtime generic shapes.
 
-Closed generic shapes used only as serializer roots, such as a custom
-`T[]`, may not otherwise have native generic code rooted by a generated
-model. Reference their closed formatter statically, or register it through a
-Context during startup. For example, a custom public factory can be rooted
-without reflection by using
+With the generator in the calling project, a direct `Deserialize<MyModel[]>`
+keeps the array formatter and the generated element factory when the model
+has an accessible global name. See the [array rooting guide](docs/aot-factory-migration.md#deserialize-an-array-without-an-earlier-write)
+for generic wrappers and other cases that need an explicit root.
+
+Other closed generic shapes used only as serializer roots may need a static
+formatter reference or context registration. A custom public factory can be
+rooted without reflection by using
 `SharpPackSerializerContextBuilder.RegisterFactory<T, TFactory>()`. The
 default generated factories are explicit static interface implementations and
 are preserved automatically. A public `CreateFormatter` discovered only by
