@@ -888,7 +888,7 @@ partial class Node : global::SharpPack.ISharpPackable<Node>, global::SharpPack.I
     {
         var __SharpPackPreserveSelfFactoryRoots = __SharpPackPreserveSelfFactoryRootsValue;
         __SharpPackEnsureAotFormatterRoots();
-        return new global::SharpPack.Formatters.SharpPackableFormatter<Node>();
+        return new __SharpPackCircularFormatter();
     }
 
     [global::SharpPack.CompilerServices.Preserve]
@@ -901,7 +901,7 @@ partial class Node : global::SharpPack.ISharpPackable<Node>, global::SharpPack.I
         {
             return new __SharpPackContextFormatter();
         }
-        return new global::SharpPack.Formatters.SharpPackableFormatter<Node>();
+        return new __SharpPackCircularFormatter();
     }
 
     [global::SharpPack.CompilerServices.Preserve]
@@ -1112,9 +1112,28 @@ partial class Node : global::SharpPack.ISharpPackable<Node>, global::SharpPack.I
             scoped ref Node? value)
             => __SharpPackDeserializeWithFormatterOverrides(ref reader, ref value);
     }
+    [global::SharpPack.CompilerServices.Preserve]
+    static void global::SharpPack.ISharpPackable<Node>.Serialize<TBufferWriter>(
+        ref global::SharpPack.SharpPackWriter<TBufferWriter> writer, scoped ref Node? value)
+        => __SharpPackCircularSerialize(ref writer, ref value);
 
     [global::SharpPack.CompilerServices.Preserve]
-    static void global::SharpPack.ISharpPackable<Node>.Serialize<TBufferWriter>(ref global::SharpPack.SharpPackWriter<TBufferWriter> writer, scoped ref Node? value)
+    static void global::SharpPack.ISharpPackable<Node>.Deserialize(ref global::SharpPack.SharpPackReader reader, scoped ref Node? value)
+        => __SharpPackCircularDeserialize(ref reader, ref value);
+
+    [global::SharpPack.CompilerServices.Preserve]
+    sealed class __SharpPackCircularFormatter : global::SharpPack.SharpPackFormatter<Node>
+    {
+        public override void Serialize<TBufferWriter>(ref global::SharpPack.SharpPackWriter<TBufferWriter> writer, scoped ref Node? value)
+            => __SharpPackCircularSerialize(ref writer, ref value);
+
+        public override void Deserialize(ref global::SharpPack.SharpPackReader reader, scoped ref Node? value)
+            => __SharpPackCircularDeserialize(ref reader, ref value);
+    }
+
+    [global::SharpPack.CompilerServices.Preserve]
+    static void __SharpPackCircularSerialize<TBufferWriter>(ref global::SharpPack.SharpPackWriter<TBufferWriter> writer, scoped ref Node? value)
+        where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
     {
 
         if (value == null)
@@ -1170,7 +1189,7 @@ partial class Node : global::SharpPack.ISharpPackable<Node>, global::SharpPack.I
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    static void global::SharpPack.ISharpPackable<Node>.Deserialize(ref global::SharpPack.SharpPackReader reader, scoped ref Node? value)
+    static void __SharpPackCircularDeserialize(ref global::SharpPack.SharpPackReader reader, scoped ref Node? value)
     {
 
         if (!reader.TryReadObjectHeader(out var count))

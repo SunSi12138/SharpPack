@@ -1,5 +1,6 @@
 using SharpPack;
 using SharpPack.Formatters;
+using System.Buffers;
 
 if (!System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)
 {
@@ -12,7 +13,6 @@ if (!System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)
     GC.KeepAlive(new ListFormatter<int>());
     GC.KeepAlive(new ListFormatter<
         AotUnmanagedWrapper<AotUnmanagedFormatted>>());
-
 }
 
 var value = new AotSharpPackModel
@@ -87,32 +87,36 @@ if (exactRoundTrip is not
         "The generated exact-size serializer failed under NativeAOT.");
 }
 
-Console.WriteLine("Checking ordinary circular reference handling under NativeAOT.");
 var mutableCircular = new AotMutableCircularNode { Label = "circular-aot" };
-Console.WriteLine("Ordinary circular model constructed.");
-_ = SharpPackSerializer.Serialize(mutableCircular);
-Console.WriteLine("Ordinary circular leaf serialized.");
+var leaf = SharpPackSerializer.Deserialize<AotMutableCircularNode>(SharpPackSerializer.Serialize(mutableCircular));
+if (leaf is not { Label: "circular-aot", Self: null })
+    throw new InvalidOperationException("An ordinary circular model's leaf did not round trip.");
+
 mutableCircular.Self = mutableCircular;
 var mutablePayload = SharpPackSerializer.Serialize(mutableCircular);
-Console.WriteLine("Ordinary circular serialization passed.");
 var mutableCopy = SharpPackSerializer.Deserialize<AotMutableCircularNode>(mutablePayload);
 if (mutableCopy?.Label != "circular-aot" || !ReferenceEquals(mutableCopy, mutableCopy.Self))
-{
     throw new InvalidOperationException("Ordinary circular reference identity was lost under NativeAOT.");
-}
-Console.WriteLine("Ordinary circular deserialization passed.");
 
-var circular = new AotCircularNode { Label = "circular-aot" };
+var callerBuffer = new ArrayBufferWriter<byte>();
+if (SharpPackSerializer.Serialize(callerBuffer, mutableCircular) != mutablePayload.Length ||
+    !callerBuffer.WrittenSpan.SequenceEqual(mutablePayload))
+    throw new InvalidOperationException("The caller-owned writer changed ordinary circular payload bytes.");
+
+var circular = new AotCircularNode { Label = "circular-aot", Count = 7 };
 circular.Self = circular;
-Console.WriteLine("Checking required init circular serialization under NativeAOT.");
 var circularPayload = SharpPackSerializer.Serialize(circular);
-Console.WriteLine("Checking required init circular deserialization under NativeAOT.");
 var circularRoundTrip = SharpPackSerializer.Deserialize<AotCircularNode>(circularPayload);
-if (circularRoundTrip?.Label != "circular-aot" || !ReferenceEquals(circularRoundTrip, circularRoundTrip.Self))
-{
+if (circularRoundTrip is not { Label: "circular-aot", Count: 7 } || !ReferenceEquals(circularRoundTrip, circularRoundTrip.Self))
     throw new InvalidOperationException("Circular required init members or reference identity were lost under NativeAOT.");
-}
-Console.WriteLine("Required init circular deserialization passed.");
+
+var circularContext = new SharpPackSerializerContextBuilder().Register(new AotPlusOneFormatter()).Build();
+var customizedCircular = SharpPackSerializer.Serialize(circular, circularContext);
+var customizedCopy = SharpPackSerializer.Deserialize<AotCircularNode>(customizedCircular, circularContext);
+if (customizedCircular.AsSpan().SequenceEqual(circularPayload) ||
+    customizedCopy is not { Label: "circular-aot", Count: 7 } || !ReferenceEquals(customizedCopy, customizedCopy.Self))
+    throw new InvalidOperationException("The circular NativeAOT formatter bypassed context overrides or lost reference identity.");
+Console.WriteLine("Circular reference tests passed with default and custom formatters.");
 
 var unmanagedFormatted = new AotUnmanagedFormatted
 {
@@ -463,6 +467,7 @@ public partial class AotExactSizeModel
 public partial class AotCircularNode
 {
     public required string Label { get; init; }
+    public int Count { get; init; }
     public AotCircularNode? Self { get; set; }
 }
 
@@ -471,9 +476,6 @@ public partial class AotMutableCircularNode
 {
     public string? Label { get; set; }
     public AotMutableCircularNode? Self { get; set; }
-
-    [SharpPackOnSerializing]
-    static void TraceGeneratedSerialize() => Console.WriteLine("Entered the generated circular writer.");
 }
 
 [SharpPackable]

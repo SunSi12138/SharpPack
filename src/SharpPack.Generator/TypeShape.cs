@@ -34,6 +34,7 @@ internal sealed record TypeShape(
         var target = model.Symbol;
         var isObject = !isExternalFormatter && !model.IsUnion && model.GenerateType != GenerateType.Collection;
         var circularRead = isObject ? model.DescribeCircularRead() : null;
+        var hasCircularCodec = isObject && !model.IsUnmanagedType && model.GenerateType == GenerateType.CircularReference;
         return new TypeShape(
             declaration.FullyQualifiedToString(),
             target.FullyQualifiedToString(),
@@ -65,7 +66,7 @@ internal sealed record TypeShape(
                 ? CollectionShape.Capture(target, references) : null,
             isObject ? AotDependencyFacts.Capture(model.Members, references) : default,
             circularRead,
-            isExternalFormatter ? default : GeneratedNameFacts.Capture(target, model.Members, circularRead is not null),
+            isExternalFormatter ? default : GeneratedNameFacts.Capture(target, model.Members, hasCircularCodec),
             GeneratedNameFacts.ChooseWriterTypeParameter(declaration));
 
         static IEnumerable<CallbackShape> CallbacksFor(CallbackPhase phase, IEnumerable<MethodMeta> callbacks)

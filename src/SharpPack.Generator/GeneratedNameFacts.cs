@@ -7,11 +7,11 @@ namespace SharpPack.Generator;
 internal readonly record struct GeneratedNameFacts(
     EquatableArray<string> MembersAndParameters,
     EquatableArray<string> SelfRootIdentifiers,
-    EquatableArray<string> CircularReadIdentifiers,
+    EquatableArray<string> CircularIdentifiers,
     bool HasUserStaticInitialization)
 {
     internal const string SelfRootStem = "__SharpPackPreserveSelfFactoryRoots";
-    internal const string CircularReadTagStem = "__SharpPackCircularReadTag";
+    internal const string CircularPrefix = "__SharpPackCircular";
 
     internal static string ChooseWriterTypeParameter(INamedTypeSymbol type)
     {
@@ -34,7 +34,7 @@ internal readonly record struct GeneratedNameFacts(
     internal static GeneratedNameFacts CaptureForNativeUnion(INamedTypeSymbol type)
         => default(GeneratedNameFacts) with { SelfRootIdentifiers = CaptureFactoryIdentifiers(type, SelfRootStem) };
 
-    internal static GeneratedNameFacts Capture(INamedTypeSymbol type, MemberMeta[] members, bool hasCircularRead)
+    internal static GeneratedNameFacts Capture(INamedTypeSymbol type, MemberMeta[] members, bool hasCircularCodec)
     {
         var memberNames = type.GetAllMembers().Select(static member => member.Name)
             .Where(IsReservedHelperName).ToArray();
@@ -44,7 +44,7 @@ internal readonly record struct GeneratedNameFacts(
             OrderedNames(memberNames.Concat(type.TypeParameters.Select(static parameter => parameter.Name)
                 .Where(IsReservedHelperName))),
             hasStaticInitialization ? default : CaptureFactoryIdentifiers(type, SelfRootStem, memberNames),
-            hasCircularRead ? CaptureFactoryIdentifiers(type, CircularReadTagStem, memberNames) : default,
+            hasCircularCodec ? CaptureFactoryIdentifiers(type, CircularPrefix, memberNames) : default,
             hasStaticInitialization);
     }
 

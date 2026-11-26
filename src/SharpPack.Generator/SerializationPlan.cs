@@ -28,7 +28,10 @@ internal sealed record GeneratedNames(
     string ReadWithOverrides,
     string EnsureAotRoots,
     string? SelfFactoryRoot,
-    string CircularReadTag);
+    string CircularReadTag,
+    string CircularFormatter,
+    string WriteCircular,
+    string ReadCircular);
 
 internal sealed record SerializationPlan(
     TypeShape Shape,
@@ -67,7 +70,10 @@ internal static class SerializationPlanner
             facts.HasUserStaticInitialization
                 ? null
                 : AvailableFactoryName(GeneratedNameFacts.SelfRootStem, facts.SelfRootIdentifiers),
-            AvailableMember(GeneratedNameFacts.CircularReadTagStem, facts.CircularReadIdentifiers));
+            AvailableMember(GeneratedNameFacts.CircularPrefix + "ReadTag", facts.CircularIdentifiers),
+            AvailableMember(GeneratedNameFacts.CircularPrefix + "Formatter", facts.CircularIdentifiers),
+            AvailableMember(GeneratedNameFacts.CircularPrefix + "Serialize", facts.CircularIdentifiers),
+            AvailableMember(GeneratedNameFacts.CircularPrefix + "Deserialize", facts.CircularIdentifiers));
 
     static string AvailableMember(string stem, EquatableArray<string> names)
     {

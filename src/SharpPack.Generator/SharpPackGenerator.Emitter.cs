@@ -272,10 +272,12 @@ using SharpPack;
         var contextFactoryInterface =
             $", global::SharpPack.ISharpPackFormatterFactory<{TypeName}>" +
             $", global::SharpPack.ISharpPackContextFormatterFactory<{TypeName}>";
-        // Diagnostic: use the already generated, model-specific formatter to
-        // separate factory dispatch from the generic adapter's static dispatch.
-        var defaultFormatter = plan.TracksReferences && plan.ContextDependencies.HasOverridableWireMembers
-            ? $"new {contextFormatterTypeName}()"
+        var genericWriterConstraint = $"where {writerParameter} : global::System.Buffers.IBufferWriter<byte>";
+        var serializeMethod = plan.TracksReferences ? $"static void {plan.Names.WriteCircular}" : staticSharpPackableMethod + "Serialize";
+        var deserializeMethod = plan.TracksReferences ? $"static void {plan.Names.ReadCircular}" : staticSharpPackableMethod + "Deserialize";
+        var circularFormatter = plan.TracksReferences ? EmitCircularFormatter(TypeName + nullable, writerParameter) : "";
+        var defaultFormatter = plan.TracksReferences
+            ? $"new {plan.Names.CircularFormatter}()"
             : $"new global::SharpPack.Formatters.SharpPackableFormatter<{TypeName}>()";
         var contextDependencyCondition = string.Join(" || ", plan.ContextDependencies.FactoryLookupTypes
             .Select(static type => $"context.HasFormatterOverrideDependency<{type}>()"));
@@ -337,10 +339,10 @@ partial {{classOrStructOrRecord}} {{TypeName}} : global::SharpPack.ISharpPackabl
 {{fixedSizeMethod}}
 {{exactSizeMethod}}
 {{contextFactoryMethod}}
-{{formatterOverrideMethods}}{{circularReadConstructor}}
+{{formatterOverrideMethods}}{{circularReadConstructor}}{{circularFormatter}}
 
     [global::SharpPack.CompilerServices.Preserve]
-    {{staticSharpPackableMethod}}Serialize<{{writerParameter}}>(ref global::SharpPack.SharpPackWriter<{{writerParameter}}> writer, {{scopedRef}} {{TypeName}}{{nullable}} value)
+    {{serializeMethod}}<{{writerParameter}}>(ref global::SharpPack.SharpPackWriter<{{writerParameter}}> writer, {{scopedRef}} {{TypeName}}{{nullable}} value){{(plan.TracksReferences ? "\n        " + genericWriterConstraint : "")}}
     {
 {{EmitCallbacks(shape, CallbackPhase.Serializing)}}
 {{serializeBody}}
@@ -350,7 +352,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : global::SharpPack.ISharpPackabl
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    {{staticSharpPackableMethod}}Deserialize(ref global::SharpPack.SharpPackReader reader, {{scopedRef}} {{TypeName}}{{nullable}} value)
+    {{deserializeMethod}}(ref global::SharpPack.SharpPackReader reader, {{scopedRef}} {{TypeName}}{{nullable}} value)
     {
 {{EmitCallbacks(shape, CallbackPhase.Deserializing)}}
 {{deserializeBody}}
@@ -362,6 +364,30 @@ partial {{classOrStructOrRecord}} {{TypeName}} : global::SharpPack.ISharpPackabl
 }
 """);
     }
+
+    // Bind circular writers to their model at compile time. NativeAOT's generic
+    // formatter adapter can miss the virtual writer instantiation for a cycle.
+    string EmitCircularFormatter(string valueType, string writerParameter) => $$"""
+
+    [global::SharpPack.CompilerServices.Preserve]
+    static void global::SharpPack.ISharpPackable<{{TypeName}}>.Serialize<{{writerParameter}}>(
+        ref global::SharpPack.SharpPackWriter<{{writerParameter}}> writer, scoped ref {{valueType}} value)
+        => {{plan.Names.WriteCircular}}(ref writer, ref value);
+
+    [global::SharpPack.CompilerServices.Preserve]
+    static void global::SharpPack.ISharpPackable<{{TypeName}}>.Deserialize(ref global::SharpPack.SharpPackReader reader, scoped ref {{valueType}} value)
+        => {{plan.Names.ReadCircular}}(ref reader, ref value);
+
+    [global::SharpPack.CompilerServices.Preserve]
+    sealed class {{plan.Names.CircularFormatter}} : global::SharpPack.SharpPackFormatter<{{TypeName}}>
+    {
+        public override void Serialize<{{writerParameter}}>(ref global::SharpPack.SharpPackWriter<{{writerParameter}}> writer, scoped ref {{valueType}} value)
+            => {{plan.Names.WriteCircular}}(ref writer, ref value);
+
+        public override void Deserialize(ref global::SharpPack.SharpPackReader reader, scoped ref {{valueType}} value)
+            => {{plan.Names.ReadCircular}}(ref reader, ref value);
+    }
+""";
 
     string EmitDeserializeBody(MemberShape[] members, bool honorFormatterOverrides)
     {

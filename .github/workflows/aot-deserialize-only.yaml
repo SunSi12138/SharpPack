@@ -38,30 +38,16 @@ jobs:
           dotnet publish sandbox/DeserializeOnlyAot -c Release -o "$RUNNER_TEMP/deserialize-only"
           "$RUNNER_TEMP/deserialize-only/DeserializeOnlyAot"
           stat -c '%n %s bytes' "$RUNNER_TEMP/deserialize-only/DeserializeOnlyAot"
-      - name: Compare the same graph on the .NET 11 NativeAOT toolchain
-        continue-on-error: true
-        run: |
-          dotnet publish sandbox/NativeAot -c Release -p:SharpPackCompareNet11Aot=true -o "$RUNNER_TEMP/original-aot-net11"
-          jq -r '.libraries | keys[] | select(contains("ILCompiler"))' sandbox/NativeAot/obj/project.assets.json
-          "$RUNNER_TEMP/original-aot-net11/NativeAot"
-      - name: Check the original direct Type deserialization sample
+      - name: Verify object, Type and circular-reference samples on .NET 10 and .NET 11 NativeAOT
         run: |
           set -o pipefail
-          dotnet publish sandbox/NativeAot -c Release -p:StripSymbols=false -o "$RUNNER_TEMP/original-aot" 2>&1 | tee "$RUNNER_TEMP/original-aot-publish.txt"
-          jq -r '.libraries | keys[] | select(contains("ILCompiler"))' sandbox/NativeAot/obj/project.assets.json
-          if grep -q 'IL2111' "$RUNNER_TEMP/original-aot-publish.txt"; then exit 1; fi
-          ulimit -c 0
-          exe="$RUNNER_TEMP/original-aot/NativeAot"
-          if ! "$exe"; then
-            if [[ "$(uname -m)" == 'x86_64' ]] && ! command -v gdb >/dev/null; then
-              sudo apt-get update -qq
-              sudo apt-get install -y -qq --no-install-recommends gdb
-            fi
-            if command -v gdb >/dev/null; then
-              gdb -q -batch -ex 'set debuginfod enabled off' -ex run -ex 'bt 16' -ex 'frame 1' -ex 'x/24i $pc-76' -ex 'info symbol *(void **)$r15' --args "$exe"
-            fi
-            exit 1
-          fi
+          for framework in net10.0 net11.0; do
+            echo "Verifying $framework"
+            output="$RUNNER_TEMP/original-aot-$framework"
+            dotnet publish sandbox/NativeAot -c Release -p:SharpPackSmokeTarget="$framework" -o "$output" 2>&1 | tee "$output.log"
+            if grep -q 'IL2111' "$output.log"; then exit 1; fi
+            "$output/NativeAot"
+          done
       - name: Check application-owned roots in NativeAOT
         run: |
           dotnet publish sandbox/HandwrittenFactoryAot -c Release -o "$RUNNER_TEMP/handwritten-aot"
