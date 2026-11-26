@@ -325,6 +325,13 @@ A property explicitly marked `[SharpPackInclude]` needs an accessible setter or
 a matching constructor parameter. An ordinary computed property can still be
 serialized without being populated on a read.
 
+Classes using `GenerateType.CircularReference` require a parameterless
+constructor. They can restore accessible `init` and `required` members while
+preserving shared references. Serialized `init` members require a fresh
+instance on a `ref` read; writable `required` members without `init` members
+can reuse the destination. For these class layouts, missing wire slots keep
+the values from the constructor or the reused instance.
+
 ```csharp
 [SharpPackable]
 public partial class Person

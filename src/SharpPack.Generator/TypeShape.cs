@@ -24,6 +24,7 @@ internal sealed record TypeShape(
     UnionShape? Union,
     CollectionShape? Collection,
     AotDependencyFacts AotDependencies,
+    CircularReadShape? CircularRead,
     GeneratedNameFacts NameFacts,
     string WriterTypeParameter)
 {
@@ -32,6 +33,8 @@ internal sealed record TypeShape(
     {
         var target = model.Symbol;
         var isObject = !isExternalFormatter && !model.IsUnion && model.GenerateType != GenerateType.Collection;
+        var circularRead = isObject ? model.DescribeCircularRead() : null;
+        var hasCircularCodec = isObject && !model.IsUnmanagedType && model.GenerateType == GenerateType.CircularReference;
         return new TypeShape(
             declaration.FullyQualifiedToString(),
             target.FullyQualifiedToString(),
@@ -62,7 +65,8 @@ internal sealed record TypeShape(
             !isExternalFormatter && !model.IsUnion && model.GenerateType == GenerateType.Collection
                 ? CollectionShape.Capture(target, references) : null,
             isObject ? AotDependencyFacts.Capture(model.Members, references) : default,
-            isExternalFormatter ? default : GeneratedNameFacts.Capture(target, model.Members),
+            circularRead,
+            isExternalFormatter ? default : GeneratedNameFacts.Capture(target, model.Members, hasCircularCodec),
             GeneratedNameFacts.ChooseWriterTypeParameter(declaration));
 
         static IEnumerable<CallbackShape> CallbacksFor(CallbackPhase phase, IEnumerable<MethodMeta> callbacks)
@@ -70,6 +74,11 @@ internal sealed record TypeShape(
                 callback.UseReaderArgument || callback.UseWriterArgument));
     }
 }
+
+internal readonly record struct CircularReadShape(
+    bool NeedsImplicitConstructor,
+    bool SetsRequiredMembers,
+    bool ReplacesExistingValue);
 
 internal sealed record MemberShape(
     string Name,
@@ -80,6 +89,7 @@ internal sealed record MemberShape(
     bool HasExplicitOrder,
     bool IsAssignable,
     bool IsSettable,
+    bool IsInitOnly,
     bool HasExactSizeSafeAccessor,
     bool SuppressDefaultInitialization,
     string? ConstructorParameter,
@@ -87,12 +97,12 @@ internal sealed record MemberShape(
     EquatableArray<string> ContextDependencyTypes)
 {
     internal static MemberShape Blank(int order)
-        => new("", "", null, MemberKind.Blank, order, false, false, false, false, false, null, null, default);
+        => new("", "", null, MemberKind.Blank, order, false, false, false, false, false, false, null, null, default);
 
     internal static MemberShape Create(MemberMeta member, ReferenceSymbols? contextReferences = null)
         => member.Kind == MemberKind.Blank ? Blank(member.Order) :
         new(member.Name, member.MemberType.FullyQualifiedToString(), ElementType(member), member.Kind, member.Order,
-            member.HasExplicitOrder, member.IsAssignable, member.IsSettable, member.HasExactSizeSafeAccessor,
+            member.HasExplicitOrder, member.IsAssignable, member.IsSettable, member.IsInitOnly, member.HasExactSizeSafeAccessor,
             member.SuppressDefaultInitialization, member.ConstructorParameterName,
             member.CustomFormatterAttribute is { } attribute
                 ? new CustomFormatterShape(

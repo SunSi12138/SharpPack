@@ -207,6 +207,7 @@ using SharpPack;
         var serializeBody = "";
         var deserializeBody = "";
         var formatterOverrideMethods = "";
+        var circularReadConstructor = "";
         var contextFormatterTypeName = plan.Names.ContextFormatterType;
         if (shape.IsUnmanaged)
         {
@@ -223,6 +224,8 @@ using SharpPack;
             serializeBody = EmitSerializeBody(wireMembers);
             deserializeBody = EmitDeserializeBody(wireMembers, honorFormatterOverrides: false);
             formatterOverrideMethods = EmitFormatterOverrideMethods(wireMembers);
+            if (shape.CircularRead is { } circularRead)
+                circularReadConstructor = EmitCircularReadConstructor(wireMembers, circularRead);
         }
 
         var classOrStructOrRecord = (shape.IsRecord, IsValueType) switch
@@ -269,17 +272,24 @@ using SharpPack;
         var contextFactoryInterface =
             $", global::SharpPack.ISharpPackFormatterFactory<{TypeName}>" +
             $", global::SharpPack.ISharpPackContextFormatterFactory<{TypeName}>";
+        var genericWriterConstraint = $"where {writerParameter} : global::System.Buffers.IBufferWriter<byte>";
+        var serializeMethod = plan.TracksReferences ? $"static void {plan.Names.WriteCircular}" : staticSharpPackableMethod + "Serialize";
+        var deserializeMethod = plan.TracksReferences ? $"static void {plan.Names.ReadCircular}" : staticSharpPackableMethod + "Deserialize";
+        var circularFormatter = plan.TracksReferences ? EmitCircularFormatter(TypeName + nullable, writerParameter) : "";
+        var defaultFormatter = plan.TracksReferences
+            ? $"new {plan.Names.CircularFormatter}()"
+            : $"new global::SharpPack.Formatters.SharpPackableFormatter<{TypeName}>()";
         var contextDependencyCondition = string.Join(" || ", plan.ContextDependencies.FactoryLookupTypes
             .Select(static type => $"context.HasFormatterOverrideDependency<{type}>()"));
         var contextFormatterSelection =
             contextDependencyCondition.Length == 0
-                ? $"return new global::SharpPack.Formatters.SharpPackableFormatter<{TypeName}>();"
+                ? $"return {defaultFormatter};"
                 : $$"""
         if ({{contextDependencyCondition}})
         {
             return new {{contextFormatterTypeName}}();
         }
-        return new global::SharpPack.Formatters.SharpPackableFormatter<{{TypeName}}>();
+        return {{defaultFormatter}};
 """;
         var selfFactoryRoot = plan.Names.SelfFactoryRoot;
         var selfFactoryRootRead = EmitFactoryRootRead(selfFactoryRoot);
@@ -305,7 +315,7 @@ using SharpPack;
     {
 {{selfFactoryRootRead}}
 {{aotRootCall}}
-        return new global::SharpPack.Formatters.SharpPackableFormatter<{{TypeName}}>();
+        return {{defaultFormatter}};
     }
 
     [global::SharpPack.CompilerServices.Preserve]
@@ -329,10 +339,10 @@ partial {{classOrStructOrRecord}} {{TypeName}} : global::SharpPack.ISharpPackabl
 {{fixedSizeMethod}}
 {{exactSizeMethod}}
 {{contextFactoryMethod}}
-{{formatterOverrideMethods}}
+{{formatterOverrideMethods}}{{circularReadConstructor}}{{circularFormatter}}
 
     [global::SharpPack.CompilerServices.Preserve]
-    {{staticSharpPackableMethod}}Serialize<{{writerParameter}}>(ref global::SharpPack.SharpPackWriter<{{writerParameter}}> writer, {{scopedRef}} {{TypeName}}{{nullable}} value)
+    {{serializeMethod}}<{{writerParameter}}>(ref global::SharpPack.SharpPackWriter<{{writerParameter}}> writer, {{scopedRef}} {{TypeName}}{{nullable}} value){{(plan.TracksReferences ? "\n        " + genericWriterConstraint : "")}}
     {
 {{EmitCallbacks(shape, CallbackPhase.Serializing)}}
 {{serializeBody}}
@@ -342,7 +352,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : global::SharpPack.ISharpPackabl
     }
 
     [global::SharpPack.CompilerServices.Preserve]
-    {{staticSharpPackableMethod}}Deserialize(ref global::SharpPack.SharpPackReader reader, {{scopedRef}} {{TypeName}}{{nullable}} value)
+    {{deserializeMethod}}(ref global::SharpPack.SharpPackReader reader, {{scopedRef}} {{TypeName}}{{nullable}} value)
     {
 {{EmitCallbacks(shape, CallbackPhase.Deserializing)}}
 {{deserializeBody}}
@@ -354,6 +364,30 @@ partial {{classOrStructOrRecord}} {{TypeName}} : global::SharpPack.ISharpPackabl
 }
 """);
     }
+
+    // Bind circular writers to their model at compile time. NativeAOT's generic
+    // formatter adapter can miss the virtual writer instantiation for a cycle.
+    string EmitCircularFormatter(string valueType, string writerParameter) => $$"""
+
+    [global::SharpPack.CompilerServices.Preserve]
+    static void global::SharpPack.ISharpPackable<{{TypeName}}>.Serialize<{{writerParameter}}>(
+        ref global::SharpPack.SharpPackWriter<{{writerParameter}}> writer, scoped ref {{valueType}} value)
+        => {{plan.Names.WriteCircular}}(ref writer, ref value);
+
+    [global::SharpPack.CompilerServices.Preserve]
+    static void global::SharpPack.ISharpPackable<{{TypeName}}>.Deserialize(ref global::SharpPack.SharpPackReader reader, scoped ref {{valueType}} value)
+        => {{plan.Names.ReadCircular}}(ref reader, ref value);
+
+    [global::SharpPack.CompilerServices.Preserve]
+    sealed class {{plan.Names.CircularFormatter}} : global::SharpPack.SharpPackFormatter<{{TypeName}}>
+    {
+        public override void Serialize<{{writerParameter}}>(ref global::SharpPack.SharpPackWriter<{{writerParameter}}> writer, scoped ref {{valueType}} value)
+            => {{plan.Names.WriteCircular}}(ref writer, ref value);
+
+        public override void Deserialize(ref global::SharpPack.SharpPackReader reader, scoped ref {{valueType}} value)
+            => {{plan.Names.ReadCircular}}(ref reader, ref value);
+    }
+""";
 
     string EmitDeserializeBody(MemberShape[] members, bool honorFormatterOverrides)
     {
@@ -419,7 +453,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : global::SharpPack.ISharpPackabl
 """;
         }
 
-        return $$"""
+        var readHeader = $$"""
         if (!reader.TryReadObjectHeader(out var count))
         {
             value = default!;
@@ -427,6 +461,12 @@ partial {{classOrStructOrRecord}} {{TypeName}} : global::SharpPack.ISharpPackabl
         }
 {{circularReferenceBody}}
 {{readBeginBody}}
+""";
+        if (Shape.CircularRead is { } circularRead)
+            return readHeader + Environment.NewLine + EmitCircularReadBody(members, circularRead, honorFormatterOverrides);
+
+        return $$"""
+{{readHeader}}
 {{circularReferenceBody2}}
 {{members.Where(x => x.Kind != MemberKind.Blank).Select(x => $"        {x.TypeName} __{x.Name};").NewLine()}}
 

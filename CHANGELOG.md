@@ -49,6 +49,11 @@
   closed, nameable model arrays when the call directly names `Item[]`. Core
   and Generator check the generated-code contract before emitting
   incompatible code.
+- **Circular-reference initialization and NativeAOT.** Circular classes restore
+  `init` and `required` members without losing shared references. A serialized
+  `init` member requires a fresh instance when reading into an existing value.
+  Ordinary circular graphs and context overrides work on both supported
+  NativeAOT targets without changing their wire format.
 - **Compatibility and lifecycle fixes.** Collection writes validate counts,
   transport reports failures at the appropriate boundary, and context
   builders release startup registrations after building. `BitArray` reads

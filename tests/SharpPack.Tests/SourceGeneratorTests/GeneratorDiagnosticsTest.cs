@@ -707,6 +707,37 @@ public partial struct Tester
     }
 
     [Fact]
+    public void SHARPPACK047_CircularMemberNeedsAnAccessibleInitializationPath()
+    {
+        Compile(47, """
+            [SharpPackable(GenerateType.CircularReference, SerializeLayout.Sequential)]
+            public partial class Model
+            {
+                [SharpPackIgnore] public required string Name { get; set; }
+            }
+            """);
+
+        Compile(47, """
+            public class BaseModel
+            {
+                public string? Name { get; private init; }
+            }
+
+            [SharpPackable(GenerateType.CircularReference, SerializeLayout.Sequential)]
+            public partial class Model : BaseModel { }
+            """);
+
+        Compile(47, """
+            [SharpPackable(GenerateType.CircularReference, SerializeLayout.Sequential)]
+            public partial class Model
+            {
+                [SharpPackOrder(0)] public int First { get; set; }
+                [SharpPackOrder(0)] public required int Skipped { get; set; }
+            }
+            """);
+    }
+
+    [Fact]
     public void SHARPPACK049_ConstructorParameterCannotBindMultipleMembers()
     {
         Compile(49, """
@@ -742,10 +773,10 @@ public partial struct Tester
             """);
 
         Compile(50, """
-            [SharpPackable(GenerateType.CircularReference)]
-            public partial class Circular
+            [SharpPackable(GenerateType.CircularReference, SerializeLayout.Sequential)]
+            public partial record struct CircularValue
             {
-                [SharpPackInclude, SharpPackOrder(0)] public string? Value { get; init; }
+                [SharpPackInclude] public required string Label { get; set; }
             }
             """);
     }
